@@ -1,18 +1,16 @@
 #pragma once
 
+#include "Logger.h"
+
 #include <volk.h>
 
-namespace Light {
-
-	class vkGraphicsContext
-	{
-	private:
+class vkGraphicsContext
+{
+private:
 
 
-	public:
-		vkGraphicsContext() = default
-		~vkGraphicsContext() = default
+public:
+	vkGraphicsContext();
+	~vkGraphicsContext();
 
-	};
-
-}
+};
