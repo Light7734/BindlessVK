@@ -7,3 +7,6 @@
 [submodule "Dependencies/glfw"]
 	path = Dependencies/glfw
 	url = https://github.com/glfw/glfw
+[submodule "Dependencies/shaderc"]
+	path = Dependencies/shaderc
+	url = https://github.com/google/shaderc
