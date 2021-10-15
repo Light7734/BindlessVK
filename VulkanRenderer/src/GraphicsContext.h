@@ -2,6 +2,8 @@
 
 #include "Base.h"
 
+#include "SharedContext.h"
+
 #include <volk.h>
 #include <glfw/glfw3.h>
 
@@ -32,7 +34,7 @@ struct SwapchainSupportDetails
 	operator bool() const { return IsSuitableForRendering(); }
 };
 
-class vkGraphicsContext
+class GraphicsContext
 {
 private:
 	VkInstance m_VkInstance;
@@ -63,11 +65,15 @@ private:
 
 	GLFWwindow* m_WindowHandle;
 
+	SharedContext m_SharedContext;
+
 public:
-	vkGraphicsContext(GLFWwindow* windowHandle);
-	~vkGraphicsContext();
+	GraphicsContext(GLFWwindow* windowHandle);
+	~GraphicsContext();
 
 	void LogDebugData();
+
+	inline SharedContext GetSharedContext() { return m_SharedContext; }
 
 private:
 	void PickPhysicalDevice();

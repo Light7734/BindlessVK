@@ -1,6 +1,7 @@
 #include "Base.h"
 
-#include "vkGraphicsContext.h"
+#include "GraphicsContext.h"
+#include "Shader.h"
 #include "Window.h"
 
 int main()
@@ -8,7 +9,9 @@ int main()
 	Logger::Init();
 
 	Window window = Window();
-	vkGraphicsContext gfxContext = vkGraphicsContext(window.GetHandle());
+	GraphicsContext graphicsContext = GraphicsContext(window.GetHandle());
+
+	Shader shader("res/VertexShader.glsl", "res/PixelShader.glsl", graphicsContext.GetSharedContext());
 
 	while (!window.IsClosed())
 	{

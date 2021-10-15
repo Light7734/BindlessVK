@@ -1,5 +1,12 @@
 #pragma once
 
+/* dependencies */
+#include <volk.h>
+
+#define VK_NO_PROTOTYPES
+#include <vulkan/vulkan.h>
+
+/* vulkan-renderer */
 #include "Base.h"
 
 /* windows */

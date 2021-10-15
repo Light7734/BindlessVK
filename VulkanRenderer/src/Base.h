@@ -1,5 +1,6 @@
 #include "Logger.h"
 #include "Exceptions.h"
+#include "SharedContext.h"
 
 #define BIT(x) 1 << x
 

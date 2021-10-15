@@ -13,9 +13,11 @@ include_directories(
     ${CMAKE_BINARY_DIR}/../Dependencies/glfw/include
     ${CMAKE_BINARY_DIR}/../Dependencies/spdlog/include
     ${CMAKE_BINARY_DIR}/../Dependencies/volk/
+
+    ${CMAKE_BINARY_DIR}/../Dependencies/shaderc/libshaderc/include
     
     $ENV{VULKAN_SDK}/Include/
-
+    
 )
 
 source_group(TREE ${CMAKE_BINARY_DIR}/../VulkanRenderer/ FILES ${RENDERER_FILES})

@@ -1,7 +1,11 @@
-#include "vkGraphicsContext.h"
+#include "GraphicsContext.h"
 
-vkGraphicsContext::vkGraphicsContext(GLFWwindow* windowHandle)
-	: m_VkInstance(VK_NULL_HANDLE),
+#include <vector>
+#include <set>
+#include <string>
+
+GraphicsContext::GraphicsContext(GLFWwindow* windowHandle) :
+	m_VkInstance(VK_NULL_HANDLE),
 	m_PhysicalDevice(VK_NULL_HANDLE),
 	m_LogicalDevice(VK_NULL_HANDLE),
 	m_Swapchain(VK_NULL_HANDLE),
@@ -24,7 +28,7 @@ vkGraphicsContext::vkGraphicsContext(GLFWwindow* windowHandle)
 	{
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 
-		.pApplicationName = "Vulkan Test Implementation",
+		.pApplicationName = "Vulkan Renderer",
 		.applicationVersion = VK_MAKE_VERSION(1u, 0u, 0u),
 
 		.pEngineName = "No Engine",
@@ -59,9 +63,11 @@ vkGraphicsContext::vkGraphicsContext(GLFWwindow* windowHandle)
 	FetchDeviceExtensions();
 	FetchSwapchainSupportDetails();
 	CreateSwapchain();
+
+	m_SharedContext.device = m_LogicalDevice;
 }
 
-vkGraphicsContext::~vkGraphicsContext()
+GraphicsContext::~GraphicsContext()
 {
 	for (auto swapchainImageView : m_SwapchainImageViews)
 		vkDestroyImageView(m_LogicalDevice, swapchainImageView, nullptr);
@@ -73,7 +79,7 @@ vkGraphicsContext::~vkGraphicsContext()
 	vkDestroyInstance(m_VkInstance, nullptr);
 }
 
-void vkGraphicsContext::FetchGlobalExtensions()
+void GraphicsContext::FetchGlobalExtensions()
 {
 	// fetch required global extensions
 	uint32_t glfwExtensionsCount = 0u;
@@ -84,7 +90,7 @@ void vkGraphicsContext::FetchGlobalExtensions()
 	m_GlobalExtensions.insert(m_GlobalExtensions.end(), glfwExtensions, glfwExtensions + glfwExtensionsCount);
 }
 
-void vkGraphicsContext::FetchDeviceExtensions()
+void GraphicsContext::FetchDeviceExtensions()
 {
 	// fetch device extensions
 	uint32_t deviceExtensionsCount = 0u;
@@ -101,21 +107,21 @@ void vkGraphicsContext::FetchDeviceExtensions()
 
 	if (!requiredExtensions.empty())
 	{
-		LOG(critical, "vkGraphicsContext::FetchDeviceExtensions: device does not supprot required extensions: ");
+		LOG(critical, "GraphicsContext::FetchDeviceExtensions: device does not supprot required extensions: ");
 
 		for (auto requiredExtension : requiredExtensions)
 			LOG(critical, "        {}", requiredExtension);
 
-		ASSERT(false, "vkGraphicsContext::FetchDeviceExtensions: aforementioned device extensinos are not supported");
+		ASSERT(false, "GraphicsContext::FetchDeviceExtensions: aforementioned device extensinos are not supported");
 	}
 }
 
-void vkGraphicsContext::PickPhysicalDevice()
+void GraphicsContext::PickPhysicalDevice()
 {
 	// fetch physical devices
 	uint32_t deviceCount = 0u;
 	vkEnumeratePhysicalDevices(m_VkInstance, &deviceCount, nullptr);
-	ASSERT(deviceCount, "vkGraphicsContext::PickPhysicalDevice: failed to find a GPU with vulkan support");
+	ASSERT(deviceCount, "GraphicsContext::PickPhysicalDevice: failed to find a GPU with vulkan support");
 
 	std::vector<VkPhysicalDevice> devices(deviceCount);
 	vkEnumeratePhysicalDevices(m_VkInstance, &deviceCount, devices.data());
@@ -157,10 +163,10 @@ void vkGraphicsContext::PickPhysicalDevice()
 		}
 	}
 
-	ASSERT(m_PhysicalDevice, "vkGraphicsContext::PickPhysicalDevice: failed to find suitable GPU for vulkan");
+	ASSERT(m_PhysicalDevice, "GraphicsContext::PickPhysicalDevice: failed to find suitable GPU for vulkan");
 }
 
-void vkGraphicsContext::CreateLogicalDevice()
+void GraphicsContext::CreateLogicalDevice()
 {
 	// fetch properties & features
 	VkPhysicalDeviceProperties deviceProperties;
@@ -208,12 +214,12 @@ void vkGraphicsContext::CreateLogicalDevice()
 	vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.graphics.value(), 0u, &m_GraphicsQueue);
 }
 
-void vkGraphicsContext::CreateWindowSurface(GLFWwindow* windowHandle)
+void GraphicsContext::CreateWindowSurface(GLFWwindow* windowHandle)
 {
 	glfwCreateWindowSurface(m_VkInstance, windowHandle, nullptr, &m_Surface);
 }
 
-void vkGraphicsContext::FilterValidationLayers()
+void GraphicsContext::FilterValidationLayers()
 {
 	// fetch available layers
 	uint32_t layerCount;
@@ -239,12 +245,12 @@ void vkGraphicsContext::FilterValidationLayers()
 		if (!layerFound)
 		{
 			m_ValidationLayers.erase(std::find(m_ValidationLayers.begin(), m_ValidationLayers.end(), layerName));
-			ASSERT("vkGraphicsContext::FilterValidationLayers: failed to find validation layer: {}", layerName);
+			ASSERT("GraphicsContext::FilterValidationLayers: failed to find validation layer: {}", layerName);
 		}
 	}
 }
 
-void vkGraphicsContext::FetchSupportedQueueFamilies()
+void GraphicsContext::FetchSupportedQueueFamilies()
 {
 	m_QueueFamilyIndices = {};
 
@@ -274,7 +280,7 @@ void vkGraphicsContext::FetchSupportedQueueFamilies()
 	m_QueueFamilyIndices.indices = { m_QueueFamilyIndices.graphics.value(), m_QueueFamilyIndices.present.value() };
 }
 
-void vkGraphicsContext::FetchSwapchainSupportDetails()
+void GraphicsContext::FetchSwapchainSupportDetails()
 {
 	// fetch device surface capabilities
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &m_SwapChainDetails.capabilities);
@@ -282,7 +288,7 @@ void vkGraphicsContext::FetchSwapchainSupportDetails()
 	// fetch device surface formats
 	uint32_t formatCount = 0u;
 	vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, nullptr);
-	ASSERT(formatCount, "vkGraphicsContext::FetchSwapchainSupportDetails: no physical device surface format");
+	ASSERT(formatCount, "GraphicsContext::FetchSwapchainSupportDetails: no physical device surface format");
 
 	m_SwapChainDetails.formats.resize(formatCount);
 	vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, m_SwapChainDetails.formats.data());
@@ -290,13 +296,13 @@ void vkGraphicsContext::FetchSwapchainSupportDetails()
 	// fetch device surface format modes
 	uint32_t presentModeCount = 0u;
 	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, nullptr);
-	ASSERT(presentModeCount, "vkGraphicsContext::FetchSwapchainSupportDetails: no phyiscal device surface present mode");
+	ASSERT(presentModeCount, "GraphicsContext::FetchSwapchainSupportDetails: no phyiscal device surface present mode");
 
 	m_SwapChainDetails.presentModes.resize(presentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, m_SwapChainDetails.presentModes.data());
 }
 
-void vkGraphicsContext::CreateSwapchain()
+void GraphicsContext::CreateSwapchain()
 {
 	// pick a decent swap chain surface format
 	VkSurfaceFormatKHR swapChainSurfaceFormat{};
@@ -364,7 +370,7 @@ void vkGraphicsContext::CreateSwapchain()
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, m_SwapchainImages.data());
 }
 
-void vkGraphicsContext::CreateImageViews()
+void GraphicsContext::CreateImageViews()
 {
 	m_SwapchainImageViews.resize(m_SwapchainImages.size());
 
@@ -398,7 +404,7 @@ void vkGraphicsContext::CreateImageViews()
 	}
 }
 
-VkDebugUtilsMessengerCreateInfoEXT vkGraphicsContext::SetupDebugMessageCallback()
+VkDebugUtilsMessengerCreateInfoEXT GraphicsContext::SetupDebugMessageCallback()
 {
 	// debug messenger create-info
 	VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo
@@ -421,7 +427,7 @@ VkDebugUtilsMessengerCreateInfoEXT vkGraphicsContext::SetupDebugMessageCallback(
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData)
 	{
-		LOGVk(trace, "vkGraphicsContext::LogDebugData: NO_IMPLEMENT");
+		LOGVk(trace, "GraphicsContext::LogDebugData: NO_IMPLEMENT");
 		return VK_FALSE;
 	};
 
@@ -429,7 +435,7 @@ VkDebugUtilsMessengerCreateInfoEXT vkGraphicsContext::SetupDebugMessageCallback(
 }
 
 // #todo: implement
-void vkGraphicsContext::LogDebugData()
+void GraphicsContext::LogDebugData()
 {
-	LOG(err, "vkGraphicsContext::LogDebugData: NO_IMPLEMENT");
+	LOG(err, "GraphicsContext::LogDebugData: NO_IMPLEMENT");
 }
