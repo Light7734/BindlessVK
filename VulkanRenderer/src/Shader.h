@@ -2,6 +2,10 @@
 
 #include "Base.h"
 
+#include "SharedContext.h"
+
+#include <volk.h>
+
 #include <shaderc/shaderc.hpp>
 
 class Shader

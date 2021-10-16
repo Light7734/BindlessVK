@@ -1,20 +1,20 @@
-#include "GraphicsContext.h"
+#include "DeviceContext.h"
 
 #include <vector>
 #include <set>
 #include <string>
 
-GraphicsContext::GraphicsContext(GLFWwindow* windowHandle) :
+DeviceContext::DeviceContext(GLFWwindow* windowHandle) :
+	m_WindowHandle(windowHandle),
+	m_Surface(VK_NULL_HANDLE),
 	m_VkInstance(VK_NULL_HANDLE),
 	m_PhysicalDevice(VK_NULL_HANDLE),
 	m_LogicalDevice(VK_NULL_HANDLE),
-	m_Swapchain(VK_NULL_HANDLE),
-	m_Surface(VK_NULL_HANDLE),
 	m_GraphicsQueue(VK_NULL_HANDLE),
+	m_PresentQueue(VK_NULL_HANDLE),
 	m_ValidationLayers{ "VK_LAYER_KHRONOS_validation" },
 	m_GlobalExtensions{ VK_EXT_DEBUG_UTILS_EXTENSION_NAME },
-	m_DeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME },
-	m_WindowHandle(windowHandle)
+	m_DeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME }
 {
 	// load and setup vulkan
 	VKC(volkInitialize());
@@ -28,10 +28,10 @@ GraphicsContext::GraphicsContext(GLFWwindow* windowHandle) :
 	{
 		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 
-		.pApplicationName = "Vulkan Renderer",
+		.pApplicationName = "VulkanRenderer",
 		.applicationVersion = VK_MAKE_VERSION(1u, 0u, 0u),
 
-		.pEngineName = "No Engine",
+		.pEngineName = "",
 		.engineVersion = VK_MAKE_VERSION(1u, 0u, 0u),
 
 		.apiVersion = VK_API_VERSION_1_2
@@ -61,25 +61,22 @@ GraphicsContext::GraphicsContext(GLFWwindow* windowHandle) :
 	PickPhysicalDevice();
 	CreateLogicalDevice();
 	FetchDeviceExtensions();
-	FetchSwapchainSupportDetails();
-	CreateSwapchain();
 
-	m_SharedContext.device = m_LogicalDevice;
+	m_SharedContext.windowHandle = windowHandle;
+	m_SharedContext.physicalDevice = m_PhysicalDevice;
+	m_SharedContext.logicalDevice = m_LogicalDevice;
+	m_SharedContext.surface = m_Surface;
+	m_SharedContext.queueFamilies = m_QueueFamilyIndices;
 }
 
-GraphicsContext::~GraphicsContext()
+DeviceContext::~DeviceContext()
 {
-	for (auto swapchainImageView : m_SwapchainImageViews)
-		vkDestroyImageView(m_LogicalDevice, swapchainImageView, nullptr);
-
-	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
-
 	vkDestroySurfaceKHR(m_VkInstance, m_Surface, nullptr);
 	vkDestroyDevice(m_LogicalDevice, nullptr);
 	vkDestroyInstance(m_VkInstance, nullptr);
 }
 
-void GraphicsContext::FetchGlobalExtensions()
+void DeviceContext::FetchGlobalExtensions()
 {
 	// fetch required global extensions
 	uint32_t glfwExtensionsCount = 0u;
@@ -90,7 +87,7 @@ void GraphicsContext::FetchGlobalExtensions()
 	m_GlobalExtensions.insert(m_GlobalExtensions.end(), glfwExtensions, glfwExtensions + glfwExtensionsCount);
 }
 
-void GraphicsContext::FetchDeviceExtensions()
+void DeviceContext::FetchDeviceExtensions()
 {
 	// fetch device extensions
 	uint32_t deviceExtensionsCount = 0u;
@@ -116,7 +113,12 @@ void GraphicsContext::FetchDeviceExtensions()
 	}
 }
 
-void GraphicsContext::PickPhysicalDevice()
+void DeviceContext::FetchSupportedQueueFamilies()
+{
+
+}
+
+void DeviceContext::PickPhysicalDevice()
 {
 	// fetch physical devices
 	uint32_t deviceCount = 0u;
@@ -166,7 +168,7 @@ void GraphicsContext::PickPhysicalDevice()
 	ASSERT(m_PhysicalDevice, "GraphicsContext::PickPhysicalDevice: failed to find suitable GPU for vulkan");
 }
 
-void GraphicsContext::CreateLogicalDevice()
+void DeviceContext::CreateLogicalDevice()
 {
 	// fetch properties & features
 	VkPhysicalDeviceProperties deviceProperties;
@@ -214,12 +216,12 @@ void GraphicsContext::CreateLogicalDevice()
 	vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.graphics.value(), 0u, &m_GraphicsQueue);
 }
 
-void GraphicsContext::CreateWindowSurface(GLFWwindow* windowHandle)
+void DeviceContext::CreateWindowSurface(GLFWwindow* windowHandle)
 {
 	glfwCreateWindowSurface(m_VkInstance, windowHandle, nullptr, &m_Surface);
 }
 
-void GraphicsContext::FilterValidationLayers()
+void DeviceContext::FilterValidationLayers()
 {
 	// fetch available layers
 	uint32_t layerCount;
@@ -250,161 +252,7 @@ void GraphicsContext::FilterValidationLayers()
 	}
 }
 
-void GraphicsContext::FetchSupportedQueueFamilies()
-{
-	m_QueueFamilyIndices = {};
-
-	// fetch queue families
-	uint32_t queueFamilyCount = 0u;
-	vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
-
-	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, queueFamilies.data());
-
-	// find queue family indices
-	uint32_t index = 0u;
-	for (const auto& queueFamily : queueFamilies)
-	{
-		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-			m_QueueFamilyIndices.graphics = index;
-
-		VkBool32 hasPresentSupport;
-		vkGetPhysicalDeviceSurfaceSupportKHR(m_PhysicalDevice, index, m_Surface, &hasPresentSupport);
-
-		if (hasPresentSupport)
-			m_QueueFamilyIndices.present = index;
-
-		index++;
-	}
-
-	m_QueueFamilyIndices.indices = { m_QueueFamilyIndices.graphics.value(), m_QueueFamilyIndices.present.value() };
-}
-
-void GraphicsContext::FetchSwapchainSupportDetails()
-{
-	// fetch device surface capabilities
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &m_SwapChainDetails.capabilities);
-
-	// fetch device surface formats
-	uint32_t formatCount = 0u;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, nullptr);
-	ASSERT(formatCount, "GraphicsContext::FetchSwapchainSupportDetails: no physical device surface format");
-
-	m_SwapChainDetails.formats.resize(formatCount);
-	vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, m_SwapChainDetails.formats.data());
-
-	// fetch device surface format modes
-	uint32_t presentModeCount = 0u;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, nullptr);
-	ASSERT(presentModeCount, "GraphicsContext::FetchSwapchainSupportDetails: no phyiscal device surface present mode");
-
-	m_SwapChainDetails.presentModes.resize(presentModeCount);
-	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, m_SwapChainDetails.presentModes.data());
-}
-
-void GraphicsContext::CreateSwapchain()
-{
-	// pick a decent swap chain surface format
-	VkSurfaceFormatKHR swapChainSurfaceFormat{};
-	for (const auto& surfaceFormat : m_SwapChainDetails.formats)
-		if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-			swapChainSurfaceFormat = surfaceFormat;
-
-	if (swapChainSurfaceFormat.format == VK_FORMAT_UNDEFINED)
-		m_SwapchainImageFormat = swapChainSurfaceFormat.format;
-
-	// pick a decent swap chain present mode
-	VkPresentModeKHR swapChainPresentMode{};
-	for (const auto& presentMode : m_SwapChainDetails.presentModes)
-		if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
-			swapChainPresentMode = presentMode;
-
-	if (m_SwapChainDetails.capabilities.currentExtent.width != UINT32_MAX)
-		m_SwapchainExtent = m_SwapChainDetails.capabilities.currentExtent;
-	else
-	{
-		int width, height;
-		glfwGetFramebufferSize(m_WindowHandle, &width, &height);
-
-		m_SwapchainExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
-
-		m_SwapchainExtent.width = std::clamp(m_SwapchainExtent.width, m_SwapChainDetails.capabilities.minImageExtent.width,
-			m_SwapChainDetails.capabilities.maxImageExtent.width);
-
-		m_SwapchainExtent.height = std::clamp(m_SwapchainExtent.height, m_SwapChainDetails.capabilities.minImageExtent.height,
-			m_SwapChainDetails.capabilities.maxImageExtent.height);
-	}
-
-	uint32_t imageCount = m_SwapChainDetails.capabilities.minImageCount + 1;
-	if (m_SwapChainDetails.capabilities.maxImageCount > 0 && imageCount > m_SwapChainDetails.capabilities.maxImageCount)
-		imageCount = m_SwapChainDetails.capabilities.maxImageCount;
-
-	// swapchain create-info
-	VkSwapchainCreateInfoKHR swapchainCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-
-		.surface = m_Surface,
-
-		.minImageCount = imageCount,
-		.imageFormat = swapChainSurfaceFormat.format,
-		.imageColorSpace = swapChainSurfaceFormat.colorSpace,
-		.imageExtent = m_SwapchainExtent,
-		.imageArrayLayers = 1u,
-		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-		.imageSharingMode = m_QueueFamilyIndices.graphics.value() == m_QueueFamilyIndices.present.value() ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
-
-		.queueFamilyIndexCount = m_QueueFamilyIndices.graphics.value() == m_QueueFamilyIndices.present.value() ? 0u : 2u,
-		.pQueueFamilyIndices = m_QueueFamilyIndices.graphics.value() == m_QueueFamilyIndices.present.value() ? nullptr : m_QueueFamilyIndices.indices.data(),
-		.preTransform = m_SwapChainDetails.capabilities.currentTransform,
-		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-		.presentMode = swapChainPresentMode,
-		.clipped = VK_TRUE,
-		.oldSwapchain = VK_NULL_HANDLE,
-	};
-
-	VKC(vkCreateSwapchainKHR(m_LogicalDevice, &swapchainCreateInfo, nullptr, &m_Swapchain));
-
-	vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, nullptr);
-	m_SwapchainImages.resize(imageCount);
-	vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, m_SwapchainImages.data());
-}
-
-void GraphicsContext::CreateImageViews()
-{
-	m_SwapchainImageViews.resize(m_SwapchainImages.size());
-
-	for (int i = 0; i < m_SwapchainImages.size(); i++)
-	{
-		// image view create-info
-		VkImageViewCreateInfo imageViewCreateInfo
-		{
-			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			.image = m_SwapchainImages[i],
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.format = m_SwapchainImageFormat,
-			.components
-			{
-				.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.g = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.b = VK_COMPONENT_SWIZZLE_IDENTITY,
-				.a = VK_COMPONENT_SWIZZLE_IDENTITY,
-			},
-			.subresourceRange
-			{
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0u,
-				.levelCount = 0u,
-				.baseArrayLayer = 0u,
-				.layerCount = 0u,
-			}
-		};
-
-		VKC(vkCreateImageView(m_LogicalDevice, &imageViewCreateInfo, nullptr, &m_SwapchainImageViews[i]));
-	}
-}
-
-VkDebugUtilsMessengerCreateInfoEXT GraphicsContext::SetupDebugMessageCallback()
+VkDebugUtilsMessengerCreateInfoEXT DeviceContext::SetupDebugMessageCallback()
 {
 	// debug messenger create-info
 	VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo
@@ -435,7 +283,7 @@ VkDebugUtilsMessengerCreateInfoEXT GraphicsContext::SetupDebugMessageCallback()
 }
 
 // #todo: implement
-void GraphicsContext::LogDebugData()
+void DeviceContext::LogDebugData()
 {
 	LOG(err, "GraphicsContext::LogDebugData: NO_IMPLEMENT");
 }
