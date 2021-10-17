@@ -115,7 +115,32 @@ void DeviceContext::FetchDeviceExtensions()
 
 void DeviceContext::FetchSupportedQueueFamilies()
 {
+	m_QueueFamilyIndices = {};
 
+	// fetch queue families
+	uint32_t queueFamilyCount = 0u;
+	vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
+
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, queueFamilies.data());
+
+	// find queue family indices
+	uint32_t index = 0u;
+	for (const auto& queueFamily : queueFamilies)
+	{
+		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			m_QueueFamilyIndices.graphics = index;
+
+		VkBool32 hasPresentSupport;
+		vkGetPhysicalDeviceSurfaceSupportKHR(m_PhysicalDevice, index, m_Surface, &hasPresentSupport);
+
+		if (hasPresentSupport)
+			m_QueueFamilyIndices.present = index;
+
+		index++;
+	}
+
+	m_QueueFamilyIndices.indices = { m_QueueFamilyIndices.graphics.value(), m_QueueFamilyIndices.present.value() };
 }
 
 void DeviceContext::PickPhysicalDevice()

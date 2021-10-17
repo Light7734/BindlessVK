@@ -43,7 +43,6 @@ private:
 	void CreateSwapchain();
 	void CreateImageViews();
 
-	void FetchSupportedQueueFamilies();
 	void FetchSwapchainSupportDetails();
 
 };
