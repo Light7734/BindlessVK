@@ -31,6 +31,8 @@ public:
 	Shader(const std::string& vertexPath, const std::string& pixelPath, SharedContext sharedContext);
 	~Shader();
 
+	inline std::array<VkPipelineShaderStageCreateInfo, 2> GetShaderStages() { return m_PipelineShaderStageCreateInfos; }
+
 protected:
 
 private:

@@ -24,6 +24,11 @@ private:
 	// context
 	SharedContext m_SharedContext;
 
+	// pipeline
+	VkPipeline m_Pipeline;
+	VkPipelineLayout m_PipelineLayout;
+	VkRenderPass m_RenderPass;
+
 	// swap chain
 	VkSwapchainKHR m_Swapchain;
 
@@ -36,12 +41,15 @@ private:
 	SwapchainSupportDetails m_SwapChainDetails;
 
 public:
-	Pipeline();
+	Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 	~Pipeline();
 
 private:
 	void CreateSwapchain();
 	void CreateImageViews();
+	void CreateRenderPass();
+	void CreatePipelineLayout();
+	void CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 
 	void FetchSwapchainSupportDetails();
 

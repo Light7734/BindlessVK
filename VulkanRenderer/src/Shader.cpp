@@ -12,7 +12,7 @@ Shader::Shader(const std::string& vertexPath, const std::string& pixelPath, Shar
 	VkShaderModuleCreateInfo vertexShaderModuleCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = (vertexResult.end() - vertexResult.begin()) * sizeof(uint32_t),
+		.codeSize = static_cast<size_t>(vertexResult.end() - vertexResult.begin()) * 4ull,
 		.pCode = vertexResult.begin()
 	};
 
@@ -20,19 +20,19 @@ Shader::Shader(const std::string& vertexPath, const std::string& pixelPath, Shar
 	VkShaderModuleCreateInfo pixelShaderModuleCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = (pixelResult.end() - pixelResult.begin()) * sizeof(uint32_t),
+		.codeSize = static_cast<size_t>(pixelResult.end() - pixelResult.begin()) * 4ull,
 		.pCode = pixelResult.begin()
 	};
 
 	// create shader modules
-	VKC(vkCreateShaderModule(m_SharedContext.logicalDevice, &vertexShaderModuleCreateInfo, nullptr, &m_PixelShaderModule));
-	VKC(vkCreateShaderModule(m_SharedContext.logicalDevice, &pixelShaderModuleCreateInfo, nullptr, &m_VertexShaderModule));
+	VKC(vkCreateShaderModule(m_SharedContext.logicalDevice, &vertexShaderModuleCreateInfo, nullptr, &m_VertexShaderModule));
+	VKC(vkCreateShaderModule(m_SharedContext.logicalDevice, &pixelShaderModuleCreateInfo, nullptr, &m_PixelShaderModule));
 
 	// pipeline vertex-shader stage create-info
 	VkPipelineShaderStageCreateInfo pipelineVertexShaderStageCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
 		.module = m_VertexShaderModule,
 		.pName = "main"
 	};
