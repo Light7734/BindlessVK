@@ -24,6 +24,9 @@ struct SharedContext
 	VkDevice logicalDevice = VK_NULL_HANDLE;
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 
+	VkQueue graphicsQueue;
+	VkQueue presentQueue;
+
 	QueueFamilyIndices queueFamilies;
 
 	inline operator bool() const { return logicalDevice; }

@@ -45,9 +45,16 @@ private:
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
+	// semaphor
+	VkSemaphore m_ImageAvailableSemaphor;
+	VkSemaphore m_RenderFinishedSemaphor;
+
 public:
 	Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 	~Pipeline();
+
+	uint32_t AquireNextImage();
+	void SubmitCommandBuffer(uint32_t imageIndex);
 
 private:
 	void CreateSwapchain();
@@ -58,7 +65,7 @@ private:
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
-
+	void CreateSemaphores();
 
 	void FetchSwapchainSupportDetails();
 

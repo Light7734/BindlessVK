@@ -67,6 +67,8 @@ DeviceContext::DeviceContext(GLFWwindow* windowHandle) :
 	m_SharedContext.logicalDevice = m_LogicalDevice;
 	m_SharedContext.surface = m_Surface;
 	m_SharedContext.queueFamilies = m_QueueFamilyIndices;
+	m_SharedContext.graphicsQueue = m_GraphicsQueue;
+	m_SharedContext.presentQueue = m_PresentQueue;
 }
 
 DeviceContext::~DeviceContext()
@@ -239,6 +241,7 @@ void DeviceContext::CreateLogicalDevice()
 	// create logical device and get it's queue
 	VKC(vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_LogicalDevice));
 	vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.graphics.value(), 0u, &m_GraphicsQueue);
+	vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.present.value(), 0u, &m_PresentQueue);
 }
 
 void DeviceContext::CreateWindowSurface(GLFWwindow* windowHandle)
@@ -305,10 +308,4 @@ VkDebugUtilsMessengerCreateInfoEXT DeviceContext::SetupDebugMessageCallback()
 	};
 
 	return debugMessengerCreateInfo;
-}
-
-// #todo: implement
-void DeviceContext::LogDebugData()
-{
-	LOG(err, "GraphicsContext::LogDebugData: NO_IMPLEMENT");
 }

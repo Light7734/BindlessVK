@@ -41,8 +41,6 @@ public:
 	DeviceContext(GLFWwindow* windowHandle);
 	~DeviceContext();
 
-	void LogDebugData();
-
 	inline SharedContext GetSharedContext() { return m_SharedContext; }
 
 private:

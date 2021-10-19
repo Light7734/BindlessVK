@@ -19,10 +19,14 @@ Pipeline::Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStage
 	CreateFramebuffers();
 	CreateCommandPool();
 	CreateCommandBuffers();
+	CreateSemaphores();
 }
 
 Pipeline::~Pipeline()
 {
+	vkDestroySemaphore(m_SharedContext.logicalDevice, m_ImageAvailableSemaphor, nullptr);
+	vkDestroySemaphore(m_SharedContext.logicalDevice, m_RenderFinishedSemaphor, nullptr);
+
 	vkDestroyCommandPool(m_SharedContext.logicalDevice, m_CommandPool, nullptr);
 
 	for (auto framebuffer : m_SwapchainFramebuffers)
@@ -36,6 +40,48 @@ Pipeline::~Pipeline()
 		vkDestroyImageView(m_SharedContext.logicalDevice, swapchainImageView, nullptr);
 
 	vkDestroySwapchainKHR(m_SharedContext.logicalDevice, m_Swapchain, nullptr);
+}
+
+uint32_t Pipeline::AquireNextImage()
+{
+	uint32_t out;
+	VKC(vkAcquireNextImageKHR(m_SharedContext.logicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphor, VK_NULL_HANDLE, &out));
+
+	return out;
+}
+
+void Pipeline::SubmitCommandBuffer(uint32_t imageIndex)
+{
+	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+	// submit info
+	VkSubmitInfo submitInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount = 1u,
+		.pWaitSemaphores = &m_ImageAvailableSemaphor,
+		.pWaitDstStageMask = &waitStage,
+		.commandBufferCount = 1u,
+		.pCommandBuffers = &m_CommandBuffers[imageIndex],
+		.signalSemaphoreCount = 1u,
+		.pSignalSemaphores = &m_RenderFinishedSemaphor,
+	};
+
+	// submit queue
+	VKC(vkQueueSubmit(m_SharedContext.graphicsQueue, 1u, &submitInfo, VK_NULL_HANDLE));
+
+	VkPresentInfoKHR presentInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1u,
+		.pWaitSemaphores = &m_RenderFinishedSemaphor,
+		.swapchainCount = 1u,
+		.pSwapchains = &m_Swapchain,
+		.pImageIndices = &imageIndex,
+		.pResults = nullptr,
+	};
+
+	VKC(vkQueuePresentKHR(m_SharedContext.presentQueue, &presentInfo));
 }
 
 void Pipeline::CreateSwapchain()
@@ -173,6 +219,17 @@ void Pipeline::CreateRenderPass()
 		.pColorAttachments = &attachmentReference
 	};
 
+	// subpass dependency
+	VkSubpassDependency subpassDependency
+	{
+		.srcSubpass = VK_SUBPASS_EXTERNAL,
+		.dstSubpass = 0u,
+		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcAccessMask = 0u,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+	};
+
 	// render pass create-info
 	VkRenderPassCreateInfo renderPassCreateInfo
 	{
@@ -180,7 +237,9 @@ void Pipeline::CreateRenderPass()
 		.attachmentCount = 1u,
 		.pAttachments = &attachmentDescription,
 		.subpassCount = 1u,
-		.pSubpasses = &subpassDescription
+		.pSubpasses = &subpassDescription,
+		.dependencyCount = 1u,
+		.pDependencies = &subpassDependency,
 	};
 
 	// create render pass
@@ -391,14 +450,14 @@ void Pipeline::CreateCommandBuffers()
 		.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size()),
 	};
 
-	VKC(vkAllocateCommandBuffers(m_SharedContext.logicalDevice, nullptr, m_CommandBuffers.data()));
+	VKC(vkAllocateCommandBuffers(m_SharedContext.logicalDevice, &commandBufferAllocateInfo, m_CommandBuffers.data()));
 
 	for (size_t i = 0ull; i < m_CommandBuffers.size(); i++)
 	{
 		// command buffer begin-info
 		VkCommandBufferBeginInfo  commandBufferBeginInfo
 		{
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags = NULL,
 			.pInheritanceInfo = nullptr,
 		};
@@ -437,6 +496,18 @@ void Pipeline::CreateCommandBuffers()
 		VKC(vkEndCommandBuffer(m_CommandBuffers[i]));
 	}
 
+}
+
+void Pipeline::CreateSemaphores()
+{
+	// semaphor create-info
+	VkSemaphoreCreateInfo semaphoreCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+	};
+
+	vkCreateSemaphore(m_SharedContext.logicalDevice, &semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphor);
+	vkCreateSemaphore(m_SharedContext.logicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphor);
 }
 
 void Pipeline::FetchSwapchainSupportDetails()
