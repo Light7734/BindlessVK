@@ -34,6 +34,7 @@ private:
 
 	std::vector<VkImage> m_SwapchainImages;
 	std::vector<VkImageView> m_SwapchainImageViews;
+	std::vector<VkFramebuffer> m_SwapchainFramebuffers;
 
 	VkFormat m_SwapchainImageFormat;
 	VkExtent2D m_SwapchainExtent;
@@ -50,6 +51,8 @@ private:
 	void CreateRenderPass();
 	void CreatePipelineLayout();
 	void CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
+	void CreateRenderbuffers();
+
 
 	void FetchSwapchainSupportDetails();
 

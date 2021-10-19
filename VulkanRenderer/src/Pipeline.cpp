@@ -16,6 +16,7 @@ Pipeline::Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStage
 	CreateRenderPass();
 	CreatePipelineLayout();
 	CreatePipeline(shaderStages);
+	CreateFramebuffers();
 }
 
 Pipeline::~Pipeline()
@@ -332,6 +333,28 @@ void Pipeline::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> sha
 
 	// create graphics pipelines
 	VKC(vkCreateGraphicsPipelines(m_SharedContext.logicalDevice, VK_NULL_HANDLE, 1u, &pipelineCreateInfo, nullptr, &m_Pipeline));
+}
+
+void Pipeline::CreateRenderbuffers()
+{
+	m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
+
+	for (size_t i = 0ull; i < m_SwapchainImageViews.size(); i++)
+	{
+		// framebuffer create-info
+		VkFramebufferCreateInfo framebufferCreateInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass = m_RenderPass,
+			.attachmentCount = 1u,
+			.pAttachments = &m_SwapchainImageViews[i],
+			.width = m_SwapchainExtent.width,
+			.height = m_SwapchainExtent.height,
+			.layers = 1u
+		};
+
+		VKC(vkCreateFramebuffer(m_SharedContext.logicalDevice, &framebufferCreateInfo, nullptr, &m_SwapchainFramebuffers[i]));
+	}
 }
 
 void Pipeline::FetchSwapchainSupportDetails()
