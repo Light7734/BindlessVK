@@ -41,6 +41,10 @@ private:
 
 	SwapchainSupportDetails m_SwapChainDetails;
 
+	// commnad
+	VkCommandPool m_CommandPool;
+	std::vector<VkCommandBuffer> m_CommandBuffers;
+
 public:
 	Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 	~Pipeline();
@@ -51,7 +55,9 @@ private:
 	void CreateRenderPass();
 	void CreatePipelineLayout();
 	void CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
-	void CreateRenderbuffers();
+	void CreateFramebuffers();
+	void CreateCommandPool();
+	void CreateCommandBuffers();
 
 
 	void FetchSwapchainSupportDetails();

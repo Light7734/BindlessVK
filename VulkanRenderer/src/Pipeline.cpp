@@ -17,10 +17,17 @@ Pipeline::Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStage
 	CreatePipelineLayout();
 	CreatePipeline(shaderStages);
 	CreateFramebuffers();
+	CreateCommandPool();
+	CreateCommandBuffers();
 }
 
 Pipeline::~Pipeline()
 {
+	vkDestroyCommandPool(m_SharedContext.logicalDevice, m_CommandPool, nullptr);
+
+	for (auto framebuffer : m_SwapchainFramebuffers)
+		vkDestroyFramebuffer(m_SharedContext.logicalDevice, framebuffer, nullptr);
+
 	vkDestroyPipeline(m_SharedContext.logicalDevice, m_Pipeline, nullptr);
 	vkDestroyPipelineLayout(m_SharedContext.logicalDevice, m_PipelineLayout, nullptr);
 	vkDestroyRenderPass(m_SharedContext.logicalDevice, m_RenderPass, nullptr);
@@ -335,7 +342,7 @@ void Pipeline::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> sha
 	VKC(vkCreateGraphicsPipelines(m_SharedContext.logicalDevice, VK_NULL_HANDLE, 1u, &pipelineCreateInfo, nullptr, &m_Pipeline));
 }
 
-void Pipeline::CreateRenderbuffers()
+void Pipeline::CreateFramebuffers()
 {
 	m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
 
@@ -355,6 +362,81 @@ void Pipeline::CreateRenderbuffers()
 
 		VKC(vkCreateFramebuffer(m_SharedContext.logicalDevice, &framebufferCreateInfo, nullptr, &m_SwapchainFramebuffers[i]));
 	}
+}
+
+void Pipeline::CreateCommandPool()
+{
+	// command pool create-info
+	VkCommandPoolCreateInfo commandpoolCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags = NULL,
+		.queueFamilyIndex = m_SharedContext.queueFamilies.graphics.value(),
+	};
+
+
+	VKC(vkCreateCommandPool(m_SharedContext.logicalDevice, &commandpoolCreateInfo, nullptr, &m_CommandPool));
+}
+
+void Pipeline::CreateCommandBuffers()
+{
+	m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
+
+	// command buffer allocate-info
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = m_CommandPool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size()),
+	};
+
+	VKC(vkAllocateCommandBuffers(m_SharedContext.logicalDevice, nullptr, m_CommandBuffers.data()));
+
+	for (size_t i = 0ull; i < m_CommandBuffers.size(); i++)
+	{
+		// command buffer begin-info
+		VkCommandBufferBeginInfo  commandBufferBeginInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.flags = NULL,
+			.pInheritanceInfo = nullptr,
+		};
+
+		VKC(vkBeginCommandBuffer(m_CommandBuffers[i], &commandBufferBeginInfo));
+
+		// clear value
+		VkClearValue clearColor =
+		{
+			.color = { 0.124f, 0.345f, 0.791f, 1.0f }
+		};
+
+		// render pass begin-info
+		VkRenderPassBeginInfo  renderpassBeginInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+			.renderPass = m_RenderPass,
+			.framebuffer = m_SwapchainFramebuffers[i],
+
+			.renderArea =
+			{
+				.offset = {0, 0},
+				.extent = m_SwapchainExtent
+			},
+
+			.clearValueCount = 1u,
+			.pClearValues = &clearColor
+		};
+
+
+		vkCmdBeginRenderPass(m_CommandBuffers[i], &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+		vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+		vkCmdEndRenderPass(m_CommandBuffers[i]);
+
+		VKC(vkEndCommandBuffer(m_CommandBuffers[i]));
+	}
+
 }
 
 void Pipeline::FetchSwapchainSupportDetails()
