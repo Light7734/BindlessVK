@@ -21,6 +21,9 @@ struct SwapchainSupportDetails
 class Pipeline
 {
 private:
+	// constants
+	const uint32_t m_FramesInFlight;
+
 	// context
 	SharedContext m_SharedContext;
 
@@ -45,12 +48,15 @@ private:
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
-	// semaphor
-	VkSemaphore m_ImageAvailableSemaphor;
-	VkSemaphore m_RenderFinishedSemaphor;
+	// synchronization
+	std::vector<VkSemaphore> m_ImageAvailableSemaphores;
+	std::vector<VkSemaphore> m_RenderFinishedSemaphores;
+	std::vector<VkFence> m_Fences;
+	std::vector<VkFence> m_ImagesInFlight;
+	size_t m_CurrentFrame = 0ull;
 
 public:
-	Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
+	Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages, uint32_t frames = 2u);
 	~Pipeline();
 
 	uint32_t AquireNextImage();
@@ -65,7 +71,7 @@ private:
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
-	void CreateSemaphores();
+	void CreateSynchronizations();
 
 	void FetchSwapchainSupportDetails();
 

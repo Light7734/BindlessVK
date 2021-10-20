@@ -303,7 +303,7 @@ VkDebugUtilsMessengerCreateInfoEXT DeviceContext::SetupDebugMessageCallback()
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData)
 	{
-		LOGVk(trace, "GraphicsContext::LogDebugData: NO_IMPLEMENT");
+		LOGVk(trace, "{}", pCallbackData->pMessage);
 		return VK_FALSE;
 	};
 

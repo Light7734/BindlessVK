@@ -33,8 +33,6 @@ public:
 
 	inline std::array<VkPipelineShaderStageCreateInfo, 2> GetShaderStages() { return m_PipelineShaderStageCreateInfos; }
 
-protected:
-
 private:
 	shaderc::SpvCompilationResult CompileGlslToSpv(const std::string& path, Stage stage);
 };

@@ -2,7 +2,8 @@
 
 #include <glfw/glfw3.h>
 
-Pipeline::Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages) :
+Pipeline::Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages, uint32_t frames /* = 2u */) :
+	m_FramesInFlight(frames),
 	m_SharedContext(sharedContext),
 	m_Pipeline(VK_NULL_HANDLE),
 	m_PipelineLayout(VK_NULL_HANDLE),
@@ -19,13 +20,17 @@ Pipeline::Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStage
 	CreateFramebuffers();
 	CreateCommandPool();
 	CreateCommandBuffers();
-	CreateSemaphores();
+	CreateSynchronizations();
 }
 
 Pipeline::~Pipeline()
 {
-	vkDestroySemaphore(m_SharedContext.logicalDevice, m_ImageAvailableSemaphor, nullptr);
-	vkDestroySemaphore(m_SharedContext.logicalDevice, m_RenderFinishedSemaphor, nullptr);
+	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
+	{
+		vkDestroySemaphore(m_SharedContext.logicalDevice, m_ImageAvailableSemaphores[i], nullptr);
+		vkDestroySemaphore(m_SharedContext.logicalDevice, m_RenderFinishedSemaphores[i], nullptr);
+		vkDestroyFence(m_SharedContext.logicalDevice, m_Fences[i], nullptr);
+	}
 
 	vkDestroyCommandPool(m_SharedContext.logicalDevice, m_CommandPool, nullptr);
 
@@ -45,13 +50,19 @@ Pipeline::~Pipeline()
 uint32_t Pipeline::AquireNextImage()
 {
 	uint32_t out;
-	VKC(vkAcquireNextImageKHR(m_SharedContext.logicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphor, VK_NULL_HANDLE, &out));
+	VKC(vkAcquireNextImageKHR(m_SharedContext.logicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &out));
 
 	return out;
 }
 
 void Pipeline::SubmitCommandBuffer(uint32_t imageIndex)
 {
+	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
+		vkWaitForFences(m_SharedContext.logicalDevice, 1u, &m_ImagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+
+	m_ImagesInFlight[imageIndex] = m_Fences[m_CurrentFrame];
+	vkWaitForFences(m_SharedContext.logicalDevice, 1u, &m_Fences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
+
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 	// submit info
@@ -59,27 +70,30 @@ void Pipeline::SubmitCommandBuffer(uint32_t imageIndex)
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.waitSemaphoreCount = 1u,
-		.pWaitSemaphores = &m_ImageAvailableSemaphor,
+		.pWaitSemaphores = &m_ImageAvailableSemaphores[m_CurrentFrame],
 		.pWaitDstStageMask = &waitStage,
 		.commandBufferCount = 1u,
 		.pCommandBuffers = &m_CommandBuffers[imageIndex],
 		.signalSemaphoreCount = 1u,
-		.pSignalSemaphores = &m_RenderFinishedSemaphor,
+		.pSignalSemaphores = &m_RenderFinishedSemaphores[m_CurrentFrame],
 	};
 
 	// submit queue
-	VKC(vkQueueSubmit(m_SharedContext.graphicsQueue, 1u, &submitInfo, VK_NULL_HANDLE));
+	vkResetFences(m_SharedContext.logicalDevice, 1u, &m_Fences[m_CurrentFrame]);
+	VKC(vkQueueSubmit(m_SharedContext.graphicsQueue, 1u, &submitInfo, m_Fences[m_CurrentFrame]));
 
 	VkPresentInfoKHR presentInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.waitSemaphoreCount = 1u,
-		.pWaitSemaphores = &m_RenderFinishedSemaphor,
+		.pWaitSemaphores = &m_RenderFinishedSemaphores[m_CurrentFrame],
 		.swapchainCount = 1u,
 		.pSwapchains = &m_Swapchain,
 		.pImageIndices = &imageIndex,
 		.pResults = nullptr,
 	};
+
+	m_CurrentFrame = (m_CurrentFrame + 1) % m_FramesInFlight;
 
 	VKC(vkQueuePresentKHR(m_SharedContext.presentQueue, &presentInfo));
 }
@@ -498,16 +512,36 @@ void Pipeline::CreateCommandBuffers()
 
 }
 
-void Pipeline::CreateSemaphores()
+void Pipeline::CreateSynchronizations()
 {
+	m_ImageAvailableSemaphores.resize(m_FramesInFlight);
+	m_RenderFinishedSemaphores.resize(m_FramesInFlight);
+	m_Fences.resize(m_FramesInFlight);
+	m_ImagesInFlight.resize(m_SwapchainImages.size(), VK_NULL_HANDLE);
+
 	// semaphor create-info
 	VkSemaphoreCreateInfo semaphoreCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 	};
 
-	vkCreateSemaphore(m_SharedContext.logicalDevice, &semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphor);
-	vkCreateSemaphore(m_SharedContext.logicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphor);
+	// fence create-info
+	VkFenceCreateInfo fenceCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+		.flags = VK_FENCE_CREATE_SIGNALED_BIT,
+	};
+
+	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
+	{
+		VKC(vkCreateSemaphore(m_SharedContext.logicalDevice, &semaphoreCreateInfo, nullptr, &m_ImageAvailableSemaphores[i]));
+		VKC(vkCreateSemaphore(m_SharedContext.logicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphores[i]));
+
+		vkCreateFence(m_SharedContext.logicalDevice, &fenceCreateInfo, nullptr, &m_Fences[i]);
+
+	}
+
+
 }
 
 void Pipeline::FetchSwapchainSupportDetails()
