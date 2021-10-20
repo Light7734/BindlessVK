@@ -5,6 +5,8 @@
 #include "Shader.h"
 #include "Window.h"
 
+#include "Timer.h"
+
 #include <glfw/glfw3.h>
 
 int main()
@@ -12,14 +14,9 @@ int main()
 	Logger::Init();
 	Window window = Window();
 
-	DeviceContext deviceContext = DeviceContext(window.GetHandle());
-	SharedContext sharedContext = deviceContext.GetSharedContext();
+	Pipeline pipeline(window.GetHandle());
 
-	Shader shader("res/VertexShader.glsl", "res/PixelShader.glsl", deviceContext.GetSharedContext());
-	Pipeline pipeline(deviceContext.GetSharedContext(), shader.GetShaderStages());
-
-	float timer = 0.0f;
-	float elapsedTime = 0.0f;
+	Timer timer;
 	uint32_t frames = 0u;
 
 	while (!window.IsClosed())
@@ -30,17 +27,14 @@ int main()
 		pipeline.SubmitCommandBuffer(imageIndex);
 
 		frames++;
-		if (glfwGetTime() - elapsedTime >= 1.0f)
+		if (timer.ElapsedTime() >= 1.0f)
 		{
 			LOG(trace, "FPS: {}", frames);
 
-			elapsedTime = glfwGetTime();
-			timer = 0.0f;
+			timer.Reset();
 			frames = 0u;
-
 		}
 	}
 
-	vkDeviceWaitIdle(sharedContext.logicalDevice);
 	return 0;
 }

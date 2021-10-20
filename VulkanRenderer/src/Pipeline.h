@@ -6,6 +6,20 @@
 
 #include <volk.h>
 
+#include <glfw/glfw3.h>
+
+struct QueueFamilyIndices
+{
+	std::optional<uint32_t> graphics;
+	std::optional<uint32_t> present;
+
+	std::vector<uint32_t> indices;
+
+	inline bool IsSuitableForRendering() const { return graphics.has_value() && present.has_value(); }
+
+	operator bool() const { return IsSuitableForRendering(); };
+};
+
 struct SwapchainSupportDetails
 {
 	VkSurfaceCapabilitiesKHR capabilities;
@@ -21,11 +35,25 @@ struct SwapchainSupportDetails
 class Pipeline
 {
 private:
-	// constants
-	const uint32_t m_FramesInFlight;
+	// window
+	GLFWwindow* m_WindowHandle;
+	VkSurfaceKHR m_Surface;
 
-	// context
-	SharedContext m_SharedContext;
+	// device
+	VkInstance m_VkInstance;
+	VkPhysicalDevice m_PhysicalDevice;
+	VkDevice m_LogicalDevice;
+
+	// queue
+	QueueFamilyIndices m_QueueFamilyIndices;
+
+	VkQueue m_GraphicsQueue;
+	VkQueue m_PresentQueue;
+
+	// validation layers & extensions
+	std::vector<const char*> m_ValidationLayers;
+	std::vector<const char*> m_GlobalExtensions;
+	std::vector<const char*> m_DeviceExtensions;
 
 	// pipeline
 	VkPipeline m_Pipeline;
@@ -44,25 +72,39 @@ private:
 
 	SwapchainSupportDetails m_SwapChainDetails;
 
-	// commnad
+	// command pool
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
 	// synchronization
+	const uint32_t m_FramesInFlight;
 	std::vector<VkSemaphore> m_ImageAvailableSemaphores;
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores;
 	std::vector<VkFence> m_Fences;
 	std::vector<VkFence> m_ImagesInFlight;
-	size_t m_CurrentFrame = 0ull;
+	size_t m_CurrentFrame;
+
+	// shaders
+	std::unique_ptr<Shader> m_ShaderTriangle;
 
 public:
-	Pipeline(SharedContext sharedContext, std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages, uint32_t frames = 2u);
+	Pipeline(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Pipeline();
 
 	uint32_t AquireNextImage();
 	void SubmitCommandBuffer(uint32_t imageIndex);
 
 private:
+	void PickPhysicalDevice();
+	void CreateLogicalDevice();
+	void CreateWindowSurface(GLFWwindow* windowHandle);
+
+	void FilterValidationLayers();
+	void FetchGlobalExtensions();
+	void FetchDeviceExtensions();
+	void FetchSupportedQueueFamilies();
+	void FetchSwapchainSupportDetails();
+
 	void CreateSwapchain();
 	void CreateImageViews();
 	void CreateRenderPass();
@@ -73,6 +115,5 @@ private:
 	void CreateCommandBuffers();
 	void CreateSynchronizations();
 
-	void FetchSwapchainSupportDetails();
-
+	VkDebugUtilsMessengerCreateInfoEXT SetupDebugMessageCallback();
 };

@@ -1,8 +1,8 @@
 #include "Shader.h"
 
 
-Shader::Shader(const std::string& vertexPath, const std::string& pixelPath, SharedContext sharedContext) :
-	m_SharedContext(sharedContext)
+Shader::Shader(const std::string& vertexPath, const std::string& pixelPath, VkDevice logicalDevice) :
+	m_LogicalDevice(logicalDevice)
 {
 	// compile glsl to spv
 	shaderc::SpvCompilationResult vertexResult = CompileGlslToSpv(vertexPath, Stage::VERTEX);
@@ -25,8 +25,8 @@ Shader::Shader(const std::string& vertexPath, const std::string& pixelPath, Shar
 	};
 
 	// create shader modules
-	VKC(vkCreateShaderModule(m_SharedContext.logicalDevice, &vertexShaderModuleCreateInfo, nullptr, &m_VertexShaderModule));
-	VKC(vkCreateShaderModule(m_SharedContext.logicalDevice, &pixelShaderModuleCreateInfo, nullptr, &m_PixelShaderModule));
+	VKC(vkCreateShaderModule(m_LogicalDevice, &vertexShaderModuleCreateInfo, nullptr, &m_VertexShaderModule));
+	VKC(vkCreateShaderModule(m_LogicalDevice, &pixelShaderModuleCreateInfo, nullptr, &m_PixelShaderModule));
 
 	// pipeline vertex-shader stage create-info
 	VkPipelineShaderStageCreateInfo pipelineVertexShaderStageCreateInfo
@@ -53,8 +53,8 @@ Shader::Shader(const std::string& vertexPath, const std::string& pixelPath, Shar
 
 Shader::~Shader()
 {
-	vkDestroyShaderModule(m_SharedContext.logicalDevice, m_VertexShaderModule, nullptr);
-	vkDestroyShaderModule(m_SharedContext.logicalDevice, m_PixelShaderModule, nullptr);
+	vkDestroyShaderModule(m_LogicalDevice, m_VertexShaderModule, nullptr);
+	vkDestroyShaderModule(m_LogicalDevice, m_PixelShaderModule, nullptr);
 }
 
 shaderc::SpvCompilationResult Shader::CompileGlslToSpv(const std::string& path, Stage stage)
