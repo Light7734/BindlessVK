@@ -15,7 +15,7 @@ public:
 	inline GLFWwindow* GetHandle() { return m_WindowHandle; }
 
 	// #todo
-	inline bool IsClosed() { return false; }
+	bool IsClosed() const;
 
 private:
 	void BindGlfwEvents();

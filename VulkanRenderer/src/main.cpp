@@ -1,12 +1,9 @@
 #include "Base.h"
 
-#include "DeviceContext.h"
 #include "Pipeline.h"
-#include "Shader.h"
 #include "Window.h"
 
 #include "Timer.h"
-
 #include <glfw/glfw3.h>
 
 int main()
@@ -23,8 +20,7 @@ int main()
 	{
 		glfwPollEvents();
 
-		uint32_t imageIndex = pipeline.AquireNextImage();
-		pipeline.SubmitCommandBuffer(imageIndex);
+		pipeline.RenderFrame();
 
 		frames++;
 		if (timer.ElapsedTime() >= 1.0f)

@@ -15,11 +15,16 @@ Window::Window()
 
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-	
+
 	m_WindowHandle = glfwCreateWindow(800, 600, "Vulkan Renderer", nullptr, nullptr);
 
 	// #todo:
 	BindGlfwEvents();
+}
+
+bool Window::IsClosed() const
+{
+	return glfwWindowShouldClose(m_WindowHandle);
 }
 
 void Window::BindGlfwEvents()

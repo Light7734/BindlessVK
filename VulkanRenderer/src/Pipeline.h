@@ -2,11 +2,10 @@
 
 #include "Base.h"
 
-#include "Shader.h"
-
 #include <volk.h>
 
-#include <glfw/glfw3.h>
+struct GLFWwindow;
+class Shader;
 
 struct QueueFamilyIndices
 {
@@ -92,7 +91,7 @@ public:
 	~Pipeline();
 
 	uint32_t AquireNextImage();
-	void SubmitCommandBuffer(uint32_t imageIndex);
+	void RenderFrame();
 
 private:
 	void PickPhysicalDevice();

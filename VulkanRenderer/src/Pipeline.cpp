@@ -1,4 +1,5 @@
 #include "Pipeline.h"
+#include "Shader.h"
 
 #include <glfw/glfw3.h>
 
@@ -112,6 +113,8 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 
 Pipeline::~Pipeline()
 {
+	m_ShaderTriangle.reset();
+
 	vkDeviceWaitIdle(m_LogicalDevice);
 
 	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
@@ -140,16 +143,11 @@ Pipeline::~Pipeline()
 	vkDestroyInstance(m_VkInstance, nullptr);
 }
 
-uint32_t Pipeline::AquireNextImage()
+void Pipeline::RenderFrame()
 {
-	uint32_t out;
-	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &out));
+	uint32_t imageIndex;
+	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex));
 
-	return out;
-}
-
-void Pipeline::SubmitCommandBuffer(uint32_t imageIndex)
-{
 	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
 		vkWaitForFences(m_LogicalDevice, 1u, &m_ImagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
 
