@@ -11,6 +11,7 @@ private:
 
 public:
 	Window();
+	~Window();
 
 	inline GLFWwindow* GetHandle() { return m_WindowHandle; }
 

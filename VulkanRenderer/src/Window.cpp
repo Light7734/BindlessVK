@@ -4,7 +4,7 @@
 
 extern "C"
 {
-	// Force Machine to use Dedicated Graphics
+	// force machine to use dedicated graphics
 	__declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001; // NVidia
 	__declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;   // AMD
 }
@@ -20,6 +20,12 @@ Window::Window()
 
 	// #todo:
 	BindGlfwEvents();
+}
+
+Window::~Window()
+{
+	glfwDestroyWindow(m_WindowHandle);
+	glfwTerminate();
 }
 
 bool Window::IsClosed() const

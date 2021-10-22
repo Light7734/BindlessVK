@@ -51,8 +51,8 @@ private:
 
 	// validation layers & extensions
 	std::vector<const char*> m_ValidationLayers;
-	std::vector<const char*> m_GlobalExtensions;
-	std::vector<const char*> m_DeviceExtensions;
+	std::vector<const char*> m_RequiredExtensions;
+	std::vector<const char*> m_LogicalDeviceExtensions;
 
 	// pipeline
 	VkPipeline m_Pipeline;
@@ -90,19 +90,12 @@ public:
 	Pipeline(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Pipeline();
 
-	uint32_t AquireNextImage();
 	void RenderFrame();
 
 private:
 	void PickPhysicalDevice();
 	void CreateLogicalDevice();
 	void CreateWindowSurface(GLFWwindow* windowHandle);
-
-	void FilterValidationLayers();
-	void FetchGlobalExtensions();
-	void FetchDeviceExtensions();
-	void FetchSupportedQueueFamilies();
-	void FetchSwapchainSupportDetails();
 
 	void CreateSwapchain();
 	void CreateImageViews();
@@ -113,6 +106,12 @@ private:
 	void CreateCommandPool();
 	void CreateCommandBuffers();
 	void CreateSynchronizations();
+
+	void FilterValidationLayers();
+	void FetchRequiredExtensions();
+	void FetchLogicalDeviceExtensions();
+	void FetchSupportedQueueFamilies();
+	void FetchSwapchainSupportDetails();
 
 	VkDebugUtilsMessengerCreateInfoEXT SetupDebugMessageCallback();
 };

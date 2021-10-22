@@ -8,20 +8,27 @@
 
 int main()
 {
+	// init logger
 	Logger::Init();
-	Window window = Window();
 
+	// create window & pipeline
+	Window window = Window();
 	Pipeline pipeline(window.GetHandle());
 
+	// fps calculator
 	Timer timer;
 	uint32_t frames = 0u;
 
+	/**  main loop  */
 	while (!window.IsClosed())
 	{
+		// handle events
 		glfwPollEvents();
 
+		// render frame
 		pipeline.RenderFrame();
 
+		// calculate fps
 		frames++;
 		if (timer.ElapsedTime() >= 1.0f)
 		{
