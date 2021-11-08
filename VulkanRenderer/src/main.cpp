@@ -14,6 +14,7 @@ int main()
 	// create window & pipeline
 	Window window = Window();
 	Pipeline pipeline(window.GetHandle());
+	window.RegisterPipeline(&pipeline);
 
 	// fps calculator
 	Timer timer;

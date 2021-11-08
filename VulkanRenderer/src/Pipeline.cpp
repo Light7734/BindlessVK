@@ -37,6 +37,8 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	m_SwapchainImageFormat(VK_FORMAT_UNDEFINED),
 	m_SwapchainExtent{},
 
+	m_SwapchainInvalidated(false),
+
 	// command pool
 	m_CommandPool(VK_NULL_HANDLE),
 	m_CommandBuffers{},
@@ -119,6 +121,9 @@ Pipeline::~Pipeline()
 	// destroy shaders
 	m_ShaderTriangle.reset();
 
+	// destroy swap chain
+	DestroySwapchain();
+
 	// destroy semaphores & fences
 	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
 	{
@@ -130,22 +135,6 @@ Pipeline::~Pipeline()
 	// destroy command pool
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
 
-	// destroy framebuffers
-	for (auto framebuffer : m_SwapchainFramebuffers)
-		vkDestroyFramebuffer(m_LogicalDevice, framebuffer, nullptr);
-
-	// destroy pipeline
-	vkDestroyPipeline(m_LogicalDevice, m_Pipeline, nullptr);
-	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
-	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
-
-	// destroy image views
-	for (auto swapchainImageView : m_SwapchainImageViews)
-		vkDestroyImageView(m_LogicalDevice, swapchainImageView, nullptr);
-
-	// destroy swap chain
-	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
-
 	// destroy device
 	vkDestroyDevice(m_LogicalDevice, nullptr);
 	vkDestroySurfaceKHR(m_VkInstance, m_Surface, nullptr);
@@ -155,7 +144,15 @@ Pipeline::~Pipeline()
 void Pipeline::RenderFrame()
 {
 	uint32_t imageIndex;
-	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex));
+	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+	{
+		RecreateSwapchain();
+		return;
+	}
+	else if (result != VK_SUCCESS)
+		throw vkException(result, __FILE__, __LINE__);
 
 	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
 		vkWaitForFences(m_LogicalDevice, 1u, &m_ImagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
@@ -195,7 +192,14 @@ void Pipeline::RenderFrame()
 
 	m_CurrentFrame = (m_CurrentFrame + 1) % m_FramesInFlight;
 
-	VKC(vkQueuePresentKHR(m_PresentQueue, &presentInfo));
+	result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || result == VK_SUBOPTIMAL_KHR) {
+		RecreateSwapchain();
+	}
+	else if (result != VK_SUCCESS) {
+		throw vkException(result, __FILE__, __LINE__);
+	}
 }
 
 void Pipeline::PickPhysicalDevice()
@@ -758,6 +762,41 @@ void Pipeline::CreateSynchronizations()
 		vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_Fences[i]);
 
 	}
+}
+
+void Pipeline::RecreateSwapchain()
+{
+	vkDeviceWaitIdle(m_LogicalDevice);
+
+	FetchSwapchainSupportDetails();
+	CreateSwapchain();
+	CreateImageViews();
+	CreateRenderPass();
+	CreatePipeline(m_ShaderTriangle->GetShaderStages());
+	CreatePipelineLayout();
+	CreateFramebuffers();
+	CreateCommandBuffers();
+}
+
+void Pipeline::DestroySwapchain()
+{
+	// destroy framebuffers
+	for (auto framebuffer : m_SwapchainFramebuffers)
+		vkDestroyFramebuffer(m_LogicalDevice, framebuffer, nullptr);
+
+	vkFreeCommandBuffers(m_LogicalDevice, m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
+
+	// destroy pipeline
+	vkDestroyPipeline(m_LogicalDevice, m_Pipeline, nullptr);
+	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
+	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
+
+	// destroy image views
+	for (auto swapchainImageView : m_SwapchainImageViews)
+		vkDestroyImageView(m_LogicalDevice, swapchainImageView, nullptr);
+
+	// destroy swap chain
+	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
 }
 
 void Pipeline::FilterValidationLayers()

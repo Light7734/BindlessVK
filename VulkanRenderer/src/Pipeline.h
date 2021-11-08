@@ -71,6 +71,9 @@ private:
 
 	SwapchainSupportDetails m_SwapChainDetails;
 
+	// aka - framebuffer resized
+	bool m_SwapchainInvalidated;
+
 	// command pool
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
@@ -92,6 +95,8 @@ public:
 
 	void RenderFrame();
 
+	inline void InvalidateSwapchain() { m_SwapchainInvalidated = true; }
+
 private:
 	void PickPhysicalDevice();
 	void CreateLogicalDevice();
@@ -106,6 +111,10 @@ private:
 	void CreateCommandPool();
 	void CreateCommandBuffers();
 	void CreateSynchronizations();
+
+	void RecreateSwapchain();
+
+	void DestroySwapchain();
 
 	void FilterValidationLayers();
 	void FetchRequiredExtensions();
