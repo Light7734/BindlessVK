@@ -5,6 +5,7 @@ project(VulkanRenderer VERSION 1.0.0 LANGUAGES CXX)
 add_subdirectory(Dependencies/volk)
 add_subdirectory(Dependencies/spdlog)
 add_subdirectory(Dependencies/glfw)
+add_subdirectory(Dependencies/glm)
 
 set(SHADERC_SKIP_TESTS ON)
 set(SHADERC_SKIP_EXAMPLES ON)

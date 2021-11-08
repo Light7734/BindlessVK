@@ -4,8 +4,51 @@
 
 #include <volk.h>
 
+#include <glm/glm.hpp>
+
 struct GLFWwindow;
 class Shader;
+
+struct Vertex
+{
+	glm::vec2 position;
+	glm::vec3 color;
+
+	static VkVertexInputBindingDescription GetBindingDescription()
+	{
+		VkVertexInputBindingDescription bindingDescription
+		{
+			.binding = 0,
+			.stride = sizeof(Vertex),
+			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+		};
+
+		return bindingDescription;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 2> GetAttributesDescription()
+	{
+		std::array<VkVertexInputAttributeDescription, 2> attributesDescription;
+
+		attributesDescription[0] =
+		{
+			.location = 0,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32_SFLOAT,
+			.offset = offsetof(Vertex, position),
+		};
+
+		attributesDescription[1] =
+		{
+			.location = 1,
+			.binding = 0,
+			.format = VK_FORMAT_R32G32B32_SFLOAT,
+			.offset = offsetof(Vertex, color),
+		};
+
+		return attributesDescription;
+	}
+};
 
 struct QueueFamilyIndices
 {
@@ -89,6 +132,8 @@ private:
 	// shaders
 	std::unique_ptr<Shader> m_ShaderTriangle;
 
+	VkBuffer m_VertexBuffer;
+	VkDeviceMemory m_VertexBufferMemory;
 public:
 	Pipeline(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Pipeline();
@@ -109,6 +154,7 @@ private:
 	void CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 	void CreateFramebuffers();
 	void CreateCommandPool();
+	void CreateVertexBuffers();
 	void CreateCommandBuffers();
 	void CreateSynchronizations();
 
@@ -121,6 +167,7 @@ private:
 	void FetchLogicalDeviceExtensions();
 	void FetchSupportedQueueFamilies();
 	void FetchSwapchainSupportDetails();
+	uint32_t FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags);
 
 	VkDebugUtilsMessengerCreateInfoEXT SetupDebugMessageCallback();
 };

@@ -5,7 +5,7 @@ if(MSVC)
     add_compile_options(/W0)
 endif()
 
-file(GLOB_RECURSE RENDERER_FILES true ABSOLUTE ${CMAKE_BINARY_DIR}/../VulkanRenderer/src/*)
+file(GLOB_RECURSE RENDERER_FILES true ABSOLUTE ${CMAKE_BINARY_DIR}/../VulkanRenderer/*)
 
 include_directories(
     ${CMAKE_BINARY_DIR}/../VulkanRenderer/src/
@@ -13,6 +13,8 @@ include_directories(
     ${CMAKE_BINARY_DIR}/../Dependencies/glfw/include
     ${CMAKE_BINARY_DIR}/../Dependencies/spdlog/include
     ${CMAKE_BINARY_DIR}/../Dependencies/volk/
+    ${CMAKE_BINARY_DIR}/../Dependencies/glm/
+
 
     ${CMAKE_BINARY_DIR}/../Dependencies/shaderc/libshaderc/include
     

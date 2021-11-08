@@ -49,7 +49,10 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	m_RenderFinishedSemaphores{},
 	m_Fences{},
 	m_ImagesInFlight{},
-	m_CurrentFrame(0ull)
+	m_CurrentFrame(0ull),
+
+	m_ShaderTriangle{},
+	m_VertexBuffer(VK_NULL_HANDLE)
 {
 	// init vulkan
 	VKC(volkInitialize());
@@ -109,6 +112,7 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	CreatePipeline(m_ShaderTriangle->GetShaderStages());
 	CreateFramebuffers();
 	CreateCommandPool();
+	CreateVertexBuffers();
 	CreateCommandBuffers();
 	CreateSynchronizations();
 }
@@ -123,6 +127,10 @@ Pipeline::~Pipeline()
 
 	// destroy swap chain
 	DestroySwapchain();
+
+	// destroy vertex buffer
+	vkDestroyBuffer(m_LogicalDevice, m_VertexBuffer, nullptr);
+	vkFreeMemory(m_LogicalDevice, m_VertexBufferMemory, nullptr);
 
 	// destroy semaphores & fences
 	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
@@ -143,6 +151,17 @@ Pipeline::~Pipeline()
 
 void Pipeline::RenderFrame()
 {
+	// vertices
+	const std::vector<Vertex> vertices = {
+		{{0.0f, -0.5f}, { (1.0f + sin(glfwGetTime())) / 2.0f, 0.0f, 0.0f}},
+		{{0.5f, 0.5f}, {0.0f, 1.0f + (cos(glfwGetTime()) / 2.0f), 0.0f}},
+		{{-0.5f, 0.5f}, {0.0f, 0.0f, abs(tan(glfwGetTime()))}}
+	};
+	void* data;
+	vkMapMemory(m_LogicalDevice, m_VertexBufferMemory, NULL, sizeof(Vertex) * 3u, NULL, &data);
+	memcpy(data, vertices.data(), sizeof(Vertex) * 3);
+	vkUnmapMemory(m_LogicalDevice, m_VertexBufferMemory);
+
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
 
@@ -501,12 +520,19 @@ void Pipeline::CreatePipelineLayout()
 
 void Pipeline::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages)
 {
+	auto bindingDescription = Vertex::GetBindingDescription();
+	auto attributesDescription = Vertex::GetAttributesDescription();
+
 	// pipeline Vertex state create-info
 	VkPipelineVertexInputStateCreateInfo pipelineVertexStateCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		.vertexBindingDescriptionCount = 0u,
-		.vertexAttributeDescriptionCount = 0u
+
+		.vertexBindingDescriptionCount = 1u,
+		.pVertexBindingDescriptions = &bindingDescription,
+
+		.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributesDescription.size()),
+		.pVertexAttributeDescriptions = attributesDescription.data()
 	};
 
 	// pipeline input-assembly state create-info
@@ -673,6 +699,37 @@ void Pipeline::CreateCommandPool()
 	VKC(vkCreateCommandPool(m_LogicalDevice, &commandpoolCreateInfo, nullptr, &m_CommandPool));
 }
 
+void Pipeline::CreateVertexBuffers()
+{
+
+
+	// buffer create-info
+	VkBufferCreateInfo bufferCreateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size = sizeof(Vertex) * 3u,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+	};
+
+	// create buffer
+	VKC(vkCreateBuffer(m_LogicalDevice, &bufferCreateInfo, nullptr, &m_VertexBuffer));
+
+	VkMemoryRequirements memoryRequirments;
+	vkGetBufferMemoryRequirements(m_LogicalDevice, m_VertexBuffer, &memoryRequirments);
+
+	VkMemoryAllocateInfo allocateInfo =
+	{
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize = memoryRequirments.size,
+		.memoryTypeIndex = FetchMemoryType(memoryRequirments.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+	};
+
+	VKC(vkAllocateMemory(m_LogicalDevice, &allocateInfo, nullptr, &m_VertexBufferMemory));
+
+	VKC(vkBindBufferMemory(m_LogicalDevice, m_VertexBuffer, m_VertexBufferMemory, 0u));
+}
+
 void Pipeline::CreateCommandBuffers()
 {
 	m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
@@ -724,14 +781,20 @@ void Pipeline::CreateCommandBuffers()
 		};
 
 
+
 		vkCmdBeginRenderPass(m_CommandBuffers[i], &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+
+		VkDeviceSize offsets[] = { 0 };
+		VkBuffer vertexBuffers[] = { m_VertexBuffer };
+		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, vertexBuffers, offsets);
+
 		vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+
 		vkCmdEndRenderPass(m_CommandBuffers[i]);
 
 		VKC(vkEndCommandBuffer(m_CommandBuffers[i]));
 	}
-
 }
 
 void Pipeline::CreateSynchronizations()
@@ -924,6 +987,23 @@ void Pipeline::FetchSwapchainSupportDetails()
 
 	m_SwapChainDetails.presentModes.resize(presentModeCount);
 	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, m_SwapChainDetails.presentModes.data());
+}
+
+uint32_t Pipeline::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags)
+{
+	VkPhysicalDeviceMemoryProperties physicalMemoryProperties;
+	vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &physicalMemoryProperties);
+
+	for (uint32_t i = 0; i < physicalMemoryProperties.memoryTypeCount; i++)
+	{
+		if (typeFilter & (1 << i) && (physicalMemoryProperties.memoryTypes[i].propertyFlags & flags) == flags)
+		{
+			return i;
+		}
+	}
+
+	throw std::runtime_error("bruh moment right here");
+	return -1;
 }
 
 VkDebugUtilsMessengerCreateInfoEXT Pipeline::SetupDebugMessageCallback()
