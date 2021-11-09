@@ -59,6 +59,8 @@ public:
 	Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
 	~Buffer();
 
+	void CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandPool, VkQueue graphicsQueue);
+
 	void* Map(uint32_t size);
 	void Unmap();
 

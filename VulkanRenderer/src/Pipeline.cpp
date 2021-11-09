@@ -101,8 +101,12 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 
 	// load shaders
 	m_ShaderTriangle = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", m_LogicalDevice);
-	m_StagingBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 3, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	m_VertexBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 3, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+	m_VertexStagingBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	m_VertexBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+	m_IndexStagingBuffer = std::make_unique<Buffer>(m_DeviceContext, sizeof(uint32_t) * 6ull, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	m_IndexBuffer = std::make_unique<Buffer>(m_DeviceContext, sizeof(uint32_t) * 6ull, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	// pipeline context
 	FetchSwapchainSupportDetails();
@@ -125,8 +129,11 @@ Pipeline::~Pipeline()
 	// destroy shaders
 	m_ShaderTriangle.reset();
 
-	m_StagingBuffer.reset();
+	m_VertexStagingBuffer.reset();
 	m_VertexBuffer.reset();
+
+	m_IndexStagingBuffer.reset();
+	m_IndexBuffer.reset();
 
 	// destroy swap chain
 	DestroySwapchain();
@@ -151,59 +158,34 @@ Pipeline::~Pipeline()
 
 void Pipeline::RenderFrame()
 {
-	VkCommandBufferAllocateInfo allocInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = m_CommandPool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1u,
-	};
-
-	VkCommandBuffer commandBuffer;
-	VKC(vkAllocateCommandBuffers(m_LogicalDevice, &allocInfo, &commandBuffer));
-
-	VkCommandBufferBeginInfo beginInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-	};
-	VKC(vkBeginCommandBuffer(commandBuffer, &beginInfo));
-
-	VkBufferCopy copyRegion
-	{
-		.srcOffset = 0u,
-		.dstOffset = 0u,
-		.size = (sizeof(glm::vec3) + sizeof(glm::vec2)) * 3
-	};
-
-	vkCmdCopyBuffer(commandBuffer, *m_StagingBuffer->GetBuffer(), *m_VertexBuffer->GetBuffer(), 1u, &copyRegion);
-	VKC(vkEndCommandBuffer(commandBuffer));
-
-	VkSubmitInfo copySubmitInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.commandBufferCount = 1u,
-		.pCommandBuffers = &commandBuffer
-	};
-
-	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &copySubmitInfo, VK_NULL_HANDLE));
-	VKC(vkQueueWaitIdle(m_GraphicsQueue));
-	vkFreeCommandBuffers(m_LogicalDevice, m_CommandPool, 1u, &commandBuffer);
-
-
-	double time = glfwGetTime();
+	double time = glfwGetTime() * 3.0f;
 	float r = (((1.0f - sin(time)) / 2.0f)) + abs(tan(time / 9.0f));
 	float g = (((1.0f + sin(time)) / 2.0f)) + abs(tan(time / 9.0f));
 	float b = (((1.0f + cos(time)) / 2.0f)) + abs(tan(time / 9.0f));
-	const std::vector<Vertex> vertices = {
-		{{0.0f, -0.5f}, { r, 0.0f, 0.0f}},
-		{{0.5f, 0.5f}, {0.0f, g, 0.0f}},
-		{{-0.5f, 0.5f}, {0.0f, 0.0f, b}}
+
+	const std::vector<Vertex> vertices =
+	{
+		{{-0.5f, -0.5f}, {r, 0.0, 0.0f}},
+		{{0.5f, -0.5f}, {0.0f, g, 0.0}},
+		{{0.5f, 0.5f}, {0.0, 0.0f, b}},
+		{{-0.5f, 0.5f}, {r, g, b}}
 	};
 
-	void* map = m_StagingBuffer->Map((sizeof(glm::vec3) + sizeof(glm::vec2)) * 3);
-	memcpy(map, &vertices[0], (sizeof(glm::vec3) + sizeof(glm::vec2)) * 3);
-	m_StagingBuffer->Unmap();
+	const std::vector<uint32_t> indices =
+	{
+		0, 1, 2, 2, 3, 0
+	};
+
+	void* map = m_VertexStagingBuffer->Map((sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull);
+	memcpy(map, &vertices[0], (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull);
+	m_VertexStagingBuffer->Unmap();
+
+	map = m_IndexStagingBuffer->Map(sizeof(uint32_t) * 6ull);
+	memcpy(map, &indices[0], sizeof(uint32_t) * 6ull);
+	m_IndexStagingBuffer->Unmap();
+
+	m_VertexBuffer->CopyBufferToSelf(m_VertexStagingBuffer.get(), (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull, m_CommandPool, m_GraphicsQueue);
+	m_IndexBuffer->CopyBufferToSelf(m_IndexStagingBuffer.get(), sizeof(uint32_t) * 6ull, m_CommandPool, m_GraphicsQueue);
 
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -804,7 +786,10 @@ void Pipeline::CreateCommandBuffers()
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, m_VertexBuffer->GetBuffer(), offsets);
 
-		vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+		vkCmdBindIndexBuffer(m_CommandBuffers[i], *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
+
+		// vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
+		vkCmdDrawIndexed(m_CommandBuffers[i], 6u, 1u, 0u, 0u, 0u);
 
 		vkCmdEndRenderPass(m_CommandBuffers[i]);
 

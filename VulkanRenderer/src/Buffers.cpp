@@ -37,6 +37,49 @@ Buffer::~Buffer()
 	vkFreeMemory(m_DeviceContext.logical, m_Memory, nullptr);
 }
 
+void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandPool, VkQueue graphicsQueue)
+{
+	VkCommandBufferAllocateInfo allocInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = commandPool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1u,
+	};
+
+	VkCommandBuffer commandBuffer;
+	VKC(vkAllocateCommandBuffers(m_DeviceContext.logical, &allocInfo, &commandBuffer));
+
+	VkCommandBufferBeginInfo beginInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+	};
+	VKC(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+	VkBufferCopy copyRegion
+	{
+		.srcOffset = 0u,
+		.dstOffset = 0u,
+		.size = size
+	};
+
+	vkCmdCopyBuffer(commandBuffer, *src->GetBuffer(), m_Buffer, 1u, &copyRegion);
+	VKC(vkEndCommandBuffer(commandBuffer));
+
+	VkSubmitInfo copySubmitInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1u,
+		.pCommandBuffers = &commandBuffer
+	};
+
+	VKC(vkQueueSubmit(graphicsQueue, 1u, &copySubmitInfo, VK_NULL_HANDLE));
+	VKC(vkQueueWaitIdle(graphicsQueue));
+	vkFreeCommandBuffers(m_DeviceContext.logical, commandPool, 1u, &commandBuffer);
+
+}
+
 void* Buffer::Map(uint32_t size)
 {
 	void* map;
