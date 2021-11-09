@@ -51,8 +51,7 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	m_ImagesInFlight{},
 	m_CurrentFrame(0ull),
 
-	m_ShaderTriangle{},
-	m_VertexBuffer(VK_NULL_HANDLE)
+	m_ShaderTriangle{}
 {
 	// init vulkan
 	VKC(volkInitialize());
@@ -102,6 +101,7 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 
 	// load shaders
 	m_ShaderTriangle = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", m_LogicalDevice);
+	m_VertexBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 3, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
 
 	// pipeline context
 	FetchSwapchainSupportDetails();
@@ -112,7 +112,6 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	CreatePipeline(m_ShaderTriangle->GetShaderStages());
 	CreateFramebuffers();
 	CreateCommandPool();
-	CreateVertexBuffers();
 	CreateCommandBuffers();
 	CreateSynchronizations();
 }
@@ -125,12 +124,10 @@ Pipeline::~Pipeline()
 	// destroy shaders
 	m_ShaderTriangle.reset();
 
+	m_VertexBuffer.reset();
+
 	// destroy swap chain
 	DestroySwapchain();
-
-	// destroy vertex buffer
-	vkDestroyBuffer(m_LogicalDevice, m_VertexBuffer, nullptr);
-	vkFreeMemory(m_LogicalDevice, m_VertexBufferMemory, nullptr);
 
 	// destroy semaphores & fences
 	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
@@ -151,16 +148,15 @@ Pipeline::~Pipeline()
 
 void Pipeline::RenderFrame()
 {
-	// vertices
 	const std::vector<Vertex> vertices = {
 		{{0.0f, -0.5f}, { (1.0f + sin(glfwGetTime())) / 2.0f, 0.0f, 0.0f}},
 		{{0.5f, 0.5f}, {0.0f, 1.0f + (cos(glfwGetTime()) / 2.0f), 0.0f}},
 		{{-0.5f, 0.5f}, {0.0f, 0.0f, abs(tan(glfwGetTime()))}}
 	};
-	void* data;
-	vkMapMemory(m_LogicalDevice, m_VertexBufferMemory, NULL, sizeof(Vertex) * 3u, NULL, &data);
-	memcpy(data, vertices.data(), sizeof(Vertex) * 3);
-	vkUnmapMemory(m_LogicalDevice, m_VertexBufferMemory);
+
+	void* map = m_VertexBuffer->Map((sizeof(glm::vec3) + sizeof(glm::vec2)) * 3);
+	memcpy(map, &vertices[0], (sizeof(glm::vec3) + sizeof(glm::vec2)) * 3);
+	m_VertexBuffer->Unmap();
 
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -269,6 +265,8 @@ void Pipeline::PickPhysicalDevice()
 	}
 
 	ASSERT(m_PhysicalDevice, "Pipeline::PickPhysicalDevice: failed to find suitable GPU for vulkan");
+
+	m_DeviceContext.physical = m_PhysicalDevice;
 }
 
 void Pipeline::CreateLogicalDevice()
@@ -321,6 +319,8 @@ void Pipeline::CreateLogicalDevice()
 
 	ASSERT(m_GraphicsQueue, "Pipeline::CreateLogicalDevice: failed to get graphics queue");
 	ASSERT(m_PresentQueue, "Pipeline::CreateLogicalDevice: failed to get present queue");
+
+	m_DeviceContext.logical = m_LogicalDevice;
 }
 
 void Pipeline::CreateWindowSurface(GLFWwindow* windowHandle)
@@ -699,37 +699,6 @@ void Pipeline::CreateCommandPool()
 	VKC(vkCreateCommandPool(m_LogicalDevice, &commandpoolCreateInfo, nullptr, &m_CommandPool));
 }
 
-void Pipeline::CreateVertexBuffers()
-{
-
-
-	// buffer create-info
-	VkBufferCreateInfo bufferCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = sizeof(Vertex) * 3u,
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-	};
-
-	// create buffer
-	VKC(vkCreateBuffer(m_LogicalDevice, &bufferCreateInfo, nullptr, &m_VertexBuffer));
-
-	VkMemoryRequirements memoryRequirments;
-	vkGetBufferMemoryRequirements(m_LogicalDevice, m_VertexBuffer, &memoryRequirments);
-
-	VkMemoryAllocateInfo allocateInfo =
-	{
-		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize = memoryRequirments.size,
-		.memoryTypeIndex = FetchMemoryType(memoryRequirments.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-	};
-
-	VKC(vkAllocateMemory(m_LogicalDevice, &allocateInfo, nullptr, &m_VertexBufferMemory));
-
-	VKC(vkBindBufferMemory(m_LogicalDevice, m_VertexBuffer, m_VertexBufferMemory, 0u));
-}
-
 void Pipeline::CreateCommandBuffers()
 {
 	m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
@@ -786,8 +755,7 @@ void Pipeline::CreateCommandBuffers()
 		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
 		VkDeviceSize offsets[] = { 0 };
-		VkBuffer vertexBuffers[] = { m_VertexBuffer };
-		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, vertexBuffers, offsets);
+		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, m_VertexBuffer->GetBuffer(), offsets);
 
 		vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
 

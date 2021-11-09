@@ -1,54 +1,15 @@
 #pragma once
 
 #include "Base.h"
-
-#include <volk.h>
+#include "DeviceContext.h"
+#include "Buffers.h"
 
 #include <glm/glm.hpp>
 
+#include <volk.h>
+
 struct GLFWwindow;
 class Shader;
-
-struct Vertex
-{
-	glm::vec2 position;
-	glm::vec3 color;
-
-	static VkVertexInputBindingDescription GetBindingDescription()
-	{
-		VkVertexInputBindingDescription bindingDescription
-		{
-			.binding = 0,
-			.stride = sizeof(Vertex),
-			.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-		};
-
-		return bindingDescription;
-	}
-
-	static std::array<VkVertexInputAttributeDescription, 2> GetAttributesDescription()
-	{
-		std::array<VkVertexInputAttributeDescription, 2> attributesDescription;
-
-		attributesDescription[0] =
-		{
-			.location = 0,
-			.binding = 0,
-			.format = VK_FORMAT_R32G32_SFLOAT,
-			.offset = offsetof(Vertex, position),
-		};
-
-		attributesDescription[1] =
-		{
-			.location = 1,
-			.binding = 0,
-			.format = VK_FORMAT_R32G32B32_SFLOAT,
-			.offset = offsetof(Vertex, color),
-		};
-
-		return attributesDescription;
-	}
-};
 
 struct QueueFamilyIndices
 {
@@ -82,6 +43,7 @@ private:
 	VkSurfaceKHR m_Surface;
 
 	// device
+	DeviceContext m_DeviceContext;
 	VkInstance m_VkInstance;
 	VkPhysicalDevice m_PhysicalDevice;
 	VkDevice m_LogicalDevice;
@@ -132,8 +94,9 @@ private:
 	// shaders
 	std::unique_ptr<Shader> m_ShaderTriangle;
 
-	VkBuffer m_VertexBuffer;
-	VkDeviceMemory m_VertexBufferMemory;
+	// buffers
+	std::unique_ptr<Buffer> m_VertexBuffer;
+
 public:
 	Pipeline(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Pipeline();
@@ -154,7 +117,6 @@ private:
 	void CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 	void CreateFramebuffers();
 	void CreateCommandPool();
-	void CreateVertexBuffers();
 	void CreateCommandBuffers();
 	void CreateSynchronizations();
 
