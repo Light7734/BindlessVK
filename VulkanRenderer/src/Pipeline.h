@@ -96,6 +96,7 @@ private:
 
 	// buffers
 	std::unique_ptr<Buffer> m_VertexBuffer;
+	std::unique_ptr<Buffer> m_StagingBuffer;
 
 public:
 	Pipeline(GLFWwindow* windowHandle, uint32_t frames = 2u);

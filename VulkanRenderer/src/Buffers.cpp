@@ -1,6 +1,6 @@
 #include "Buffers.h"
 
-Buffer::Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage) :
+Buffer::Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties) :
 	m_DeviceContext(deviceContext),
 	m_Buffer(VK_NULL_HANDLE),
 	m_Memory(VK_NULL_HANDLE)
@@ -24,7 +24,7 @@ Buffer::Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags us
 	{
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize = memoryRequirments.size,
-		.memoryTypeIndex = FetchMemoryType(memoryRequirments.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+		.memoryTypeIndex = FetchMemoryType(memoryRequirments.memoryTypeBits, memoryProperties),
 	};
 
 	VKC(vkAllocateMemory(m_DeviceContext.logical, &allocateInfo, nullptr, &m_Memory));

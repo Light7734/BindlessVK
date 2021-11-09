@@ -56,7 +56,7 @@ private:
 	VkDeviceMemory m_Memory;
 
 public:
-	Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage);
+	Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
 	~Buffer();
 
 	void* Map(uint32_t size);
