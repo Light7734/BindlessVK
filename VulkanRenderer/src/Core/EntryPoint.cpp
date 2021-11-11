@@ -1,9 +1,9 @@
-#include "Base.h"
+#include "Core/Base.h"
+#include "Core/Timer.h"
+#include "Core/Window.h"
 
-#include "Pipeline.h"
-#include "Window.h"
+#include "Graphics/Pipeline.h"
 
-#include "Timer.h"
 #include <glfw/glfw3.h>
 
 int main()
@@ -13,7 +13,8 @@ int main()
 
 	// create window & pipeline
 	Window window = Window();
-	Pipeline pipeline(window.GetHandle());
+	Pipeline pipeline = Pipeline(window.GetHandle());
+
 	window.RegisterPipeline(&pipeline);
 
 	// fps calculator

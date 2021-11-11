@@ -1,5 +1,5 @@
 #include "Window.h"
-#include "Pipeline.h"
+#include "Graphics/Pipeline.h"
 
 #include <glfw/glfw3.h>
 

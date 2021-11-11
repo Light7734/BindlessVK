@@ -758,7 +758,7 @@ void Pipeline::CreateCommandBuffers()
 		// clear value
 		VkClearValue clearColor =
 		{
-			.color = { 0.124f, 0.345f, 0.791f, 1.0f }
+			.color = { 0.124, 0.231, 0.491f, 1.0f }
 		};
 
 		// render pass begin-info
@@ -804,7 +804,7 @@ void Pipeline::CreateSynchronizations()
 	m_Fences.resize(m_FramesInFlight);
 	m_ImagesInFlight.resize(m_SwapchainImages.size(), VK_NULL_HANDLE);
 
-	// semaphor create-info
+	// semaphore create-info
 	VkSemaphoreCreateInfo semaphoreCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "Base.h"
-#include "DeviceContext.h"
-#include "Buffers.h"
+#include "Core/Base.h"
+
+#include "Graphics/DeviceContext.h"
+#include "Graphics/Buffers.h"
 
 #include <glm/glm.hpp>
 

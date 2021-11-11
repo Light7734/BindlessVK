@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Logger.h"
-#include "Exceptions.h"
+#include "Debug/Logger.h"
+#include "Debug/Exceptions.h"
 
 #define BIT(x) 1 << x
 
