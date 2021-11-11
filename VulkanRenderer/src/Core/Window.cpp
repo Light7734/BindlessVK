@@ -1,5 +1,5 @@
 #include "Window.h"
-#include "Graphics/Pipeline.h"
+#include "Graphics/Renderer.h"
 
 #include <glfw/glfw3.h>
 
@@ -39,8 +39,8 @@ void Window::BindGlfwEvents()
 {
 	glfwSetFramebufferSizeCallback(m_WindowHandle, [](GLFWwindow* window, int width, int height)
 		{
-			Pipeline** pipelinePtr = (Pipeline**)glfwGetWindowUserPointer(window);
-			if (Pipeline* pipeline = *pipelinePtr)
+			Renderer** pipelinePtr = (Renderer**)glfwGetWindowUserPointer(window);
+			if (Renderer* pipeline = *pipelinePtr)
 				pipeline->InvalidateSwapchain();
 		});
 }

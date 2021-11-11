@@ -1,9 +1,9 @@
-#include "Pipeline.h"
+#include "Graphics/Renderer.h"
 #include "Shader.h"
 
 #include <glfw/glfw3.h>
 
-Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
+Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	// window
 	m_WindowHandle(windowHandle),
 	m_Surface(VK_NULL_HANDLE),
@@ -121,7 +121,7 @@ Pipeline::Pipeline(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	CreateSynchronizations();
 }
 
-Pipeline::~Pipeline()
+Renderer::~Renderer()
 {
 	// wait for drawing and presentation operations to end
 	vkDeviceWaitIdle(m_LogicalDevice);
@@ -156,11 +156,12 @@ Pipeline::~Pipeline()
 	vkDestroyInstance(m_VkInstance, nullptr);
 }
 
-void Pipeline::RenderFrame()
+void Renderer::RenderFrame()
 {
 	double time = glfwGetTime() * 3.0f;
-	float r = (((1.0f - sin(time)) / 2.0f)) + abs(tan(time / 9.0f));
-	float g = (((1.0f + sin(time)) / 2.0f)) + abs(tan(time / 9.0f));
+
+	float r = (((1.0f - sin(time * 1.2)) / 2.0f)) + abs(tan(time / 9.0f));
+	float g = (((1.0f + sin(time * 0.8)) / 2.0f)) + abs(tan(time / 9.0f));
 	float b = (((1.0f + cos(time)) / 2.0f)) + abs(tan(time / 9.0f));
 
 	const std::vector<Vertex> vertices =
@@ -246,7 +247,7 @@ void Pipeline::RenderFrame()
 	}
 }
 
-void Pipeline::PickPhysicalDevice()
+void Renderer::PickPhysicalDevice()
 {
 	// fetch physical devices
 	uint32_t deviceCount = 0u;
@@ -298,7 +299,7 @@ void Pipeline::PickPhysicalDevice()
 	m_DeviceContext.physical = m_PhysicalDevice;
 }
 
-void Pipeline::CreateLogicalDevice()
+void Renderer::CreateLogicalDevice()
 {
 	// fetch properties & features
 	VkPhysicalDeviceProperties deviceProperties;
@@ -352,12 +353,12 @@ void Pipeline::CreateLogicalDevice()
 	m_DeviceContext.logical = m_LogicalDevice;
 }
 
-void Pipeline::CreateWindowSurface(GLFWwindow* windowHandle)
+void Renderer::CreateWindowSurface(GLFWwindow* windowHandle)
 {
 	glfwCreateWindowSurface(m_VkInstance, windowHandle, nullptr, &m_Surface);
 }
 
-void Pipeline::CreateSwapchain()
+void Renderer::CreateSwapchain()
 {
 	// pick the desired swap chain surface format
 	VkSurfaceFormatKHR swapChainSurfaceFormat{};
@@ -438,7 +439,7 @@ void Pipeline::CreateSwapchain()
 	vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, m_SwapchainImages.data());
 }
 
-void Pipeline::CreateImageViews()
+void Renderer::CreateImageViews()
 {
 	m_SwapchainImageViews.resize(m_SwapchainImages.size());
 
@@ -473,7 +474,7 @@ void Pipeline::CreateImageViews()
 	}
 }
 
-void Pipeline::CreateRenderPass()
+void Renderer::CreateRenderPass()
 {
 	/// attachment description
 	VkAttachmentDescription attachmentDescription
@@ -531,7 +532,7 @@ void Pipeline::CreateRenderPass()
 
 }
 
-void Pipeline::CreatePipelineLayout()
+void Renderer::CreatePipelineLayout()
 {
 	// pipeline layout create-info
 	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
@@ -547,7 +548,7 @@ void Pipeline::CreatePipelineLayout()
 	VKC(vkCreatePipelineLayout(m_LogicalDevice, &pipelineLayoutCreateInfo, nullptr, &m_PipelineLayout));
 }
 
-void Pipeline::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages)
+void Renderer::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages)
 {
 	auto bindingDescription = Vertex::GetBindingDescription();
 	auto attributesDescription = Vertex::GetAttributesDescription();
@@ -692,7 +693,7 @@ void Pipeline::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> sha
 	VKC(vkCreateGraphicsPipelines(m_LogicalDevice, VK_NULL_HANDLE, 1u, &pipelineCreateInfo, nullptr, &m_Pipeline));
 }
 
-void Pipeline::CreateFramebuffers()
+void Renderer::CreateFramebuffers()
 {
 	m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
 
@@ -714,7 +715,7 @@ void Pipeline::CreateFramebuffers()
 	}
 }
 
-void Pipeline::CreateCommandPool()
+void Renderer::CreateCommandPool()
 {
 	// command pool create-info
 	VkCommandPoolCreateInfo commandpoolCreateInfo
@@ -728,7 +729,7 @@ void Pipeline::CreateCommandPool()
 	VKC(vkCreateCommandPool(m_LogicalDevice, &commandpoolCreateInfo, nullptr, &m_CommandPool));
 }
 
-void Pipeline::CreateCommandBuffers()
+void Renderer::CreateCommandBuffers()
 {
 	m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
 
@@ -797,7 +798,7 @@ void Pipeline::CreateCommandBuffers()
 	}
 }
 
-void Pipeline::CreateSynchronizations()
+void Renderer::CreateSynchronizations()
 {
 	m_ImageAvailableSemaphores.resize(m_FramesInFlight);
 	m_RenderFinishedSemaphores.resize(m_FramesInFlight);
@@ -827,7 +828,7 @@ void Pipeline::CreateSynchronizations()
 	}
 }
 
-void Pipeline::RecreateSwapchain()
+void Renderer::RecreateSwapchain()
 {
 	vkDeviceWaitIdle(m_LogicalDevice);
 
@@ -841,7 +842,7 @@ void Pipeline::RecreateSwapchain()
 	CreateCommandBuffers();
 }
 
-void Pipeline::DestroySwapchain()
+void Renderer::DestroySwapchain()
 {
 	// destroy framebuffers
 	for (auto framebuffer : m_SwapchainFramebuffers)
@@ -862,7 +863,7 @@ void Pipeline::DestroySwapchain()
 	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
 }
 
-void Pipeline::FilterValidationLayers()
+void Renderer::FilterValidationLayers()
 {
 	// fetch available layers
 	uint32_t layerCount;
@@ -894,7 +895,7 @@ void Pipeline::FilterValidationLayers()
 	}
 }
 
-void Pipeline::FetchRequiredExtensions()
+void Renderer::FetchRequiredExtensions()
 {
 	// fetch required global extensions
 	uint32_t glfwExtensionsCount = 0u;
@@ -905,7 +906,7 @@ void Pipeline::FetchRequiredExtensions()
 	m_RequiredExtensions.insert(m_RequiredExtensions.end(), glfwExtensions, glfwExtensions + glfwExtensionsCount);
 }
 
-void Pipeline::FetchLogicalDeviceExtensions()
+void Renderer::FetchLogicalDeviceExtensions()
 {
 	// fetch device extensions
 	uint32_t deviceExtensionsCount = 0u;
@@ -931,7 +932,7 @@ void Pipeline::FetchLogicalDeviceExtensions()
 	}
 }
 
-void Pipeline::FetchSupportedQueueFamilies()
+void Renderer::FetchSupportedQueueFamilies()
 {
 	m_QueueFamilyIndices = {};
 
@@ -967,7 +968,7 @@ void Pipeline::FetchSupportedQueueFamilies()
 	m_QueueFamilyIndices.indices = { m_QueueFamilyIndices.graphics.value(), m_QueueFamilyIndices.present.value() };
 }
 
-void Pipeline::FetchSwapchainSupportDetails()
+void Renderer::FetchSwapchainSupportDetails()
 {
 	// fetch device surface capabilities
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &m_SwapChainDetails.capabilities);
@@ -989,7 +990,7 @@ void Pipeline::FetchSwapchainSupportDetails()
 	vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, m_Surface, &presentModeCount, m_SwapChainDetails.presentModes.data());
 }
 
-uint32_t Pipeline::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags)
+uint32_t Renderer::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags)
 {
 	VkPhysicalDeviceMemoryProperties physicalMemoryProperties;
 	vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &physicalMemoryProperties);
@@ -1006,7 +1007,7 @@ uint32_t Pipeline::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags fl
 	return -1;
 }
 
-VkDebugUtilsMessengerCreateInfoEXT Pipeline::SetupDebugMessageCallback()
+VkDebugUtilsMessengerCreateInfoEXT Renderer::SetupDebugMessageCallback()
 {
 	// debug messenger create-info
 	VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo

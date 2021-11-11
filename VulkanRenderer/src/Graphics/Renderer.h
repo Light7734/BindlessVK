@@ -36,7 +36,7 @@ struct SwapchainSupportDetails
 	operator bool() const { return IsSuitableForRendering(); }
 };
 
-class Pipeline
+class Renderer
 {
 private:
 	// window
@@ -103,8 +103,8 @@ private:
 	std::unique_ptr<Buffer> m_IndexStagingBuffer;
 
 public:
-	Pipeline(GLFWwindow* windowHandle, uint32_t frames = 2u);
-	~Pipeline();
+	Renderer(GLFWwindow* windowHandle, uint32_t frames = 2u);
+	~Renderer();
 
 	void RenderFrame();
 

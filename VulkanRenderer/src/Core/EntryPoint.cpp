@@ -2,7 +2,7 @@
 #include "Core/Timer.h"
 #include "Core/Window.h"
 
-#include "Graphics/Pipeline.h"
+#include "Graphics/Renderer.h"
 
 #include <glfw/glfw3.h>
 
@@ -13,7 +13,7 @@ int main()
 
 	// create window & pipeline
 	Window window = Window();
-	Pipeline pipeline = Pipeline(window.GetHandle());
+	Renderer pipeline = Renderer(window.GetHandle());
 
 	window.RegisterPipeline(&pipeline);
 
