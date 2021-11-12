@@ -24,9 +24,7 @@ Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	m_RequiredExtensions{ VK_EXT_DEBUG_UTILS_EXTENSION_NAME },
 	m_LogicalDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME },
 
-	// pipeline
-	m_Pipeline(VK_NULL_HANDLE),
-	m_PipelineLayout(VK_NULL_HANDLE),
+	// render pass
 	m_RenderPass(VK_NULL_HANDLE),
 
 	// swap chain
@@ -49,9 +47,7 @@ Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	m_RenderFinishedSemaphores{},
 	m_Fences{},
 	m_ImagesInFlight{},
-	m_CurrentFrame(0ull),
-
-	m_ShaderTriangle{}
+	m_CurrentFrame(0ull)
 {
 	// init vulkan
 	VKC(volkInitialize());
@@ -99,22 +95,13 @@ Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	CreateLogicalDevice();
 	FetchLogicalDeviceExtensions();
 
-	// load shaders
-	m_ShaderTriangle = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", m_LogicalDevice);
-
-	m_VertexStagingBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	m_VertexBuffer = std::make_unique<Buffer>(m_DeviceContext, (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-	m_IndexStagingBuffer = std::make_unique<Buffer>(m_DeviceContext, sizeof(uint32_t) * 6ull, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	m_IndexBuffer = std::make_unique<Buffer>(m_DeviceContext, sizeof(uint32_t) * 6ull, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 	// pipeline context
 	FetchSwapchainSupportDetails();
 	CreateSwapchain();
 	CreateImageViews();
 	CreateRenderPass();
-	CreatePipelineLayout();
-	CreatePipeline(m_ShaderTriangle->GetShaderStages());
+	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_SwapchainExtent);
+	// CreatePipeline(m_ShaderTriangle->GetShaderStages());
 	CreateFramebuffers();
 	CreateCommandPool();
 	CreateCommandBuffers();
@@ -126,18 +113,10 @@ Renderer::~Renderer()
 	// wait for drawing and presentation operations to end
 	vkDeviceWaitIdle(m_LogicalDevice);
 
-	// destroy shaders
-	m_ShaderTriangle.reset();
-
-	m_VertexStagingBuffer.reset();
-	m_VertexBuffer.reset();
-
-	m_IndexStagingBuffer.reset();
-	m_IndexBuffer.reset();
-
-	// destroy swap chain
 	DestroySwapchain();
 
+	// destroy renderer programs
+	m_RainbowRectProgram.reset();
 
 	// destroy semaphores & fences
 	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
@@ -158,35 +137,37 @@ Renderer::~Renderer()
 
 void Renderer::RenderFrame()
 {
-	double time = glfwGetTime() * 3.0f;
+	// time
+	const double time = glfwGetTime() * 3.0f;
 
-	float r = (((1.0f - sin(time * 1.2)) / 2.0f)) + abs(tan(time / 9.0f));
-	float g = (((1.0f + sin(time * 0.8)) / 2.0f)) + abs(tan(time / 9.0f));
-	float b = (((1.0f + cos(time)) / 2.0f)) + abs(tan(time / 9.0f));
+	// dynamic rainbow colors >_<
+	const float r = (((1.0f - sin(time * 1.2)) / 2.0f)) + abs(tan(time / 9.0f));
+	const float g = (((1.0f + sin(time * 0.8)) / 2.0f)) + abs(tan(time / 9.0f));
+	const float b = (((1.0f + cos(time)) / 2.0f)) + abs(tan(time / 9.0f));
 
-	const std::vector<Vertex> vertices =
+	const float vertices[] =
 	{
-		{{-0.5f, -0.5f}, {r, 0.0, 0.0f}},
-		{{0.5f, -0.5f}, {0.0f, g, 0.0}},
-		{{0.5f, 0.5f}, {0.0, 0.0f, b}},
-		{{-0.5f, 0.5f}, {r, g, b}}
+		//   position,      color
+		//   x      y       r      g      b
+			-0.5f, -0.5f,   r,     0.0f,  0.0f,
+			 0.5f, -0.5f,   0.0f,  g,     0.0f,
+			 0.5f,  0.5f,   0.0f,  0.0f,  b,
+			-0.5f,  0.5f,   r,     g,     b,
 	};
 
-	const std::vector<uint32_t> indices =
+
+	const uint32_t indices[] =
 	{
-		0, 1, 2, 2, 3, 0
+		0u, 1u, 2u, 2u, 3u, 0u
 	};
 
-	void* map = m_VertexStagingBuffer->Map((sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull);
+	void* map = m_RainbowRectProgram->MapVerticesBegin();
 	memcpy(map, &vertices[0], (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull);
-	m_VertexStagingBuffer->Unmap();
+	m_RainbowRectProgram->MapVerticesEnd();
 
-	map = m_IndexStagingBuffer->Map(sizeof(uint32_t) * 6ull);
+	map = m_RainbowRectProgram->MapIndicesBegin();
 	memcpy(map, &indices[0], sizeof(uint32_t) * 6ull);
-	m_IndexStagingBuffer->Unmap();
-
-	m_VertexBuffer->CopyBufferToSelf(m_VertexStagingBuffer.get(), (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull, m_CommandPool, m_GraphicsQueue);
-	m_IndexBuffer->CopyBufferToSelf(m_IndexStagingBuffer.get(), sizeof(uint32_t) * 6ull, m_CommandPool, m_GraphicsQueue);
+	m_RainbowRectProgram->MapIndicesEnd();
 
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -532,167 +513,6 @@ void Renderer::CreateRenderPass()
 
 }
 
-void Renderer::CreatePipelineLayout()
-{
-	// pipeline layout create-info
-	VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount = 0u,
-		.pSetLayouts = nullptr,
-		.pushConstantRangeCount = 0u,
-		.pPushConstantRanges = nullptr
-	};
-
-	// create pipeline layout
-	VKC(vkCreatePipelineLayout(m_LogicalDevice, &pipelineLayoutCreateInfo, nullptr, &m_PipelineLayout));
-}
-
-void Renderer::CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages)
-{
-	auto bindingDescription = Vertex::GetBindingDescription();
-	auto attributesDescription = Vertex::GetAttributesDescription();
-
-	// pipeline Vertex state create-info
-	VkPipelineVertexInputStateCreateInfo pipelineVertexStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-
-		.vertexBindingDescriptionCount = 1u,
-		.pVertexBindingDescriptions = &bindingDescription,
-
-		.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributesDescription.size()),
-		.pVertexAttributeDescriptions = attributesDescription.data()
-	};
-
-	// pipeline input-assembly state create-info
-	VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-		.primitiveRestartEnable = VK_FALSE
-	};
-
-	// viewport
-	VkViewport viewport
-	{
-		.x = 0.0f,
-		.y = 0.0f,
-		.width = static_cast<float>(m_SwapchainExtent.width),
-		.height = static_cast<float>(m_SwapchainExtent.height),
-		.minDepth = 0.0f,
-		.maxDepth = 1.0f
-	};
-
-	// siccors
-	VkRect2D siccors
-	{
-		.offset = { 0, 0 },
-		.extent = m_SwapchainExtent
-	};
-
-	// viewportState
-	VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-		.viewportCount = 1u,
-		.pViewports = &viewport,
-		.scissorCount = 1u,
-		.pScissors = &siccors
-	};
-
-	// pipeline rasterization state create-info
-	VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-		.depthClampEnable = VK_FALSE,
-		.rasterizerDiscardEnable = VK_FALSE,
-		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = VK_CULL_MODE_BACK_BIT,
-		.frontFace = VK_FRONT_FACE_CLOCKWISE,
-		.depthBiasEnable = VK_FALSE,
-		.depthBiasConstantFactor = 0.0f,
-		.depthBiasClamp = 0.0f,
-		.depthBiasSlopeFactor = 0.0f,
-		.lineWidth = 1.0f,
-	};
-
-	// pipeline multisample state create-info
-	VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
-		.sampleShadingEnable = VK_FALSE,
-		.minSampleShading = 1.0f,
-		.pSampleMask = nullptr,
-		.alphaToCoverageEnable = VK_FALSE,
-		.alphaToOneEnable = VK_FALSE
-	};
-
-	// pipeline color blend attachment state
-	VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState
-	{
-		.blendEnable = VK_TRUE,
-		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-		.colorBlendOp = VK_BLEND_OP_ADD,
-		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-		.alphaBlendOp = VK_BLEND_OP_ADD,
-		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-	};
-
-	// pipeline color blend state create-info
-	VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-		.logicOpEnable = VK_FALSE,
-		.logicOp = VK_LOGIC_OP_COPY,
-		.attachmentCount = 1u,
-		.pAttachments = &pipelineColorBlendAttachmentState,
-		.blendConstants = { 0.0f, 0.0f, 0.0f, 0.0f },
-	};
-
-	// dynamic state
-	VkDynamicState dynamicState[] =
-	{
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_LINE_WIDTH,
-	};
-
-	// pipeline dynamic state create-info
-	VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-		.dynamicStateCount = 2u,
-		.pDynamicStates = dynamicState
-	};
-
-	// pipeline create-info
-	VkGraphicsPipelineCreateInfo pipelineCreateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount = shaderStages.size(),
-		.pStages = shaderStages.data(),
-		.pVertexInputState = &pipelineVertexStateCreateInfo,
-		.pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo,
-		.pViewportState = &pipelineViewportStateCreateInfo,
-		.pRasterizationState = &pipelineRasterizationStateCreateInfo,
-		.pMultisampleState = &pipelineMultisampleStateCreateInfo,
-		.pDepthStencilState = nullptr,
-		.pColorBlendState = &pipelineColorBlendStateCreateInfo,
-		.pDynamicState = nullptr,
-		.layout = m_PipelineLayout,
-		.renderPass = m_RenderPass,
-		.subpass = 0u,
-		.basePipelineHandle = VK_NULL_HANDLE,
-		.basePipelineIndex = -1
-	};
-
-	// create graphics pipelines
-	VKC(vkCreateGraphicsPipelines(m_LogicalDevice, VK_NULL_HANDLE, 1u, &pipelineCreateInfo, nullptr, &m_Pipeline));
-}
-
 void Renderer::CreateFramebuffers()
 {
 	m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
@@ -731,6 +551,8 @@ void Renderer::CreateCommandPool()
 
 void Renderer::CreateCommandBuffers()
 {
+	const VkDeviceSize offsets[] = { 0 };
+
 	m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
 
 	// command buffer allocate-info
@@ -779,17 +601,12 @@ void Renderer::CreateCommandBuffers()
 			.pClearValues = &clearColor
 		};
 
-
-
 		vkCmdBeginRenderPass(m_CommandBuffers[i], &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_RainbowRectProgram->GetPipeline());
 
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, m_VertexBuffer->GetBuffer(), offsets);
+		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, m_RainbowRectProgram->GetVertexVkBuffer(), offsets);
+		vkCmdBindIndexBuffer(m_CommandBuffers[i], *m_RainbowRectProgram->GetIndexVkBuffer(), 0u, VK_INDEX_TYPE_UINT32);
 
-		vkCmdBindIndexBuffer(m_CommandBuffers[i], *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
-
-		// vkCmdDraw(m_CommandBuffers[i], 3, 1, 0, 0);
 		vkCmdDrawIndexed(m_CommandBuffers[i], 6u, 1u, 0u, 0u, 0u);
 
 		vkCmdEndRenderPass(m_CommandBuffers[i]);
@@ -836,8 +653,7 @@ void Renderer::RecreateSwapchain()
 	CreateSwapchain();
 	CreateImageViews();
 	CreateRenderPass();
-	CreatePipeline(m_ShaderTriangle->GetShaderStages());
-	CreatePipelineLayout();
+	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_SwapchainExtent);
 	CreateFramebuffers();
 	CreateCommandBuffers();
 }
@@ -850,9 +666,7 @@ void Renderer::DestroySwapchain()
 
 	vkFreeCommandBuffers(m_LogicalDevice, m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
 
-	// destroy pipeline
-	vkDestroyPipeline(m_LogicalDevice, m_Pipeline, nullptr);
-	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
+	// destroy render pass
 	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
 
 	// destroy image views

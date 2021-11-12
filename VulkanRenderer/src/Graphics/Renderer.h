@@ -2,6 +2,8 @@
 
 #include "Core/Base.h"
 
+#include "Graphics/RendererProgram.h"
+
 #include "Graphics/DeviceContext.h"
 #include "Graphics/Buffers.h"
 
@@ -60,9 +62,7 @@ private:
 	std::vector<const char*> m_RequiredExtensions;
 	std::vector<const char*> m_LogicalDeviceExtensions;
 
-	// pipeline
-	VkPipeline m_Pipeline;
-	VkPipelineLayout m_PipelineLayout;
+	// render pass
 	VkRenderPass m_RenderPass;
 
 	// swap chain
@@ -92,16 +92,8 @@ private:
 	std::vector<VkFence> m_ImagesInFlight;
 	size_t m_CurrentFrame;
 
-	// shaders
-	std::unique_ptr<Shader> m_ShaderTriangle;
-
-	// buffers
-	std::unique_ptr<Buffer> m_VertexBuffer;
-	std::unique_ptr<Buffer> m_VertexStagingBuffer;
-
-	std::unique_ptr<Buffer> m_IndexBuffer;
-	std::unique_ptr<Buffer> m_IndexStagingBuffer;
-
+	// Programs
+	std::unique_ptr<RainbowRectRendererProgram> m_RainbowRectProgram;
 public:
 	Renderer(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Renderer();
@@ -118,8 +110,6 @@ private:
 	void CreateSwapchain();
 	void CreateImageViews();
 	void CreateRenderPass();
-	void CreatePipelineLayout();
-	void CreatePipeline(std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages);
 	void CreateFramebuffers();
 	void CreateCommandPool();
 	void CreateCommandBuffers();
