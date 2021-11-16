@@ -1,6 +1,6 @@
 #include "QuadRendererProgram.h"
 
-QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent) :
+QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount) :
 	RendererProgram(deviceContext, commandPool, graphicsQueue)
 {
 	// shader
@@ -46,6 +46,106 @@ QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPa
 	};
 	VKC(vkCreatePipelineLayout(deviceContext.logical, &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 
+
+	// create render pipeline
+	CreatePipeline(renderPassHandle, extent);
+
+	// command buffer allocate-info
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = commandPool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = swapchainImageCount,
+	};
+	m_CommandBuffers.resize(swapchainImageCount);
+
+	VKC(vkAllocateCommandBuffers(deviceContext.logical, &commandBufferAllocateInfo, m_CommandBuffers.data()));
+}
+
+void QuadRendererProgram::Map()
+{
+	m_QuadCount = 0u;
+	m_VerticesMapCurrent = (Vertex*)m_StagingVertexBuffer->Map(sizeof(Vertex) * MAX_QUAD_RENDERER_VERTICES);
+
+	m_VerticesMapBegin = m_VerticesMapCurrent;
+	m_VerticesMapEnd = m_VerticesMapCurrent + MAX_QUAD_RENDERER_VERTICES;
+}
+
+void QuadRendererProgram::UnMap()
+{
+	m_StagingVertexBuffer->Unmap();
+
+	m_VerticesMapCurrent = nullptr;
+	m_VerticesMapBegin = nullptr;
+	m_VerticesMapEnd = nullptr;
+}
+
+VkCommandBuffer QuadRendererProgram::CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex)
+{
+	const VkDeviceSize offsets[] = { 0 };
+
+	// command buffer begin-info
+	static const VkCommandBufferBeginInfo  commandBufferBeginInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = NULL,
+		.pInheritanceInfo = nullptr,
+	};
+
+	// clear value
+	static const VkClearValue clearColor =
+	{
+		.color = { 0.124, 0.231, 0.491f, 1.0f }
+	};
+
+	// render pass begin-info
+	VkRenderPassBeginInfo  renderpassBeginInfo
+	{
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass = renderPass,
+		.framebuffer = frameBuffer,
+
+		.renderArea =
+		{
+			.offset = {0, 0},
+			.extent = swapchainExtent
+		},
+
+		.clearValueCount = 1u,
+		.pClearValues = &clearColor
+	};
+
+	// alias
+	const auto& cmd = m_CommandBuffers[swapchainImageIndex];
+
+	VKC(vkResetCommandBuffer(cmd, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT));
+	VKC(vkBeginCommandBuffer(cmd, &commandBufferBeginInfo));
+	const VkBufferCopy copyRegion
+	{
+		.srcOffset = 0u,
+		.dstOffset = 0u,
+		.size = m_QuadCount * 4u * sizeof(Vertex)
+	};
+	vkCmdCopyBuffer(cmd, *m_StagingVertexBuffer->GetBuffer(), *m_VertexBuffer->GetBuffer(), 1u, &copyRegion);
+
+	vkCmdBeginRenderPass(cmd, &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+	vkCmdBindVertexBuffers(cmd, 0u, 1u, m_VertexBuffer->GetBuffer(), offsets);
+	vkCmdBindIndexBuffer(cmd, *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
+
+	vkCmdDrawIndexed(cmd, m_QuadCount * 6u, m_QuadCount, 0u, 0u, 0u);
+
+	vkCmdEndRenderPass(cmd);
+
+	VKC(vkEndCommandBuffer(cmd));
+
+	return cmd;
+}
+
+void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent)
+{
 	// pipeline Vertex state create-info
 	auto bindingDescription = QuadRendererProgram::Vertex::GetBindingDescription();
 	auto attributesDescription = QuadRendererProgram::Vertex::GetAttributesDescription();
@@ -184,99 +284,8 @@ QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPa
 		.basePipelineHandle = VK_NULL_HANDLE,
 		.basePipelineIndex = -1
 	};
-	VKC(vkCreateGraphicsPipelines(deviceContext.logical, VK_NULL_HANDLE, 1u, &graphicsPipelineInfo, nullptr, &m_Pipeline));
 
-	// command buffer allocate-info
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = commandPool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1u,
-	};
-
-
-	VKC(vkAllocateCommandBuffers(deviceContext.logical, &commandBufferAllocateInfo, &m_CommandBuffer));
-}
-
-void QuadRendererProgram::Map()
-{
-	m_QuadCount = 0u;
-	m_VerticesMapCurrent = (Vertex*)m_StagingVertexBuffer->Map(sizeof(Vertex) * MAX_QUAD_RENDERER_VERTICES);
-
-	m_VerticesMapBegin = m_VerticesMapCurrent;
-	m_VerticesMapEnd = m_VerticesMapCurrent + MAX_QUAD_RENDERER_VERTICES;
-}
-
-void QuadRendererProgram::UnMap()
-{
-	m_StagingVertexBuffer->Unmap();
-
-	m_VerticesMapCurrent = nullptr;
-	m_VerticesMapBegin = nullptr;
-	m_VerticesMapEnd = nullptr;
-}
-
-VkCommandBuffer QuadRendererProgram::CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent)
-{
-	//m_VertexBuffer->CopyBufferToSelf(m_StagingVertexBuffer.get(), sizeof(Vertex) * m_QuadCount, m_CommandPool, m_GraphicsQueue);
-
-	const VkDeviceSize offsets[] = { 0 };
-
-	// command buffer begin-info
-	static const VkCommandBufferBeginInfo  commandBufferBeginInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags = NULL,
-		.pInheritanceInfo = nullptr,
-	};
-
-	// clear value
-	static const VkClearValue clearColor =
-	{
-		.color = { 0.124, 0.231, 0.491f, 1.0f }
-	};
-
-	// render pass begin-info
-	VkRenderPassBeginInfo  renderpassBeginInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass = renderPass,
-		.framebuffer = frameBuffer,
-
-		.renderArea =
-		{
-			.offset = {0, 0},
-			.extent = swapchainExtent
-		},
-
-		.clearValueCount = 1u,
-		.pClearValues = &clearColor
-	};
-
-	VKC(vkResetCommandBuffer(m_CommandBuffer, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT));
-	VKC(vkBeginCommandBuffer(m_CommandBuffer, &commandBufferBeginInfo));
-	const VkBufferCopy copyRegion
-	{
-		.srcOffset = 0u,
-		.dstOffset = 0u,
-		.size = m_QuadCount * 4u * sizeof(Vertex)
-	};
-	vkCmdCopyBuffer(m_CommandBuffer, *m_StagingVertexBuffer->GetBuffer(), *m_VertexBuffer->GetBuffer(), 1u, &copyRegion);
-
-	vkCmdBeginRenderPass(m_CommandBuffer, &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-	vkCmdBindPipeline(m_CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
-	vkCmdBindVertexBuffers(m_CommandBuffer, 0u, 1u, m_VertexBuffer->GetBuffer(), offsets);
-	vkCmdBindIndexBuffer(m_CommandBuffer, *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
-
-	vkCmdDrawIndexed(m_CommandBuffer, m_QuadCount * 6u, m_QuadCount, 0u, 0u, 0u);
-
-	vkCmdEndRenderPass(m_CommandBuffer);
-
-	VKC(vkEndCommandBuffer(m_CommandBuffer));
-
-	return m_CommandBuffer;
+	VKC(vkCreateGraphicsPipelines(m_DeviceContext.logical, VK_NULL_HANDLE, 1u, &graphicsPipelineInfo, nullptr, &m_Pipeline));
 }
 
 bool QuadRendererProgram::TryAdvance()

@@ -64,11 +64,13 @@ private:
 	uint32_t m_QuadCount = 0u;
 
 public:
-	QuadRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent);
+	QuadRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount);
 
 	void Map();
 	void UnMap();
-	VkCommandBuffer CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent);
+	VkCommandBuffer CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex);
+
+	void CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent);
 
 	bool TryAdvance();
 

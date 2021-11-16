@@ -146,28 +146,28 @@ void Renderer::DrawQuad(const glm::mat4& transform, const glm::vec4& tint)
 	// Dynamic rainbow colors >_<
 	// #note: this is not an actual part of the draw quad process, it's just a fun thing to have
 	const double time = glfwGetTime() * 3.0f;
-	const float r = (((1.0f - sin(time)) / 2.0f)) + abs(tan(time / 15.0f));
-	const float g = (((1.0f + sin(time)) / 2.0f)) + abs(tan(time / 15.0f));
-	const float b = (((1.0f + sin(time)) / 2.0f)) + abs(tan(time / 15.0f));
-	const float white = abs(tan(time / 15.0f));
+	const float r = (((1.0f - sin(time / 2.0)) / 2.0f)) + abs(tan(time / 15.0f));
+	const float g = (((1.0f + sin(time / 0.5)) / 2.0f)) + abs(tan(time / 15.0f));
+	const float b = (((1.0f + sin(time / 1.0)) / 2.0f)) + abs(tan(time / 15.0f));
+	const float t = (((1.0f + cos(time)) / 2.0f)) + abs(tan(time / 25.0f));
 
 	QuadRendererProgram::Vertex* map = m_QuadRendererProgram->GetMapCurrent();
 
 	// top left
 	map[0].position = transform * glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f);
-	map[0].tint = glm::vec4(r, 0.0f, 0.0f, 1.0f);
+	map[0].tint = glm::vec4(r, 0.0, t / 0.5, 1.0f);
 
 	// top right
 	map[1].position = transform * glm::vec4(0.5f, -0.5f, 0.0f, 1.0f);
-	map[1].tint = glm::vec4(0.0f, g, 0.0f, 1.0f);
+	map[1].tint = glm::vec4(t / 2.0, g, 0.0f, 1.0f);
 
 	// bottom right
 	map[2].position = transform * glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
-	map[2].tint = glm::vec4(0.0f, 0.0f, b, 1.0f);
+	map[2].tint = glm::vec4(0.0f, t / 1.0, b, 1.0f);
 
 	// bottom left
 	map[3].position = transform * glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f);
-	map[3].tint = glm::vec4(white, white, white, 1.0f);
+	map[3].tint = glm::vec4(t / 2.0, t, t, 1.0f);
 
 	if (!m_QuadRendererProgram->TryAdvance())
 	{
@@ -188,12 +188,8 @@ void Renderer::EndScene()
 
 	// fetch image ( & recreate swap chain if necessary )
 	uint32_t imageIndex = FetchNextImage();
-
-	// generate command buffers
-	VkCommandBuffer QuadRendererCommands = m_QuadRendererProgram->CreateCommandBuffer(m_RenderPass, m_SwapchainFramebuffers[imageIndex], m_SwapchainExtent);
-
-	std::vector<VkCommandBuffer> commandBuffers;
-	commandBuffers.push_back(QuadRendererCommands);
+	if (imageIndex == UINT32_MAX)
+		return;
 
 	// check if the prev frame is using this image
 	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
@@ -202,8 +198,11 @@ void Renderer::EndScene()
 	// mark the image as now being used by this frame
 	m_ImagesInFlight[imageIndex] = m_Fences[m_CurrentFrame];
 
-	// reset fence's state
-	vkResetFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame]);
+	// generate command buffers
+	VkCommandBuffer QuadRendererCommands = m_QuadRendererProgram->CreateCommandBuffer(m_RenderPass, m_SwapchainFramebuffers[imageIndex], m_SwapchainExtent, imageIndex);
+
+	std::vector<VkCommandBuffer> commandBuffers;
+	commandBuffers.push_back(QuadRendererCommands);
 
 	// submit info
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -220,6 +219,7 @@ void Renderer::EndScene()
 	};
 
 	// submit queue
+	vkResetFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame]);
 	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_Fences[m_CurrentFrame]));
 
 	VkPresentInfoKHR presentInfo
@@ -534,12 +534,11 @@ void Renderer::CreateRenderPass()
 
 	// create render pass
 	VKC(vkCreateRenderPass(m_LogicalDevice, &renderPassCreateInfo, nullptr, &m_RenderPass));
-
 }
 
 void Renderer::CreateRendererPrograms()
 {
-	m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_GraphicsQueue, m_SwapchainExtent);
+	m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_GraphicsQueue, m_SwapchainExtent, m_SwapchainImages.size());
 }
 
 void Renderer::CreateFramebuffers()
@@ -604,7 +603,6 @@ void Renderer::CreateSynchronizations()
 		VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderFinishedSemaphores[i]));
 
 		vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_Fences[i]);
-
 	}
 }
 
@@ -617,10 +615,13 @@ void Renderer::RecreateSwapchain()
 	CreateImageViews();
 	CreateRenderPass();
 
+	m_QuadRendererProgram->CreatePipeline(m_RenderPass, m_SwapchainExtent);
+
 	// #todo: do this more efficiently
-	CreateRendererPrograms();
+	// CreateRendererPrograms();
 
 	CreateFramebuffers();
+	m_ImagesInFlight.resize(m_SwapchainImages.size(), VK_NULL_HANDLE);
 }
 
 void Renderer::DestroySwapchain()

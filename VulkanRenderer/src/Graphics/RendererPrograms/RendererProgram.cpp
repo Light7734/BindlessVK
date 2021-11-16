@@ -22,7 +22,7 @@ RendererProgram::~RendererProgram()
 	m_StagingIndexBuffer.reset();
 	m_IndexBuffer.reset();
 
-	vkFreeCommandBuffers(m_DeviceContext.logical, m_CommandPool, 1u, &m_CommandBuffer);
+	vkFreeCommandBuffers(m_DeviceContext.logical, m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
 
 	// destroy pipeline
 	vkDestroyPipelineLayout(m_DeviceContext.logical, m_PipelineLayout, nullptr);

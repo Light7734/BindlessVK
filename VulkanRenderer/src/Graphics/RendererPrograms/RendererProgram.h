@@ -15,8 +15,8 @@ protected:
 
 	VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
 
-	VkCommandBuffer m_CommandBuffer = VK_NULL_HANDLE;
 	VkCommandPool m_CommandPool = VK_NULL_HANDLE;
+	std::vector<VkCommandBuffer> m_CommandBuffers;
 
 	VkPipeline m_Pipeline = VK_NULL_HANDLE;
 	VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
