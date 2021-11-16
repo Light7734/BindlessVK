@@ -2,7 +2,7 @@
 
 #include "Core/Base.h"
 
-#include "Graphics/RendererPrograms.h"
+#include "Graphics/RendererPrograms/QuadRendererProgram.h"
 
 #include "Graphics/DeviceContext.h"
 #include "Graphics/Buffers.h"
@@ -82,7 +82,6 @@ private:
 
 	// command pool
 	VkCommandPool m_CommandPool;
-	std::vector<VkCommandBuffer> m_CommandBuffers;
 
 	// synchronization
 	const uint32_t m_FramesInFlight;
@@ -93,17 +92,19 @@ private:
 	size_t m_CurrentFrame;
 
 	// Programs
-	std::unique_ptr<RainbowRectRendererProgram> m_RainbowRectProgram;
+	std::unique_ptr<QuadRendererProgram> m_QuadRendererProgram;
 public:
 	Renderer(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Renderer();
 
+	void BeginFrame();
 	void BeginScene();
 
 	// #todo:
-	void AddEntity();
+	void DrawQuad(const glm::mat4& transform, const glm::vec4& tint);
 
 	void EndScene();
+	void EndFrame();
 
 	inline void InvalidateSwapchain() { m_SwapchainInvalidated = true; }
 
@@ -115,13 +116,15 @@ private:
 	void CreateSwapchain();
 	void CreateImageViews();
 	void CreateRenderPass();
+	void CreateRendererPrograms();
 	void CreateFramebuffers();
 	void CreateCommandPool();
-	void CreateCommandBuffers();
 	void CreateSynchronizations();
 
 	void RecreateSwapchain();
 	void DestroySwapchain();
+
+	uint32_t FetchNextImage();
 
 	void FilterValidationLayers();
 	void FetchRequiredExtensions();

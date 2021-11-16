@@ -6,6 +6,10 @@
 
 #include <glfw/glfw3.h>
 
+#include <glm/glm.hpp>
+#include <glm/matrix.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 int main()
 {
 	// init logger
@@ -29,7 +33,7 @@ int main()
 
 		// render frame
 		pipeline.BeginScene();
-		pipeline.AddEntity();
+		pipeline.DrawQuad(glm::mat4(1.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 		pipeline.EndScene();
 
 		// calculate fps

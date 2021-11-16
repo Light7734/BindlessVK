@@ -76,8 +76,8 @@ void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandP
 
 	VKC(vkQueueSubmit(graphicsQueue, 1u, &copySubmitInfo, VK_NULL_HANDLE));
 	VKC(vkQueueWaitIdle(graphicsQueue));
-	vkFreeCommandBuffers(m_DeviceContext.logical, commandPool, 1u, &commandBuffer);
 
+	vkFreeCommandBuffers(m_DeviceContext.logical, commandPool, 1u, &commandBuffer);
 }
 
 void* Buffer::Map(uint32_t size)

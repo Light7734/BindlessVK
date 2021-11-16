@@ -39,7 +39,6 @@ Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 
 	// command pool
 	m_CommandPool(VK_NULL_HANDLE),
-	m_CommandBuffers{},
 
 	// synchronization
 	m_FramesInFlight(frames),
@@ -100,10 +99,9 @@ Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	CreateSwapchain();
 	CreateImageViews();
 	CreateRenderPass();
-	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_SwapchainExtent);
-	CreateFramebuffers();
 	CreateCommandPool();
-	CreateCommandBuffers();
+	CreateFramebuffers();
+	CreateRendererPrograms();
 	CreateSynchronizations();
 }
 
@@ -115,7 +113,7 @@ Renderer::~Renderer()
 	DestroySwapchain();
 
 	// destroy renderer programs
-	m_RainbowRectProgram.reset();
+	m_QuadRendererProgram.reset();
 
 	// destroy semaphores & fences
 	for (uint32_t i = 0ull; i < m_FramesInFlight; i++)
@@ -134,114 +132,124 @@ Renderer::~Renderer()
 	vkDestroyInstance(m_VkInstance, nullptr);
 }
 
-void Renderer::BeginScene()
+void Renderer::BeginFrame()
 {
-	m_RainbowRectProgram->MapVerticesBegin();
-	m_RainbowRectProgram->MapIndicesBegin();
 }
 
-void Renderer::AddEntity()
+void Renderer::BeginScene()
 {
-	// dynamic rainbow colors >_<
+	m_QuadRendererProgram->Map();
+}
+
+void Renderer::DrawQuad(const glm::mat4& transform, const glm::vec4& tint)
+{
+	// Dynamic rainbow colors >_<
+	// #note: this is not an actual part of the draw quad process, it's just a fun thing to have
 	const double time = glfwGetTime() * 3.0f;
-	const float r = (((1.0f - sin(time * 1.2)) / 2.0f)) + abs(tan(time / 9.0f));
-	const float g = (((1.0f + sin(time * 0.8)) / 2.0f)) + abs(tan(time / 9.0f));
-	const float b = (((1.0f + sin(time * 1.0)) / 2.0f)) + abs(tan(time / 9.0f));
-	const float white = abs(cos(tan(time / 50.0f)));
+	const float r = (((1.0f - sin(time)) / 2.0f)) + abs(tan(time / 15.0f));
+	const float g = (((1.0f + sin(time)) / 2.0f)) + abs(tan(time / 15.0f));
+	const float b = (((1.0f + sin(time)) / 2.0f)) + abs(tan(time / 15.0f));
+	const float white = abs(tan(time / 15.0f));
 
-	// submit vertices
-	RainbowRectVertex* verticesMap = m_RainbowRectProgram->GetVerticesMapCurrent();
-	verticesMap[0].position = glm::vec2(-0.5f, -0.5f);
-	verticesMap[0].color = glm::vec3(r, 0.0f, 0.0f);
+	QuadRendererProgram::Vertex* map = m_QuadRendererProgram->GetMapCurrent();
 
-	verticesMap[1].position = glm::vec2(0.5f, -0.5f);
-	verticesMap[1].color = glm::vec3(0.0f, g, 0.0f);
+	// top left
+	map[0].position = transform * glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f);
+	map[0].tint = glm::vec4(r, 0.0f, 0.0f, 1.0f);
 
-	verticesMap[2].position = glm::vec2(0.5f, 0.5f);
-	verticesMap[2].color = glm::vec3(0.0f, 0.0f, b);
+	// top right
+	map[1].position = transform * glm::vec4(0.5f, -0.5f, 0.0f, 1.0f);
+	map[1].tint = glm::vec4(0.0f, g, 0.0f, 1.0f);
 
-	verticesMap[3].position = glm::vec2(-0.5f, 0.5f);
-	verticesMap[3].color = glm::vec3(white, white, white);
-	m_RainbowRectProgram->AdvanceVertices(4u);
+	// bottom right
+	map[2].position = transform * glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
+	map[2].tint = glm::vec4(0.0f, 0.0f, b, 1.0f);
 
-	// submit indices
-	const uint32_t indices[] =
+	// bottom left
+	map[3].position = transform * glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f);
+	map[3].tint = glm::vec4(white, white, white, 1.0f);
+
+	if (!m_QuadRendererProgram->TryAdvance())
 	{
-		0u, 1u, 2u, 2u, 3u, 0u
-	};
+		LOG(warn, "%s: quad renderer exceeded max vertices limit!", __FUNCTION__);
 
-	uint32_t* indicesMap = m_RainbowRectProgram->GetIndicesMapCurrent();
-	memcpy(indicesMap, indices, sizeof(uint32_t) * 6u);
-	m_RainbowRectProgram->AdvanceIndices(6u);
+		// #todo: flush scene
+		EndScene();
+	}
 }
 
 void Renderer::EndScene()
 {
-	// handle renderer programs
-	m_RainbowRectProgram->MapVerticesEnd();
-	m_RainbowRectProgram->MapIndicesEnd();
-	m_RainbowRectProgram->ResolveStagedBuffers(m_CommandPool, m_GraphicsQueue);
+	// unmap vertex/index buffers
+	m_QuadRendererProgram->UnMap();
 
-	// get image
-	uint32_t imageIndex;
-	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+	// wait for the desired frame to finish rendering
+	vkWaitForFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
-	{
-		RecreateSwapchain();
-		return;
-	}
-	else if (result != VK_SUCCESS)
-		throw vkException(result, __FILE__, __LINE__);
+	// fetch image ( & recreate swap chain if necessary )
+	uint32_t imageIndex = FetchNextImage();
 
+	// generate command buffers
+	VkCommandBuffer QuadRendererCommands = m_QuadRendererProgram->CreateCommandBuffer(m_RenderPass, m_SwapchainFramebuffers[imageIndex], m_SwapchainExtent);
+
+	std::vector<VkCommandBuffer> commandBuffers;
+	commandBuffers.push_back(QuadRendererCommands);
+
+	// check if the prev frame is using this image
 	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
 		vkWaitForFences(m_LogicalDevice, 1u, &m_ImagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
 
+	// mark the image as now being used by this frame
 	m_ImagesInFlight[imageIndex] = m_Fences[m_CurrentFrame];
-	vkWaitForFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
-	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	// reset fence's state
+	vkResetFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame]);
 
 	// submit info
+	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo submitInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.waitSemaphoreCount = 1u,
-		.pWaitSemaphores = &m_ImageAvailableSemaphores[m_CurrentFrame],
+		.pWaitSemaphores = &m_ImageAvailableSemaphores[m_CurrentFrame], // <-- (semaphore) wait for the image requested by vkAquireImage to be available
 		.pWaitDstStageMask = &waitStage,
-		.commandBufferCount = 1u,
-		.pCommandBuffers = &m_CommandBuffers[imageIndex],
+		.commandBufferCount = static_cast<uint32_t>(commandBuffers.size()),
+		.pCommandBuffers = commandBuffers.data(),
 		.signalSemaphoreCount = 1u,
 		.pSignalSemaphores = &m_RenderFinishedSemaphores[m_CurrentFrame],
 	};
 
 	// submit queue
-	vkResetFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame]);
-
-	// resolve submissions
 	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_Fences[m_CurrentFrame]));
 
 	VkPresentInfoKHR presentInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.waitSemaphoreCount = 1u,
-		.pWaitSemaphores = &m_RenderFinishedSemaphores[m_CurrentFrame],
+		.pWaitSemaphores = &m_RenderFinishedSemaphores[m_CurrentFrame], // <-- (semaphore) wait for the the frame to be rendererd
 		.swapchainCount = 1u,
 		.pSwapchains = &m_Swapchain,
 		.pImageIndices = &imageIndex,
 		.pResults = nullptr,
 	};
 
+	// increment frame
 	m_CurrentFrame = (m_CurrentFrame + 1) % m_FramesInFlight;
 
-	result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+	// finally... present queue
+	VkResult result = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
 
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || result == VK_SUBOPTIMAL_KHR) {
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_SwapchainInvalidated) {
+		m_SwapchainInvalidated = false;
 		RecreateSwapchain();
 	}
 	else if (result != VK_SUCCESS) {
-		throw vkException(result, __FILE__, __LINE__);
+		throw std::runtime_error("bruh moment");
 	}
+}
+
+void Renderer::EndFrame()
+{
 }
 
 void Renderer::PickPhysicalDevice()
@@ -529,6 +537,11 @@ void Renderer::CreateRenderPass()
 
 }
 
+void Renderer::CreateRendererPrograms()
+{
+	m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_GraphicsQueue, m_SwapchainExtent);
+}
+
 void Renderer::CreateFramebuffers()
 {
 	m_SwapchainFramebuffers.resize(m_SwapchainImageViews.size());
@@ -557,78 +570,12 @@ void Renderer::CreateCommandPool()
 	VkCommandPoolCreateInfo commandpoolCreateInfo
 	{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-		.flags = NULL,
+		.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 		.queueFamilyIndex = m_QueueFamilyIndices.graphics.value(),
 	};
 
 
 	VKC(vkCreateCommandPool(m_LogicalDevice, &commandpoolCreateInfo, nullptr, &m_CommandPool));
-}
-
-void Renderer::CreateCommandBuffers()
-{
-	const VkDeviceSize offsets[] = { 0 };
-
-	m_CommandBuffers.resize(m_SwapchainFramebuffers.size());
-
-	// command buffer allocate-info
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo
-	{
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = m_CommandPool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size()),
-	};
-
-	VKC(vkAllocateCommandBuffers(m_LogicalDevice, &commandBufferAllocateInfo, m_CommandBuffers.data()));
-
-	for (size_t i = 0ull; i < m_CommandBuffers.size(); i++)
-	{
-		// command buffer begin-info
-		VkCommandBufferBeginInfo  commandBufferBeginInfo
-		{
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-			.flags = NULL,
-			.pInheritanceInfo = nullptr,
-		};
-
-		VKC(vkBeginCommandBuffer(m_CommandBuffers[i], &commandBufferBeginInfo));
-
-		// clear value
-		VkClearValue clearColor =
-		{
-			.color = { 0.124, 0.231, 0.491f, 1.0f }
-		};
-
-		// render pass begin-info
-		VkRenderPassBeginInfo  renderpassBeginInfo
-		{
-			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-			.renderPass = m_RenderPass,
-			.framebuffer = m_SwapchainFramebuffers[i],
-
-			.renderArea =
-			{
-				.offset = {0, 0},
-				.extent = m_SwapchainExtent
-			},
-
-			.clearValueCount = 1u,
-			.pClearValues = &clearColor
-		};
-
-		vkCmdBeginRenderPass(m_CommandBuffers[i], &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(m_CommandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, m_RainbowRectProgram->GetPipeline());
-
-		vkCmdBindVertexBuffers(m_CommandBuffers[i], 0u, 1u, m_RainbowRectProgram->GetVertexVkBuffer(), offsets);
-		vkCmdBindIndexBuffer(m_CommandBuffers[i], *m_RainbowRectProgram->GetIndexVkBuffer(), 0u, VK_INDEX_TYPE_UINT32);
-
-		vkCmdDrawIndexed(m_CommandBuffers[i], 6u, 1u, 0u, 0u, 0u);
-
-		vkCmdEndRenderPass(m_CommandBuffers[i]);
-
-		VKC(vkEndCommandBuffer(m_CommandBuffers[i]));
-	}
 }
 
 void Renderer::CreateSynchronizations()
@@ -669,9 +616,11 @@ void Renderer::RecreateSwapchain()
 	CreateSwapchain();
 	CreateImageViews();
 	CreateRenderPass();
-	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_SwapchainExtent);
+
+	// #todo: do this more efficiently
+	CreateRendererPrograms();
+
 	CreateFramebuffers();
-	CreateCommandBuffers();
 }
 
 void Renderer::DestroySwapchain()
@@ -679,8 +628,6 @@ void Renderer::DestroySwapchain()
 	// destroy framebuffers
 	for (auto framebuffer : m_SwapchainFramebuffers)
 		vkDestroyFramebuffer(m_LogicalDevice, framebuffer, nullptr);
-
-	vkFreeCommandBuffers(m_LogicalDevice, m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
 
 	// destroy render pass
 	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
@@ -691,6 +638,23 @@ void Renderer::DestroySwapchain()
 
 	// destroy swap chain
 	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
+}
+
+uint32_t Renderer::FetchNextImage()
+{
+	uint32_t index;
+	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &index);
+
+	// recreate swap chain if out-of-date/suboptimal
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+	{
+		RecreateSwapchain();
+		return UINT32_MAX;
+	}
+	else if (result != VK_SUCCESS)
+		throw vkException(result, __FILE__, __LINE__);
+
+	return index;
 }
 
 void Renderer::FilterValidationLayers()
