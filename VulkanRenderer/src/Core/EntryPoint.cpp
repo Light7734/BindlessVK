@@ -28,7 +28,9 @@ int main()
 		glfwPollEvents();
 
 		// render frame
-		pipeline.RenderFrame();
+		pipeline.BeginScene();
+		pipeline.AddEntity();
+		pipeline.EndScene();
 
 		// calculate fps
 		frames++;

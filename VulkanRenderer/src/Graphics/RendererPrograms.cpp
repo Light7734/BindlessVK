@@ -1,47 +1,22 @@
 #pragma once
 
-#include "RendererProgram.h"
+#include "RendererPrograms.h"
 
 #include "Graphics/Shader.h"
 #include "Graphics/Buffers.h"
 
-
-RendererProgram::RendererProgram(DeviceContext deviceContext) :
-	m_DeviceContext(deviceContext)
-{
-}
-
-RendererProgram::~RendererProgram()
-{
-	// destroy shader
-	m_Shader.reset();
-
-	// destroy buffers
-	m_StagingVertexBuffer.reset();
-	m_VertexBuffer.reset();
-
-	m_StagingIndexBuffer.reset();
-	m_IndexBuffer.reset();
-
-	// destroy pipeline
-	vkDestroyPipelineLayout(m_DeviceContext.logical, m_PipelineLayout, nullptr);
-	vkDestroyPipeline(m_DeviceContext.logical, m_Pipeline, nullptr);
-}
-
-
-RainbowRectRendererProgram::RainbowRectRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkExtent2D extent) :
-	RendererProgram(deviceContext)
+RainbowRectRendererProgram::RainbowRectRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkExtent2D extent) :
+	RendererProgram(deviceContext, commandPool)
 {
 	// shader
 	m_Shader = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", deviceContext.logical);
 
 	// buffers
-	m_VertexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(Vertex) * MAX_RENDERER_VERTICES_RAINBOWRECT, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	m_StagingVertexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(Vertex) * MAX_RENDERER_VERTICES_RAINBOWRECT, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	m_VertexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(RainbowRectVertex) * MAX_RENDERER_VERTICES_RAINBOWRECT, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	m_StagingVertexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(RainbowRectVertex) * MAX_RENDERER_VERTICES_RAINBOWRECT, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	m_IndexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(uint32_t) * MAX_RENDERER_INDICES_RAINBOWRECT, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 	m_StagingIndexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(uint32_t) * MAX_RENDERER_INDICES_RAINBOWRECT, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
 
 	// pipeline layout create-info
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo
@@ -56,8 +31,8 @@ RainbowRectRendererProgram::RainbowRectRendererProgram(DeviceContext deviceConte
 
 
 	// pipeline Vertex state create-info
-	auto bindingDescription = Vertex::GetBindingDescription();
-	auto attributesDescription = Vertex::GetAttributesDescription();
+	auto bindingDescription = RainbowRectVertex::GetBindingDescription();
+	auto attributesDescription = RainbowRectVertex::GetAttributesDescription();
 
 	VkPipelineVertexInputStateCreateInfo pipelineVertexStateCreateInfo
 	{
@@ -194,28 +169,4 @@ RainbowRectRendererProgram::RainbowRectRendererProgram(DeviceContext deviceConte
 		.basePipelineIndex = -1
 	};
 	VKC(vkCreateGraphicsPipelines(deviceContext.logical, VK_NULL_HANDLE, 1u, &graphicsPipelineInfo, nullptr, &m_Pipeline));
-}
-
-RainbowRectRendererProgram::~RainbowRectRendererProgram()
-{
-}
-
-void* RainbowRectRendererProgram::MapVerticesBegin()
-{
-	return m_VertexBuffer->Map(sizeof(Vertex) * MAX_RENDERER_VERTICES_RAINBOWRECT);
-}
-
-void RainbowRectRendererProgram::MapVerticesEnd()
-{
-	m_VertexBuffer->Unmap();
-}
-
-void* RainbowRectRendererProgram::MapIndicesBegin()
-{
-	return m_IndexBuffer->Map(sizeof(uint32_t) * MAX_RENDERER_INDICES_RAINBOWRECT);
-}
-
-void RainbowRectRendererProgram::MapIndicesEnd()
-{
-	m_IndexBuffer->Unmap();
 }

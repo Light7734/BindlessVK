@@ -2,7 +2,7 @@
 
 #include "Core/Base.h"
 
-#include "Graphics/RendererProgram.h"
+#include "Graphics/RendererPrograms.h"
 
 #include "Graphics/DeviceContext.h"
 #include "Graphics/Buffers.h"
@@ -98,7 +98,12 @@ public:
 	Renderer(GLFWwindow* windowHandle, uint32_t frames = 2u);
 	~Renderer();
 
-	void RenderFrame();
+	void BeginScene();
+
+	// #todo:
+	void AddEntity();
+
+	void EndScene();
 
 	inline void InvalidateSwapchain() { m_SwapchainInvalidated = true; }
 
@@ -116,7 +121,6 @@ private:
 	void CreateSynchronizations();
 
 	void RecreateSwapchain();
-
 	void DestroySwapchain();
 
 	void FilterValidationLayers();

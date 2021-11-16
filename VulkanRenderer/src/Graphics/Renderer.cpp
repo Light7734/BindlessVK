@@ -100,8 +100,7 @@ Renderer::Renderer(GLFWwindow* windowHandle, uint32_t frames /* = 2u */) :
 	CreateSwapchain();
 	CreateImageViews();
 	CreateRenderPass();
-	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_SwapchainExtent);
-	// CreatePipeline(m_ShaderTriangle->GetShaderStages());
+	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_SwapchainExtent);
 	CreateFramebuffers();
 	CreateCommandPool();
 	CreateCommandBuffers();
@@ -135,40 +134,55 @@ Renderer::~Renderer()
 	vkDestroyInstance(m_VkInstance, nullptr);
 }
 
-void Renderer::RenderFrame()
+void Renderer::BeginScene()
 {
-	// time
-	const double time = glfwGetTime() * 3.0f;
+	m_RainbowRectProgram->MapVerticesBegin();
+	m_RainbowRectProgram->MapIndicesBegin();
+}
 
+void Renderer::AddEntity()
+{
 	// dynamic rainbow colors >_<
+	const double time = glfwGetTime() * 3.0f;
 	const float r = (((1.0f - sin(time * 1.2)) / 2.0f)) + abs(tan(time / 9.0f));
 	const float g = (((1.0f + sin(time * 0.8)) / 2.0f)) + abs(tan(time / 9.0f));
-	const float b = (((1.0f + cos(time)) / 2.0f)) + abs(tan(time / 9.0f));
+	const float b = (((1.0f + sin(time * 1.0)) / 2.0f)) + abs(tan(time / 9.0f));
+	const float white = abs(cos(tan(time / 50.0f)));
 
-	const float vertices[] =
-	{
-		//   position,      color
-		//   x      y       r      g      b
-			-0.5f, -0.5f,   r,     0.0f,  0.0f,
-			 0.5f, -0.5f,   0.0f,  g,     0.0f,
-			 0.5f,  0.5f,   0.0f,  0.0f,  b,
-			-0.5f,  0.5f,   r,     g,     b,
-	};
+	// submit vertices
+	RainbowRectVertex* verticesMap = m_RainbowRectProgram->GetVerticesMapCurrent();
+	verticesMap[0].position = glm::vec2(-0.5f, -0.5f);
+	verticesMap[0].color = glm::vec3(r, 0.0f, 0.0f);
 
+	verticesMap[1].position = glm::vec2(0.5f, -0.5f);
+	verticesMap[1].color = glm::vec3(0.0f, g, 0.0f);
 
+	verticesMap[2].position = glm::vec2(0.5f, 0.5f);
+	verticesMap[2].color = glm::vec3(0.0f, 0.0f, b);
+
+	verticesMap[3].position = glm::vec2(-0.5f, 0.5f);
+	verticesMap[3].color = glm::vec3(white, white, white);
+	m_RainbowRectProgram->AdvanceVertices(4u);
+
+	// submit indices
 	const uint32_t indices[] =
 	{
 		0u, 1u, 2u, 2u, 3u, 0u
 	};
 
-	void* map = m_RainbowRectProgram->MapVerticesBegin();
-	memcpy(map, &vertices[0], (sizeof(glm::vec3) + sizeof(glm::vec2)) * 4ull);
+	uint32_t* indicesMap = m_RainbowRectProgram->GetIndicesMapCurrent();
+	memcpy(indicesMap, indices, sizeof(uint32_t) * 6u);
+	m_RainbowRectProgram->AdvanceIndices(6u);
+}
+
+void Renderer::EndScene()
+{
+	// handle renderer programs
 	m_RainbowRectProgram->MapVerticesEnd();
-
-	map = m_RainbowRectProgram->MapIndicesBegin();
-	memcpy(map, &indices[0], sizeof(uint32_t) * 6ull);
 	m_RainbowRectProgram->MapIndicesEnd();
+	m_RainbowRectProgram->ResolveStagedBuffers(m_CommandPool, m_GraphicsQueue);
 
+	// get image
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
 
@@ -203,6 +217,8 @@ void Renderer::RenderFrame()
 
 	// submit queue
 	vkResetFences(m_LogicalDevice, 1u, &m_Fences[m_CurrentFrame]);
+
+	// resolve submissions
 	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_Fences[m_CurrentFrame]));
 
 	VkPresentInfoKHR presentInfo
@@ -653,7 +669,7 @@ void Renderer::RecreateSwapchain()
 	CreateSwapchain();
 	CreateImageViews();
 	CreateRenderPass();
-	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_SwapchainExtent);
+	m_RainbowRectProgram = std::make_unique<RainbowRectRendererProgram>(m_DeviceContext, m_RenderPass, m_CommandPool, m_SwapchainExtent);
 	CreateFramebuffers();
 	CreateCommandBuffers();
 }
