@@ -7,20 +7,21 @@ struct GLFWwindow;
 class Window
 {
 private:
-	GLFWwindow* m_WindowHandle;
+    GLFWwindow* m_WindowHandle;
 
-	class Renderer* m_Pipeline;
+    class Renderer* m_Pipeline;
+
 public:
-	Window();
-	~Window();
+    Window();
+    ~Window();
 
-	inline void RegisterPipeline(class Renderer* pipeline) { m_Pipeline = pipeline; }
+    inline void RegisterPipeline(class Renderer* pipeline) { m_Pipeline = pipeline; }
 
-	inline GLFWwindow* GetHandle() { return m_WindowHandle; }
+    inline GLFWwindow* GetHandle() { return m_WindowHandle; }
 
-	// #todo
-	bool IsClosed() const;
+    // #todo
+    bool IsClosed() const;
 
 private:
-	void BindGlfwEvents();
+    void BindGlfwEvents();
 };

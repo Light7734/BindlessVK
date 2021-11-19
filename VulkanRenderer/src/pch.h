@@ -18,13 +18,13 @@
 
 /* containers */
 #include <array>
-#include <vector>
-#include <list>
-#include <set>
 #include <bitset>
+#include <list>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 /* misc */
 #include <algorithm>
@@ -34,13 +34,13 @@
 #include <utility>
 
 /* input/output */
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <sstream>
 
 /* multi threading */
-#include <thread>
 #include <atomic>
+#include <thread>
 
 /* string */
 #include <string>
@@ -50,5 +50,5 @@
 #include <filesystem>
 
 /* c libraries */
-#include <time.h>
 #include <math.h>
+#include <time.h>

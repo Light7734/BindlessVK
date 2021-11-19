@@ -7,7 +7,7 @@
 #include <volk.h>
 
 #define MAX_QUAD_RENDERER_VERTICES 1000u * 4u
-#define MAX_QUAD_RENDERER_INDICES MAX_QUAD_RENDERER_VERTICES * 6u
+#define MAX_QUAD_RENDERER_INDICES  MAX_QUAD_RENDERER_VERTICES * 6u
 
 class QuadRendererProgram : public RendererProgram
 {
@@ -19,8 +19,7 @@ public:
 
 		static constexpr VkVertexInputBindingDescription GetBindingDescription()
 		{
-			VkVertexInputBindingDescription bindingDescription
-			{
+			VkVertexInputBindingDescription bindingDescription {
 				.binding = 0u,
 				.stride = sizeof(Vertex),
 				.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
@@ -34,16 +33,14 @@ public:
 			std::vector<VkVertexInputAttributeDescription> attributesDescription;
 			attributesDescription.resize(2);
 
-			attributesDescription[0] =
-			{
+			attributesDescription[0] = {
 				.location = 0u,
 				.binding = 0u,
 				.format = VK_FORMAT_R32G32_SFLOAT,
 				.offset = offsetof(Vertex, position),
 			};
 
-			attributesDescription[1] =
-			{
+			attributesDescription[1] = {
 				.location = 1u,
 				.binding = 0u,
 				.format = VK_FORMAT_R32G32B32_SFLOAT,
