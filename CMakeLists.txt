@@ -21,4 +21,7 @@ target_link_libraries(VulkanRenderer spdlog)
 target_link_libraries(VulkanRenderer volk)
 target_link_libraries(VulkanRenderer shaderc)
 
+configure_file(${CMAKE_SOURCE_DIR}/DependenciesConfig/spdlog/tweakme.h.in
+               ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include/spdlog/tweakme.h)
+
 set_target_properties(VulkanRenderer PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/VulkanRenderer)
