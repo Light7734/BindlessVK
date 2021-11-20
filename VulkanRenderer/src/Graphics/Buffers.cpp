@@ -1,7 +1,9 @@
 #include "Graphics/Buffers.h"
 
-Buffer::Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties)
-    : m_DeviceContext(deviceContext)
+#include "Graphics/Device.h"
+
+Buffer::Buffer(class Device* device, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties)
+    : m_Device(device)
     , m_Buffer(VK_NULL_HANDLE)
     , m_Memory(VK_NULL_HANDLE)
 {
@@ -14,10 +16,10 @@ Buffer::Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags us
     };
 
     // create buffer
-    VKC(vkCreateBuffer(m_DeviceContext.logical, &bufferCreateInfo, nullptr, &m_Buffer));
+    VKC(vkCreateBuffer(m_Device->logical(), &bufferCreateInfo, nullptr, &m_Buffer));
 
     VkMemoryRequirements memoryRequirments;
-    vkGetBufferMemoryRequirements(m_DeviceContext.logical, m_Buffer, &memoryRequirments);
+    vkGetBufferMemoryRequirements(m_Device->logical(), m_Buffer, &memoryRequirments);
 
     VkMemoryAllocateInfo allocateInfo = {
         .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -25,14 +27,14 @@ Buffer::Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags us
         .memoryTypeIndex = FetchMemoryType(memoryRequirments.memoryTypeBits, memoryProperties),
     };
 
-    VKC(vkAllocateMemory(m_DeviceContext.logical, &allocateInfo, nullptr, &m_Memory));
-    VKC(vkBindBufferMemory(m_DeviceContext.logical, m_Buffer, m_Memory, 0u));
+    VKC(vkAllocateMemory(m_Device->logical(), &allocateInfo, nullptr, &m_Memory));
+    VKC(vkBindBufferMemory(m_Device->logical(), m_Buffer, m_Memory, 0u));
 }
 
 Buffer::~Buffer()
 {
-    vkDestroyBuffer(m_DeviceContext.logical, m_Buffer, nullptr);
-    vkFreeMemory(m_DeviceContext.logical, m_Memory, nullptr);
+    vkDestroyBuffer(m_Device->logical(), m_Buffer, nullptr);
+    vkFreeMemory(m_Device->logical(), m_Memory, nullptr);
 }
 
 void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandPool, VkQueue graphicsQueue)
@@ -45,7 +47,7 @@ void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandP
     };
 
     VkCommandBuffer commandBuffer;
-    VKC(vkAllocateCommandBuffers(m_DeviceContext.logical, &allocInfo, &commandBuffer));
+    VKC(vkAllocateCommandBuffers(m_Device->logical(), &allocInfo, &commandBuffer));
 
     VkCommandBufferBeginInfo beginInfo {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -71,25 +73,25 @@ void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandP
     VKC(vkQueueSubmit(graphicsQueue, 1u, &copySubmitInfo, VK_NULL_HANDLE));
     VKC(vkQueueWaitIdle(graphicsQueue));
 
-    vkFreeCommandBuffers(m_DeviceContext.logical, commandPool, 1u, &commandBuffer);
+    vkFreeCommandBuffers(m_Device->logical(), commandPool, 1u, &commandBuffer);
 }
 
 void* Buffer::Map(uint32_t size)
 {
     void* map;
-    VKC(vkMapMemory(m_DeviceContext.logical, m_Memory, NULL, size, NULL, &map));
+    VKC(vkMapMemory(m_Device->logical(), m_Memory, NULL, size, NULL, &map));
     return map;
 }
 
 void Buffer::Unmap()
 {
-    vkUnmapMemory(m_DeviceContext.logical, m_Memory);
+    vkUnmapMemory(m_Device->logical(), m_Memory);
 }
 
 uint32_t Buffer::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags)
 {
     VkPhysicalDeviceMemoryProperties physicalMemoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(m_DeviceContext.physical, &physicalMemoryProperties);
+    vkGetPhysicalDeviceMemoryProperties(m_Device->physical(), &physicalMemoryProperties);
 
     for (uint32_t i = 0; i < physicalMemoryProperties.memoryTypeCount; i++)
     {

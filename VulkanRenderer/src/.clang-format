@@ -25,6 +25,8 @@ BinPackParameters: 'true'
 BreakAfterJavaFieldAnnotations: 'true'
 BreakBeforeBinaryOperators: None
 
+AlignConsecutiveDeclarations: 'true'
+
 BreakBeforeBraces: Custom
 BraceWrapping:
     AfterCaseLabel: true

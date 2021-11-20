@@ -6,21 +6,28 @@ struct GLFWwindow;
 
 class Window
 {
-private:
-    GLFWwindow* m_WindowHandle;
-
-    class Renderer* m_Pipeline;
-
 public:
-    Window();
+    Window(uint32_t width, uint32_t height);
     ~Window();
 
-    inline void RegisterPipeline(class Renderer* pipeline) { m_Pipeline = pipeline; }
+    inline uint32_t GetWidth() const { return m_Width; }
+    inline uint32_t GetHeight() const { return m_Height; }
 
     inline GLFWwindow* GetHandle() { return m_WindowHandle; }
 
     // #todo
     bool IsClosed() const;
+
+    // swapchain resize...
+    inline bool WasResized() const { return m_WasResized; }
+    inline void ResizeHandled() { m_WasResized = false; }
+
+private:
+    GLFWwindow* m_WindowHandle;
+
+    uint32_t m_Width, m_Height;
+
+    bool m_WasResized;
 
 private:
     void BindGlfwEvents();

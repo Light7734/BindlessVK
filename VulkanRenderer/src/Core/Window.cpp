@@ -11,18 +11,19 @@ extern "C"
     __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;          // AMD
 }
 
-Window::Window()
+Window::Window(uint32_t width, uint32_t height)
+    : m_Width(width), m_Height(height)
 {
     ASSERT(glfwInit(), "Window::Window: failed to initialize glfw");
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     // glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    m_WindowHandle = glfwCreateWindow(800, 600, "Vulkan Renderer", nullptr, nullptr);
+    m_WindowHandle = glfwCreateWindow(width, height, "Vulkan Renderer", nullptr, nullptr);
 
     // #todo:
     BindGlfwEvents();
-    glfwSetWindowUserPointer(m_WindowHandle, &m_Pipeline);
+    glfwSetWindowUserPointer(m_WindowHandle, &m_WasResized);
 }
 
 Window::~Window()
@@ -39,9 +40,9 @@ bool Window::IsClosed() const
 void Window::BindGlfwEvents()
 {
     glfwSetFramebufferSizeCallback(m_WindowHandle, [](GLFWwindow* window, int width, int height) {
-        Renderer** pipelinePtr = (Renderer**)glfwGetWindowUserPointer(window);
-        if (Renderer* pipeline = *pipelinePtr)
-            pipeline->InvalidateSwapchain();
+        bool* wasResized = (bool*)glfwGetWindowUserPointer(window);
+
+        *wasResized = false;
     });
 
     glfwSetKeyCallback(m_WindowHandle, [](GLFWwindow* window, int key, int scancode, int action, int mods) {

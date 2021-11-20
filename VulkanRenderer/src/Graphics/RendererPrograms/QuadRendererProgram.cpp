@@ -1,25 +1,27 @@
 #include "Graphics/RendererPrograms/QuadRendererProgram.h"
 
-QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount)
-    : RendererProgram(deviceContext, commandPool, graphicsQueue)
+#include "Graphics/Device.h"
+
+QuadRendererProgram::QuadRendererProgram(Device* device, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount)
+    : RendererProgram(device, commandPool, graphicsQueue)
 {
     // shader
-    m_Shader = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", deviceContext.logical);
+    m_Shader = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", device->logical());
 
     // buffers
-    m_VertexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(Vertex) * MAX_QUAD_RENDERER_VERTICES,
+    m_VertexBuffer = std::make_unique<class Buffer>(device, sizeof(Vertex) * MAX_QUAD_RENDERER_VERTICES,
                                                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    m_StagingVertexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(Vertex) * MAX_QUAD_RENDERER_VERTICES,
+    m_StagingVertexBuffer = std::make_unique<class Buffer>(device, sizeof(Vertex) * MAX_QUAD_RENDERER_VERTICES,
                                                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    m_IndexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES,
+    m_IndexBuffer = std::make_unique<class Buffer>(device, sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES,
                                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    m_StagingIndexBuffer = std::make_unique<class Buffer>(deviceContext, sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES,
+    m_StagingIndexBuffer = std::make_unique<class Buffer>(device, sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES,
                                                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -53,7 +55,7 @@ QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPa
         .pushConstantRangeCount = 0u,
         .pPushConstantRanges    = nullptr,
     };
-    VKC(vkCreatePipelineLayout(deviceContext.logical, &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
+    VKC(vkCreatePipelineLayout(device->logical(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 
     // create render pipeline
     CreatePipeline(renderPassHandle, extent);
@@ -67,7 +69,7 @@ QuadRendererProgram::QuadRendererProgram(DeviceContext deviceContext, VkRenderPa
     };
     m_CommandBuffers.resize(swapchainImageCount);
 
-    VKC(vkAllocateCommandBuffers(deviceContext.logical, &commandBufferAllocateInfo, m_CommandBuffers.data()));
+    VKC(vkAllocateCommandBuffers(device->logical(), &commandBufferAllocateInfo, m_CommandBuffers.data()));
 }
 
 void QuadRendererProgram::Map()
@@ -240,19 +242,6 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
         .blendConstants  = { 0.0f, 0.0f, 0.0f, 0.0f },
     };
 
-    // dynamic state
-    VkDynamicState dynamicState[] = {
-        VK_DYNAMIC_STATE_VIEWPORT,
-        VK_DYNAMIC_STATE_LINE_WIDTH,
-    };
-
-    // pipeline dynamic state create-info
-    VkPipelineDynamicStateCreateInfo pipelineDynamicStateCreateInfo {
-        .sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .dynamicStateCount = 2u,
-        .pDynamicStates    = dynamicState,
-    };
-
     // graphics pipeline create-info
     VkGraphicsPipelineCreateInfo graphicsPipelineInfo {
         .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -273,7 +262,7 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
         .basePipelineIndex   = -1,
     };
 
-    VKC(vkCreateGraphicsPipelines(m_DeviceContext.logical, VK_NULL_HANDLE, 1u, &graphicsPipelineInfo, nullptr, &m_Pipeline));
+    VKC(vkCreateGraphicsPipelines(m_Device->logical(), VK_NULL_HANDLE, 1u, &graphicsPipelineInfo, nullptr, &m_Pipeline));
 }
 
 bool QuadRendererProgram::TryAdvance()

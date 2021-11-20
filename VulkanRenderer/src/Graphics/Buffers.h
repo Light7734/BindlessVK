@@ -10,13 +10,13 @@
 class Buffer
 {
 private:
-    DeviceContext m_DeviceContext;
+    class Device* m_Device;
 
     VkBuffer       m_Buffer;
     VkDeviceMemory m_Memory;
 
 public:
-    Buffer(DeviceContext deviceContext, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
+    Buffer(class Device* device, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
     ~Buffer();
 
     void CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandPool, VkQueue graphicsQueue);

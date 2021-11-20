@@ -3,10 +3,11 @@
 #include "Graphics/RendererPrograms/RendererProgram.h"
 
 #include "Graphics/Buffers.h"
+#include "Graphics/Device.h"
 #include "Graphics/Shader.h"
 
-RendererProgram::RendererProgram(DeviceContext deviceContext, VkCommandPool commandPool, VkQueue graphicsQueue)
-    : m_DeviceContext(deviceContext)
+RendererProgram::RendererProgram(Device* device, VkCommandPool commandPool, VkQueue graphicsQueue)
+    : m_Device(device)
     , m_CommandPool(commandPool)
     , m_GraphicsQueue(graphicsQueue)
 {
@@ -24,9 +25,9 @@ RendererProgram::~RendererProgram()
     m_StagingIndexBuffer.reset();
     m_IndexBuffer.reset();
 
-    vkFreeCommandBuffers(m_DeviceContext.logical, m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
+    vkFreeCommandBuffers(m_Device->logical(), m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
 
     // destroy pipeline
-    vkDestroyPipelineLayout(m_DeviceContext.logical, m_PipelineLayout, nullptr);
-    vkDestroyPipeline(m_DeviceContext.logical, m_Pipeline, nullptr);
+    vkDestroyPipelineLayout(m_Device->logical(), m_PipelineLayout, nullptr);
+    vkDestroyPipeline(m_Device->logical(), m_Pipeline, nullptr);
 }

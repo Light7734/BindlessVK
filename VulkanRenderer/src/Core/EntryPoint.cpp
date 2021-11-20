@@ -15,10 +15,8 @@ int main()
     Logger::Init();
 
     // create window & pipeline
-    Window   window   = Window();
-    Renderer pipeline = Renderer(window.GetHandle());
-
-    window.RegisterPipeline(&pipeline);
+    Window   window   = Window(800, 600);
+    Renderer pipeline = Renderer(&window, 3);
 
     // fps calculator
     Timer    timer;
