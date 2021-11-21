@@ -97,6 +97,9 @@ void Renderer::EndScene()
         return;
     }
 
+    // write uniform buffers
+    m_QuadRendererProgram->UpdateCamera(imageIndex);
+
     // check if the image is in use
     if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
         vkWaitForFences(m_Device->logical(), 1u, &m_ImagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);

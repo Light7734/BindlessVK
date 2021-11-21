@@ -15,6 +15,8 @@ RendererProgram::RendererProgram(Device* device, VkCommandPool commandPool, VkQu
 
 RendererProgram::~RendererProgram()
 {
+    vkDestroyDescriptorSetLayout(m_Device->logical(), m_DescriptorSetLayout, nullptr);
+
     // destroy shader
     m_Shader.reset();
 

@@ -20,6 +20,10 @@ protected:
     VkPipeline       m_Pipeline       = VK_NULL_HANDLE;
     VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
 
+    VkDescriptorSetLayout        m_DescriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool             m_DescriptorPool      = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> m_DescriptorSets;
+
     VkViewport m_Viewport;
     VkRect2D   m_Scissors;
 

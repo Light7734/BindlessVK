@@ -22,7 +22,7 @@ public:
     void BeginScene();
 
     // #todo:
-    void DrawGayRect(const glm::mat4& transform, const glm::vec4& tint);
+    void DrawQuad(const glm::mat4& transform, const glm::vec4& tint);
 
     void EndScene();
     void EndFrame();

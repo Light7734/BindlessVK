@@ -11,6 +11,13 @@
 class QuadRendererProgram: public RendererProgram
 {
 public:
+    struct UBO_MVP
+    {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
+
     struct Vertex
     {
         glm::vec2 position;
@@ -59,6 +66,8 @@ private:
 
     uint32_t m_QuadCount = 0u;
 
+    std::vector<std::unique_ptr<Buffer>> m_UBO_Camera;
+
 public:
     QuadRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount);
 
@@ -67,6 +76,8 @@ public:
     VkCommandBuffer CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex);
 
     void CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent);
+
+    void UpdateCamera(uint32_t framebufferIndex);
 
     bool TryAdvance();
 
