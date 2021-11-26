@@ -36,10 +36,11 @@ public:
     inline VkDevice         logical() { return m_LogicalDevice; }
     inline VkPhysicalDevice physical() { return m_PhysicalDevice; }
     inline VkSurfaceKHR     surface() { return m_Surface; }
-    inline VkCommandPool    commandPool() { return m_CommandPool; }
 
     // Getters - Queue
     inline QueueFamilyIndices queueIndices() const { return m_QueueFamilyIndices; }
+    inline uint32_t           graphicsQueueIndex() const { return m_QueueFamilyIndices.graphics.value(); }
+    inline uint32_t           presentQueueIndex() const { return m_QueueFamilyIndices.present.value(); }
     inline VkQueue            graphicsQueue() const { return m_GraphicsQueue; }
     inline VkQueue            presentQueue() const { return m_PresentQueue; }
 
@@ -53,7 +54,6 @@ private:
     VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
     VkDevice         m_LogicalDevice  = VK_NULL_HANDLE;
     VkSurfaceKHR     m_Surface        = VK_NULL_HANDLE;
-    VkCommandPool    m_CommandPool    = VK_NULL_HANDLE;
 
     // queue
     QueueFamilyIndices m_QueueFamilyIndices;
@@ -70,7 +70,6 @@ private:
     void CreateWindowSurface();
     void PickPhysicalDevice();
     void CreateLogicalDevice();
-    void CreateCommandPool();
 
     void FilterValidationLayers();
     void FetchRequiredExtensions();

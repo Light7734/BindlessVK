@@ -22,14 +22,10 @@ Device::Device(Window* window)
     CreateWindowSurface();
     PickPhysicalDevice();
     CreateLogicalDevice();
-    CreateCommandPool();
 }
 
 Device::~Device()
 {
-    // destroy command pool
-    vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
-
     // destroy device
     vkDestroyDevice(m_LogicalDevice, nullptr);
     vkDestroySurfaceKHR(m_VkInstance, m_Surface, nullptr);
@@ -199,18 +195,6 @@ void Device::CreateLogicalDevice()
 
         ASSERT(false, "Pipeline::FetchDeviceExtensions: aforementioned device extensinos are not supported");
     }
-}
-
-void Device::CreateCommandPool()
-{
-    // command pool create-info
-    VkCommandPoolCreateInfo commandpoolCreateInfo {
-        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = m_QueueFamilyIndices.graphics.value(),
-    };
-
-    VKC(vkCreateCommandPool(m_LogicalDevice, &commandpoolCreateInfo, nullptr, &m_CommandPool));
 }
 
 void Device::FilterValidationLayers()

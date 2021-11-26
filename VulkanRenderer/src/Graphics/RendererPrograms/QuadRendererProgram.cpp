@@ -9,9 +9,11 @@
 
 #include <chrono>
 
-QuadRendererProgram::QuadRendererProgram(Device* device, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount)
-    : RendererProgram(device, commandPool, graphicsQueue)
+QuadRendererProgram::QuadRendererProgram(Device* device, VkRenderPass renderPassHandle, VkExtent2D extent, uint32_t swapchainImageCount)
+    : RendererProgram(device, swapchainImageCount)
 {
+    CreateCommandPool();
+
     // shader
     m_Shader = std::make_unique<Shader>("res/VertexShader.glsl", "res/PixelShader.glsl", device->logical());
 
@@ -32,7 +34,7 @@ QuadRendererProgram::QuadRendererProgram(Device* device, VkRenderPass renderPass
                                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-    for (uint32_t i = 0; i < swapchainImageCount; i++)
+    for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
         m_UBO_Camera.push_back(std::make_unique<Buffer>(m_Device, sizeof(UBO_MVP), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
     // create indices
@@ -55,101 +57,13 @@ QuadRendererProgram::QuadRendererProgram(Device* device, VkRenderPass renderPass
     uint32_t* map = (uint32_t*)m_StagingIndexBuffer->Map(sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES);
     memcpy(map, indices, sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES);
     m_StagingIndexBuffer->Unmap();
-    m_IndexBuffer->CopyBufferToSelf(m_StagingIndexBuffer.get(), sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES, m_CommandPool, m_GraphicsQueue);
+    m_IndexBuffer->CopyBufferToSelf(m_StagingIndexBuffer.get(), sizeof(uint32_t) * MAX_QUAD_RENDERER_INDICES, m_CommandPool, m_Device->graphicsQueue());
 
-    // pipeline layout create-info
-    VkDescriptorSetLayoutBinding uboLayoutBinding {
-        .binding            = 0,
-        .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount    = 1u,
-        .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
-        .pImmutableSamplers = nullptr,
-    };
-
-    // descriptor set create-info
-    VkDescriptorSetLayoutCreateInfo descriptoSetLayoutCreateInfo {
-        .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1u,
-        .pBindings    = &uboLayoutBinding,
-    };
-
-    // create descriptor set layout
-    VKC(vkCreateDescriptorSetLayout(m_Device->logical(), &descriptoSetLayoutCreateInfo, nullptr, &m_DescriptorSetLayout));
-
-    // descriptor pool size
-    VkDescriptorPoolSize poolSize {
-        .type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .descriptorCount = swapchainImageCount,
-    };
-
-    // descriptor pool create-info
-    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
-        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets       = swapchainImageCount,
-        .poolSizeCount = 1,
-        .pPoolSizes    = &poolSize,
-    };
-
-    VKC(vkCreateDescriptorPool(m_Device->logical(), &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
-
-    // pipeline layout info
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo {
-        .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount         = 1u,
-        .pSetLayouts            = &m_DescriptorSetLayout,
-        .pushConstantRangeCount = 0u,
-        .pPushConstantRanges    = nullptr,
-    };
-    VKC(vkCreatePipelineLayout(device->logical(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
-
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts(swapchainImageCount, m_DescriptorSetLayout);
-
-    VkDescriptorSetAllocateInfo allocInfo {
-        .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool     = m_DescriptorPool,
-        .descriptorSetCount = swapchainImageCount,
-        .pSetLayouts        = descriptorSetLayouts.data()
-    };
-    m_DescriptorSets.resize(swapchainImageCount);
-
-    VKC(vkAllocateDescriptorSets(m_Device->logical(), &allocInfo, m_DescriptorSets.data()));
-
-    for (uint32_t i = 0; i < swapchainImageCount; i++)
-    {
-        VkDescriptorBufferInfo bufferInfo {
-            .buffer = *m_UBO_Camera[i]->GetBuffer(),
-            .offset = 0,
-            .range  = sizeof(UBO_MVP),
-        };
-
-        VkWriteDescriptorSet descriptorWrite {
-            .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet           = m_DescriptorSets[i],
-            .dstBinding       = 0u,
-            .dstArrayElement  = 0u,
-            .descriptorCount  = 1u,
-            .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pImageInfo       = nullptr,
-            .pBufferInfo      = &bufferInfo,
-            .pTexelBufferView = nullptr,
-        };
-
-        vkUpdateDescriptorSets(m_Device->logical(), 1u, &descriptorWrite, 0u, nullptr);
-    }
-
-    // create render pipeline
+    // create stuff
+    CreateDescriptorPool();
+    CreateDescriptorSets();
     CreatePipeline(renderPassHandle, extent);
-
-    // command buffer allocate-info
-    VkCommandBufferAllocateInfo commandBufferAllocateInfo {
-        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool        = commandPool,
-        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = swapchainImageCount,
-    };
-    m_CommandBuffers.resize(swapchainImageCount);
-
-    VKC(vkAllocateCommandBuffers(device->logical(), &commandBufferAllocateInfo, m_CommandBuffers.data()));
+    CreateCommandBuffer();
 }
 
 void QuadRendererProgram::Map()
@@ -170,7 +84,7 @@ void QuadRendererProgram::UnMap()
     m_VerticesMapEnd     = nullptr;
 }
 
-VkCommandBuffer QuadRendererProgram::CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex)
+VkCommandBuffer QuadRendererProgram::RecordCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex)
 {
     const VkDeviceSize offsets[] = { 0 };
 
@@ -228,6 +142,94 @@ VkCommandBuffer QuadRendererProgram::CreateCommandBuffer(VkRenderPass renderPass
     return cmd;
 }
 
+void QuadRendererProgram::CreateCommandPool()
+{
+    // command pool create-info
+    VkCommandPoolCreateInfo commandpoolCreateInfo {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = m_Device->graphicsQueueIndex(),
+    };
+
+    VKC(vkCreateCommandPool(m_Device->logical(), &commandpoolCreateInfo, nullptr, &m_CommandPool));
+}
+
+void QuadRendererProgram::CreateDescriptorPool()
+{
+    // descriptor pool size
+    VkDescriptorPoolSize poolSize {
+        .type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = m_SwapchainImageCount,
+    };
+
+    // descriptor pool create-info
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
+        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets       = m_SwapchainImageCount,
+        .poolSizeCount = 1,
+        .pPoolSizes    = &poolSize,
+    };
+
+    VKC(vkCreateDescriptorPool(m_Device->logical(), &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
+}
+
+void QuadRendererProgram::CreateDescriptorSets()
+{
+    // pipeline layout create-info
+    VkDescriptorSetLayoutBinding uboLayoutBinding {
+        .binding            = 0,
+        .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount    = 1u,
+        .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    // descriptor set create-info
+    VkDescriptorSetLayoutCreateInfo descriptoSetLayoutCreateInfo {
+        .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = 1u,
+        .pBindings    = &uboLayoutBinding,
+    };
+
+    // create descriptor set layout
+    VKC(vkCreateDescriptorSetLayout(m_Device->logical(), &descriptoSetLayoutCreateInfo, nullptr, &m_DescriptorSetLayout));
+
+    std::vector<VkDescriptorSetLayout> descriptorSetLayouts(m_SwapchainImageCount, m_DescriptorSetLayout);
+
+    VkDescriptorSetAllocateInfo allocInfo {
+        .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool     = m_DescriptorPool,
+        .descriptorSetCount = m_SwapchainImageCount,
+        .pSetLayouts        = descriptorSetLayouts.data()
+    };
+    m_DescriptorSets.resize(m_SwapchainImageCount);
+
+    VKC(vkAllocateDescriptorSets(m_Device->logical(), &allocInfo, m_DescriptorSets.data()));
+
+    for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
+    {
+        VkDescriptorBufferInfo bufferInfo {
+            .buffer = *m_UBO_Camera[i]->GetBuffer(),
+            .offset = 0,
+            .range  = sizeof(UBO_MVP),
+        };
+
+        VkWriteDescriptorSet descriptorWrite {
+            .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet           = m_DescriptorSets[i],
+            .dstBinding       = 0u,
+            .dstArrayElement  = 0u,
+            .descriptorCount  = 1u,
+            .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pImageInfo       = nullptr,
+            .pBufferInfo      = &bufferInfo,
+            .pTexelBufferView = nullptr,
+        };
+
+        vkUpdateDescriptorSets(m_Device->logical(), 1u, &descriptorWrite, 0u, nullptr);
+    }
+}
+
 void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent)
 {
     // pipeline Vertex state create-info
@@ -242,6 +244,15 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
 
         .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributesDescription.size()),
         .pVertexAttributeDescriptions    = attributesDescription.data(),
+    };
+
+    // pipeline layout info
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo {
+        .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount         = 1u,
+        .pSetLayouts            = &m_DescriptorSetLayout,
+        .pushConstantRangeCount = 0u,
+        .pPushConstantRanges    = nullptr,
     };
 
     // pipeline input-assembly state create-info
@@ -325,6 +336,7 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
     };
 
     // graphics pipeline create-info
+    VKC(vkCreatePipelineLayout(m_Device->logical(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
     VkGraphicsPipelineCreateInfo graphicsPipelineInfo {
         .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .stageCount          = static_cast<uint32_t>(m_Shader->GetShaderStages().size()),
@@ -345,6 +357,20 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
     };
 
     VKC(vkCreateGraphicsPipelines(m_Device->logical(), VK_NULL_HANDLE, 1u, &graphicsPipelineInfo, nullptr, &m_Pipeline));
+}
+
+void QuadRendererProgram::CreateCommandBuffer()
+{
+    // command buffer allocate-info
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo {
+        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool        = m_CommandPool,
+        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = m_SwapchainImageCount,
+    };
+    m_CommandBuffers.resize(m_SwapchainImageCount);
+
+    VKC(vkAllocateCommandBuffers(m_Device->logical(), &commandBufferAllocateInfo, m_CommandBuffers.data()));
 }
 
 void QuadRendererProgram::UpdateCamera(uint32_t framebufferIndex)

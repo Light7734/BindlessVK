@@ -6,10 +6,8 @@
 #include "Graphics/Device.h"
 #include "Graphics/Shader.h"
 
-RendererProgram::RendererProgram(Device* device, VkCommandPool commandPool, VkQueue graphicsQueue)
-    : m_Device(device)
-    , m_CommandPool(commandPool)
-    , m_GraphicsQueue(graphicsQueue)
+RendererProgram::RendererProgram(Device* device, uint32_t swapchainImageCount)
+    : m_Device(device), m_SwapchainImageCount(swapchainImageCount)
 {
 }
 

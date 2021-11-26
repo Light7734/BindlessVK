@@ -19,7 +19,7 @@ Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
 
     CreateSyncObjects();
 
-    m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Device->commandPool(), m_Device->graphicsQueue(), m_Swapchain->GetExtent(), m_MaxConcurrentFrames);
+    m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_MaxConcurrentFrames);
 }
 
 Renderer::~Renderer()
@@ -108,7 +108,7 @@ void Renderer::EndScene()
     m_ImagesInFlight[imageIndex] = m_Fences[m_CurrentFrame];
 
     // generate command buffers
-    VkCommandBuffer QuadRendererCommands = m_QuadRendererProgram->CreateCommandBuffer(m_Swapchain->GetRenderPass(),
+    VkCommandBuffer QuadRendererCommands = m_QuadRendererProgram->RecordCommandBuffer(m_Swapchain->GetRenderPass(),
                                                                                       m_Swapchain->GetFramebuffer(imageIndex),
                                                                                       m_Swapchain->GetExtent(),
                                                                                       imageIndex);
@@ -129,7 +129,7 @@ void Renderer::EndScene()
         .pSignalSemaphores    = &m_RenderFinishedSemaphores[m_CurrentFrame],
     };
 
-    // submit queue
+    // submit queues
     vkResetFences(m_Device->logical(), 1u, &m_Fences[m_CurrentFrame]);
     VKC(vkQueueSubmit(m_Device->graphicsQueue(), 1u, &submitInfo, m_Fences[m_CurrentFrame]));
 

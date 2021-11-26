@@ -69,13 +69,18 @@ private:
     std::vector<std::unique_ptr<Buffer>> m_UBO_Camera;
 
 public:
-    QuadRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkCommandPool commandPool, VkQueue graphicsQueue, VkExtent2D extent, uint32_t swapchainImageCount);
+    QuadRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkExtent2D extent, uint32_t swapchainImageCount);
 
     void            Map();
     void            UnMap();
-    VkCommandBuffer CreateCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex);
+    VkCommandBuffer RecordCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex);
+
+    void CreateCommandPool();
+    void CreateDescriptorPool();
+    void CreateDescriptorSets();
 
     void CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent);
+    void CreateCommandBuffer();
 
     void UpdateCamera(uint32_t framebufferIndex);
 
