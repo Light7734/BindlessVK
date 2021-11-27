@@ -2,6 +2,7 @@
 
 #include "Core/Window.h"
 #include "Graphics/Device.h"
+#include "Graphics/RendererCommand.h"
 #include "Graphics/Shader.h"
 #include "Graphics/Swapchain.h"
 
@@ -19,7 +20,8 @@ Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
 
     CreateSyncObjects();
 
-    m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_MaxConcurrentFrames);
+    RendererCommand::Init(m_Device);
+    m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
 }
 
 Renderer::~Renderer()
@@ -57,22 +59,26 @@ void Renderer::DrawQuad(const glm::mat4& transform, const glm::vec4& tint)
     // top left
     map[0].position = transform * glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f);
     map[0].tint     = glm::vec4(r, 0.0, t / 0.5, 1.0f);
+    map[0].uv       = glm::vec2(0.0f, 0.0f);
 
     // top right
     map[1].position = transform * glm::vec4(0.5f, -0.5f, 0.0f, 1.0f);
     map[1].tint     = glm::vec4(t / 2.0, g, 0.0f, 1.0f);
+    map[1].uv       = glm::vec2(1.0f, 0.0f);
 
     // bottom right
     map[2].position = transform * glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
     map[2].tint     = glm::vec4(0.0f, t / 1.0, b, 1.0f);
+    map[2].uv       = glm::vec2(1.0f, 1.0f);
 
     // bottom left
     map[3].position = transform * glm::vec4(-0.5f, 0.5f, 0.0f, 1.0f);
     map[3].tint     = glm::vec4(t / 2.0, t, t, 1.0f);
+    map[3].uv       = glm::vec2(0.0f, 1.0f);
 
     if (!m_QuadRendererProgram->TryAdvance())
     {
-        LOG(warn, "%s: quad renderer exceeded max vertices limit!", __FUNCTION__);
+        LOG(warn, "Quad renderer exceeded max vertices limit!");
 
         // #todo: flush scene
         EndScene();
@@ -156,9 +162,16 @@ void Renderer::EndScene()
         vkDeviceWaitIdle(m_Device->logical());
         Swapchain* old = m_Swapchain;
         m_Swapchain    = new Swapchain(m_Window, m_Device, old);
+
+        RendererCommand::Init(m_Device);
+
+        m_QuadRendererProgram.reset();
+        m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
     }
     else if (result != VK_SUCCESS)
-        throw std::runtime_error("bruh moment");
+    {
+        ASSERT(false, "bruh moment")
+    }
 }
 
 void Renderer::EndFrame()

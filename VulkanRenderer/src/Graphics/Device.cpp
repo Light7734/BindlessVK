@@ -78,7 +78,7 @@ void Device::PickPhysicalDevice()
     // fetch physical devices
     uint32_t deviceCount = 0u;
     vkEnumeratePhysicalDevices(m_VkInstance, &deviceCount, nullptr);
-    ASSERT(deviceCount, "GraphicsContext::PickPhysicalDevice: failed to find a GPU with vulkan support");
+    ASSERT(deviceCount, "Failed to find a GPU with vulkan support");
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(m_VkInstance, &deviceCount, devices.data());
@@ -120,7 +120,7 @@ void Device::PickPhysicalDevice()
         }
     }
 
-    ASSERT(m_PhysicalDevice, "Pipeline::PickPhysicalDevice: failed to find suitable GPU for vulkan");
+    ASSERT(m_PhysicalDevice, "Failed to find suitable GPU for vulkan");
 }
 
 void Device::CreateLogicalDevice()
@@ -131,6 +131,8 @@ void Device::CreateLogicalDevice()
 
     vkGetPhysicalDeviceProperties(m_PhysicalDevice, &deviceProperties);
     vkGetPhysicalDeviceFeatures(m_PhysicalDevice, &deviceFeatures);
+
+    // deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos;
     deviceQueueCreateInfos.reserve(m_QueueFamilyIndices.indices.size());

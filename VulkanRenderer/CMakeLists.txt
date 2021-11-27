@@ -8,15 +8,17 @@ endif()
 file(GLOB_RECURSE RENDERER_FILES true ABSOLUTE ${CMAKE_BINARY_DIR}/../VulkanRenderer/*)
 
 include_directories(
-    ${CMAKE_BINARY_DIR}/../VulkanRenderer/src/
+    ${CMAKE_SOURCE_DIR}/VulkanRenderer/src/
     
-    ${CMAKE_BINARY_DIR}/../Dependencies/glfw/include
-    ${CMAKE_BINARY_DIR}/../Dependencies/spdlog/include
-    ${CMAKE_BINARY_DIR}/../Dependencies/volk/
-    ${CMAKE_BINARY_DIR}/../Dependencies/glm/
+    ${CMAKE_SOURCE_DIR}/Dependencies/glfw/include
+    ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include
+    ${CMAKE_SOURCE_DIR}/Dependencies/volk/
+    ${CMAKE_SOURCE_DIR}/Dependencies/glm/
 
+    ${CMAKE_SOURCE_DIR}/Dependencies/stb_image/
 
     ${CMAKE_BINARY_DIR}/../Dependencies/shaderc/libshaderc/include
+    ${CMAKE_}/../Dependencies/shaderc/libshaderc/include
     
     $ENV{VULKAN_SDK}/Include/
     

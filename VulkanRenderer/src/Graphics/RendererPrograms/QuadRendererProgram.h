@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Base.h"
+#include "Graphics/Image.h"
 #include "Graphics/RendererPrograms/RendererProgram.h"
 
 #include <volk.h>
@@ -22,6 +23,7 @@ public:
     {
         glm::vec2 position;
         glm::vec3 tint;
+        glm::vec2 uv;
 
         static constexpr VkVertexInputBindingDescription GetBindingDescription()
         {
@@ -37,7 +39,7 @@ public:
         static constexpr std::vector<VkVertexInputAttributeDescription> GetAttributesDescription()
         {
             std::vector<VkVertexInputAttributeDescription> attributesDescription;
-            attributesDescription.resize(2);
+            attributesDescription.resize(3u);
 
             attributesDescription[0] = {
                 .location = 0u,
@@ -53,11 +55,21 @@ public:
                 .offset   = offsetof(Vertex, tint),
             };
 
+            attributesDescription[2] = {
+                .location = 2u,
+                .binding  = 0u,
+                .format   = VK_FORMAT_R32G32_SFLOAT,
+                .offset   = offsetof(Vertex, uv),
+            };
+
             return attributesDescription;
         }
     };
 
 private:
+    //   TEMP:
+    std::unique_ptr<Image> m_Image;
+
     Vertex* m_VerticesMapCurrent = nullptr;
     Vertex* m_VerticesMapBegin   = nullptr;
     Vertex* m_VerticesMapEnd     = nullptr;

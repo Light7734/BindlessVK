@@ -2,6 +2,8 @@
 
 #include "Graphics/Device.h"
 
+#include <filesystem>
+
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -116,7 +118,7 @@ VkCommandBuffer QuadRendererProgram::RecordCommandBuffer(VkRenderPass renderPass
     // alias
     const auto& cmd = m_CommandBuffers[swapchainImageIndex];
 
-    VKC(vkResetCommandBuffer(cmd, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT));
+    //  VKC(vkResetCommandBuffer(cmd, VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT));
     VKC(vkBeginCommandBuffer(cmd, &commandBufferBeginInfo));
     const VkBufferCopy copyRegion {
         .srcOffset = 0u,
@@ -156,9 +158,16 @@ void QuadRendererProgram::CreateCommandPool()
 
 void QuadRendererProgram::CreateDescriptorPool()
 {
-    // descriptor pool size
-    VkDescriptorPoolSize poolSize {
+    // descriptor pool sizes
+    std::array<VkDescriptorPoolSize, 2> poolSizes;
+
+    poolSizes[0] = VkDescriptorPoolSize {
         .type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = m_SwapchainImageCount,
+    };
+
+    poolSizes[1] = VkDescriptorPoolSize {
+        .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .descriptorCount = m_SwapchainImageCount,
     };
 
@@ -166,8 +175,8 @@ void QuadRendererProgram::CreateDescriptorPool()
     VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
         .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets       = m_SwapchainImageCount,
-        .poolSizeCount = 1,
-        .pPoolSizes    = &poolSize,
+        .poolSizeCount = 2u,
+        .pPoolSizes    = poolSizes.data(),
     };
 
     VKC(vkCreateDescriptorPool(m_Device->logical(), &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
@@ -177,18 +186,28 @@ void QuadRendererProgram::CreateDescriptorSets()
 {
     // pipeline layout create-info
     VkDescriptorSetLayoutBinding uboLayoutBinding {
-        .binding            = 0,
+        .binding            = 0u,
         .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .descriptorCount    = 1u,
         .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
         .pImmutableSamplers = nullptr,
     };
 
+    VkDescriptorSetLayoutBinding samplerLayoutBinding {
+        .binding            = 1u,
+        .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount    = 1u,
+        .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    std::array<VkDescriptorSetLayoutBinding, 2> layoutBindings = { uboLayoutBinding, samplerLayoutBinding };
+
     // descriptor set create-info
     VkDescriptorSetLayoutCreateInfo descriptoSetLayoutCreateInfo {
         .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 1u,
-        .pBindings    = &uboLayoutBinding,
+        .bindingCount = 2u,
+        .pBindings    = layoutBindings.data(),
     };
 
     // create descriptor set layout
@@ -206,6 +225,8 @@ void QuadRendererProgram::CreateDescriptorSets()
 
     VKC(vkAllocateDescriptorSets(m_Device->logical(), &allocInfo, m_DescriptorSets.data()));
 
+    m_Image = std::make_unique<Image>(m_Device, "res/texture.jpg");
+
     for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
     {
         VkDescriptorBufferInfo bufferInfo {
@@ -214,7 +235,15 @@ void QuadRendererProgram::CreateDescriptorSets()
             .range  = sizeof(UBO_MVP),
         };
 
-        VkWriteDescriptorSet descriptorWrite {
+        VkDescriptorImageInfo imageInfo {
+            .sampler     = m_Image->GetSampler(),
+            .imageView   = m_Image->GetImageView(),
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        };
+
+        std::array<VkWriteDescriptorSet, 2> writeDescriptorSets;
+
+        writeDescriptorSets[0] = VkWriteDescriptorSet {
             .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet           = m_DescriptorSets[i],
             .dstBinding       = 0u,
@@ -226,7 +255,19 @@ void QuadRendererProgram::CreateDescriptorSets()
             .pTexelBufferView = nullptr,
         };
 
-        vkUpdateDescriptorSets(m_Device->logical(), 1u, &descriptorWrite, 0u, nullptr);
+        writeDescriptorSets[1] = VkWriteDescriptorSet {
+            .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet           = m_DescriptorSets[i],
+            .dstBinding       = 1u,
+            .dstArrayElement  = 0u,
+            .descriptorCount  = 1u,
+            .descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo       = &imageInfo,
+            .pBufferInfo      = nullptr,
+            .pTexelBufferView = nullptr,
+        };
+
+        vkUpdateDescriptorSets(m_Device->logical(), 2u, writeDescriptorSets.data(), 0u, nullptr);
     }
 }
 
