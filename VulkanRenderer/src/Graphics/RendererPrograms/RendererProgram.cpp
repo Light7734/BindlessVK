@@ -26,6 +26,7 @@ RendererProgram::~RendererProgram()
     m_IndexBuffer.reset();
 
     vkFreeCommandBuffers(m_Device->logical(), m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
+    vkDestroyCommandPool(m_Device->logical(), m_CommandPool, nullptr);
 
     // destroy pipeline
     vkDestroyPipelineLayout(m_Device->logical(), m_PipelineLayout, nullptr);

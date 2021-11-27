@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "vector": "cpp",
+        "optional": "cpp"
+    }
+}

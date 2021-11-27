@@ -27,5 +27,5 @@ public:
     inline const VkBuffer* GetBuffer() { return &m_Buffer; }
 
 private:
-    uint32_t FetchMemoryType(uint32_t filter, VkMemoryPropertyFlags flags);
+    uint32_t FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags);
 };

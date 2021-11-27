@@ -8,6 +8,7 @@
 #define ASSERT(x, ...)                             \
     if (!x)                                        \
     {                                              \
+        __debugbreak();                            \
         LOG(critical, __VA_ARGS__);                \
         throw failedAssertion(__FILE__, __LINE__); \
     }

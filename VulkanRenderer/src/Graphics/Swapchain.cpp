@@ -28,7 +28,7 @@ uint32_t Swapchain::FetchNextImage(VkSemaphore semaphore)
     }
     else if (result != VK_SUCCESS)
     {
-        throw vkException(result, __FILE__, __LINE__);
+        ASSERT(false, "bruh moment")
     }
 
     return index;
@@ -100,6 +100,10 @@ void Swapchain::CreateSwapchain(Swapchain* old)
 
     bool queueFamiliesSameIndex = m_Device->queueIndices().graphics.value() == m_Device->queueIndices().present.value();
 
+    LOG(trace, m_Device->queueIndices().indices.data()[0]);
+    LOG(trace, m_Device->queueIndices().indices.data()[1]);
+    // std::cout << "Swapchain Indices: \t" << m_Device->queueIndices().indices.data() << std::endl;
+
     // swapchain create-info
     VkSwapchainCreateInfoKHR swapchainCreateInfo {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -112,10 +116,10 @@ void Swapchain::CreateSwapchain(Swapchain* old)
         .imageExtent      = m_Extent,
         .imageArrayLayers = 1u,
         .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        .imageSharingMode = queueFamiliesSameIndex ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
+        .imageSharingMode = !queueFamiliesSameIndex ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
 
-        .queueFamilyIndexCount = queueFamiliesSameIndex ? 0u : 2u,
-        .pQueueFamilyIndices   = queueFamiliesSameIndex ? nullptr : m_Device->queueIndices().indices.data(),
+        .queueFamilyIndexCount = !queueFamiliesSameIndex ? 0u : 2u,
+        .pQueueFamilyIndices   = !queueFamiliesSameIndex ? nullptr : m_Device->queueIndices().indices.data(),
         .preTransform          = m_SwapChainDetails.capabilities.currentTransform,
         .compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode           = swapChainPresentMode,

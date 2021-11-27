@@ -1,6 +1,7 @@
 #include "Graphics/Buffers.h"
 
 #include "Graphics/Device.h"
+#include "Graphics/RendererCommand.h"
 
 Buffer::Buffer(class Device* device, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties)
     : m_Device(device)
@@ -39,21 +40,7 @@ Buffer::~Buffer()
 
 void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandPool, VkQueue graphicsQueue)
 {
-    VkCommandBufferAllocateInfo allocInfo {
-        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool        = commandPool,
-        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1u,
-    };
-
-    VkCommandBuffer commandBuffer;
-    VKC(vkAllocateCommandBuffers(m_Device->logical(), &allocInfo, &commandBuffer));
-
-    VkCommandBufferBeginInfo beginInfo {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
-    };
-    VKC(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+    VkCommandBuffer commandBuffer = RendererCommand::BeginOneTimeCommand();
 
     VkBufferCopy copyRegion {
         .srcOffset = 0u,
@@ -62,18 +49,8 @@ void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandP
     };
 
     vkCmdCopyBuffer(commandBuffer, *src->GetBuffer(), m_Buffer, 1u, &copyRegion);
-    VKC(vkEndCommandBuffer(commandBuffer));
 
-    VkSubmitInfo copySubmitInfo {
-        .sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount = 1u,
-        .pCommandBuffers    = &commandBuffer
-    };
-
-    VKC(vkQueueSubmit(graphicsQueue, 1u, &copySubmitInfo, VK_NULL_HANDLE));
-    VKC(vkQueueWaitIdle(graphicsQueue));
-
-    vkFreeCommandBuffers(m_Device->logical(), commandPool, 1u, &commandBuffer);
+    RendererCommand::EndOneTimeCommand(&commandBuffer);
 }
 
 void* Buffer::Map(uint32_t size)
