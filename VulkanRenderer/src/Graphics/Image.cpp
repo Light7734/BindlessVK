@@ -12,6 +12,7 @@ Image::Image(Device* device, const std::string& path)
     CreateImage();
     TransitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
     CopyBufferToImage();
+    TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     CreateImageView();
     CreateImageSampler();

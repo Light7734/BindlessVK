@@ -225,7 +225,6 @@ void QuadRendererProgram::CreateDescriptorSets()
 
     VKC(vkAllocateDescriptorSets(m_Device->logical(), &allocInfo, m_DescriptorSets.data()));
 
-    LOG(trace, std::filesystem::current_path().string());
     m_Image = std::make_unique<Image>(m_Device, "res/texture.jpg");
 
     for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
@@ -259,8 +258,8 @@ void QuadRendererProgram::CreateDescriptorSets()
         writeDescriptorSets[1] = VkWriteDescriptorSet {
             .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstSet           = m_DescriptorSets[i],
-            .dstBinding       = 0u,
-            .dstArrayElement  = 1u,
+            .dstBinding       = 1u,
+            .dstArrayElement  = 0u,
             .descriptorCount  = 1u,
             .descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .pImageInfo       = &imageInfo,
