@@ -36,10 +36,9 @@ public:
             return bindingDescription;
         }
 
-        static constexpr std::vector<VkVertexInputAttributeDescription> GetAttributesDescription()
+        static constexpr std::array<VkVertexInputAttributeDescription, 3> GetAttributesDescription()
         {
-            std::vector<VkVertexInputAttributeDescription> attributesDescription;
-            attributesDescription.resize(3u);
+            std::array<VkVertexInputAttributeDescription, 3> attributesDescription;
 
             attributesDescription[0] = {
                 .location = 0u,

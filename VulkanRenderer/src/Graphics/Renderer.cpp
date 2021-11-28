@@ -6,7 +6,7 @@
 #include "Graphics/Shader.h"
 #include "Graphics/Swapchain.h"
 
-#include <glfw/glfw3.h>
+#include <GLFW/glfw3.h>
 
 Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
     : m_Window(window)

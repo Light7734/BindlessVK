@@ -2,14 +2,7 @@
 
 #include "Graphics/Renderer.h"
 
-#include <glfw/glfw3.h>
-
-extern "C"
-{
-    // force machine to use dedicated graphics
-    __declspec(dllexport) unsigned long NvOptimusEnablement        = 0x00000001; // NVidia
-    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;          // AMD
-}
+#include <GLFW/glfw3.h>
 
 Window::Window(uint32_t width, uint32_t height)
     : m_Width(width), m_Height(height)

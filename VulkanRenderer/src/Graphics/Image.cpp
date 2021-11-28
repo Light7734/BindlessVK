@@ -3,7 +3,6 @@
 #include "Graphics/Device.h"
 #include "Graphics/RendererCommand.h"
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 Image::Image(Device* device, const std::string& path)
@@ -44,7 +43,7 @@ void Image::CreateImage()
     // image create-info
     VkImageCreateInfo imageCreateInfo {
         .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .flags     = NULL,
+        .flags     = 0x0,
         .imageType = VK_IMAGE_TYPE_2D,
         .format    = VK_FORMAT_R8G8B8A8_SRGB,
         .extent    = {
@@ -133,8 +132,8 @@ void Image::TransitionImageLayout(VkImageLayout newLayout)
 
     VkImageMemoryBarrier barrier {
         .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask       = NULL,
-        .dstAccessMask       = NULL,
+        .srcAccessMask       = 0x0,
+        .dstAccessMask       = 0x0,
         .oldLayout           = m_OldLayout,
         .newLayout           = newLayout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -150,12 +149,12 @@ void Image::TransitionImageLayout(VkImageLayout newLayout)
 
     };
 
-    VkPipelineStageFlags sourceStage      = NULL;
-    VkPipelineStageFlags destinationStage = NULL;
+    VkPipelineStageFlags sourceStage      = 0x0;
+    VkPipelineStageFlags destinationStage = 0x0;
 
     if (m_OldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
-        barrier.srcAccessMask = NULL;
+        barrier.srcAccessMask = 0x0;
         barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
         sourceStage      = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
@@ -176,7 +175,7 @@ void Image::TransitionImageLayout(VkImageLayout newLayout)
 
     vkCmdPipelineBarrier(commandBuffer,
                          sourceStage, destinationStage, /* TODO */
-                         NULL,
+                         0x0,
                          0u, nullptr,
                          0u, nullptr,
                          1u, &barrier);
@@ -200,7 +199,11 @@ void Image::CopyBufferToImage()
             .baseArrayLayer = 0u,
             .layerCount     = 1u,
         },
-        .imageOffset = 0u,
+        .imageOffset = {
+            .x = 0,
+            .y = 0,
+            .z = 0,
+        },
         .imageExtent = {
             .width  = static_cast<uint32_t>(m_Width),
             .height = static_cast<uint32_t>(m_Height),

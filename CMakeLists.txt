@@ -6,6 +6,7 @@ add_subdirectory(Dependencies/volk)
 add_subdirectory(Dependencies/spdlog)
 add_subdirectory(Dependencies/glfw)
 add_subdirectory(Dependencies/glm)
+add_subdirectory(Dependencies/stb_image)
 
 set(SHADERC_SKIP_TESTS ON)
 set(SHADERC_SKIP_EXAMPLES ON)
@@ -20,6 +21,7 @@ target_link_libraries(VulkanRenderer glfw)
 target_link_libraries(VulkanRenderer spdlog)
 target_link_libraries(VulkanRenderer volk)
 target_link_libraries(VulkanRenderer shaderc)
+target_link_libraries(VulkanRenderer stb_image)
 
 configure_file(${CMAKE_SOURCE_DIR}/DependenciesConfig/spdlog/tweakme.h.in
                ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include/spdlog/tweakme.h)

@@ -2,7 +2,7 @@
 
 #include "Core/Window.h"
 
-#include <glfw/glfw3.h>
+#include <GLFW/glfw3.h>
 
 Device::Device(Window* window)
     : m_Window(window)
@@ -296,11 +296,11 @@ VkDebugUtilsMessengerCreateInfoEXT Device::SetupDebugMessageCallback()
 
     // debug message callback
     debugMessengerCreateInfo.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT      messageSeverity,
-                                                  VkDebugUtilsMessageTypeFlagsEXT             messageType,
+                                                  VkDebugUtilsMessageTypeFlagsEXT             messageTypes,
                                                   const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                                                   void*                                       pUserData) {
         LOGVk(trace, "{}", pCallbackData->pMessage);
-        return VK_FALSE;
+        return static_cast<VkBool32>(VK_FALSE);
     };
 
     return debugMessengerCreateInfo;
