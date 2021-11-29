@@ -79,6 +79,12 @@ private:
 
 	std::vector<std::unique_ptr<Buffer>> m_UBO_Camera;
 
+
+	// Depth resources
+	VkImage m_DepthImage;
+	VkDeviceMemory m_DepthImageMemory;
+	VkImageView m_DepthImageView;
+
 public:
 	QuadRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkExtent2D extent, uint32_t swapchainImageCount);
 
@@ -99,4 +105,7 @@ public:
 
 	inline Vertex* GetMapCurrent() const { return m_VerticesMapCurrent; }
 	inline uint32_t GetQuadCount() const { return m_QuadCount; }
+
+private:
+	void CreateDepthResources();
 };

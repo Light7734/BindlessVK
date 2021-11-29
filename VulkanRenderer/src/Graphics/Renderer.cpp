@@ -15,12 +15,13 @@ Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
 	ASSERT(window, "Null window passed to renderer");
 	m_Device = new Device(window);
 
+	RendererCommand::Init(m_Device);
+
 	ASSERT(m_Device, "Failed to create vulkan device");
 	m_Swapchain = new Swapchain(window, m_Device);
 
 	CreateSyncObjects();
 
-	RendererCommand::Init(m_Device);
 	m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
 }
 

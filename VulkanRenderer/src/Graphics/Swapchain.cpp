@@ -173,6 +173,24 @@ void Swapchain::CreateImageViews()
 
 void Swapchain::CreateRenderPass()
 {
+	m_DepthImage = std::make_unique<Image>(m_Device, m_Extent.width, m_Extent.height);
+
+	VkAttachmentDescription depthAttachmentDescription {
+		.format         = m_DepthImage->GetFormat(),
+		.samples        = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	};
+
+	VkAttachmentReference depthAttachmentReference {
+		.attachment = 1u,
+		.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	};
+
 	/// attachment description
 	VkAttachmentDescription attachmentDescription {
 		.format         = m_SwapchainImageFormat,
@@ -193,26 +211,28 @@ void Swapchain::CreateRenderPass()
 
 	// subpass description
 	VkSubpassDescription subpassDescription {
-		.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.colorAttachmentCount = 1,
-		.pColorAttachments    = &attachmentReference
+		.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount    = 1,
+		.pColorAttachments       = &attachmentReference,
+		.pDepthStencilAttachment = &depthAttachmentReference,
 	};
 
 	// subpass dependency
 	VkSubpassDependency subpassDependency {
 		.srcSubpass    = VK_SUBPASS_EXTERNAL,
 		.dstSubpass    = 0u,
-		.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+		.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
 		.srcAccessMask = 0u,
-		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
 	};
 
 	// render pass create-info
+	std::array<VkAttachmentDescription, 2> attachments = { attachmentDescription, depthAttachmentDescription };
 	VkRenderPassCreateInfo renderPassCreateInfo {
 		.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-		.attachmentCount = 1u,
-		.pAttachments    = &attachmentDescription,
+		.attachmentCount = static_cast<uint32_t>(attachments.size()),
+		.pAttachments    = attachments.data(),
 		.subpassCount    = 1u,
 		.pSubpasses      = &subpassDescription,
 		.dependencyCount = 1u,
@@ -229,12 +249,14 @@ void Swapchain::CreateFramebuffers()
 
 	for (size_t i = 0ull; i < m_ImageViews.size(); i++)
 	{
+		std::array<VkImageView, 2> attachments = { m_ImageViews[i], m_DepthImage->GetImageView() };
+
 		// framebuffer create-info
 		VkFramebufferCreateInfo framebufferCreateInfo {
 			.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass      = m_RenderPass,
-			.attachmentCount = 1u,
-			.pAttachments    = &m_ImageViews[i],
+			.attachmentCount = static_cast<uint32_t>(attachments.size()),
+			.pAttachments    = attachments.data(),
 			.width           = m_Extent.width,
 			.height          = m_Extent.height,
 			.layers          = 1u

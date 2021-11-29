@@ -2,6 +2,7 @@
 
 #include "Core/Base.h"
 #include "Graphics/Device.h"
+#include "Graphics/Image.h"
 
 #include <volk.h>
 
@@ -54,6 +55,8 @@ private:
 
 	VkFormat m_SwapchainImageFormat;
 	VkExtent2D m_Extent;
+
+	std::unique_ptr<Image> m_DepthImage;
 
 	VkRenderPass m_RenderPass;
 

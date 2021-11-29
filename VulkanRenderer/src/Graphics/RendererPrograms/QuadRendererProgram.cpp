@@ -97,7 +97,15 @@ VkCommandBuffer QuadRendererProgram::RecordCommandBuffer(VkRenderPass renderPass
 	};
 
 	// clear value
-	static const VkClearValue clearColor = { .color = { 0.124f, 0.231f, 0.491f, 1.0f } };
+	static const std::array<VkClearValue, 2> clearValues = {
+		VkClearValue {
+		    .color = { 0.124f, 0.231f, 0.491f, 1.0f },
+		},
+
+		VkClearValue {
+		    .depthStencil = { 1.0f, 0u },
+		},
+	};
 
 	// render pass begin-info
 	VkRenderPassBeginInfo renderpassBeginInfo {
@@ -110,8 +118,8 @@ VkCommandBuffer QuadRendererProgram::RecordCommandBuffer(VkRenderPass renderPass
 		    .extent = swapchainExtent,
 		},
 
-		.clearValueCount = 1u,
-		.pClearValues    = &clearColor,
+		.clearValueCount = static_cast<uint32_t>(clearValues.size()),
+		.pClearValues    = clearValues.data(),
 	};
 
 	// alias
@@ -375,6 +383,20 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
 		.blendConstants  = { 0.0f, 0.0f, 0.0f, 0.0f },
 	};
 
+	// depth stencil create-info
+	VkPipelineDepthStencilStateCreateInfo pipelineDepthStencilStateCreateInfo {
+		.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable       = VK_TRUE,
+		.depthWriteEnable      = VK_TRUE,
+		.depthCompareOp        = VK_COMPARE_OP_LESS,
+		.depthBoundsTestEnable = VK_FALSE,
+		.stencilTestEnable     = VK_FALSE,
+		.front                 = {},
+		.back                  = {},
+		.minDepthBounds        = 0.0f,
+		.maxDepthBounds        = 1.0,
+	};
+
 	// graphics pipeline create-info
 	VKC(vkCreatePipelineLayout(m_Device->logical(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 	VkGraphicsPipelineCreateInfo graphicsPipelineInfo {
@@ -386,7 +408,7 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
 		.pViewportState      = &pipelineViewportStateCreateInfo,
 		.pRasterizationState = &pipelineRasterizationStateCreateInfo,
 		.pMultisampleState   = &pipelineMultisampleStateCreateInfo,
-		.pDepthStencilState  = nullptr,
+		.pDepthStencilState  = &pipelineDepthStencilStateCreateInfo,
 		.pColorBlendState    = &pipelineColorBlendStateCreateInfo,
 		.pDynamicState       = nullptr,
 		.layout              = m_PipelineLayout,
@@ -436,4 +458,8 @@ bool QuadRendererProgram::TryAdvance()
 	m_QuadCount++;
 
 	return m_VerticesMapCurrent < m_VerticesMapEnd;
+}
+
+void QuadRendererProgram::CreateDepthResources()
+{
 }

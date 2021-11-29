@@ -8,13 +8,28 @@
 Image::Image(Device* device, const std::string& path)
     : m_Device(device), m_Path(path)
 {
-	CreateImage();
-	TransitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	CreateImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	CopyBufferToImage();
-	TransitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-	CreateImageView();
+	CreateImageView(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 	CreateImageSampler();
+}
+
+Image::Image(Device* device, uint32_t width, uint32_t height)
+    : m_Device(device), m_Path("")
+{
+	m_Width  = width;
+	m_Height = height;
+
+	VkFormat depthFormat = FindSupportedFormat({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+	                                           VK_IMAGE_TILING_OPTIMAL,
+	                                           VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+
+	CreateImage(depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+	TransitionImageLayout(depthFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 Image::~Image()
@@ -25,27 +40,32 @@ Image::~Image()
 	vkFreeMemory(m_Device->logical(), m_ImageMemory, nullptr);
 }
 
-void Image::CreateImage()
+void Image::CreateImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryProperties)
 {
-	uint8_t* pixels = (uint8_t*)stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Components, 4);
-	ASSERT(pixels, "failed to load image at: {}", m_Path);
+	m_ImageFormat = format;
 
-	VkDeviceSize imageSize = m_Width * m_Height * 4;
+	if (!m_Path.empty())
+	{
+		uint8_t* pixels = (uint8_t*)stbi_load(m_Path.c_str(), &m_Width, &m_Height, &m_Components, 4);
+		ASSERT(pixels, "failed to load image at: {}", m_Path);
 
-	m_StagingBuffer = std::make_unique<Buffer>(m_Device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		VkDeviceSize imageSize = m_Width * m_Height * 4;
 
-	void* map = m_StagingBuffer->Map(imageSize);
-	memcpy(map, pixels, imageSize);
-	m_StagingBuffer->Unmap();
+		m_StagingBuffer = std::make_unique<Buffer>(m_Device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-	stbi_image_free(pixels);
+		void* map = m_StagingBuffer->Map(imageSize);
+		memcpy(map, pixels, imageSize);
+		m_StagingBuffer->Unmap();
+
+		stbi_image_free(pixels);
+	}
 
 	// image create-info
 	VkImageCreateInfo imageCreateInfo {
 		.sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
 		.flags     = 0x0,
 		.imageType = VK_IMAGE_TYPE_2D,
-		.format    = VK_FORMAT_R8G8B8A8_SRGB,
+		.format    = format,
 		.extent    = {
             .width  = static_cast<uint32_t>(m_Width),
             .height = static_cast<uint32_t>(m_Height),
@@ -54,8 +74,8 @@ void Image::CreateImage()
 		.mipLevels     = 1u,
 		.arrayLayers   = 1u,
 		.samples       = VK_SAMPLE_COUNT_1_BIT,
-		.tiling        = VK_IMAGE_TILING_OPTIMAL,
-		.usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		.tiling        = tiling,
+		.usage         = usageFlags,
 		.sharingMode   = VK_SHARING_MODE_EXCLUSIVE,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 	};
@@ -70,24 +90,24 @@ void Image::CreateImage()
 	VkMemoryAllocateInfo allocInfo {
 		.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize  = memoryRequirements.size,
-		.memoryTypeIndex = FetchMemoryType(memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT),
+		.memoryTypeIndex = FetchMemoryType(memoryRequirements.memoryTypeBits, memoryProperties),
 	};
 
 	VKC(vkAllocateMemory(m_Device->logical(), &allocInfo, nullptr, &m_ImageMemory));
 	vkBindImageMemory(m_Device->logical(), m_Image, m_ImageMemory, 0ull);
 }
 
-void Image::CreateImageView()
+void Image::CreateImageView(VkFormat format, VkImageAspectFlags aspectFlags)
 {
 	// image view create-info
 	VkImageViewCreateInfo viewCreateInfo {
 		.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image    = m_Image,
 		.viewType = VK_IMAGE_VIEW_TYPE_2D,
-		.format   = VK_FORMAT_R8G8B8A8_SRGB,
+		.format   = format,
 
 		.subresourceRange = {
-		    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+		    .aspectMask     = aspectFlags,
 		    .baseMipLevel   = 0,
 		    .levelCount     = 1,
 		    .baseArrayLayer = 0,
@@ -126,7 +146,7 @@ void Image::CreateImageSampler()
 	vkCreateSampler(m_Device->logical(), &samplerCreateInfo, nullptr, &m_ImageSampler);
 }
 
-void Image::TransitionImageLayout(VkImageLayout newLayout)
+void Image::TransitionImageLayout(VkFormat format, VkImageLayout newLayout)
 {
 	VkCommandBuffer commandBuffer = RendererCommand::BeginOneTimeCommand();
 
@@ -146,7 +166,6 @@ void Image::TransitionImageLayout(VkImageLayout newLayout)
             .baseArrayLayer = 0,
             .layerCount     = 1u,
         },
-
 	};
 
 	VkPipelineStageFlags sourceStage      = 0x0;
@@ -168,6 +187,14 @@ void Image::TransitionImageLayout(VkImageLayout newLayout)
 		sourceStage      = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	}
+	else if (m_OldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+		sourceStage      = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
 	else
 	{
 		ASSERT(false, "Bruh moment");
@@ -184,15 +211,6 @@ void Image::TransitionImageLayout(VkImageLayout newLayout)
 
 	m_OldLayout = newLayout;
 }
-
-namespace test {
-
-class a
-{
-	int t = 2;
-};
-
-} // namespace test
 
 void Image::CopyBufferToImage()
 {
@@ -239,4 +257,20 @@ uint32_t Image::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags
 
 	throw std::runtime_error("failed to fetch required memory type!");
 	return -1;
+}
+
+
+VkFormat Image::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlagBits features) const
+{
+	for (VkFormat format : candidates)
+	{
+		VkFormatProperties properties;
+		vkGetPhysicalDeviceFormatProperties(m_Device->physical(), format, &properties);
+		if (tiling == VK_IMAGE_TILING_LINEAR && (properties.linearTilingFeatures & features) == features)
+			return format;
+		else if (tiling == VK_IMAGE_TILING_OPTIMAL && (properties.optimalTilingFeatures & features) == features)
+			return format;
+	}
+
+	ASSERT(false, "Failed to find supported format");
 }
