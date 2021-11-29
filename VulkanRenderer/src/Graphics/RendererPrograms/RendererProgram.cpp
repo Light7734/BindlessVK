@@ -13,22 +13,22 @@ RendererProgram::RendererProgram(Device* device, uint32_t swapchainImageCount)
 
 RendererProgram::~RendererProgram()
 {
-    vkDestroyDescriptorSetLayout(m_Device->logical(), m_DescriptorSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_Device->logical(), m_DescriptorSetLayout, nullptr);
 
-    // destroy shader
-    m_Shader.reset();
+	// destroy shader
+	m_Shader.reset();
 
-    // destroy buffers
-    m_StagingVertexBuffer.reset();
-    m_VertexBuffer.reset();
+	// destroy buffers
+	m_StagingVertexBuffer.reset();
+	m_VertexBuffer.reset();
 
-    m_StagingIndexBuffer.reset();
-    m_IndexBuffer.reset();
+	m_StagingIndexBuffer.reset();
+	m_IndexBuffer.reset();
 
-    vkFreeCommandBuffers(m_Device->logical(), m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
-    vkDestroyCommandPool(m_Device->logical(), m_CommandPool, nullptr);
+	vkFreeCommandBuffers(m_Device->logical(), m_CommandPool, m_CommandBuffers.size(), m_CommandBuffers.data());
+	vkDestroyCommandPool(m_Device->logical(), m_CommandPool, nullptr);
 
-    // destroy pipeline
-    vkDestroyPipelineLayout(m_Device->logical(), m_PipelineLayout, nullptr);
-    vkDestroyPipeline(m_Device->logical(), m_Pipeline, nullptr);
+	// destroy pipeline
+	vkDestroyPipelineLayout(m_Device->logical(), m_PipelineLayout, nullptr);
+	vkDestroyPipeline(m_Device->logical(), m_Pipeline, nullptr);
 }

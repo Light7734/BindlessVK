@@ -9,12 +9,12 @@
 class Logger
 {
 private:
-    static std::shared_ptr<spdlog::logger> s_RendererLogger;
-    static std::shared_ptr<spdlog::logger> s_VkLogger;
+	static std::shared_ptr<spdlog::logger> s_RendererLogger;
+	static std::shared_ptr<spdlog::logger> s_VkLogger;
 
 public:
-    static void Init();
+	static void Init();
 
-    static std::shared_ptr<spdlog::logger> GetRendererLogger() { return s_RendererLogger; }
-    static std::shared_ptr<spdlog::logger> GetVkLogger() { return s_VkLogger; }
+	static std::shared_ptr<spdlog::logger> GetRendererLogger() { return s_RendererLogger; }
+	static std::shared_ptr<spdlog::logger> GetVkLogger() { return s_VkLogger; }
 };

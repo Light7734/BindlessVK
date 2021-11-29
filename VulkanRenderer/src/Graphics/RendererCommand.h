@@ -7,24 +7,24 @@
 class RendererCommand
 {
 private:
-    static RendererCommand* s_Instance;
+	static RendererCommand* s_Instance;
 
-    class Device* m_Device;
+	class Device* m_Device;
 
-    VkCommandPool m_CommandPool;
+	VkCommandPool m_CommandPool;
 
 public:
-    ~RendererCommand();
+	~RendererCommand();
 
-    static void Init(class Device* device);
+	static void Init(class Device* device);
 
-    static VkCommandBuffer BeginOneTimeCommand() { return s_Instance->BeginOneTimeCommandImpl(); }
+	static VkCommandBuffer BeginOneTimeCommand() { return s_Instance->BeginOneTimeCommandImpl(); }
 
-    static void EndOneTimeCommand(VkCommandBuffer* commandBuffer) { s_Instance->EndOneTimeCommandImpl(commandBuffer); }
+	static void EndOneTimeCommand(VkCommandBuffer* commandBuffer) { s_Instance->EndOneTimeCommandImpl(commandBuffer); }
 
 private:
-    RendererCommand(Device* device);
+	RendererCommand(Device* device);
 
-    VkCommandBuffer BeginOneTimeCommandImpl();
-    void            EndOneTimeCommandImpl(VkCommandBuffer* commandBuffer);
+	VkCommandBuffer BeginOneTimeCommandImpl();
+	void EndOneTimeCommandImpl(VkCommandBuffer* commandBuffer);
 };
