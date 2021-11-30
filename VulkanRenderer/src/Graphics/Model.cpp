@@ -33,7 +33,7 @@ Model::Model(Device* device, const std::string& modelPath, const std::string& ba
 			};
 			vertex.uv = {
 				attrib.texcoords[2 * index.texcoord_index + 0],
-				attrib.texcoords[2 * index.texcoord_index + 1],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1],
 			};
 
 			m_Vertices.push_back(vertex);

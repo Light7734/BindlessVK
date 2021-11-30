@@ -446,33 +446,13 @@ void ModelRendererProgram::UpdateImage(VkImageView imageView, VkSampler sampler)
 {
 	for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
 	{
-		VkDescriptorBufferInfo bufferInfo {
-			.buffer = *m_UBO_Camera[i]->GetBuffer(),
-			.offset = 0,
-			.range  = sizeof(UBO_MVP),
-		};
-
 		VkDescriptorImageInfo imageInfo {
 			.sampler     = sampler,
 			.imageView   = imageView,
 			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 		};
 
-		std::array<VkWriteDescriptorSet, 2> writeDescriptorSets;
-
-		writeDescriptorSets[0] = VkWriteDescriptorSet {
-			.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet           = m_DescriptorSets[i],
-			.dstBinding       = 0u,
-			.dstArrayElement  = 0u,
-			.descriptorCount  = 1u,
-			.descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.pImageInfo       = nullptr,
-			.pBufferInfo      = &bufferInfo,
-			.pTexelBufferView = nullptr,
-		};
-
-		writeDescriptorSets[1] = VkWriteDescriptorSet {
+		VkWriteDescriptorSet writeDescriptorSet {
 			.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
 			.dstSet           = m_DescriptorSets[i],
 			.dstBinding       = 1u,
@@ -484,7 +464,7 @@ void ModelRendererProgram::UpdateImage(VkImageView imageView, VkSampler sampler)
 			.pTexelBufferView = nullptr,
 		};
 
-		vkUpdateDescriptorSets(m_Device->logical(), 2u, writeDescriptorSets.data(), 0u, nullptr);
+		vkUpdateDescriptorSets(m_Device->logical(), 1u, &writeDescriptorSet, 0u, nullptr);
 	}
 }
 
