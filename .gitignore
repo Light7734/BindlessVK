@@ -420,6 +420,8 @@ FodyWeavers.xsd
 .idea/
 *.sln.iml
 
-
 # build directory
 build/
+
+# !Model files
+!VulkanRenderer/res/*.obj
