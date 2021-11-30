@@ -78,6 +78,10 @@ private:
 	VkDeviceMemory m_DepthImageMemory;
 	VkImageView m_DepthImageView;
 
+	// Model image
+	VkImageView m_ModelImageView;
+	VkSampler m_ModelSampler;
+
 public:
 	ModelRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkExtent2D extent, uint32_t swapchainImageCount);
 
@@ -86,8 +90,13 @@ public:
 	VkCommandBuffer RecordCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex);
 
 	void UpdateCamera(uint32_t framebufferIndex);
-	void UpdateImage(VkImageView imageView, VkSampler sampler);
+	void UpdateImage(uint32_t framebufferIndex);
 
+	inline void SetImage(VkImageView imageView, VkSampler sampler)
+	{
+		m_ModelImageView = imageView;
+		m_ModelSampler   = sampler;
+	}
 
 	void CreateCommandPool();
 	void CreateDescriptorPool();

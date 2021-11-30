@@ -442,30 +442,27 @@ void ModelRendererProgram::UpdateCamera(uint32_t framebufferIndex)
 	m_UBO_Camera[framebufferIndex]->Unmap();
 }
 
-void ModelRendererProgram::UpdateImage(VkImageView imageView, VkSampler sampler)
+void ModelRendererProgram::UpdateImage(uint32_t framebufferIndex)
 {
-	for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
-	{
-		VkDescriptorImageInfo imageInfo {
-			.sampler     = sampler,
-			.imageView   = imageView,
-			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-		};
+	VkDescriptorImageInfo imageInfo {
+		.sampler     = m_ModelSampler,
+		.imageView   = m_ModelImageView,
+		.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+	};
 
-		VkWriteDescriptorSet writeDescriptorSet {
-			.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			.dstSet           = m_DescriptorSets[i],
-			.dstBinding       = 1u,
-			.dstArrayElement  = 0u,
-			.descriptorCount  = 1u,
-			.descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			.pImageInfo       = &imageInfo,
-			.pBufferInfo      = nullptr,
-			.pTexelBufferView = nullptr,
-		};
+	VkWriteDescriptorSet writeDescriptorSet {
+		.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		.dstSet           = m_DescriptorSets[framebufferIndex],
+		.dstBinding       = 1u,
+		.dstArrayElement  = 0u,
+		.descriptorCount  = 1u,
+		.descriptorType   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.pImageInfo       = &imageInfo,
+		.pBufferInfo      = nullptr,
+		.pTexelBufferView = nullptr,
+	};
 
-		vkUpdateDescriptorSets(m_Device->logical(), 1u, &writeDescriptorSet, 0u, nullptr);
-	}
+	vkUpdateDescriptorSets(m_Device->logical(), 1u, &writeDescriptorSet, 0u, nullptr);
 }
 
 bool ModelRendererProgram::TryAdvance(size_t vertexCount)

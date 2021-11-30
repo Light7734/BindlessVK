@@ -32,6 +32,7 @@ Renderer::~Renderer()
 
 	// destroy renderer programs
 	m_QuadRendererProgram.reset();
+	m_ModelRendererProgram.reset();
 
 	delete m_Swapchain;
 	delete m_Device;
@@ -93,7 +94,7 @@ void Renderer::DrawModel(const glm::mat4& transform, Model& model)
 	ModelRendererProgram::Vertex* map = m_ModelRendererProgram->GetMapCurrent();
 
 	memcpy(map, model.GetVertices(), model.GetVerticesSize());
-	m_ModelRendererProgram->UpdateImage(model.GetImageView(), model.GetImageSampler());
+	m_ModelRendererProgram->SetImage(model.GetImageView(), model.GetImageSampler());
 
 	m_ModelRendererProgram->TryAdvance(model.GetVerticesCount());
 }
@@ -120,6 +121,7 @@ void Renderer::EndScene()
 	// write uniform buffers
 	m_QuadRendererProgram->UpdateCamera(imageIndex);
 	m_ModelRendererProgram->UpdateCamera(imageIndex);
+	m_ModelRendererProgram->UpdateImage(imageIndex);
 
 	// check if the image is in use
 	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
