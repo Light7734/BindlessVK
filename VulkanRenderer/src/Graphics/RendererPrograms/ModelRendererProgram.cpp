@@ -435,8 +435,8 @@ void ModelRendererProgram::UpdateCamera(uint32_t framebufferIndex)
 	UBO_MVP* map = (UBO_MVP*)m_UBO_Camera[framebufferIndex]->Map(sizeof(UBO_MVP));
 
 	map->model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	map->view  = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	map->proj  = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 10.0f);
+	map->view  = glm::lookAt(glm::vec3(1.0f, 1.0f, abs(sin(time))), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 2));
+	map->proj  = glm::perspective(glm::radians(90.0f), 800.0f / 600.0f, 0.01f, 100.0f);
 	map->proj[1][1] *= -1.0f;
 
 	m_UBO_Camera[framebufferIndex]->Unmap();

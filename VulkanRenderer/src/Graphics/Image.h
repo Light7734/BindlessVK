@@ -14,6 +14,8 @@ private:
 	int m_Height     = 0;
 	int m_Components = 0;
 
+	uint32_t m_MipLevels = 1u;
+
 	VkImage m_Image              = VK_NULL_HANDLE;
 	VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
 	VkImageView m_ImageView      = VK_NULL_HANDLE;
@@ -24,6 +26,7 @@ private:
 	VkImageLayout m_OldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	std::unique_ptr<Buffer> m_StagingBuffer = nullptr;
+
 
 public:
 	// Color Image
@@ -50,4 +53,6 @@ private:
 private:
 	VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlagBits features) const;
 	inline bool HasStencilComponent(VkFormat format) const { return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT; }
+
+	void GenerateMipmaps();
 };

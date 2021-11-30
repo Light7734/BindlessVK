@@ -8,10 +8,12 @@
 Image::Image(Device* device, const std::string& path)
     : m_Device(device), m_Path(path)
 {
-	CreateImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	CreateImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
 	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 	CopyBufferToImage(VK_IMAGE_ASPECT_COLOR_BIT);
-	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	// TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	GenerateMipmaps();
 
 	CreateImageView(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 	CreateImageSampler();
@@ -51,6 +53,8 @@ void Image::CreateImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags
 
 		VkDeviceSize imageSize = m_Width * m_Height * 4;
 
+		m_MipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(m_Width, m_Height)))) + 1u;
+
 		m_StagingBuffer = std::make_unique<Buffer>(m_Device, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 		void* map = m_StagingBuffer->Map(imageSize);
@@ -71,7 +75,7 @@ void Image::CreateImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags
             .height = static_cast<uint32_t>(m_Height),
             .depth  = 1u,
         },
-		.mipLevels     = 1u,
+		.mipLevels     = m_MipLevels,
 		.arrayLayers   = 1u,
 		.samples       = VK_SAMPLE_COUNT_1_BIT,
 		.tiling        = tiling,
@@ -109,7 +113,7 @@ void Image::CreateImageView(VkFormat format, VkImageAspectFlags aspectFlags)
 		.subresourceRange = {
 		    .aspectMask     = aspectFlags,
 		    .baseMipLevel   = 0,
-		    .levelCount     = 1,
+		    .levelCount     = m_MipLevels,
 		    .baseArrayLayer = 0,
 		    .layerCount     = 1,
 		},
@@ -132,13 +136,13 @@ void Image::CreateImageSampler()
 		.addressModeU            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias              = 0.0f,
+		.mipLodBias              = VK_SAMPLER_MIPMAP_MODE_LINEAR,
 		.anisotropyEnable        = VK_FALSE,
 		.maxAnisotropy           = 1.0f,
 		.compareEnable           = VK_FALSE,
 		.compareOp               = VK_COMPARE_OP_ALWAYS,
 		.minLod                  = 0.0f,
-		.maxLod                  = 0.0f,
+		.maxLod                  = static_cast<float>(m_MipLevels),
 		.borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
 		.unnormalizedCoordinates = VK_FALSE,
 	};
@@ -162,7 +166,7 @@ void Image::TransitionImageLayout(VkFormat format, VkImageLayout newLayout, VkIm
 		.subresourceRange    = {
             .aspectMask     = aspectFlags,
             .baseMipLevel   = 0,
-            .levelCount     = 1,
+            .levelCount     = m_MipLevels,
             .baseArrayLayer = 0,
             .layerCount     = 1u,
         },
@@ -273,4 +277,103 @@ VkFormat Image::FindSupportedFormat(const std::vector<VkFormat>& candidates, VkI
 	}
 
 	ASSERT(false, "Failed to find supported format");
+}
+
+void Image::GenerateMipmaps()
+{
+	VkCommandBuffer commandBuffer = RendererCommand::BeginOneTimeCommand();
+
+	VkImageMemoryBarrier barrier {
+		.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.image               = m_Image,
+		.subresourceRange    = {
+            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount     = 1u,
+            .baseArrayLayer = 0u,
+            .layerCount     = 1u,
+        },
+	};
+
+	int mipWidth  = m_Width;
+	int mipHeight = m_Height;
+
+	for (uint32_t i = 1u; i < m_MipLevels; i++)
+	{
+		barrier.subresourceRange.baseMipLevel = i - 1u;
+		barrier.oldLayout                     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout                     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		barrier.srcAccessMask                 = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask                 = VK_ACCESS_TRANSFER_READ_BIT;
+
+		vkCmdPipelineBarrier(commandBuffer,
+		                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u,
+		                     0u, nullptr,
+		                     0u, nullptr,
+		                     1, &barrier);
+
+		VkImageBlit blit {
+			.srcSubresource = {
+			    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+			    .mipLevel       = i - 1u,
+			    .baseArrayLayer = 0u,
+			    .layerCount     = 1u,
+			},
+
+			.srcOffsets = {
+			    { 0, 0, 0 },
+			    { mipWidth, mipHeight, 1u },
+			},
+
+			.dstSubresource = {
+			    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+			    .mipLevel       = i,
+			    .baseArrayLayer = 0,
+			    .layerCount     = 1,
+			},
+
+			.dstOffsets = {
+			    { 0, 0, 0 },
+			    { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 },
+			},
+		};
+
+		vkCmdBlitImage(commandBuffer,
+		               m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		               m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		               1u, &blit,
+		               VK_FILTER_LINEAR);
+
+		barrier.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		vkCmdPipelineBarrier(commandBuffer,
+		                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u,
+		                     0u, nullptr,
+		                     0u, nullptr,
+		                     1u, &barrier);
+
+		if (mipWidth > 1)
+			mipWidth /= 2;
+
+		if (mipHeight > 1)
+			mipHeight /= 2;
+	}
+
+	barrier.subresourceRange.baseMipLevel = m_MipLevels - 1;
+	barrier.oldLayout                     = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	barrier.newLayout                     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.srcAccessMask                 = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask                 = VK_ACCESS_SHADER_READ_BIT;
+
+	vkCmdPipelineBarrier(commandBuffer,
+	                     VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u,
+	                     0, nullptr,
+	                     0, nullptr,
+	                     1, &barrier);
+
+	RendererCommand::EndOneTimeCommand(&commandBuffer);
 }
