@@ -16,7 +16,6 @@ int main()
 	// create window & pipeline
 	Window window     = Window(800, 600);
 	Renderer renderer = Renderer(&window, 3);
-
 	Model model(renderer.GetDevice(), "res/viking_room.obj", "res/viking_room.png");
 
 	// fps calculator

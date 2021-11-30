@@ -353,7 +353,7 @@ void QuadRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExtent
 	// pipeline multisample state create-info
 	VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo {
 		.sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-		.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT,
+		.rasterizationSamples  = m_Device->sampleCount(),
 		.sampleShadingEnable   = VK_FALSE,
 		.minSampleShading      = 1.0f,
 		.pSampleMask           = nullptr,

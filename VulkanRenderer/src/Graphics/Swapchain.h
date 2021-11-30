@@ -57,6 +57,7 @@ private:
 	VkExtent2D m_Extent;
 
 	std::unique_ptr<Image> m_DepthImage;
+	std::unique_ptr<Image> m_MultisampleImage;
 
 	VkRenderPass m_RenderPass;
 

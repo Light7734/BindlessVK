@@ -173,11 +173,30 @@ void Swapchain::CreateImageViews()
 
 void Swapchain::CreateRenderPass()
 {
-	m_DepthImage = std::make_unique<Image>(m_Device, m_Extent.width, m_Extent.height);
+	m_DepthImage       = std::make_unique<Image>(m_Device, m_Extent.width, m_Extent.height);
+	m_MultisampleImage = std::make_unique<Image>(m_Device, m_Extent.width, m_Extent.height, m_Device->sampleCount(), m_SwapchainImageFormat);
 
+	// msaa attachment
+	VkAttachmentDescription msaaAttachmentDescription {
+		.format         = m_MultisampleImage->GetFormat(),
+		.samples        = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+	};
+
+	VkAttachmentReference msaaAttachmentReference {
+		.attachment = 2u,
+		.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	};
+
+	// depth atachment
 	VkAttachmentDescription depthAttachmentDescription {
 		.format         = m_DepthImage->GetFormat(),
-		.samples        = VK_SAMPLE_COUNT_1_BIT,
+		.samples        = m_Device->sampleCount(),
 		.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -194,13 +213,13 @@ void Swapchain::CreateRenderPass()
 	/// attachment description
 	VkAttachmentDescription attachmentDescription {
 		.format         = m_SwapchainImageFormat,
-		.samples        = VK_SAMPLE_COUNT_1_BIT,
+		.samples        = m_Device->sampleCount(),
 		.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		.storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
 		.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-		.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+		.finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 
 	// attachment reference
@@ -214,6 +233,7 @@ void Swapchain::CreateRenderPass()
 		.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.colorAttachmentCount    = 1,
 		.pColorAttachments       = &attachmentReference,
+		.pResolveAttachments     = &msaaAttachmentReference,
 		.pDepthStencilAttachment = &depthAttachmentReference,
 	};
 
@@ -228,7 +248,7 @@ void Swapchain::CreateRenderPass()
 	};
 
 	// render pass create-info
-	std::array<VkAttachmentDescription, 2> attachments = { attachmentDescription, depthAttachmentDescription };
+	std::array<VkAttachmentDescription, 3> attachments = { attachmentDescription, depthAttachmentDescription, msaaAttachmentDescription };
 	VkRenderPassCreateInfo renderPassCreateInfo {
 		.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
 		.attachmentCount = static_cast<uint32_t>(attachments.size()),
@@ -249,7 +269,11 @@ void Swapchain::CreateFramebuffers()
 
 	for (size_t i = 0ull; i < m_ImageViews.size(); i++)
 	{
-		std::array<VkImageView, 2> attachments = { m_ImageViews[i], m_DepthImage->GetImageView() };
+		std::array<VkImageView, 3> attachments = {
+			m_MultisampleImage->GetImageView(),
+			m_DepthImage->GetImageView(),
+			m_ImageViews[i],
+		};
 
 		// framebuffer create-info
 		VkFramebufferCreateInfo framebufferCreateInfo {

@@ -8,7 +8,7 @@
 Image::Image(Device* device, const std::string& path)
     : m_Device(device), m_Path(path)
 {
-	CreateImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	CreateImage(VK_FORMAT_R8G8B8A8_SRGB, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 	CopyBufferToImage(VK_IMAGE_ASPECT_COLOR_BIT);
@@ -20,18 +20,28 @@ Image::Image(Device* device, const std::string& path)
 }
 
 Image::Image(Device* device, uint32_t width, uint32_t height)
-    : m_Device(device), m_Path("")
+    : m_Device(device)
+    , m_Path("")
+    , m_Width(width)
+    , m_Height(height)
 {
-	m_Width  = width;
-	m_Height = height;
-
 	VkFormat depthFormat = FindSupportedFormat({ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 	                                           VK_IMAGE_TILING_OPTIMAL,
 	                                           VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
-	CreateImage(depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	CreateImage(depthFormat, m_Device->sampleCount(), VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 	TransitionImageLayout(depthFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
+Image::Image(Device* device, uint32_t width, uint32_t height, VkSampleCountFlags sampleCount, VkFormat format)
+    : m_Device(device)
+    , m_Path("")
+    , m_Width(width)
+    , m_Height(height)
+{
+	CreateImage(format, m_Device->sampleCount(), VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	CreateImageView(format, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 Image::~Image()
@@ -42,7 +52,7 @@ Image::~Image()
 	vkFreeMemory(m_Device->logical(), m_ImageMemory, nullptr);
 }
 
-void Image::CreateImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryProperties)
+void Image::CreateImage(VkFormat format, VkSampleCountFlagBits sampleCount, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryProperties)
 {
 	m_ImageFormat = format;
 
@@ -77,7 +87,7 @@ void Image::CreateImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags
         },
 		.mipLevels     = m_MipLevels,
 		.arrayLayers   = 1u,
-		.samples       = VK_SAMPLE_COUNT_1_BIT,
+		.samples       = sampleCount,
 		.tiling        = tiling,
 		.usage         = usageFlags,
 		.sharingMode   = VK_SHARING_MODE_EXCLUSIVE,

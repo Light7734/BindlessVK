@@ -121,6 +121,7 @@ void Device::PickPhysicalDevice()
 	}
 
 	ASSERT(m_PhysicalDevice, "Failed to find suitable GPU for vulkan");
+	FetchMaxUsableSampleCount();
 }
 
 void Device::CreateLogicalDevice()
@@ -276,6 +277,22 @@ void Device::FetchSupportedQueueFamilies()
 	}
 
 	m_QueueFamilyIndices.indices = { m_QueueFamilyIndices.graphics.value(), m_QueueFamilyIndices.present.value() };
+}
+
+void Device::FetchMaxUsableSampleCount()
+{
+	VkPhysicalDeviceProperties physicalDeviceProperties;
+	vkGetPhysicalDeviceProperties(m_PhysicalDevice, &physicalDeviceProperties);
+
+	VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+	m_MSAASamples = counts & VK_SAMPLE_COUNT_64_BIT ? VK_SAMPLE_COUNT_64_BIT :
+	                counts & VK_SAMPLE_COUNT_32_BIT ? VK_SAMPLE_COUNT_32_BIT :
+	                counts & VK_SAMPLE_COUNT_16_BIT ? VK_SAMPLE_COUNT_16_BIT :
+	                counts & VK_SAMPLE_COUNT_8_BIT  ? VK_SAMPLE_COUNT_8_BIT :
+	                counts & VK_SAMPLE_COUNT_4_BIT  ? VK_SAMPLE_COUNT_4_BIT :
+	                counts & VK_SAMPLE_COUNT_2_BIT  ? VK_SAMPLE_COUNT_2_BIT :
+                                                      VK_SAMPLE_COUNT_1_BIT;
 }
 
 VkDebugUtilsMessengerCreateInfoEXT Device::SetupDebugMessageCallback()

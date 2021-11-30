@@ -34,6 +34,10 @@ public:
 
 	// Depth Image
 	Image(Device* device, uint32_t width, uint32_t height);
+
+	// MSAA Image
+	Image(Device* device, uint32_t width, uint32_t height, VkSampleCountFlags sampleCount, VkFormat format);
+
 	~Image();
 
 	inline VkImageView GetImageView() const { return m_ImageView; }
@@ -42,7 +46,7 @@ public:
 	inline VkFormat GetFormat() const { return m_ImageFormat; }
 
 private:
-	void CreateImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryProperties);
+	void CreateImage(VkFormat format, VkSampleCountFlagBits sampleCount, VkImageTiling tiling, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags memoryProperties);
 	void CreateImageView(VkFormat format, VkImageAspectFlags aspectFlags);
 	void CreateImageSampler();
 

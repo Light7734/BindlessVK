@@ -37,6 +37,8 @@ public:
 	inline VkPhysicalDevice physical() { return m_PhysicalDevice; }
 	inline VkSurfaceKHR surface() { return m_Surface; }
 
+	inline VkSampleCountFlagBits sampleCount() { return m_MSAASamples; }
+
 	// Getters - Queue
 	inline QueueFamilyIndices queueIndices() const { return m_QueueFamilyIndices; }
 	inline uint32_t graphicsQueueIndex() const { return m_QueueFamilyIndices.graphics.value(); }
@@ -65,6 +67,8 @@ private:
 	std::vector<const char*> m_RequiredExtensions      = {};
 	std::vector<const char*> m_LogicalDeviceExtensions = {};
 
+	VkSampleCountFlagBits m_MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
 private:
 	void CreateVkInstance(VkDebugUtilsMessengerCreateInfoEXT debugMessageCreateInfo);
 	void CreateWindowSurface();
@@ -74,6 +78,8 @@ private:
 	void FilterValidationLayers();
 	void FetchRequiredExtensions();
 	void FetchSupportedQueueFamilies();
+	void FetchMaxUsableSampleCount();
+
 
 	VkDebugUtilsMessengerCreateInfoEXT SetupDebugMessageCallback();
 };
