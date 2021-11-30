@@ -6,6 +6,8 @@ if(MSVC)
 endif()
 
 file(GLOB_RECURSE RENDERER_FILES true ABSOLUTE ${CMAKE_BINARY_DIR}/../VulkanRenderer/*)
+list(REMOVE_ITEM RENDERER_FILES ${CMAKE_BINARY_DIR}/../VulkanRenderer/res/viking_room.obj)
+
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/VulkanRenderer/src/
@@ -14,15 +16,16 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include
     ${CMAKE_SOURCE_DIR}/Dependencies/volk/
     ${CMAKE_SOURCE_DIR}/Dependencies/glm/
+    ${CMAKE_SOURCE_DIR}/Dependencies/tinyobjloader/
 
     ${CMAKE_SOURCE_DIR}/Dependencies/stb_image/
 
     ${CMAKE_BINARY_DIR}/../Dependencies/shaderc/libshaderc/include
     ${CMAKE_}/../Dependencies/shaderc/libshaderc/include
     
-    $ENV{VULKAN_SDK}/Include/
-    
+    $ENV{VULKAN_SDK}/Include/    
 )
+
 
 source_group(TREE ${CMAKE_BINARY_DIR}/../VulkanRenderer/ FILES ${RENDERER_FILES})
 add_executable(VulkanRenderer ${RENDERER_FILES})

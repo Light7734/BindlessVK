@@ -3,6 +3,8 @@
 #include "Core/Base.h"
 #include "Graphics/Buffers.h"
 #include "Graphics/DeviceContext.h"
+#include "Graphics/Model.h"
+#include "Graphics/RendererPrograms/ModelRendererProgram.h"
 #include "Graphics/RendererPrograms/QuadRendererProgram.h"
 
 #include <glm/glm.hpp>
@@ -22,9 +24,12 @@ public:
 
 	// #todo:
 	void DrawQuad(const glm::mat4& transform, const glm::vec4& tint);
+	void DrawModel(const glm::mat4& transform, Model& model);
 
 	void EndScene();
 	void EndFrame();
+
+	inline class Device* GetDevice() { return m_Device; }
 
 private:
 	class Window* m_Window       = nullptr;
@@ -34,6 +39,7 @@ private:
 	VkExtent2D m_Extent;
 
 	std::unique_ptr<QuadRendererProgram> m_QuadRendererProgram;
+	std::unique_ptr<ModelRendererProgram> m_ModelRendererProgram;
 
 	// synchronization
 	const uint32_t m_MaxConcurrentFrames;

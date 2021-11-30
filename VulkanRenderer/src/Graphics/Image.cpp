@@ -9,9 +9,9 @@ Image::Image(Device* device, const std::string& path)
     : m_Device(device), m_Path(path)
 {
 	CreateImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	CopyBufferToImage();
-	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+	CopyBufferToImage(VK_IMAGE_ASPECT_COLOR_BIT);
+	TransitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
 
 	CreateImageView(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
 	CreateImageSampler();
@@ -29,7 +29,7 @@ Image::Image(Device* device, uint32_t width, uint32_t height)
 
 	CreateImage(depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	CreateImageView(depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-	TransitionImageLayout(depthFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	TransitionImageLayout(depthFormat, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 Image::~Image()
@@ -146,7 +146,7 @@ void Image::CreateImageSampler()
 	vkCreateSampler(m_Device->logical(), &samplerCreateInfo, nullptr, &m_ImageSampler);
 }
 
-void Image::TransitionImageLayout(VkFormat format, VkImageLayout newLayout)
+void Image::TransitionImageLayout(VkFormat format, VkImageLayout newLayout, VkImageAspectFlags aspectFlags)
 {
 	VkCommandBuffer commandBuffer = RendererCommand::BeginOneTimeCommand();
 
@@ -160,7 +160,7 @@ void Image::TransitionImageLayout(VkFormat format, VkImageLayout newLayout)
 		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
 		.image               = m_Image,
 		.subresourceRange    = {
-            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask     = aspectFlags,
             .baseMipLevel   = 0,
             .levelCount     = 1,
             .baseArrayLayer = 0,
@@ -212,7 +212,7 @@ void Image::TransitionImageLayout(VkFormat format, VkImageLayout newLayout)
 	m_OldLayout = newLayout;
 }
 
-void Image::CopyBufferToImage()
+void Image::CopyBufferToImage(VkImageAspectFlags aspectFlags)
 {
 	VkCommandBuffer commandBuffer = RendererCommand::BeginOneTimeCommand();
 
@@ -221,7 +221,7 @@ void Image::CopyBufferToImage()
 		.bufferRowLength   = 0u,
 		.bufferImageHeight = 0u,
 		.imageSubresource  = {
-            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask     = aspectFlags,
             .mipLevel       = 0u,
             .baseArrayLayer = 0u,
             .layerCount     = 1u,

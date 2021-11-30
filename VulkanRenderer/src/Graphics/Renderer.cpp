@@ -22,7 +22,8 @@ Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
 
 	CreateSyncObjects();
 
-	m_QuadRendererProgram = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
+	m_QuadRendererProgram  = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
+	m_ModelRendererProgram = std::make_unique<ModelRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
 }
 
 Renderer::~Renderer()
@@ -43,6 +44,7 @@ void Renderer::BeginFrame()
 void Renderer::BeginScene()
 {
 	m_QuadRendererProgram->Map();
+	m_ModelRendererProgram->Map();
 }
 
 void Renderer::DrawQuad(const glm::mat4& transform, const glm::vec4& tint)
@@ -86,10 +88,21 @@ void Renderer::DrawQuad(const glm::mat4& transform, const glm::vec4& tint)
 	}
 }
 
+void Renderer::DrawModel(const glm::mat4& transform, Model& model)
+{
+	ModelRendererProgram::Vertex* map = m_ModelRendererProgram->GetMapCurrent();
+
+	memcpy(map, model.GetVertices(), model.GetVerticesSize());
+	m_ModelRendererProgram->UpdateImage(model.GetImageView(), model.GetImageSampler());
+
+	m_ModelRendererProgram->TryAdvance(model.GetVerticesCount());
+}
+
 void Renderer::EndScene()
 {
 	// unmap vertex/index buffers
 	m_QuadRendererProgram->UnMap();
+	m_ModelRendererProgram->UnMap();
 
 	vkWaitForFences(m_Device->logical(), 1u, &m_Fences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
@@ -106,6 +119,7 @@ void Renderer::EndScene()
 
 	// write uniform buffers
 	m_QuadRendererProgram->UpdateCamera(imageIndex);
+	m_ModelRendererProgram->UpdateCamera(imageIndex);
 
 	// check if the image is in use
 	if (m_ImagesInFlight[imageIndex] != VK_NULL_HANDLE)
@@ -115,13 +129,20 @@ void Renderer::EndScene()
 	m_ImagesInFlight[imageIndex] = m_Fences[m_CurrentFrame];
 
 	// generate command buffers
-	VkCommandBuffer QuadRendererCommands = m_QuadRendererProgram->RecordCommandBuffer(m_Swapchain->GetRenderPass(),
+	VkCommandBuffer quadRendererCommands = m_QuadRendererProgram->RecordCommandBuffer(m_Swapchain->GetRenderPass(),
 	                                                                                  m_Swapchain->GetFramebuffer(imageIndex),
 	                                                                                  m_Swapchain->GetExtent(),
 	                                                                                  imageIndex);
 
+	VkCommandBuffer modelRendererCommand = m_ModelRendererProgram->RecordCommandBuffer(m_Swapchain->GetRenderPass(),
+	                                                                                   m_Swapchain->GetFramebuffer(imageIndex),
+	                                                                                   m_Swapchain->GetExtent(),
+	                                                                                   imageIndex);
+
+
 	std::vector<VkCommandBuffer> commandBuffers;
-	commandBuffers.push_back(QuadRendererCommands);
+	commandBuffers.push_back(quadRendererCommands);
+	commandBuffers.push_back(modelRendererCommand);
 
 	// submit info
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

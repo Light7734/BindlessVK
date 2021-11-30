@@ -43,8 +43,8 @@ private:
 	void CreateImageView(VkFormat format, VkImageAspectFlags aspectFlags);
 	void CreateImageSampler();
 
-	void TransitionImageLayout(VkFormat format, VkImageLayout newLayout);
-	void CopyBufferToImage();
+	void TransitionImageLayout(VkFormat format, VkImageLayout newLayout, VkImageAspectFlags aspectFlags);
+	void CopyBufferToImage(VkImageAspectFlags aspectFlags);
 	uint32_t FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags);
 
 private:

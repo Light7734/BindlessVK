@@ -6,10 +6,10 @@
 
 #include <volk.h>
 
-#define MAX_QUAD_RENDERER_VERTICES 1000u * 4u
-#define MAX_QUAD_RENDERER_INDICES  MAX_QUAD_RENDERER_VERTICES * 6u
+#define MAX_MODEL_RENDERER_VERTICES 100000u * 4u
+#define MAX_MODEL_RENDERER_INDICES  MAX_MODEL_RENDERER_VERTICES * 6u
 
-class QuadRendererProgram: public RendererProgram
+class ModelRendererProgram: public RendererProgram
 {
 public:
 	struct UBO_MVP
@@ -22,7 +22,6 @@ public:
 	struct Vertex
 	{
 		glm::vec3 position;
-		glm::vec3 tint;
 		glm::vec2 uv;
 
 		static constexpr VkVertexInputBindingDescription GetBindingDescription()
@@ -36,9 +35,9 @@ public:
 			return bindingDescription;
 		}
 
-		static constexpr std::array<VkVertexInputAttributeDescription, 3> GetAttributesDescription()
+		static constexpr std::array<VkVertexInputAttributeDescription, 2> GetAttributesDescription()
 		{
-			std::array<VkVertexInputAttributeDescription, 3> attributesDescription;
+			std::array<VkVertexInputAttributeDescription, 2> attributesDescription;
 
 			attributesDescription[0] = {
 				.location = 0u,
@@ -49,13 +48,6 @@ public:
 
 			attributesDescription[1] = {
 				.location = 1u,
-				.binding  = 0u,
-				.format   = VK_FORMAT_R32G32B32_SFLOAT,
-				.offset   = offsetof(Vertex, tint),
-			};
-
-			attributesDescription[2] = {
-				.location = 2u,
 				.binding  = 0u,
 				.format   = VK_FORMAT_R32G32_SFLOAT,
 				.offset   = offsetof(Vertex, uv),
@@ -75,7 +67,8 @@ private:
 
 	bool m_VertexBufferStaged = false;
 
-	uint32_t m_QuadCount = 0u;
+	uint32_t m_ModelCount  = 0u;
+	uint32_t m_VertexCount = 0u;
 
 	std::vector<std::unique_ptr<Buffer>> m_UBO_Camera;
 
@@ -86,11 +79,15 @@ private:
 	VkImageView m_DepthImageView;
 
 public:
-	QuadRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkExtent2D extent, uint32_t swapchainImageCount);
+	ModelRendererProgram(class Device* device, VkRenderPass renderPassHandle, VkExtent2D extent, uint32_t swapchainImageCount);
 
 	void Map();
 	void UnMap();
 	VkCommandBuffer RecordCommandBuffer(VkRenderPass renderPass, VkFramebuffer frameBuffer, VkExtent2D swapchainExtent, uint32_t swapchainImageIndex);
+
+	void UpdateCamera(uint32_t framebufferIndex);
+	void UpdateImage(VkImageView imageView, VkSampler sampler);
+
 
 	void CreateCommandPool();
 	void CreateDescriptorPool();
@@ -99,10 +96,9 @@ public:
 	void CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent);
 	void CreateCommandBuffer();
 
-	void UpdateCamera(uint32_t framebufferIndex);
 
-	bool TryAdvance();
+	bool TryAdvance(size_t vertexCount);
 
 	inline Vertex* GetMapCurrent() const { return m_VerticesMapCurrent; }
-	inline uint32_t GetQuadCount() const { return m_QuadCount; }
+	inline uint32_t GetModelCount() const { return m_ModelCount; }
 };
