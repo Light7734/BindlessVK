@@ -136,7 +136,7 @@ void Image::CreateImageSampler()
 		.addressModeU            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		.mipLodBias              = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		.mipLodBias              = 0.0f,
 		.anisotropyEnable        = VK_FALSE,
 		.maxAnisotropy           = 1.0f,
 		.compareEnable           = VK_FALSE,
@@ -329,8 +329,8 @@ void Image::GenerateMipmaps()
 			.dstSubresource = {
 			    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
 			    .mipLevel       = i,
-			    .baseArrayLayer = 0,
-			    .layerCount     = 1,
+			    .baseArrayLayer = 0u,
+			    .layerCount     = 1u,
 			},
 
 			.dstOffsets = {
@@ -343,7 +343,7 @@ void Image::GenerateMipmaps()
 		               m_Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 		               m_Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		               1u, &blit,
-		               VK_FILTER_LINEAR);
+		               VK_FILTER_NEAREST);
 
 		barrier.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 		barrier.newLayout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
