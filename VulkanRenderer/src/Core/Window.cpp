@@ -25,6 +25,11 @@ Window::~Window()
 	glfwTerminate();
 }
 
+void Window::SetWindowUserPointer(class Renderer* renderer)
+{
+	glfwSetWindowUserPointer(m_WindowHandle, (void*)renderer);
+}
+
 bool Window::IsClosed() const
 {
 	return glfwWindowShouldClose(m_WindowHandle);
@@ -32,10 +37,13 @@ bool Window::IsClosed() const
 
 void Window::BindGlfwEvents()
 {
-	glfwSetFramebufferSizeCallback(m_WindowHandle, [](GLFWwindow* window, int width, int height) {
-		bool* wasResized = (bool*)glfwGetWindowUserPointer(window);
+	glfwSetWindowSizeCallback(m_WindowHandle, [](GLFWwindow* window, int width, int height) {
+		Renderer* renderer = (Renderer*)glfwGetWindowUserPointer(window);
 
-		*wasResized = false;
+		if (renderer)
+		{
+			renderer->Resize(width, height);
+		}
 	});
 
 	glfwSetKeyCallback(m_WindowHandle, [](GLFWwindow* window, int key, int scancode, int action, int mods) {

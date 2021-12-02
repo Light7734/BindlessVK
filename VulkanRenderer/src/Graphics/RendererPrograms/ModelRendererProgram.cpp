@@ -52,6 +52,7 @@ ModelRendererProgram::ModelRendererProgram(Device* device, VkRenderPass renderPa
 	// create stuff
 	CreateDescriptorPool();
 	CreateDescriptorSets();
+	CreatePipelineLayout();
 	CreatePipeline(renderPassHandle, extent);
 	CreateCommandBuffer();
 }
@@ -284,15 +285,6 @@ void ModelRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExten
 		.pVertexAttributeDescriptions    = attributesDescription.data(),
 	};
 
-	// pipeline layout info
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo {
-		.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-		.setLayoutCount         = 1u,
-		.pSetLayouts            = &m_DescriptorSetLayout,
-		.pushConstantRangeCount = 0u,
-		.pPushConstantRanges    = nullptr,
-	};
-
 	// pipeline input-assembly state create-info
 	VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo {
 		.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -301,6 +293,7 @@ void ModelRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExten
 	};
 
 	// viewport
+	LOG(trace, "{}x{}", extent.width, extent.height);
 	VkViewport viewport {
 		.x        = 0.0f,
 		.y        = 0.0f,
@@ -344,7 +337,7 @@ void ModelRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExten
 	VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo {
 		.sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
 		.rasterizationSamples  = m_Device->sampleCount(),
-		.sampleShadingEnable   = VK_FALSE,
+		.sampleShadingEnable   = VK_TRUE,
 		.minSampleShading      = 1.0f,
 		.pSampleMask           = nullptr,
 		.alphaToCoverageEnable = VK_FALSE,
@@ -388,7 +381,6 @@ void ModelRendererProgram::CreatePipeline(VkRenderPass renderPassHandle, VkExten
 	};
 
 	// graphics pipeline create-info
-	VKC(vkCreatePipelineLayout(m_Device->logical(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 	VkGraphicsPipelineCreateInfo graphicsPipelineInfo {
 		.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 		.stageCount          = static_cast<uint32_t>(m_Shader->GetShaderStages().size()),
@@ -472,4 +464,18 @@ bool ModelRendererProgram::TryAdvance(size_t vertexCount)
 	m_ModelCount++;
 
 	return m_VerticesMapCurrent < m_VerticesMapEnd;
+}
+
+void ModelRendererProgram::CreatePipelineLayout()
+{
+	// pipeline layout info
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo {
+		.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount         = 1u,
+		.pSetLayouts            = &m_DescriptorSetLayout,
+		.pushConstantRangeCount = 0u,
+		.pPushConstantRanges    = nullptr,
+	};
+
+	VKC(vkCreatePipelineLayout(m_Device->logical(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout));
 }

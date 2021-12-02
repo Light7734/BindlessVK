@@ -39,6 +39,8 @@ public:
 
 	inline VkSampleCountFlagBits sampleCount() { return m_MSAASamples; }
 
+	inline float maxAnisotropy() { return m_MaxAnisotropy; }
+
 	// Getters - Queue
 	inline QueueFamilyIndices queueIndices() const { return m_QueueFamilyIndices; }
 	inline uint32_t graphicsQueueIndex() const { return m_QueueFamilyIndices.graphics.value(); }
@@ -68,6 +70,8 @@ private:
 	std::vector<const char*> m_LogicalDeviceExtensions = {};
 
 	VkSampleCountFlagBits m_MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+	float m_MaxAnisotropy = 0.0f;
 
 private:
 	void CreateVkInstance(VkDebugUtilsMessengerCreateInfoEXT debugMessageCreateInfo);

@@ -55,14 +55,28 @@ void Buffer::CopyBufferToSelf(Buffer* src, uint32_t size, VkCommandPool commandP
 
 void* Buffer::Map(uint32_t size)
 {
+	if (m_Mapped)
+	{
+		LOG(warn, "Buffer already mapped");
+		return nullptr;
+	}
+
 	void* map;
 	VKC(vkMapMemory(m_Device->logical(), m_Memory, NULL, size, NULL, &map));
+	m_Mapped = true;
 	return map;
 }
 
 void Buffer::Unmap()
 {
+	if (!m_Mapped)
+	{
+		LOG(warn, "Buffer not mapped");
+		return;
+	}
+
 	vkUnmapMemory(m_Device->logical(), m_Memory);
+	m_Mapped = false;
 }
 
 uint32_t Buffer::FetchMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags flags)

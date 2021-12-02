@@ -22,6 +22,8 @@ public:
 	void BeginFrame();
 	void BeginScene();
 
+	inline bool IsSwapchainOk() const { return m_SwapchainOK; }
+
 	// #todo:
 	void DrawQuad(const glm::mat4& transform, const glm::vec4& tint);
 	void DrawModel(const glm::mat4& transform, Model& model);
@@ -29,9 +31,13 @@ public:
 	void EndScene();
 	void EndFrame();
 
+	void Resize(int width, int height);
+
 	inline class Device* GetDevice() { return m_Device; }
 
 private:
+	bool m_SwapchainOK = true;
+
 	class Window* m_Window       = nullptr;
 	class Device* m_Device       = nullptr;
 	class Swapchain* m_Swapchain = nullptr;

@@ -22,13 +22,13 @@ uint32_t Swapchain::FetchNextImage(VkSemaphore semaphore)
 	VkResult result = vkAcquireNextImageKHR(m_Device->logical(), m_Swapchain, UINT64_MAX, semaphore, VK_NULL_HANDLE, &index);
 
 	// recreate swap chain if out-of-date/suboptimal
-	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
 		return UINT32_MAX;
 	}
-	else if (result != VK_SUCCESS)
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 	{
-		ASSERT(false, "bruh moment")
+		ASSERT(false, "Unhandled VkResult failure: {}", result);
 	}
 
 	return index;
@@ -100,10 +100,6 @@ void Swapchain::CreateSwapchain(Swapchain* old)
 
 	bool queueFamiliesSameIndex = m_Device->queueIndices().graphics.value() == m_Device->queueIndices().present.value();
 
-	LOG(trace, m_Device->queueIndices().indices.data()[0]);
-	LOG(trace, m_Device->queueIndices().indices.data()[1]);
-	// std::cout << "Swapchain Indices: \t" << m_Device->queueIndices().indices.data() << std::endl;
-
 	// swapchain create-info
 	VkSwapchainCreateInfoKHR swapchainCreateInfo {
 		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -124,7 +120,7 @@ void Swapchain::CreateSwapchain(Swapchain* old)
 		.compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
 		.presentMode           = swapChainPresentMode,
 		.clipped               = VK_TRUE,
-		.oldSwapchain          = VK_NULL_HANDLE,
+		.oldSwapchain          = old ? *old->GetVkSwapchain() : VK_NULL_HANDLE,
 	};
 
 	// create swap chain
@@ -132,6 +128,9 @@ void Swapchain::CreateSwapchain(Swapchain* old)
 
 	// store image format
 	m_SwapchainImageFormat = swapChainSurfaceFormat.format;
+
+	//	if (old)
+	//		vkDestroySwapchainKHR(m_Device->logical(), m_Swapchain, nullptr);
 
 	// fetch images
 	vkGetSwapchainImagesKHR(m_Device->logical(), m_Swapchain, &imageCount, nullptr);

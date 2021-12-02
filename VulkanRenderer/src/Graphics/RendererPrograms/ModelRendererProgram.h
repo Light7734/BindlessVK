@@ -105,9 +105,11 @@ public:
 	void CreatePipeline(VkRenderPass renderPassHandle, VkExtent2D extent);
 	void CreateCommandBuffer();
 
-
 	bool TryAdvance(size_t vertexCount);
 
 	inline Vertex* GetMapCurrent() const { return m_VerticesMapCurrent; }
 	inline uint32_t GetModelCount() const { return m_ModelCount; }
+
+private:
+	void CreatePipelineLayout();
 };

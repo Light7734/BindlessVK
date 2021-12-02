@@ -18,6 +18,8 @@ int main()
 	Renderer renderer = Renderer(&window, 3);
 	Model model(renderer.GetDevice(), "res/viking_room.obj", "res/viking_room.png");
 
+	window.SetWindowUserPointer(&renderer);
+
 	// fps calculator
 	Timer timer;
 	uint32_t frames = 0u;
@@ -25,23 +27,13 @@ int main()
 	/**  main loop  */
 	while (!window.IsClosed())
 	{
-		// handle events
-		glfwPollEvents();
+		if (renderer.IsSwapchainOk())
+			glfwPollEvents();
 
 		// render frame
 		renderer.BeginScene();
-
-		// renderer.DrawQuad(glm::mat4(1.0f), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-		// renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-		// renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-		// renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 1.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 		renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, -1.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-		// renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-		// renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-		// renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -2.0f, 0.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-
 		renderer.DrawModel(glm::mat4(1.0f), model);
-
 		renderer.EndScene();
 
 		// calculate fps

@@ -14,6 +14,8 @@ private:
 	VkBuffer m_Buffer;
 	VkDeviceMemory m_Memory;
 
+	bool m_Mapped = false;
+
 public:
 	Buffer(class Device* device, uint32_t size, VkBufferUsageFlags usage, VkMemoryPropertyFlags memoryProperties);
 	~Buffer();

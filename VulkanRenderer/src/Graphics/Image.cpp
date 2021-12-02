@@ -49,6 +49,10 @@ Image::~Image()
 	vkDestroySampler(m_Device->logical(), m_ImageSampler, nullptr);
 	vkDestroyImageView(m_Device->logical(), m_ImageView, nullptr);
 	vkDestroyImage(m_Device->logical(), m_Image, nullptr);
+	static uint64_t freeCount = 0ull;
+
+	freeCount++;
+	LOG(trace, "Free: {}", freeCount);
 	vkFreeMemory(m_Device->logical(), m_ImageMemory, nullptr);
 }
 
@@ -107,8 +111,12 @@ void Image::CreateImage(VkFormat format, VkSampleCountFlagBits sampleCount, VkIm
 		.memoryTypeIndex = FetchMemoryType(memoryRequirements.memoryTypeBits, memoryProperties),
 	};
 
+	static uint64_t allocCount = 0ull;
+
+	allocCount++;
+	LOG(trace, "Alloc: {}", allocCount);
 	VKC(vkAllocateMemory(m_Device->logical(), &allocInfo, nullptr, &m_ImageMemory));
-	vkBindImageMemory(m_Device->logical(), m_Image, m_ImageMemory, 0ull);
+	VKC(vkBindImageMemory(m_Device->logical(), m_Image, m_ImageMemory, 0ull));
 }
 
 void Image::CreateImageView(VkFormat format, VkImageAspectFlags aspectFlags)
@@ -147,8 +155,8 @@ void Image::CreateImageSampler()
 		.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		.mipLodBias              = 0.0f,
-		.anisotropyEnable        = VK_FALSE,
-		.maxAnisotropy           = 1.0f,
+		.anisotropyEnable        = VK_TRUE,
+		.maxAnisotropy           = m_Device->maxAnisotropy(),
 		.compareEnable           = VK_FALSE,
 		.compareOp               = VK_COMPARE_OP_ALWAYS,
 		.minLod                  = 0.0f,

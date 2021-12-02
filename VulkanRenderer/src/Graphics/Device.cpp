@@ -6,8 +6,8 @@
 
 Device::Device(Window* window)
     : m_Window(window)
-    , m_ValidationLayers { "VK_LAYER_KHRONOS_validation" }
-    , m_RequiredExtensions { VK_EXT_DEBUG_UTILS_EXTENSION_NAME }
+    , m_ValidationLayers {}
+    , m_RequiredExtensions {}
     , m_LogicalDeviceExtensions { VK_KHR_SWAPCHAIN_EXTENSION_NAME }
 
 {
@@ -121,6 +121,10 @@ void Device::PickPhysicalDevice()
 	}
 
 	ASSERT(m_PhysicalDevice, "Failed to find suitable GPU for vulkan");
+
+	VkPhysicalDeviceProperties properties {};
+	vkGetPhysicalDeviceProperties(m_PhysicalDevice, &properties);
+	m_MaxAnisotropy = properties.limits.maxSamplerAnisotropy;
 	FetchMaxUsableSampleCount();
 }
 
@@ -133,7 +137,8 @@ void Device::CreateLogicalDevice()
 	vkGetPhysicalDeviceProperties(m_PhysicalDevice, &deviceProperties);
 	vkGetPhysicalDeviceFeatures(m_PhysicalDevice, &deviceFeatures);
 
-	// deviceFeatures.samplerAnisotropy = VK_TRUE;
+	deviceFeatures.samplerAnisotropy = VK_TRUE;
+	deviceFeatures.sampleRateShading = VK_TRUE;
 
 	std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos;
 	deviceQueueCreateInfos.reserve(m_QueueFamilyIndices.indices.size());
@@ -172,8 +177,8 @@ void Device::CreateLogicalDevice()
 	vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.graphics.value(), 0u, &m_GraphicsQueue);
 	vkGetDeviceQueue(m_LogicalDevice, m_QueueFamilyIndices.present.value(), 0u, &m_PresentQueue);
 
-	ASSERT(m_GraphicsQueue, "Pipeline::CreateLogicalDevice: failed to get graphics queue");
-	ASSERT(m_PresentQueue, "Pipeline::CreateLogicalDevice: failed to get present queue");
+	ASSERT(m_GraphicsQueue, "Failed to create graphics queue");
+	ASSERT(m_PresentQueue, "Failed to create present queue");
 
 	// validate device ...
 	// fetch device extensions
@@ -191,12 +196,10 @@ void Device::CreateLogicalDevice()
 
 	if (!requiredExtensions.empty())
 	{
-		LOG(critical, "Pipeline::FetchDeviceExtensions: device does not supprot required extensions: ");
-
 		for (auto requiredExtension : requiredExtensions)
-			LOG(critical, "        {}", requiredExtension);
+			LOG(critical, "Extension not supported: {}", requiredExtension);
 
-		ASSERT(false, "Pipeline::FetchDeviceExtensions: aforementioned device extensinos are not supported");
+		ASSERT(false, "Required extensions are not supported");
 	}
 }
 
@@ -227,7 +230,7 @@ void Device::FilterValidationLayers()
 		if (!layerFound)
 		{
 			m_ValidationLayers.erase(std::find(m_ValidationLayers.begin(), m_ValidationLayers.end(), layerName));
-			LOG(err, "Pipeline::FilterValidationLayers: failed to find validation layer: {}", layerName);
+			LOG(err, "Failed to find validation layer: {}", layerName);
 		}
 	}
 }
@@ -261,7 +264,7 @@ void Device::FetchSupportedQueueFamilies()
 		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 		{
 			m_QueueFamilyIndices.graphics = index;
-			LOG(info, "Pipeline::FetchSupportedQueueFamilies: graphics index: {}", index);
+			LOG(info, "Graphics queue index: {}", index);
 		}
 
 		VkBool32 hasPresentSupport;
@@ -270,7 +273,7 @@ void Device::FetchSupportedQueueFamilies()
 		if (hasPresentSupport)
 		{
 			m_QueueFamilyIndices.present = index;
-			LOG(info, "Pipeline::FetchSupportedQueueFamilies: present index: {}", index);
+			LOG(info, "Present queue index: {}", index);
 		}
 
 		index++;
@@ -316,6 +319,7 @@ VkDebugUtilsMessengerCreateInfoEXT Device::SetupDebugMessageCallback()
 	                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 	                                              const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	                                              void* pUserData) {
+		// #todo: parse pMessage
 		LOGVk(trace, "{}", pCallbackData->pMessage);
 		return static_cast<VkBool32>(VK_FALSE);
 	};

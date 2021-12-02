@@ -15,7 +15,7 @@ struct failedAssertion: std::exception
 {
 	failedAssertion(const char* file, int line)
 	{
-		LOG(critical, "failedAssertion at: {}:{}", file, line);
+		LOG(critical, "FailedAssertion thrown at: {}:{}", file, line);
 	}
 };
 
@@ -23,6 +23,6 @@ struct vkException: std::exception
 {
 	vkException(int errorCode, const char* file, int line)
 	{
-		LOG(critical, "vkException: thrown with code {} ==> at {}:{}", errorCode, file, line);
+		LOG(critical, "vkException: thrown with code {} at {}:{}", errorCode, file, line);
 	}
 };

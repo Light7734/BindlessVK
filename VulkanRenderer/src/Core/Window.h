@@ -4,6 +4,12 @@
 
 struct GLFWwindow;
 
+struct WindowUserPointer
+{
+	class Swapchain* swapchain;
+	class Renderer* renderer;
+};
+
 class Window
 {
 public:
@@ -14,6 +20,8 @@ public:
 	inline uint32_t GetHeight() const { return m_Height; }
 
 	inline GLFWwindow* GetHandle() { return m_WindowHandle; }
+
+	void SetWindowUserPointer(class Renderer* renderer);
 
 	// #todo
 	bool IsClosed() const;
