@@ -16,3 +16,6 @@
 [submodule "Dependencies/tinyobjloader"]
 	path = Dependencies/tinyobjloader
 	url = https://github.com/tinyobjloader/tinyobjloader
+[submodule "Dependencies/VulkanMemoryAllocator"]
+	path = Dependencies/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
