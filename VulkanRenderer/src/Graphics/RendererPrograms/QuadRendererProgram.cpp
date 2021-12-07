@@ -92,7 +92,7 @@ VkCommandBuffer QuadRendererProgram::RecordCommandBuffer(VkRenderPass renderPass
 	// command buffer begin-info
 	static const VkCommandBufferBeginInfo commandBufferBeginInfo {
 		.sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-		.flags            = NULL,
+		.flags            = 0x0,
 		.pInheritanceInfo = nullptr,
 	};
 

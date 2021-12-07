@@ -13,7 +13,7 @@ struct SwapchainSupportDetails
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
 
-	inline bool IsSuitableForRendering() const { !formats.empty() && !presentModes.empty(); }
+	inline bool IsSuitableForRendering() const { return !formats.empty() && !presentModes.empty(); }
 
 	operator bool() const { return IsSuitableForRendering(); }
 };
