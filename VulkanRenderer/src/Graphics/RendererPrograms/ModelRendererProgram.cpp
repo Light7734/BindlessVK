@@ -454,7 +454,8 @@ void ModelRendererProgram::UpdateImage(uint32_t framebufferIndex)
 		.pTexelBufferView = nullptr,
 	};
 
-	vkUpdateDescriptorSets(m_Device->logical(), 1u, &writeDescriptorSet, 0u, nullptr);
+    if(m_ModelImageView)
+	    vkUpdateDescriptorSets(m_Device->logical(), 1u, &writeDescriptorSet, 0u, nullptr);
 }
 
 bool ModelRendererProgram::TryAdvance(size_t vertexCount)

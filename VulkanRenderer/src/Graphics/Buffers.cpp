@@ -62,7 +62,7 @@ void* Buffer::Map(uint32_t size)
 	}
 
 	void* map;
-	VKC(vkMapMemory(m_Device->logical(), m_Memory, NULL, size, NULL, &map));
+	VKC(vkMapMemory(m_Device->logical(), m_Memory, NULL, size, 0x0, &map));
 	m_Mapped = true;
 	return map;
 }

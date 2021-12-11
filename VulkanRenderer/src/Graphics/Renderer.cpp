@@ -203,6 +203,7 @@ void Renderer::Resize(int width, int height)
 
 	m_ModelRendererProgram->CreatePipeline(m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent());
 
+    vkDeviceWaitIdle(m_Device->logical());
 	EndScene();
 }
 

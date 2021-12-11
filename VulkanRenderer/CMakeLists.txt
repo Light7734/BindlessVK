@@ -5,6 +5,12 @@ if(MSVC)
     add_compile_options(/W0)
 endif()
 
+if(UNIX)
+    add_definitions(-DVULKANRENDERER_PLATFORM_LINUX)
+elseif(WIN32)
+    add_definitions(-DVULKANRENDERER_PLATFORM_WINDOWS)
+endif()
+
 file(GLOB_RECURSE RENDERER_FILES true ABSOLUTE ${CMAKE_BINARY_DIR}/../VulkanRenderer/*)
 list(REMOVE_ITEM RENDERER_FILES ${CMAKE_BINARY_DIR}/../VulkanRenderer/res/viking_room.obj)
 

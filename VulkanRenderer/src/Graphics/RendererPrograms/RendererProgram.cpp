@@ -1,5 +1,3 @@
-#pragma once
-
 #include "Graphics/RendererPrograms/RendererProgram.h"
 
 #include "Graphics/Buffers.h"
