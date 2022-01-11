@@ -425,3 +425,7 @@ build/
 
 # !Model files
 !VulkanRenderer/res/*.obj
+
+# VIM
+.vimspector.json
+compile_commands.json
