@@ -6,7 +6,7 @@
 
 Device::Device(Window* window)
     : m_Window(window)
-    , m_ValidationLayers {}
+    , m_ValidationLayers { "VK_LAYER_KHRONOS_validation" }
     , m_RequiredExtensions {}
     , m_LogicalDeviceExtensions { VK_KHR_SWAPCHAIN_EXTENSION_NAME }
 

@@ -33,6 +33,8 @@ public:
 	//       struct member variables.
 	//
 	// Getters
+	inline VkInstance instance() { return m_VkInstance; }
+
 	inline VkDevice logical() { return m_LogicalDevice; }
 	inline VkPhysicalDevice physical() { return m_PhysicalDevice; }
 	inline VkSurfaceKHR surface() { return m_Surface; }

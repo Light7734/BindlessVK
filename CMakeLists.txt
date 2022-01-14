@@ -4,6 +4,7 @@ project(VulkanRenderer VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_BUILD_TYPE Debug)
 
+add_subdirectory(Dependencies/)
 add_subdirectory(Dependencies/volk)
 add_subdirectory(Dependencies/spdlog)
 add_subdirectory(Dependencies/glfw)
@@ -24,6 +25,9 @@ target_link_libraries(VulkanRenderer spdlog)
 target_link_libraries(VulkanRenderer volk)
 target_link_libraries(VulkanRenderer shaderc)
 target_link_libraries(VulkanRenderer stb_image)
+target_link_libraries(VulkanRenderer imgui)
+
+target_link_libraries(imgui volk)
 
 configure_file(${CMAKE_SOURCE_DIR}/DependenciesConfig/spdlog/tweakme.h.in
                ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include/spdlog/tweakme.h)

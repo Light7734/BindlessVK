@@ -23,6 +23,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/Dependencies/volk/
     ${CMAKE_SOURCE_DIR}/Dependencies/glm/
     ${CMAKE_SOURCE_DIR}/Dependencies/tinyobjloader/
+    ${CMAKE_SOURCE_DIR}/Dependencies/imgui/
 
     ${CMAKE_SOURCE_DIR}/Dependencies/stb_image/
 

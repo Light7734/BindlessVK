@@ -7,6 +7,8 @@
 #include "Graphics/Swapchain.h"
 
 #include <GLFW/glfw3.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <imgui.h>
 
 Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
     : m_Window(window)
@@ -99,7 +101,7 @@ void Renderer::DrawModel(const glm::mat4& transform, Model& model)
 	m_ModelRendererProgram->TryAdvance(model.GetVerticesCount());
 }
 
-void Renderer::EndScene()
+void Renderer::EndScene(ImDrawData* imguiDrawData)
 {
 	// unmap vertex/index buffers
 	// m_QuadRendererProgram->UnMap();
@@ -141,10 +143,13 @@ void Renderer::EndScene()
 	                                                                                   m_Swapchain->GetExtent(),
 	                                                                                   imageIndex);
 
+	VkCommandBuffer imguiCommandBuffer;
+	ImGui_ImplVulkan_RenderDrawData(imguiDrawData, imguiCommandBuffer);
 
 	std::vector<VkCommandBuffer> commandBuffers;
 	//commandBuffers.push_back(quadRendererCommands);
 	commandBuffers.push_back(modelRendererCommand);
+	commandBuffers.push_back(imguiCommandBuffer);
 
 	// submit info
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -162,6 +167,14 @@ void Renderer::EndScene()
 	// submit queues
 	vkResetFences(m_Device->logical(), 1u, &m_Fences[m_CurrentFrame]);
 	VKC(vkQueueSubmit(m_Device->graphicsQueue(), 1u, &submitInfo, m_Fences[m_CurrentFrame]));
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+	{
+		ImGui::UpdatePlatformWindows();
+		ImGui::RenderPlatformWindowsDefault();
+	}
 
 	VkPresentInfoKHR presentInfo {
 		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -204,7 +217,7 @@ void Renderer::Resize(int width, int height)
 	m_ModelRendererProgram->CreatePipeline(m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent());
 
     vkDeviceWaitIdle(m_Device->logical());
-	EndScene();
+	EndScene(nullptr);
 }
 
 void Renderer::CreateSyncObjects()

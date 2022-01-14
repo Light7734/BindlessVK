@@ -4,7 +4,6 @@
 
 #define LOG(logLevel, ...)   SPDLOG_LOGGER_CALL(Logger::GetRendererLogger(), spdlog::level::logLevel, __VA_ARGS__)
 #define LOGVk(logLevel, ...) SPDLOG_LOGGER_CALL(Logger::GetVkLogger(), spdlog::level::logLevel, __VA_ARGS__)
-// #define LOGVk(logLevel, ...) Logger::GetVkLogger()->log(spdlog::level::logLevel, __VA_ARGS__)
 
 class Logger
 {

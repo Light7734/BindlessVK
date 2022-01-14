@@ -6,6 +6,7 @@
 #include "Graphics/Model.h"
 #include "Graphics/RendererPrograms/ModelRendererProgram.h"
 #include "Graphics/RendererPrograms/QuadRendererProgram.h"
+#include "Graphics/Swapchain.h"
 
 #include <glm/glm.hpp>
 #include <volk.h>
@@ -28,19 +29,20 @@ public:
 	void DrawQuad(const glm::mat4& transform, const glm::vec4& tint);
 	void DrawModel(const glm::mat4& transform, Model& model);
 
-	void EndScene();
+	void EndScene(struct ImDrawData* imguiDrawData);
 	void EndFrame();
 
 	void Resize(int width, int height);
 
 	inline class Device* GetDevice() { return m_Device; }
+	inline VkRenderPass GetRenderPass() { return m_Swapchain->GetRenderPass(); }
 
 private:
 	bool m_SwapchainOK = true;
 
 	class Window* m_Window       = nullptr;
 	class Device* m_Device       = nullptr;
-	class Swapchain* m_Swapchain = nullptr;
+	Swapchain* m_Swapchain       = nullptr;
 
 	VkExtent2D m_Extent;
 
