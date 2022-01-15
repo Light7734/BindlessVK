@@ -24,6 +24,23 @@ Renderer::Renderer(class Window* window, uint32_t maxConcurrentFrames)
 
 	CreateSyncObjects();
 
+	VkCommandPoolCreateInfo commandPoolInfo {
+		.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+		.queueFamilyIndex = m_Device->graphicsQueueIndex(),
+	};
+
+	VKC(vkCreateCommandPool(m_Device->logical(), &commandPoolInfo, nullptr, &m_ImGuiCommandPool));
+
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo {
+		.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool        = m_ImGuiCommandPool,
+		.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = static_cast<uint32_t>(m_Swapchain->GetImageCount()),
+	};
+	m_ImGuiCommandBuffer.resize(m_Swapchain->GetImageCount());
+	VKC(vkAllocateCommandBuffers(m_Device->logical(), &commandBufferAllocateInfo, m_ImGuiCommandBuffer.data()));
+
 	// m_QuadRendererProgram  = std::make_unique<QuadRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
 	m_ModelRendererProgram = std::make_unique<ModelRendererProgram>(m_Device, m_Swapchain->GetRenderPass(), m_Swapchain->GetExtent(), m_Swapchain->GetImageCount());
 }
@@ -143,13 +160,12 @@ void Renderer::EndScene(ImDrawData* imguiDrawData)
 	                                                                                   m_Swapchain->GetExtent(),
 	                                                                                   imageIndex);
 
-	VkCommandBuffer imguiCommandBuffer;
-	ImGui_ImplVulkan_RenderDrawData(imguiDrawData, imguiCommandBuffer);
 
+	ImGui_ImplVulkan_RenderDrawData(imguiDrawData, m_ImGuiCommandBuffer[imageIndex]);
 	std::vector<VkCommandBuffer> commandBuffers;
 	//commandBuffers.push_back(quadRendererCommands);
 	commandBuffers.push_back(modelRendererCommand);
-	commandBuffers.push_back(imguiCommandBuffer);
+	commandBuffers.push_back(m_ImGuiCommandBuffer[imageIndex]);
 
 	// submit info
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;

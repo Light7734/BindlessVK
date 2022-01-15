@@ -46,6 +46,7 @@ private:
 
 	VkExtent2D m_Extent;
 
+	// renderer programs
 	std::unique_ptr<QuadRendererProgram> m_QuadRendererProgram;
 	std::unique_ptr<ModelRendererProgram> m_ModelRendererProgram;
 
@@ -57,6 +58,10 @@ private:
 	std::vector<VkSemaphore> m_RenderFinishedSemaphores;
 	std::vector<VkFence> m_Fences;
 	std::vector<VkFence> m_ImagesInFlight;
+
+	// #temp, imgui stuff
+	std::vector<VkCommandBuffer> m_ImGuiCommandBuffer;
+	VkCommandPool m_ImGuiCommandPool;
 
 private:
 	void CreateSyncObjects();
