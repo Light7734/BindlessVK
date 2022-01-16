@@ -74,6 +74,42 @@ UserInterface::UserInterface(GLFWwindow* window, Device* device, VkRenderPass re
 	};
 
 	ImGui_ImplVulkan_Init(&initInfo, renderPass);
+	VkCommandPool commandPool;
+	// command pool create-info
+	VkCommandPoolCreateInfo commandpoolCreateInfo {
+		.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+		.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+		.queueFamilyIndex = device->graphicsQueueIndex(),
+	};
+
+	VKC(vkCreateCommandPool(device->logical(), &commandpoolCreateInfo, nullptr, &commandPool));
+	// Use any command queue
+	// command buffer allocate-info
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo {
+		.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool        = commandPool,
+		.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1,
+	};
+	VkCommandBuffer commandBuffer;
+	VKC(vkAllocateCommandBuffers(device->logical(), &commandBufferAllocateInfo, &commandBuffer));
+
+	VKC(vkResetCommandPool(device->logical(), commandPool, 0));
+	VkCommandBufferBeginInfo begin_info = {};
+	begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+	VKC(vkBeginCommandBuffer(commandBuffer, &begin_info));
+
+	ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+
+	VkSubmitInfo end_info       = {};
+	end_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	end_info.commandBufferCount = 1;
+	end_info.pCommandBuffers    = &commandBuffer;
+	VKC(vkEndCommandBuffer(commandBuffer));
+	VKC(vkQueueSubmit(device->graphicsQueue(), 1, &end_info, VK_NULL_HANDLE));
+	VKC(vkDeviceWaitIdle(device->logical()));
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
 UserInterface::~UserInterface()
@@ -81,4 +117,24 @@ UserInterface::~UserInterface()
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+}
+void UserInterface::Begin()
+{
+	// render user interface
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+}
+
+void UserInterface::End()
+{
+	static bool showDemo = true;
+	ImGui::ShowDemoWindow(&showDemo);
+
+	ImGui::Render();
+}
+
+class ImDrawData* UserInterface::GetDrawData()
+{
+	return ImGui::GetDrawData();
 }

@@ -14,4 +14,8 @@ private:
 public:
 	UserInterface(GLFWwindow* window, class Device* devicem, VkRenderPass renderPass);
 	~UserInterface();
+
+	void Begin();
+	void End();
+	class ImDrawData* GetDrawData();
 };

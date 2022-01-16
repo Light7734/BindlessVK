@@ -21,4 +21,4 @@
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
 [submodule "Dependencies/imgui"]
 	path = Dependencies/imgui
-	url = https://github.com/ocornut/imgui
+	url = https://github.com/Light3039/imgui

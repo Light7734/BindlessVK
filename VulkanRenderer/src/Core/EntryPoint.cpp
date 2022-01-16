@@ -20,6 +20,7 @@ int main()
 	// create window & pipeline
 	Window window     = Window(800, 600);
 	Renderer renderer = Renderer(&window, 3);
+
 	Model model(renderer.GetDevice(), "res/viking_room.obj", "res/viking_room.png");
 
 	window.SetWindowUserPointer(&renderer);
@@ -29,45 +30,7 @@ int main()
 	Timer timer;
 	uint32_t frames = 0u;
 
-	ImGuiIO& io = ImGui::GetIO();
-	// Upload Fonts
 	{
-		VkCommandPool commandPool;
-		// command pool create-info
-		VkCommandPoolCreateInfo commandpoolCreateInfo {
-			.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-			.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-			.queueFamilyIndex = renderer.GetDevice()->graphicsQueueIndex(),
-		};
-
-		VKC(vkCreateCommandPool(renderer.GetDevice()->logical(), &commandpoolCreateInfo, nullptr, &commandPool));
-		// Use any command queue
-		// command buffer allocate-info
-		VkCommandBufferAllocateInfo commandBufferAllocateInfo {
-			.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool        = commandPool,
-			.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			.commandBufferCount = 1,
-		};
-		VkCommandBuffer commandBuffer;
-		VKC(vkAllocateCommandBuffers(renderer.GetDevice()->logical(), &commandBufferAllocateInfo, &commandBuffer));
-
-		VKC(vkResetCommandPool(renderer.GetDevice()->logical(), commandPool, 0));
-		VkCommandBufferBeginInfo begin_info = {};
-		begin_info.sType                    = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		VKC(vkBeginCommandBuffer(commandBuffer, &begin_info));
-
-		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-
-		VkSubmitInfo end_info       = {};
-		end_info.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		end_info.commandBufferCount = 1;
-		end_info.pCommandBuffers    = &commandBuffer;
-		VKC(vkEndCommandBuffer(commandBuffer));
-		VKC(vkQueueSubmit(renderer.GetDevice()->graphicsQueue(), 1, &end_info, VK_NULL_HANDLE));
-		VKC(vkDeviceWaitIdle(renderer.GetDevice()->logical()));
-		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
 	/**  main loop  */
 	while (!window.IsClosed())
@@ -75,23 +38,16 @@ int main()
 		if (renderer.IsSwapchainOk())
 			glfwPollEvents();
 
-		// render user interface
-		ImGui_ImplVulkan_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
+		// user interface ...
+		userInterface.Begin();
 
-
-		static bool showDemo = true;
-		ImGui::ShowDemoWindow(&showDemo);
-
-		ImGui::Render();
-		ImDrawData* imguiDrawData = ImGui::GetDrawData();
+		userInterface.End();
 
 		// render frame
 		renderer.BeginScene();
 		renderer.DrawQuad(glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, -1.0f)), glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 		renderer.DrawModel(glm::mat4(1.0f), model);
-		renderer.EndScene(imguiDrawData);
+		renderer.EndScene(userInterface.GetDrawData());
 
 		// calculate fps
 		frames++;
