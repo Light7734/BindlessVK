@@ -10,6 +10,8 @@ set(SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp
     # Core
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Entrypoint.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Base.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Timer.cpp
     # Debug
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
     )
