@@ -1,4 +1,5 @@
 #include "Core/Base.hpp"
+#include "Core/Timer.hpp"
 
 #include <iostream>
 
@@ -16,9 +17,18 @@ int main()
 
 
 		// Main loop...
+		uint32_t frames = 0u;
+		Timer fpsTimer;
 		while (true)
 		{
-			LOG(trace, "looping...");
+			frames++;
+
+			if (fpsTimer.ElapsedTime() >= 1.0f)
+			{
+				LOG(trace, "FPS: {}", frames);
+				frames = 0;
+				fpsTimer.Reset();
+			}
 		}
 	}
 
