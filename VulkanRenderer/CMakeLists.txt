@@ -12,6 +12,7 @@ set(SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Entrypoint.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Base.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Timer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Window.cpp
     # Debug
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
     )

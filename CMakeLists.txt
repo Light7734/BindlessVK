@@ -8,4 +8,8 @@ add_subdirectory(Dependencies/)
 set(CMAKE_EXPORT_COMPILE_COMMNADS ON)
 
 # Link dependencies to VulkanRenderer
-target_link_libraries(VulkanRenderer spdlog)
+target_link_libraries(
+    VulkanRenderer 
+    PRIVATE spdlog
+    PRIVATE glfw
+)

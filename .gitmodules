@@ -1,24 +1,6 @@
-[submodule "Dependencies/volk"]
-	path = Dependencies/volk
-	url = https://github.com/zeux/volk/
 [submodule "Dependencies/spdlog"]
 	path = Dependencies/spdlog
 	url = https://github.com/gabime/spdlog
 [submodule "Dependencies/glfw"]
 	path = Dependencies/glfw
 	url = https://github.com/glfw/glfw
-[submodule "Dependencies/shaderc"]
-	path = Dependencies/shaderc
-	url = https://github.com/google/shaderc
-[submodule "Dependencies/glm"]
-	path = Dependencies/glm
-	url = https://github.com/g-truc/glm
-[submodule "Dependencies/tinyobjloader"]
-	path = Dependencies/tinyobjloader
-	url = https://github.com/tinyobjloader/tinyobjloader
-[submodule "Dependencies/VulkanMemoryAllocator"]
-	path = Dependencies/VulkanMemoryAllocator
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
-[submodule "Dependencies/imgui"]
-	path = Dependencies/imgui
-	url = https://github.com/Light3039/imgui

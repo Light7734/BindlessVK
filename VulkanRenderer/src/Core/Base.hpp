@@ -1,3 +1,5 @@
+#pragma once
+
 // Note: files that are included by this file should not #include "Base.hpp"
 #include "Debug/Logger.hpp"
 

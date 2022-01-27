@@ -1,5 +1,6 @@
 #include "Core/Base.hpp"
 #include "Core/Timer.hpp"
+#include "Core/Window.hpp"
 
 #include <iostream>
 
@@ -13,13 +14,21 @@ int main()
 	// Try: Run the application
 	try
 	{
-		// Initialize singletons...
+		// Initialize..
+		WindowSpecs windowSpecs {
+			.title     = "Vulkan renderer",
+			.width     = 800u,
+			.height    = 600u,
+			.resizable = false,
+			.floating  = true,
+		};
 
+		Window window(windowSpecs);
 
 		// Main loop...
 		uint32_t frames = 0u;
 		Timer fpsTimer;
-		while (true)
+		while (!window.ShouldClose())
 		{
 			frames++;
 
