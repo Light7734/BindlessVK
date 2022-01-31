@@ -2,16 +2,16 @@
 
 #include <GLFW/glfw3.h>
 
-Window::Window(WindowSpecs& specs)
-    : m_Specs(specs)
+Window::Window(WindowCreateInfo& createInfo)
+    : m_Specs(createInfo.specs)
 {
 	ASSERT(glfwInit(), "Failed to initalize glfw");
 
-	glfwWindowHint(GLFW_RESIZABLE, specs.resizable ? GLFW_TRUE : GLFW_FALSE);
-	glfwWindowHint(GLFW_FLOATING, specs.floating ? GLFW_TRUE : GLFW_FALSE);
+	glfwWindowHint(GLFW_RESIZABLE, m_Specs.resizable ? GLFW_TRUE : GLFW_FALSE);
+	glfwWindowHint(GLFW_FLOATING, m_Specs.floating ? GLFW_TRUE : GLFW_FALSE);
 	glfwWindowHint(GLFW_OPENGL_API, GLFW_NO_API);
 
-	m_GlfwWindowHandle = glfwCreateWindow(specs.width, specs.height, specs.title.c_str(), nullptr, nullptr);
+	m_GlfwWindowHandle = glfwCreateWindow(m_Specs.width, m_Specs.height, m_Specs.title.c_str(), nullptr, nullptr);
 	ASSERT(m_GlfwWindowHandle, "Failed to create glfw window");
 
 	glfwSetWindowUserPointer(m_GlfwWindowHandle, &m_Specs);

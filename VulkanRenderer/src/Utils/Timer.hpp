@@ -1,3 +1,7 @@
+#pragma once
+
+#include "Core/Base.hpp"
+
 #include <chrono>
 
 // Simple timer class to keep track of the elapsed time

@@ -12,10 +12,16 @@ struct WindowSpecs
 	bool resizable, floating;
 };
 
+struct WindowCreateInfo
+{
+	WindowSpecs specs;
+	// #TODO: Add glfw flags
+};
+
 class Window
 {
 public:
-	Window(WindowSpecs& specs);
+	Window(WindowCreateInfo& createInfo);
 	~Window();
 
 	bool ShouldClose();

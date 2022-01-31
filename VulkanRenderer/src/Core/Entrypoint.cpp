@@ -1,8 +1,10 @@
 #include "Core/Base.hpp"
-#include "Core/Timer.hpp"
 #include "Core/Window.hpp"
+#include "Graphics/Device.hpp"
+#include "Utils/Timer.hpp"
 
 #include <iostream>
+#include <vulkan/vulkan_core.h>
 
 int main()
 {
@@ -15,15 +17,27 @@ int main()
 	try
 	{
 		// Initialize..
-		WindowSpecs windowSpecs {
-			.title     = "Vulkan renderer",
-			.width     = 800u,
-			.height    = 600u,
-			.resizable = false,
-			.floating  = true,
+		WindowCreateInfo windowCreateInfo {
+			.specs = {
+			    .title     = "Vulkan renderer",
+			    .width     = 800u,
+			    .height    = 600u,
+			    .resizable = false,
+			    .floating  = true,
+			},
 		};
 
-		Window window(windowSpecs);
+		Window window(windowCreateInfo);
+
+		DeviceCreateInfo deviceCreateInfo {
+			.layers             = { "VK_LAYER_KHRONOS_validation" },
+			.extensions         = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME },
+			.enableDebugging    = true,
+			.minMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+			.messageTypes       = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+		};
+
+		Device device(deviceCreateInfo);
 
 		// Main loop...
 		uint32_t frames = 0u;

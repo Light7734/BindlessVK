@@ -11,12 +11,14 @@ set(SRC_FILES
     # Core
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Entrypoint.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Base.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Timer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Window.cpp
     # Debug
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
+    # Utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Timer.cpp
     )
 add_executable(VulkanRenderer ${SRC_FILES})
 
