@@ -12,4 +12,5 @@ target_link_libraries(
     VulkanRenderer 
     PRIVATE spdlog
     PRIVATE glfw
+    PRIVATE volk
 )

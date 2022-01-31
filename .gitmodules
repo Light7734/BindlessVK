@@ -4,3 +4,6 @@
 [submodule "Dependencies/glfw"]
 	path = Dependencies/glfw
 	url = https://github.com/glfw/glfw
+[submodule "Dependencies/volk"]
+	path = Dependencies/volk
+	url = https://github.com/zeux/volk
