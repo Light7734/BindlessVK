@@ -39,6 +39,7 @@ void Device::CreateInstance(VkDebugUtilsMessengerCreateInfoEXT debugCallbackCrea
 	};
 
 	VKC(vkCreateInstance(&createInfo, nullptr, &m_Instance));
+	volkLoadInstance(m_Instance);
 }
 
 
@@ -64,12 +65,15 @@ VkDebugUtilsMessengerCreateInfoEXT Device::CreateDebugCallbackCreateInfo()
 
 bool Device::CheckLayersSupport()
 {
+	// Get layer count
 	uint32_t layersCount;
 	vkEnumerateInstanceLayerProperties(&layersCount, nullptr);
 
+	// Get layers
 	std::vector<VkLayerProperties> availableLayers(layersCount);
 	vkEnumerateInstanceLayerProperties(&layersCount, availableLayers.data());
 
+	// Check if we support all the required layers
 	for (const char* requiredLayerName : m_Layers)
 	{
 		bool layerFound = false;
@@ -83,11 +87,8 @@ bool Device::CheckLayersSupport()
 			}
 		}
 
-		if (!layerFound)
-		{
-			LOG(critical, "Layer not supported: {}", requiredLayerName);
-			return false;
-		}
+		// Layer is not supported!
+		ASSERT(layerFound, "Required layer not found");
 	}
 
 	return true;

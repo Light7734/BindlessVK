@@ -9,13 +9,12 @@ struct WindowSpecs
 {
 	std::string title;
 	uint32_t width, height;
-	bool resizable, floating;
 };
 
 struct WindowCreateInfo
 {
 	WindowSpecs specs;
-	// #TODO: Add glfw flags
+	std::vector<std::pair<int, int>> hints;
 };
 
 class Window
@@ -24,12 +23,13 @@ public:
 	Window(WindowCreateInfo& createInfo);
 	~Window();
 
+	std::vector<const char*> GetRequiredExtensions();
+
 	bool ShouldClose();
 
 private:
 	GLFWwindow* m_GlfwWindowHandle = nullptr;
 	WindowSpecs m_Specs;
-
 
 	void BindCallbacks();
 };

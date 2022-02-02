@@ -3,6 +3,7 @@
 #include "Graphics/Device.hpp"
 #include "Utils/Timer.hpp"
 
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <vulkan/vulkan_core.h>
 
@@ -16,22 +17,29 @@ int main()
 	// Try: Run the application
 	try
 	{
-		// Initialize..
+		// Create window
 		WindowCreateInfo windowCreateInfo {
 			.specs = {
 			    .title     = "Vulkan renderer",
 			    .width     = 800u,
 			    .height    = 600u,
-			    .resizable = false,
-			    .floating  = true,
+			},
+			.hints = {
+			    { GLFW_RESIZABLE, GLFW_FALSE },
+			    { GLFW_FLOATING, GLFW_TRUE },
 			},
 		};
 
 		Window window(windowCreateInfo);
 
+		// Set required device extensions
+		auto deviceExtensions = window.GetRequiredExtensions();
+		deviceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+		// Create device
 		DeviceCreateInfo deviceCreateInfo {
 			.layers             = { "VK_LAYER_KHRONOS_validation" },
-			.extensions         = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME },
+			.extensions         = deviceExtensions,
 			.enableDebugging    = true,
 			.minMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
 			.messageTypes       = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
