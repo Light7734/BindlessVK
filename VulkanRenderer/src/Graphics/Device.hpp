@@ -24,13 +24,20 @@ private:
 	// Instance
 	VkInstance m_Instance = VK_NULL_HANDLE;
 
+	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+	VkPhysicalDeviceProperties m_PhysicalDeviceProperties = {};
+
+	// Queue
+	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
+
 	// Layers & Extensions
 	std::vector<const char*> m_Layers;
 	std::vector<const char*> m_Extensions;
 
-	void CreateInstance(VkDebugUtilsMessengerCreateInfoEXT debugCallbackCreateInfo);
+	void CreateInstance();
+	void PickPhysicalDevice();
 
 	VkDebugUtilsMessengerCreateInfoEXT CreateDebugCallbackCreateInfo();
-	bool CheckLayersSupport();
-	bool CheckExtensionsSupport();
+	void CheckLayersSupport();
+	bool FetchQueueFamilyIndices(VkPhysicalDevice device);
 };
