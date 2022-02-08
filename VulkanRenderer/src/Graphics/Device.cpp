@@ -1,4 +1,6 @@
 #include "Graphics/Device.hpp"
+
+#include <vulkan/vulkan_core.h>
 Device::Device(DeviceCreateInfo& createInfo)
     : m_Layers(createInfo.layers), m_Extensions(createInfo.extensions)
 {
@@ -31,7 +33,6 @@ Device::Device(DeviceCreateInfo& createInfo)
 				}
 			}
 
-			// Layer is not supported!
 			ASSERT(layerFound, "Required layer not found");
 		}
 	}
@@ -39,7 +40,6 @@ Device::Device(DeviceCreateInfo& createInfo)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create vulkan instance, debug messenger, and load it with volk
 	{
-		// Application info
 		VkApplicationInfo applicationInfo {
 			.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.pApplicationName   = "Vulkan Renderer",
@@ -49,14 +49,12 @@ Device::Device(DeviceCreateInfo& createInfo)
 			.apiVersion         = VK_API_VERSION_1_2
 		};
 
-		// Debug messenger create-info
 		VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
 			.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT, // #TODO: Config
 			.messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 			.pUserData       = nullptr
 		};
-
 		debugMessengerCreateInfo.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 		                                              const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -65,7 +63,6 @@ Device::Device(DeviceCreateInfo& createInfo)
 			return static_cast<VkBool32>(VK_FALSE);
 		};
 
-		// Instance create-info
 		VkInstanceCreateInfo createInfo {
 			.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
 			.pNext                   = &debugMessengerCreateInfo,
@@ -76,7 +73,6 @@ Device::Device(DeviceCreateInfo& createInfo)
 			.ppEnabledExtensionNames = m_Extensions.data(),
 		};
 
-		// Create and load vulkan
 		VKC(vkCreateInstance(&createInfo, nullptr, &m_Instance));
 		volkLoadInstance(m_Instance);
 	}
@@ -102,15 +98,13 @@ Device::Device(DeviceCreateInfo& createInfo)
 			// Fetch properties & features
 			VkPhysicalDeviceProperties properties;
 			VkPhysicalDeviceFeatures features;
-
 			vkGetPhysicalDeviceProperties(device, &properties);
 			vkGetPhysicalDeviceFeatures(device, &features);
 
-			// Geometry shader and some queue families are required for rendering and presenting
 			if (!features.geometryShader)
 				continue;
 
-			/** Check if the device supports all the required queues **/
+			/** Check if the device supports the required queues **/
 			{
 				// Fetch queue families
 				uint32_t queueFamiliesCount;
@@ -146,21 +140,42 @@ Device::Device(DeviceCreateInfo& createInfo)
 				}
 			}
 
+			if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+				score += 69420; // nice
 
-		// Discrete gpu is favored
-		if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-			score += 69420; // nice
+			score += properties.limits.maxImageDimension2D;
 
-		// Higher image dimensions are favored
-		score += properties.limits.maxImageDimension2D;
-
-		// Pick the most suitable device
-		m_PhysicalDevice = score > highScore ? device : m_PhysicalDevice;
+			m_PhysicalDevice = score > highScore ? device : m_PhysicalDevice;
 		}
 		ASSERT(m_PhysicalDevice, "No suitable physical device found");
 
 		// Store the selected physical device's properties
 		vkGetPhysicalDeviceProperties(m_PhysicalDevice, &m_PhysicalDeviceProperties);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create logical device
+	{
+		float queuePriority = 1.0f; // Always 1.0
+
+		VkDeviceQueueCreateInfo queueCreateInfo {
+			.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+			.queueFamilyIndex = m_GraphicsQueueIndex,
+			.queueCount       = 1u,
+			.pQueuePriorities = &queuePriority,
+		};
+
+		// No features needed ATM
+		VkPhysicalDeviceFeatures physicalDeviceFeatures {};
+
+		VkDeviceCreateInfo logicalDeviceCreateInfo {
+			.sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+			.queueCreateInfoCount = 0u,
+			.pQueueCreateInfos    = &queueCreateInfo,
+			.pEnabledFeatures     = &physicalDeviceFeatures,
+		};
+
+		VKC(vkCreateDevice(m_PhysicalDevice, &logicalDeviceCreateInfo, nullptr, &m_LogicalDevice));
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -192,4 +207,5 @@ Device::Device(DeviceCreateInfo& createInfo)
 Device::~Device()
 {
 	vkDestroyInstance(m_Instance, nullptr);
+	vkDestroyDevice(m_LogicalDevice, nullptr);
 }

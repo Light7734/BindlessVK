@@ -28,6 +28,8 @@ private:
 	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 	VkPhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 
+	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
+
 	// Queue
 	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
 
