@@ -24,6 +24,7 @@ private:
 	// Instance
 	VkInstance m_Instance = VK_NULL_HANDLE;
 
+	// Device
 	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
 	VkPhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 
@@ -33,11 +34,4 @@ private:
 	// Layers & Extensions
 	std::vector<const char*> m_Layers;
 	std::vector<const char*> m_Extensions;
-
-	void CreateInstance();
-	void PickPhysicalDevice();
-
-	VkDebugUtilsMessengerCreateInfoEXT CreateDebugCallbackCreateInfo();
-	void CheckLayersSupport();
-	bool FetchQueueFamilyIndices(VkPhysicalDevice device);
 };
