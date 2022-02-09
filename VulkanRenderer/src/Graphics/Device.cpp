@@ -1,7 +1,10 @@
 #include "Graphics/Device.hpp"
 
+#include "Core/Window.hpp"
+
 #include <vulkan/vulkan_core.h>
-Device::Device(DeviceCreateInfo& createInfo)
+
+Device::Device(DeviceCreateInfo& createInfo, Window& window)
     : m_Layers(createInfo.layers), m_Extensions(createInfo.extensions)
 {
 	/////////////////////////////////////////////////////////////////////////////////
@@ -9,7 +12,7 @@ Device::Device(DeviceCreateInfo& createInfo)
 	VKC(volkInitialize());
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Check if the required layers are supported.
+	// Check if the required layers exist.
 	{
 		// Fetch supported layers
 		uint32_t layersCount;
@@ -38,13 +41,13 @@ Device::Device(DeviceCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create vulkan instance, debug messenger, and load it with volk
+	// Create vulkan instance, window surface, debug messenger, and load the instace with the volk.
 	{
 		VkApplicationInfo applicationInfo {
 			.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
 			.pApplicationName   = "Vulkan Renderer",
 			.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-			.pEngineName        = "NA",
+			.pEngineName        = "None",
 			.engineVersion      = VK_MAKE_VERSION(1, 0, 0),
 			.apiVersion         = VK_API_VERSION_1_2
 		};
@@ -75,6 +78,7 @@ Device::Device(DeviceCreateInfo& createInfo)
 
 		VKC(vkCreateInstance(&createInfo, nullptr, &m_Instance));
 		volkLoadInstance(m_Instance);
+		m_Surface = window.CreateSurface(m_Instance);
 	}
 
 
@@ -118,24 +122,33 @@ Device::Device(DeviceCreateInfo& createInfo)
 				uint32_t index = 0u;
 				for (auto queueFamilyProperties : queueFamiliesProperties)
 				{
-					// Check if current queue index is a desired queue
+					// Check if current queue index supports a desired queue
 					if (queueFamilyProperties.queueFlags & VK_QUEUE_GRAPHICS_BIT)
 					{
 						m_GraphicsQueueIndex = index;
 					}
+
+					VkBool32 presentSupport;
+					vkGetPhysicalDeviceSurfaceSupportKHR(device, index, m_Surface, &presentSupport);
+					if (presentSupport)
+					{
+						m_PresentQueueIndex = index;
+					}
+
 					index++;
 
 					// Device does supports all the required queues!
-					if (m_GraphicsQueueIndex != UINT32_MAX)
+					if (m_GraphicsQueueIndex != UINT32_MAX && m_PresentQueueIndex != UINT32_MAX)
 					{
 						break;
 					}
 				}
 
 				// Device doesn't support all the required queues!
-				if (m_GraphicsQueueIndex == UINT32_MAX)
+				if (m_GraphicsQueueIndex == UINT32_MAX || m_PresentQueueIndex == UINT32_MAX)
 				{
 					m_GraphicsQueueIndex = UINT32_MAX;
+					m_PresentQueueIndex  = UINT32_MAX;
 					continue;
 				}
 			}

@@ -2,8 +2,9 @@
 
 #include "Core/Base.hpp"
 
-struct GLFWwindow;
+#include <volk.h>
 
+struct GLFWwindow;
 
 struct WindowSpecs
 {
@@ -26,6 +27,8 @@ public:
 	std::vector<const char*> GetRequiredExtensions();
 
 	bool ShouldClose();
+
+	VkSurfaceKHR CreateSurface(VkInstance instance);
 
 private:
 	GLFWwindow* m_GlfwWindowHandle = nullptr;

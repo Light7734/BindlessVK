@@ -4,6 +4,8 @@
 
 #include <volk.h>
 
+class Window;
+
 struct DeviceCreateInfo
 {
 	std::vector<const char*> layers;
@@ -17,7 +19,7 @@ struct DeviceCreateInfo
 class Device
 {
 public:
-	Device(DeviceCreateInfo& createInfo);
+	Device(DeviceCreateInfo& createInfo, Window& window);
 	~Device();
 
 private:
@@ -30,8 +32,12 @@ private:
 
 	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
 
-	// Queue
+	// Surface
+	VkSurfaceKHR m_Surface;
+
+	// Queues
 	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
+	uint32_t m_PresentQueueIndex  = UINT32_MAX;
 
 	// Layers & Extensions
 	std::vector<const char*> m_Layers;

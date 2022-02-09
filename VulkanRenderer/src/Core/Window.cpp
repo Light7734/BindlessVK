@@ -5,20 +5,21 @@
 Window::Window(WindowCreateInfo& createInfo)
     : m_Specs(createInfo.specs)
 {
-	// initialzie glfw
+	// Initialzie glfw
 	ASSERT(glfwInit(), "Failed to initalize glfw");
 
-	// hint glfw about the window
+	// Hint glfw about the window
 	for (auto hint : createInfo.hints)
+	{
 		glfwWindowHint(hint.first, hint.second);
+		LOG(trace, "{} ==> {}", hint.first, hint.second);
+	}
 
-	glfwWindowHint(GLFW_OPENGL_API, GLFW_NO_API);
-
-	// create window
+	// Create window
 	m_GlfwWindowHandle = glfwCreateWindow(m_Specs.width, m_Specs.height, m_Specs.title.c_str(), nullptr, nullptr);
 	ASSERT(m_GlfwWindowHandle, "Failed to create glfw window");
 
-	// setup callbacks & userpointer
+	// Setup callbacks & userpointer
 	glfwSetWindowUserPointer(m_GlfwWindowHandle, &m_Specs);
 	BindCallbacks();
 }
@@ -28,6 +29,7 @@ Window::~Window()
 	glfwDestroyWindow(m_GlfwWindowHandle);
 	glfwTerminate();
 }
+
 std::vector<const char*> Window::GetRequiredExtensions()
 {
 	const char** extensions;
@@ -41,6 +43,16 @@ std::vector<const char*> Window::GetRequiredExtensions()
 bool Window::ShouldClose()
 {
 	return glfwWindowShouldClose(m_GlfwWindowHandle);
+}
+
+VkSurfaceKHR Window::CreateSurface(VkInstance instance)
+{
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+	ASSERT(m_GlfwWindowHandle, "Invalid glfw handle");
+	ASSERT(instance, "Invalid instance");
+	VKC(glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface));
+	ASSERT(surface, "Failed to create window surface");
+	return surface;
 }
 
 void Window::BindCallbacks()

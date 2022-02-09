@@ -2,7 +2,7 @@
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
 #include "Utils/Timer.hpp"
-
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <iostream>
 #include <vulkan/vulkan_core.h>
@@ -20,13 +20,15 @@ int main()
 		// Create window
 		WindowCreateInfo windowCreateInfo {
 			.specs = {
-			    .title     = "Vulkan renderer",
-			    .width     = 800u,
-			    .height    = 600u,
+			    .title  = "Vulkan renderer",
+			    .width  = 800u,
+			    .height = 600u,
 			},
 			.hints = {
+			    { GLFW_CLIENT_API, GLFW_NO_API },
 			    { GLFW_RESIZABLE, GLFW_FALSE },
 			    { GLFW_FLOATING, GLFW_TRUE },
+			    { GLFW_VISIBLE, GLFW_FALSE },
 			},
 		};
 
@@ -45,7 +47,7 @@ int main()
 			.messageTypes       = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 		};
 
-		Device device(deviceCreateInfo);
+		Device device(deviceCreateInfo, window);
 
 		// Main loop...
 		uint32_t frames = 0u;
