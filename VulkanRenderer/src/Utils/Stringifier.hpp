@@ -4,7 +4,7 @@
 
 #include <volk.h>
 
-class Stringifier
+    class Stringifier
 {
 public:
 	static const char* VkMsgSeverity(VkDebugUtilsMessageSeverityFlagBitsEXT severity);

@@ -14,3 +14,5 @@ target_link_libraries(
     PRIVATE glfw
     PRIVATE volk
 )
+
+set(CMAKE_BUILD_TYPE debug)

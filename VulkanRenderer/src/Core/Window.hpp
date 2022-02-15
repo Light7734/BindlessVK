@@ -29,6 +29,7 @@ public:
 	bool ShouldClose();
 
 	VkSurfaceKHR CreateSurface(VkInstance instance);
+	VkExtent2D GetFramebufferSize();
 
 private:
 	GLFWwindow* m_GlfwWindowHandle = nullptr;

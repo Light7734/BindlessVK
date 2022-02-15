@@ -10,6 +10,7 @@ struct DeviceCreateInfo
 {
 	std::vector<const char*> layers;
 	std::vector<const char*> extensions;
+	std::vector<const char*> deviceExtensions;
 
 	bool enableDebugging;
 	VkDebugUtilsMessageSeverityFlagBitsEXT minMessageSeverity;
@@ -35,9 +36,21 @@ private:
 	// Surface
 	VkSurfaceKHR m_Surface;
 
-	// Queues
+	// Queues #WARNING: Don't change the order of these 2 variables, they should be coherent in the memory
 	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
 	uint32_t m_PresentQueueIndex  = UINT32_MAX;
+
+	// Swap chain
+	VkSwapchainKHR m_Swapchain;
+	std::vector<VkImage> m_SwapchainImages;
+
+	VkSurfaceFormatKHR m_SwapchainFormat;
+	VkPresentModeKHR m_SwapchainPresentMode;
+	VkExtent2D m_SwapchainExtent;
+
+	VkSurfaceCapabilitiesKHR m_SwapchainCapabilities;
+	std::vector<VkSurfaceFormatKHR> m_SupportedSwapchainFormats;
+	std::vector<VkPresentModeKHR> m_SupportedSwapchainPresentModes;
 
 	// Layers & Extensions
 	std::vector<const char*> m_Layers;
