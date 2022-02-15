@@ -326,12 +326,45 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		};
 
 		VKC(vkCreateSwapchainKHR(m_LogicalDevice, &swapchainCreateInfo, nullptr, &m_Swapchain));
-
-		// Store swapchain images
-		vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, nullptr);
-		m_SwapchainImages.resize(imageCount);
-		vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, m_SwapchainImages.data());
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Fetch swap chain images and create image views
+	{
+		// Fetch images
+		uint32_t imageCount;
+		vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, nullptr);
+		m_Images.resize(imageCount);
+		m_ImageViews.resize(imageCount);
+		vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, m_Images.data());
+
+
+		for (uint32_t i = 0; i < m_Images.size(); i++)
+		{
+			VkImageViewCreateInfo imageViewCreateInfo {
+				.sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+				.image      = m_Images[i],
+				.viewType   = VK_IMAGE_VIEW_TYPE_2D,
+				.format     = m_SwapchainFormat.format,
+				.components = {
+				    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+				    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+				    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+				    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+				},
+				.subresourceRange = {
+				    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+				    .baseMipLevel   = 0,
+				    .levelCount     = 1,
+				    .baseArrayLayer = 0,
+				    .layerCount     = 1,
+				},
+			};
+
+			VKC(vkCreateImageView(m_LogicalDevice, &imageViewCreateInfo, nullptr, &m_ImageViews[i]));
+		}
+	}
+
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Log debug information about the selected physical device, layers, extensions, etc.
@@ -359,14 +392,20 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		LOG(info, "        Present: {}", m_PresentQueueIndex);
 
 		LOG(info, "    Swapchain:");
-		LOG(info, "        imageCount: {}", m_SwapchainImages.size());
+		LOG(info, "        imageCount: {}", m_Images.size());
 		LOG(info, "        extent: {}x{}", m_SwapchainExtent.width, m_SwapchainExtent.height);
 	}
 }
 
 Device::~Device()
 {
+	for (auto imageView : m_ImageViews)
+	{
+		vkDestroyImageView(m_LogicalDevice, imageView, nullptr);
+	}
+
 	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
 	vkDestroyInstance(m_Instance, nullptr);
 	vkDestroyDevice(m_LogicalDevice, nullptr);
+
 }

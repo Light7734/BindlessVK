@@ -40,9 +40,8 @@ private:
 	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
 	uint32_t m_PresentQueueIndex  = UINT32_MAX;
 
-	// Swap chain
+	// Swapchain
 	VkSwapchainKHR m_Swapchain;
-	std::vector<VkImage> m_SwapchainImages;
 
 	VkSurfaceFormatKHR m_SwapchainFormat;
 	VkPresentModeKHR m_SwapchainPresentMode;
@@ -51,6 +50,10 @@ private:
 	VkSurfaceCapabilitiesKHR m_SwapchainCapabilities;
 	std::vector<VkSurfaceFormatKHR> m_SupportedSwapchainFormats;
 	std::vector<VkPresentModeKHR> m_SupportedSwapchainPresentModes;
+
+	// Swapcain images
+	std::vector<VkImage> m_Images;
+	std::vector<VkImageView> m_ImageViews;
 
 	// Layers & Extensions
 	std::vector<const char*> m_Layers;
