@@ -50,14 +50,14 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
 			.pEngineName        = "None",
 			.engineVersion      = VK_MAKE_VERSION(1, 0, 0),
-			.apiVersion         = VK_API_VERSION_1_2
+			.apiVersion         = VK_API_VERSION_1_2,
 		};
 
 		VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
 			.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
 			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT, // #TODO: Config
 			.messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-			.pUserData       = nullptr
+			.pUserData       = nullptr,
 		};
 		debugMessengerCreateInfo.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
@@ -89,7 +89,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		// Fetch physical devices with vulkan support
 		uint32_t deviceCount;
 		vkEnumeratePhysicalDevices(m_Instance, &deviceCount, nullptr);
-		ASSERT(deviceCount, "No graphic device with vulkan support found");
+		ASSERT(deviceCount, "No physical device with vulkan support found");
 
 		std::vector<VkPhysicalDevice> devices(deviceCount);
 		vkEnumeratePhysicalDevices(m_Instance, &deviceCount, devices.data());
@@ -191,7 +191,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 			/** Check if swap chain is adequate **/
 			{
-				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_Surface, &m_SwapchainCapabilities);
+				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, m_Surface, &m_SurfcaCapabilities);
 
 				// Fetch swap chain formats
 				uint32_t formatCount;
@@ -199,9 +199,9 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 				if (!formatCount)
 					continue;
 
-				m_SupportedSwapchainFormats.clear();
-				m_SupportedSwapchainFormats.resize(formatCount);
-				vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_Surface, &formatCount, m_SupportedSwapchainFormats.data());
+				m_SupportedSurfaceFormats.clear();
+				m_SupportedSurfaceFormats.resize(formatCount);
+				vkGetPhysicalDeviceSurfaceFormatsKHR(device, m_Surface, &formatCount, m_SupportedSurfaceFormats.data());
 
 				// Fetch swap chain present modes
 				uint32_t presentModeCount;
@@ -209,9 +209,9 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 				if (!presentModeCount)
 					continue;
 
-				m_SupportedSwapchainPresentModes.clear();
-				m_SupportedSwapchainPresentModes.resize(presentModeCount);
-				vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, m_SupportedSwapchainPresentModes.data());
+				m_SupportedPresentModes.clear();
+				m_SupportedPresentModes.resize(presentModeCount);
+				vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, m_SupportedPresentModes.data());
 			}
 
 
@@ -252,7 +252,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		}
 
 		// No features needed ATM
-		VkPhysicalDeviceFeatures physicalDeviceFeatures {};
+		VkPhysicalDeviceFeatures physicalDeviceFeatures {}; // #TODO
 
 		VkDeviceCreateInfo logicalDeviceCreateInfo {
 			.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -271,38 +271,37 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	// Create the swap chain.
 	{
 		// Select surface format
-		m_SwapchainFormat = m_SupportedSwapchainFormats[0]; // default
-		for (const auto& surfaceFormat : m_SupportedSwapchainFormats)
+		m_SurfaceFormat = m_SupportedSurfaceFormats[0]; // default
+		for (const auto& surfaceFormat : m_SupportedSurfaceFormats)
 		{
 			if (surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB && surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 			{
-				m_SwapchainFormat = surfaceFormat;
+				m_SurfaceFormat = surfaceFormat;
 				break;
 			}
 		}
 
 		// Select present mode
-		m_SwapchainPresentMode = m_SupportedSwapchainPresentModes[0]; // default
-		for (const auto& presentMode : m_SupportedSwapchainPresentModes)
+		m_PresentMode = m_SupportedPresentModes[0]; // default
+		for (const auto& presentMode : m_SupportedPresentModes)
 		{
 			if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
 			{
-				m_SwapchainPresentMode = presentMode;
+				m_PresentMode = presentMode;
 			}
 		}
 
 		// Select extent
-		m_SwapchainExtent = m_SwapchainCapabilities.currentExtent;
+		m_SwapchainExtent = m_SurfcaCapabilities.currentExtent;
 		if (m_SwapchainExtent.width == UINT32_MAX)
 		{
 			VkExtent2D actualExtent = window.GetFramebufferSize();
-			actualExtent.width      = std::clamp(actualExtent.width, m_SwapchainCapabilities.minImageExtent.width, m_SwapchainCapabilities.maxImageExtent.width);
-			actualExtent.height     = std::clamp(actualExtent.height, m_SwapchainCapabilities.minImageExtent.height, m_SwapchainCapabilities.maxImageExtent.height);
+			actualExtent.width      = std::clamp(actualExtent.width, m_SurfcaCapabilities.minImageExtent.width, m_SurfcaCapabilities.maxImageExtent.width);
+			actualExtent.height     = std::clamp(actualExtent.height, m_SurfcaCapabilities.minImageExtent.height, m_SurfcaCapabilities.maxImageExtent.height);
 		}
 
 		// Select image count ; one more than minImageCount, if minImageCount +1 is not higher than maxImageCount (maxImageCount of 0 means no limit)
-		uint32_t imageCount;
-		imageCount = m_SwapchainCapabilities.maxImageCount > 0 && m_SwapchainCapabilities.minImageCount + 1 > m_SwapchainCapabilities.maxImageCount ? m_SwapchainCapabilities.maxImageCount : m_SwapchainCapabilities.minImageCount + 1;
+		uint32_t imageCount = m_SurfcaCapabilities.maxImageCount > 0 && m_SurfcaCapabilities.minImageCount + 1 > m_SurfcaCapabilities.maxImageCount ? m_SurfcaCapabilities.maxImageCount : m_SurfcaCapabilities.minImageCount + 1;
 
 		// Create swapchain
 		bool sameQueueIndex = m_GraphicsQueueIndex == m_PresentQueueIndex;
@@ -310,18 +309,18 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.sType                 = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
 			.surface               = m_Surface,
 			.minImageCount         = imageCount,
-			.imageFormat           = m_SwapchainFormat.format,
-			.imageColorSpace       = m_SwapchainFormat.colorSpace,
+			.imageFormat           = m_SurfaceFormat.format,
+			.imageColorSpace       = m_SurfaceFormat.colorSpace,
 			.imageExtent           = m_SwapchainExtent,
-			.imageArrayLayers      = 1,
-			.imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.imageArrayLayers      = 1u,
+			.imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // Write directly to the image (we would use a value like VK_IMAGE_USAGE_TRANSFER_DST_BIT if we wanted to do post-processing)
 			.imageSharingMode      = sameQueueIndex ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
 			.queueFamilyIndexCount = sameQueueIndex ? 0u : 2u,
 			.pQueueFamilyIndices   = sameQueueIndex ? nullptr : &m_GraphicsQueueIndex,
-			.preTransform          = m_SwapchainCapabilities.currentTransform,
-			.compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-			.presentMode           = m_SwapchainPresentMode,
-			.clipped               = VK_TRUE,
+			.preTransform          = m_SurfcaCapabilities.currentTransform,
+			.compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, // No alpha-blending between multiple windows
+			.presentMode           = m_PresentMode,
+			.clipped               = VK_TRUE, // Don't render the obsecured pixels
 			.oldSwapchain          = VK_NULL_HANDLE,
 		};
 
@@ -338,25 +337,25 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		m_ImageViews.resize(imageCount);
 		vkGetSwapchainImagesKHR(m_LogicalDevice, m_Swapchain, &imageCount, m_Images.data());
 
-
 		for (uint32_t i = 0; i < m_Images.size(); i++)
 		{
 			VkImageViewCreateInfo imageViewCreateInfo {
 				.sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 				.image      = m_Images[i],
 				.viewType   = VK_IMAGE_VIEW_TYPE_2D,
-				.format     = m_SwapchainFormat.format,
+				.format     = m_SurfaceFormat.format,
 				.components = {
+				    // Don't swizzle the colors around...
 				    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
 				    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
 				    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
 				    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
 				},
 				.subresourceRange = {
-				    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-				    .baseMipLevel   = 0,
-				    .levelCount     = 1,
-				    .baseArrayLayer = 0,
+				    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT, // Image will be used as color target
+				    .baseMipLevel   = 0,                         // No mipmaipping
+				    .levelCount     = 1,                         // No levels
+				    .baseArrayLayer = 0,                         // No nothin...
 				    .layerCount     = 1,
 				},
 			};

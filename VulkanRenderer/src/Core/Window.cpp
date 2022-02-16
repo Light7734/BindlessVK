@@ -48,8 +48,6 @@ bool Window::ShouldClose()
 VkSurfaceKHR Window::CreateSurface(VkInstance instance)
 {
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	ASSERT(m_GlfwWindowHandle, "Invalid glfw handle");
-	ASSERT(instance, "Invalid instance");
 	VKC(glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface));
 	ASSERT(surface, "Failed to create window surface");
 	return surface;

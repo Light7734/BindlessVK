@@ -43,13 +43,13 @@ private:
 	// Swapchain
 	VkSwapchainKHR m_Swapchain;
 
-	VkSurfaceFormatKHR m_SwapchainFormat;
-	VkPresentModeKHR m_SwapchainPresentMode;
+	VkSurfaceFormatKHR m_SurfaceFormat;
+	VkPresentModeKHR m_PresentMode;
 	VkExtent2D m_SwapchainExtent;
 
-	VkSurfaceCapabilitiesKHR m_SwapchainCapabilities;
-	std::vector<VkSurfaceFormatKHR> m_SupportedSwapchainFormats;
-	std::vector<VkPresentModeKHR> m_SupportedSwapchainPresentModes;
+	VkSurfaceCapabilitiesKHR m_SurfcaCapabilities;
+	std::vector<VkSurfaceFormatKHR> m_SupportedSurfaceFormats;
+	std::vector<VkPresentModeKHR> m_SupportedPresentModes;
 
 	// Swapcain images
 	std::vector<VkImage> m_Images;
