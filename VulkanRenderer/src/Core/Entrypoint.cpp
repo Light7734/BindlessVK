@@ -1,6 +1,7 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
+#include "Graphics/Shader.hpp"
 #include "Utils/Timer.hpp"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -9,14 +10,14 @@
 
 int main()
 {
-	int exitCode = 0;
-
-	// Initialize Logger (assumed to always succeed)
+	// Initialize Logger
 	Logger::Init();
 
-	// Try: Run the application
+
+	int exitCode = 0;
 	try
 	{
+		/////////////////////////////////////////////////////////////////////////////////
 		// Create window
 		WindowCreateInfo windowCreateInfo {
 			.specs = {
@@ -31,14 +32,13 @@ int main()
 			    { GLFW_VISIBLE, GLFW_FALSE },
 			},
 		};
-
 		Window window(windowCreateInfo);
 
-		// Set required device extensions
+		/////////////////////////////////////////////////////////////////////////////////
+		// Create device
 		auto deviceExtensions = window.GetRequiredExtensions();
 		deviceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-		// Create device
 		DeviceCreateInfo deviceCreateInfo {
 			.layers           = { "VK_LAYER_KHRONOS_validation" },
 			.extensions       = deviceExtensions,
@@ -49,10 +49,21 @@ int main()
 			.minMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
 			.messageTypes       = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 		};
-
 		Device device(deviceCreateInfo, window);
 
-		// Main loop...
+		/////////////////////////////////////////////////////////////////////////////////
+		// Create shader
+		ShaderCreateInfo shaderCreateInfo {
+			.logicalDevice     = device.GetLogicalDevice(),
+			.optimizationLevel = shaderc_optimization_level_performance,
+			.vertexPath        = "res/vertex.glsl",
+			.pixelPath         = "res/pixel.glsl",
+		};
+		Shader shader(shaderCreateInfo);
+
+
+		/////////////////////////////////////////////////////////////////////////////////
+		// Main loop
 		uint32_t frames = 0u;
 		Timer fpsTimer;
 		while (!window.ShouldClose())
@@ -65,8 +76,8 @@ int main()
 				frames = 0;
 				fpsTimer.Reset();
 			}
+			}
 		}
-	}
 
 	// Report unexpected termination
 	catch (FailedAsssertionException exception)

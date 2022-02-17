@@ -13,6 +13,7 @@ target_link_libraries(
     PRIVATE spdlog
     PRIVATE glfw
     PRIVATE volk
+    PRIVATE shaderc
 )
 
 set(CMAKE_BUILD_TYPE debug)

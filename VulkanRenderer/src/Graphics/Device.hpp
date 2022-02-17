@@ -23,6 +23,9 @@ public:
 	Device(DeviceCreateInfo& createInfo, Window& window);
 	~Device();
 
+
+	inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
+
 private:
 	// Instance
 	VkInstance m_Instance = VK_NULL_HANDLE;

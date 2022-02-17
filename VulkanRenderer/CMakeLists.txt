@@ -16,6 +16,7 @@ set(SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Shader.cpp
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Timer.cpp
@@ -27,5 +28,7 @@ target_include_directories(VulkanRenderer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_SOURCE_DIR}/Dependencies/glfw/include/
     ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include/
-    ${CMAKE_SOURCE_DIR}/Dependencies/volk/)
+    ${CMAKE_SOURCE_DIR}/Dependencies/volk/
+    ${CMAKE_SOURCE_DIR}/Dependencies/shaderc/libshaderc/include)
+
 target_precompile_headers(VulkanRenderer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp)
