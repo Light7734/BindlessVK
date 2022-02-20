@@ -19,6 +19,9 @@ public:
 	Shader(ShaderCreateInfo& createInfo);
 	~Shader();
 
+	inline uint32_t GetStageCount() const { return 2u; }; //TODO: Geometry shader
+	inline VkPipelineShaderStageCreateInfo* GetShaderStageCreateInfos() { return &m_PipelineShaderCreateInfos[0]; }
+
 private:
 	// Shader stages enum
 	enum class Stage : uint8_t

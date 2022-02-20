@@ -58,6 +58,8 @@ private:
 	std::vector<VkImage> m_Images;
 	std::vector<VkImageView> m_ImageViews;
 
+	VkRenderPass m_RenderPass;
+
 	// Layers & Extensions
 	std::vector<const char*> m_Layers;
 	std::vector<const char*> m_Extensions;

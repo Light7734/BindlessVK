@@ -1,6 +1,7 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
+#include "Graphics/Pipeline.hpp"
 #include "Graphics/Shader.hpp"
 #include "Utils/Timer.hpp"
 #define GLFW_INCLUDE_VULKAN
@@ -52,15 +53,14 @@ int main()
 		Device device(deviceCreateInfo, window);
 
 		/////////////////////////////////////////////////////////////////////////////////
-		// Create shader
-		ShaderCreateInfo shaderCreateInfo {
-			.logicalDevice     = device.GetLogicalDevice(),
-			.optimizationLevel = shaderc_optimization_level_performance,
-			.vertexPath        = "res/vertex.glsl",
-			.pixelPath         = "res/pixel.glsl",
+		// Create graphics pipeline
+		PipelineCreateInfo pipelineCreateInfo {
+			.logicalDevice    = device.GetLogicalDevice(),
+			.viewportExtent   = window.GetFramebufferSize(),
+			.vertexShaderPath = "res/vertex.glsl",
+			.pixelShaderPath  = "res/pixel.glsl",
 		};
-		Shader shader(shaderCreateInfo);
-
+		Pipeline pipeline(pipelineCreateInfo);
 
 		/////////////////////////////////////////////////////////////////////////////////
 		// Main loop
@@ -76,8 +76,8 @@ int main()
 				frames = 0;
 				fpsTimer.Reset();
 			}
-			}
 		}
+	}
 
 	// Report unexpected termination
 	catch (FailedAsssertionException exception)

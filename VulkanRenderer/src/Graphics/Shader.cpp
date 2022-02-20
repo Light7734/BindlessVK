@@ -5,7 +5,7 @@ Shader::Shader(ShaderCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
 {
 	/////////////////////////////////////////////////////////////////////////////////
-	// Vertex shader
+	// Compile vertex shader and create shader module create-info
 	auto vertexSpv = CompileGlslToSpv(createInfo.vertexPath, Stage::Vertex, createInfo.optimizationLevel);
 
 	VkShaderModuleCreateInfo vertexCreateInfo {
@@ -23,7 +23,7 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 	};
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Pixel shader
+	// Compile pixel shader and create shader module create-info
 	auto pixelSpv = CompileGlslToSpv(createInfo.pixelPath, Stage::Pixel, createInfo.optimizationLevel);
 
 	VkShaderModuleCreateInfo pixelCreateInfo {

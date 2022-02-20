@@ -1,4 +1,3 @@
-
 #include "Graphics/Device.hpp"
 
 #include "Core/Window.hpp"
@@ -364,6 +363,44 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		}
 	}
 
+	/////////////////////////////////////////////////////////////////////////////////
+	// Specify the attachments and subpasses and create the renderpass
+	{
+		// Attachments
+		VkAttachmentDescription colorAttachmentDesc {
+			.format         = m_SurfaceFormat.format,
+			.samples        = VK_SAMPLE_COUNT_1_BIT,
+			.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+			.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+			.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+			.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		};
+
+		// Subpasses
+		VkAttachmentReference colorAttachmentRef {
+			.attachment = 0u,
+			.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+
+		VkSubpassDescription subpassDesc {
+			.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS,
+			.colorAttachmentCount = 1u,
+			.pColorAttachments    = &colorAttachmentRef,
+		};
+
+		// Renderpass
+		VkRenderPassCreateInfo renderPassCreateInfo {
+			.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+			.attachmentCount = 1u,
+			.pAttachments    = &colorAttachmentDesc,
+			.subpassCount    = 1u,
+			.pSubpasses      = &subpassDesc,
+		};
+
+		VKC(vkCreateRenderPass(m_LogicalDevice, &renderPassCreateInfo, nullptr, &m_RenderPass));
+	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Log debug information about the selected physical device, layers, extensions, etc.
