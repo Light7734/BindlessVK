@@ -403,6 +403,26 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create the framebuffers
+	{
+		m_Framebuffers.resize(m_Images.size());
+		for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
+		{
+			VkFramebufferCreateInfo framebufferCreateInfo {
+				.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+				.renderPass      = m_RenderPass,
+				.attachmentCount = 1u,
+				.pAttachments    = &m_ImageViews[i],
+				.width           = m_SwapchainExtent.width,
+				.height          = m_SwapchainExtent.height,
+				.layers          = 1u,
+			};
+
+			VKC(vkCreateFramebuffer(m_LogicalDevice, &framebufferCreateInfo, nullptr, &m_Framebuffers[i]));
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Log debug information about the selected physical device, layers, extensions, etc.
 	{
 		LOG(info, "Device created:");
@@ -435,9 +455,10 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 Device::~Device()
 {
-	for (auto imageView : m_ImageViews)
+	for (uint32_t i = 0; i < m_Images.size(); i++)
 	{
-		vkDestroyImageView(m_LogicalDevice, imageView, nullptr);
+		vkDestroyImageView(m_LogicalDevice, m_ImageViews[i], nullptr);
+		vkDestroyFramebuffer(m_LogicalDevice, m_Framebuffers[i], nullptr);
 	}
 
 	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);

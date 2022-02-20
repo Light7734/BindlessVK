@@ -54,10 +54,13 @@ private:
 	std::vector<VkSurfaceFormatKHR> m_SupportedSurfaceFormats;
 	std::vector<VkPresentModeKHR> m_SupportedPresentModes;
 
-	// Swapcain images
+	// Swapcain images & framebuffers
 	std::vector<VkImage> m_Images;
 	std::vector<VkImageView> m_ImageViews;
 
+	std::vector<VkFramebuffer> m_Framebuffers;
+
+	// RenderPass
 	VkRenderPass m_RenderPass;
 
 	// Layers & Extensions
