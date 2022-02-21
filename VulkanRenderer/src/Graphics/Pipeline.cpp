@@ -153,6 +153,69 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 
 		VKC(vkCreateGraphicsPipelines(m_LogicalDevice, nullptr, 1u, &graphicsPipelineCreateInfo, nullptr, &m_Pipeline));
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create command buffers...
+	{
+		m_CommandBuffers.resize(createInfo.imageCount);
+
+		VkCommandBufferAllocateInfo commandBufferAllocInfo {
+			.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool        = createInfo.commandPool,
+			.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size()),
+		};
+
+		VKC(vkAllocateCommandBuffers(m_LogicalDevice, &commandBufferAllocInfo, m_CommandBuffers.data()));
+	}
+}
+
+VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
+{
+	uint32_t index = startInfo.imageIndex; // alias
+
+	// Begin command buffer
+	VkCommandBufferBeginInfo commandBufferBeginInfo {
+		.sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags            = 0x0,
+		.pInheritanceInfo = nullptr
+	};
+
+	VKC(vkBeginCommandBuffer(m_CommandBuffers[index], &commandBufferBeginInfo));
+
+	// Begin renderpass
+	VkClearValue clearValue { { {
+		0.0f,
+		0.0f,
+		0.0f,
+		1.0f,
+	} } };
+
+	VkRenderPassBeginInfo renderpassBeginInfo {
+		.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+		.renderPass  = startInfo.renderPass,
+		.framebuffer = startInfo.framebuffer,
+		.renderArea {
+		    .offset = { 0, 0 },
+		    .extent = startInfo.extent,
+		},
+		.clearValueCount = 1u,
+		.pClearValues    = &clearValue,
+	};
+
+	vkCmdBeginRenderPass(m_CommandBuffers[index], &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+	// Bind pipeline
+	vkCmdBindPipeline(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+
+	// Draw
+	vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);
+
+	// End...
+	vkCmdEndRenderPass(m_CommandBuffers[index]);
+	VKC(vkEndCommandBuffer(m_CommandBuffers[index]));
+
+	return m_CommandBuffers[index];
 }
 
 Pipeline::~Pipeline()

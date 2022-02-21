@@ -9,7 +9,7 @@ class Window;
 struct DeviceCreateInfo
 {
 	std::vector<const char*> layers;
-	std::vector<const char*> extensions;
+	std::vector<const char*> instanceExtensions;
 	std::vector<const char*> deviceExtensions;
 
 	bool enableDebugging;
@@ -23,12 +23,15 @@ public:
 	Device(DeviceCreateInfo& createInfo, Window& window);
 	~Device();
 
-
 	inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
 
 private:
 	// Instance
 	VkInstance m_Instance = VK_NULL_HANDLE;
+
+	// Layers & Extensions
+	std::vector<const char*> m_Layers;
+	std::vector<const char*> m_Extensions;
 
 	// Device
 	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
@@ -43,7 +46,7 @@ private:
 	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
 	uint32_t m_PresentQueueIndex  = UINT32_MAX;
 
-	// Swapchain
+    // Swapchain
 	VkSwapchainKHR m_Swapchain;
 
 	VkSurfaceFormatKHR m_SurfaceFormat;
@@ -63,7 +66,7 @@ private:
 	// RenderPass
 	VkRenderPass m_RenderPass;
 
-	// Layers & Extensions
-	std::vector<const char*> m_Layers;
-	std::vector<const char*> m_Extensions;
+	// Commands
+	VkCommandPool m_CommandPool;
+	std::vector<VkCommandBuffer> m_CommandBuffers;
 };

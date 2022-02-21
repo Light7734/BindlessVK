@@ -9,9 +9,19 @@ struct PipelineCreateInfo
 {
 	VkDevice logicalDevice;
 	VkExtent2D viewportExtent;
+	VkCommandPool commandPool;
+	uint32_t imageCount;
 
 	const std::string vertexShaderPath;
 	const std::string pixelShaderPath;
+};
+
+struct CommandBufferStartInfo
+{
+	VkRenderPass renderPass;
+	VkFramebuffer framebuffer;
+	VkExtent2D extent;
+	uint32_t imageIndex;
 };
 
 class Pipeline
@@ -19,6 +29,8 @@ class Pipeline
 public:
 	Pipeline(PipelineCreateInfo& createInfo);
 	~Pipeline();
+
+	VkCommandBuffer RecordCommandBuffer(CommandBufferStartInfo& startInfo);
 
 private:
 	VkDevice m_LogicalDevice;
@@ -28,4 +40,5 @@ private:
 	VkRenderPass m_RenderPass;
 
 	std::unique_ptr<Shader> m_Shader;
+	std::vector<VkCommandBuffer> m_CommandBuffers;
 };

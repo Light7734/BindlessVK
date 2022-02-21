@@ -16,6 +16,7 @@ set(SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Shader.cpp
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp

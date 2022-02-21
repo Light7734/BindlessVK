@@ -5,7 +5,7 @@
 #include <vulkan/vulkan_core.h>
 
 Device::Device(DeviceCreateInfo& createInfo, Window& window)
-    : m_Layers(createInfo.layers), m_Extensions(createInfo.extensions)
+    : m_Layers(createInfo.layers), m_Extensions(createInfo.instanceExtensions)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Initialize volk
@@ -403,7 +403,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create the framebuffers
+	// Create the framebuffers and command pool
 	{
 		m_Framebuffers.resize(m_Images.size());
 		for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
@@ -420,7 +420,19 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 			VKC(vkCreateFramebuffer(m_LogicalDevice, &framebufferCreateInfo, nullptr, &m_Framebuffers[i]));
 		}
+
+		VkCommandPoolCreateInfo commandPoolCreateInfo {
+			.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.queueFamilyIndex = m_GraphicsQueueIndex,
+		};
+
+		VKC(vkCreateCommandPool(m_LogicalDevice, &commandPoolCreateInfo, nullptr, &m_CommandPool));
 	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create the command pool
+	{}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Log debug information about the selected physical device, layers, extensions, etc.
@@ -455,6 +467,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 Device::~Device()
 {
+	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
 	for (uint32_t i = 0; i < m_Images.size(); i++)
 	{
 		vkDestroyImageView(m_LogicalDevice, m_ImageViews[i], nullptr);
