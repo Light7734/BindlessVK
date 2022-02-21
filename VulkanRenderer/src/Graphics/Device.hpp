@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Base.hpp"
+#include "Graphics/Pipeline.hpp"
 
 #include <volk.h>
 
@@ -23,7 +24,11 @@ public:
 	Device(DeviceCreateInfo& createInfo, Window& window);
 	~Device();
 
+	void DrawFrame();
+
 	inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
+	inline VkCommandPool GetCommandPool() const { return m_CommandPool; }
+	inline uint32_t GetImageCount() const { return m_Images.size(); }
 
 private:
 	// Instance
@@ -38,6 +43,10 @@ private:
 	VkPhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 
 	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
+
+	// Queue
+	VkQueue m_GraphicsQueue;
+	VkQueue m_PresentQueue;
 
 	// Surface
 	VkSurfaceKHR m_Surface;
@@ -69,4 +78,11 @@ private:
 	// Commands
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
+
+	// Sync
+	VkSemaphore m_AquireImageSemaphore;
+	VkSemaphore m_RenderSemaphore;
+
+	// Pipelines
+	std::unique_ptr<Pipeline> m_TrianglePipeline;
 };

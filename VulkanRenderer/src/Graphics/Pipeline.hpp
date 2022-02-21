@@ -11,6 +11,7 @@ struct PipelineCreateInfo
 	VkExtent2D viewportExtent;
 	VkCommandPool commandPool;
 	uint32_t imageCount;
+	VkRenderPass renderPass;
 
 	const std::string vertexShaderPath;
 	const std::string pixelShaderPath;

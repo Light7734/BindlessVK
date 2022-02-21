@@ -1,7 +1,7 @@
 #include "Graphics/Pipeline.hpp"
 
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice)
+    : m_LogicalDevice(createInfo.logicalDevice), m_RenderPass(createInfo.renderPass)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create shader modules
@@ -170,6 +170,13 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	}
 }
 
+Pipeline::~Pipeline()
+{
+	vkDestroyPipeline(m_LogicalDevice, m_Pipeline, nullptr);
+	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
+	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
+}
+
 VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 {
 	uint32_t index = startInfo.imageIndex; // alias
@@ -193,7 +200,7 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 
 	VkRenderPassBeginInfo renderpassBeginInfo {
 		.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-		.renderPass  = startInfo.renderPass,
+		.renderPass  = m_RenderPass,
 		.framebuffer = startInfo.framebuffer,
 		.renderArea {
 		    .offset = { 0, 0 },
@@ -216,11 +223,4 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 	VKC(vkEndCommandBuffer(m_CommandBuffers[index]));
 
 	return m_CommandBuffers[index];
-}
-
-Pipeline::~Pipeline()
-{
-	vkDestroyPipeline(m_LogicalDevice, m_Pipeline, nullptr);
-	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
-	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
 }

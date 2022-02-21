@@ -263,6 +263,12 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		};
 
 		VKC(vkCreateDevice(m_PhysicalDevice, &logicalDeviceCreateInfo, nullptr, &m_LogicalDevice));
+
+		vkGetDeviceQueue(m_LogicalDevice, m_GraphicsQueueIndex, 0u, &m_GraphicsQueue);
+		vkGetDeviceQueue(m_LogicalDevice, m_PresentQueueIndex, 0u, &m_PresentQueue);
+
+		ASSERT(m_GraphicsQueue, "Failed to fetch graphics queue");
+		ASSERT(m_PresentQueue, "Failed to fetch present queue");
 	}
 
 
@@ -378,6 +384,15 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 		};
 
+		VkSubpassDependency subpassDependency {
+			.srcSubpass    = VK_SUBPASS_EXTERNAL,
+			.dstSubpass    = 0u,
+			.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = 0u,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		};
+
 		// Subpasses
 		VkAttachmentReference colorAttachmentRef {
 			.attachment = 0u,
@@ -397,13 +412,15 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.pAttachments    = &colorAttachmentDesc,
 			.subpassCount    = 1u,
 			.pSubpasses      = &subpassDesc,
+			.dependencyCount = 1u,
+			.pDependencies   = &subpassDependency,
 		};
 
 		VKC(vkCreateRenderPass(m_LogicalDevice, &renderPassCreateInfo, nullptr, &m_RenderPass));
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create the framebuffers and command pool
+	// Create the framebuffers
 	{
 		m_Framebuffers.resize(m_Images.size());
 		for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
@@ -420,7 +437,12 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 			VKC(vkCreateFramebuffer(m_LogicalDevice, &framebufferCreateInfo, nullptr, &m_Framebuffers[i]));
 		}
+	}
 
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create the command pool
+	{
 		VkCommandPoolCreateInfo commandPoolCreateInfo {
 			.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 			.queueFamilyIndex = m_GraphicsQueueIndex,
@@ -431,8 +453,30 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create the command pool
-	{}
+	// Create sync objects
+	{
+		VkSemaphoreCreateInfo semaphoreCreateInfo {
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+		};
+
+		VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_AquireImageSemaphore));
+		VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderSemaphore));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create pipelines
+	{
+		PipelineCreateInfo pipelineCreateInfo {
+			.logicalDevice    = m_LogicalDevice,
+			.viewportExtent   = m_SwapchainExtent,
+			.commandPool      = m_CommandPool,
+			.imageCount       = static_cast<uint32_t>(m_Images.size()),
+			.renderPass       = m_RenderPass,
+			.vertexShaderPath = "VulkanRenderer/res/vertex.glsl",
+			.pixelShaderPath  = "VulkanRenderer/res/pixel.glsl",
+		};
+		m_TrianglePipeline = std::make_unique<Pipeline>(pipelineCreateInfo);
+	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Log debug information about the selected physical device, layers, extensions, etc.
@@ -467,6 +511,9 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 Device::~Device()
 {
+	vkDestroySemaphore(m_LogicalDevice, m_AquireImageSemaphore, nullptr);
+	vkDestroySemaphore(m_LogicalDevice, m_RenderSemaphore, nullptr);
+
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
 	for (uint32_t i = 0; i < m_Images.size(); i++)
 	{
@@ -477,5 +524,45 @@ Device::~Device()
 	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
 	vkDestroyInstance(m_Instance, nullptr);
 	vkDestroyDevice(m_LogicalDevice, nullptr);
-
 }
+
+void Device::DrawFrame()
+{
+	uint32_t index; // image index
+	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphore, VK_NULL_HANDLE, &index));
+
+	CommandBufferStartInfo commandBufferStartInfo {
+		.framebuffer = m_Framebuffers[index],
+		.extent      = m_SwapchainExtent,
+		.imageIndex  = index,
+	};
+
+	VkCommandBuffer firstTriangleCommandBuffer = m_TrianglePipeline->RecordCommandBuffer(commandBufferStartInfo);
+
+	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkSubmitInfo submitInfo {
+		.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount   = 1u,
+		.pWaitSemaphores      = &m_AquireImageSemaphore,
+		.pWaitDstStageMask    = &waitStage,
+		.commandBufferCount   = 1u,
+		.pCommandBuffers      = &firstTriangleCommandBuffer,
+		.signalSemaphoreCount = 1u,
+		.pSignalSemaphores    = &m_RenderSemaphore,
+	};
+
+	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, VK_NULL_HANDLE));
+
+	VkPresentInfoKHR presentInfo {
+		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1u,
+		.pWaitSemaphores    = &m_RenderSemaphore,
+		.swapchainCount     = 1u,
+		.pSwapchains        = &m_Swapchain,
+		.pImageIndices      = &index,
+		.pResults           = nullptr
+	};
+
+	vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+}
+

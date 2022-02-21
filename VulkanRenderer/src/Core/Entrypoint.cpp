@@ -30,7 +30,6 @@ int main()
 			    { GLFW_CLIENT_API, GLFW_NO_API },
 			    { GLFW_RESIZABLE, GLFW_FALSE },
 			    { GLFW_FLOATING, GLFW_TRUE },
-			    { GLFW_VISIBLE, GLFW_FALSE },
 			},
 		};
 		Window window(windowCreateInfo);
@@ -53,22 +52,13 @@ int main()
 		Device device(deviceCreateInfo, window);
 
 		/////////////////////////////////////////////////////////////////////////////////
-		// Create graphics pipeline
-		PipelineCreateInfo pipelineCreateInfo {
-			.logicalDevice    = device.GetLogicalDevice(),
-			.viewportExtent   = window.GetFramebufferSize(),
-			.vertexShaderPath = "res/vertex.glsl",
-			.pixelShaderPath  = "res/pixel.glsl",
-		};
-		Pipeline pipeline(pipelineCreateInfo);
-
-		/////////////////////////////////////////////////////////////////////////////////
 		// Main loop
 		uint32_t frames = 0u;
 		Timer fpsTimer;
 		while (!window.ShouldClose())
 		{
 			frames++;
+			device.DrawFrame();
 
 			if (fpsTimer.ElapsedTime() >= 1.0f)
 			{

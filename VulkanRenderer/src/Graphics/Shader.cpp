@@ -1,4 +1,6 @@
 #include "Graphics/Shader.hpp"
+
+#include <filesystem>
 #include <fstream>
 
 Shader::Shader(ShaderCreateInfo& createInfo)
@@ -16,7 +18,7 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 	VKC(vkCreateShaderModule(m_LogicalDevice, &vertexCreateInfo, nullptr, &m_VertexShaderModule));
 
 	m_PipelineShaderCreateInfos[0] = {
-		.sType  = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 		.stage  = VK_SHADER_STAGE_VERTEX_BIT,
 		.module = m_VertexShaderModule,
 		.pName  = "main",
@@ -34,7 +36,7 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 	VKC(vkCreateShaderModule(m_LogicalDevice, &pixelCreateInfo, nullptr, &m_PixelShaderModule));
 
 	m_PipelineShaderCreateInfos[1] = {
-		.sType  = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
 		.stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
 		.module = m_PixelShaderModule,
 		.pName  = "main",
@@ -58,6 +60,7 @@ shaderc::SpvCompilationResult Shader::CompileGlslToSpv(const std::string& path, 
 	std::ifstream file(path, std::ios::ate | std::ios::binary | std::ios::in);
 	std::string sourceText = "";
 	std::string fileName   = path.substr(path.find_last_of("/") + 1);
+	LOG(warn, "Working dir: {}", std::filesystem::current_path().c_str());
 	if (file)
 	{
 		sourceText.resize(static_cast<size_t>(file.tellg()));
