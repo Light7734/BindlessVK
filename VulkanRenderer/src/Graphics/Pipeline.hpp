@@ -19,7 +19,6 @@ struct PipelineCreateInfo
 
 struct CommandBufferStartInfo
 {
-	VkRenderPass renderPass;
 	VkFramebuffer framebuffer;
 	VkExtent2D extent;
 	uint32_t imageIndex;

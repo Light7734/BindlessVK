@@ -445,6 +445,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	{
 		VkCommandPoolCreateInfo commandPoolCreateInfo {
 			.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			.queueFamilyIndex = m_GraphicsQueueIndex,
 		};
 
@@ -455,12 +456,26 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create sync objects
 	{
-		VkSemaphoreCreateInfo semaphoreCreateInfo {
-			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
-		};
+		m_AquireImageSemaphores.resize(m_MaxFramesInFlight);
+		m_RenderSemaphores.resize(m_MaxFramesInFlight);
+		m_FrameFences.resize(m_MaxFramesInFlight);
+		m_ImageFences.resize(m_Images.size(), VK_NULL_HANDLE);
 
-		VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_AquireImageSemaphore));
-		VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderSemaphore));
+		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+		{
+			VkSemaphoreCreateInfo semaphoreCreateInfo {
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+			};
+
+			VkFenceCreateInfo fenceCreateInfo {
+				.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+				.flags = VK_FENCE_CREATE_SIGNALED_BIT,
+			};
+
+			VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_AquireImageSemaphores[i]));
+			VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderSemaphores[i]));
+			VKC(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_FrameFences[i]));
+		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -511,8 +526,14 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 Device::~Device()
 {
-	vkDestroySemaphore(m_LogicalDevice, m_AquireImageSemaphore, nullptr);
-	vkDestroySemaphore(m_LogicalDevice, m_RenderSemaphore, nullptr);
+	vkDeviceWaitIdle(m_LogicalDevice);
+
+	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+	{
+		vkDestroySemaphore(m_LogicalDevice, m_AquireImageSemaphores[i], nullptr);
+		vkDestroySemaphore(m_LogicalDevice, m_RenderSemaphores[i], nullptr);
+		vkDestroyFence(m_LogicalDevice, m_FrameFences[i], nullptr);
+	}
 
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
 	for (uint32_t i = 0; i < m_Images.size(); i++)
@@ -528,8 +549,17 @@ Device::~Device()
 
 void Device::DrawFrame()
 {
+	// If the frame we're trying to draw to is currently in flight, then wait for it
+	VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+
 	uint32_t index; // image index
-	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphore, VK_NULL_HANDLE, &index));
+	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &index));
+
+	if (m_ImageFences[index] != VK_NULL_HANDLE)
+	{
+		VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_ImageFences[index], VK_TRUE, UINT64_MAX));
+	}
+	m_ImageFences[index] = m_FrameFences[m_CurrentFrame];
 
 	CommandBufferStartInfo commandBufferStartInfo {
 		.framebuffer = m_Framebuffers[index],
@@ -543,20 +573,21 @@ void Device::DrawFrame()
 	VkSubmitInfo submitInfo {
 		.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 		.waitSemaphoreCount   = 1u,
-		.pWaitSemaphores      = &m_AquireImageSemaphore,
+		.pWaitSemaphores      = &m_AquireImageSemaphores[m_CurrentFrame],
 		.pWaitDstStageMask    = &waitStage,
 		.commandBufferCount   = 1u,
 		.pCommandBuffers      = &firstTriangleCommandBuffer,
 		.signalSemaphoreCount = 1u,
-		.pSignalSemaphores    = &m_RenderSemaphore,
+		.pSignalSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
 	};
 
-	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, VK_NULL_HANDLE));
+	VKC(vkResetFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame]));
+	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_FrameFences[m_CurrentFrame]));
 
 	VkPresentInfoKHR presentInfo {
 		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.waitSemaphoreCount = 1u,
-		.pWaitSemaphores    = &m_RenderSemaphore,
+		.pWaitSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
 		.swapchainCount     = 1u,
 		.pSwapchains        = &m_Swapchain,
 		.pImageIndices      = &index,
@@ -564,5 +595,6 @@ void Device::DrawFrame()
 	};
 
 	vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+	m_CurrentFrame = (m_CurrentFrame + 1u) % m_MaxFramesInFlight;
 }
 

@@ -80,8 +80,12 @@ private:
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
 	// Sync
-	VkSemaphore m_AquireImageSemaphore;
-	VkSemaphore m_RenderSemaphore;
+	std::vector<VkSemaphore> m_AquireImageSemaphores;
+	std::vector<VkSemaphore> m_RenderSemaphores;
+	std::vector<VkFence> m_FrameFences;
+	std::vector<VkFence> m_ImageFences;
+	const uint32_t m_MaxFramesInFlight = 2u;
+	uint32_t m_CurrentFrame            = 0u;
 
 	// Pipelines
 	std::unique_ptr<Pipeline> m_TrianglePipeline;
