@@ -179,7 +179,8 @@ Pipeline::~Pipeline()
 
 VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 {
-	uint32_t index = startInfo.imageIndex; // alias
+	uint32_t index = startInfo.frameIndex; // alias
+	VKC(vkResetCommandBuffer(m_CommandBuffers[index], 0));
 
 	// Begin command buffer
 	VkCommandBufferBeginInfo commandBufferBeginInfo {

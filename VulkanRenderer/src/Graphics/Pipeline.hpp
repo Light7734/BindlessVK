@@ -21,7 +21,7 @@ struct CommandBufferStartInfo
 {
 	VkFramebuffer framebuffer;
 	VkExtent2D extent;
-	uint32_t imageIndex;
+	uint32_t frameIndex;
 };
 
 class Pipeline

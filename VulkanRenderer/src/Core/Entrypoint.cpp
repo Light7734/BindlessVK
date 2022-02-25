@@ -40,14 +40,14 @@ int main()
 		deviceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 		DeviceCreateInfo deviceCreateInfo {
-			.layers             = { "VK_LAYER_KHRONOS_validation" },
-			.instanceExtensions = deviceExtensions,
-			.deviceExtensions   = {
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-            },
-			.enableDebugging    = true,
-			.minMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
-			.messageTypes       = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.layers                  = { "VK_LAYER_KHRONOS_validation" },
+			.instanceExtensions      = deviceExtensions,
+			.logicalDeviceExtensions = {
+			    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			},
+			.enableDebugging      = true,
+			.debugMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+			.debugMessageTypes    = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 		};
 		Device device(deviceCreateInfo, window);
 

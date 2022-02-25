@@ -11,11 +11,11 @@ struct DeviceCreateInfo
 {
 	std::vector<const char*> layers;
 	std::vector<const char*> instanceExtensions;
-	std::vector<const char*> deviceExtensions;
+	std::vector<const char*> logicalDeviceExtensions;
 
 	bool enableDebugging;
-	VkDebugUtilsMessageSeverityFlagBitsEXT minMessageSeverity;
-	VkDebugUtilsMessageTypeFlagsEXT messageTypes;
+	VkDebugUtilsMessageSeverityFlagBitsEXT debugMessageSeverity;
+	VkDebugUtilsMessageTypeFlagsEXT debugMessageTypes;
 };
 
 class Device
@@ -79,7 +79,7 @@ private:
 	VkCommandPool m_CommandPool;
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 
-	// Sync
+	//Synchronization
 	std::vector<VkSemaphore> m_AquireImageSemaphores;
 	std::vector<VkSemaphore> m_RenderSemaphores;
 	std::vector<VkFence> m_FrameFences;

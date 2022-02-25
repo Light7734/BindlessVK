@@ -41,7 +41,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create vulkan instance, window surface, debug messenger, and load the instace with the volk.
+	// Create vulkan instance, window surface, debug messenger, and load the instace with volk.
 	{
 		VkApplicationInfo applicationInfo {
 			.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -54,10 +54,12 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 		VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
 			.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-			.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT, // #TODO: Config
-			.messageType     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.messageSeverity = createInfo.debugMessageSeverity,
+			.messageType     = createInfo.debugMessageTypes,
 			.pUserData       = nullptr,
 		};
+
+		// Setup validation layer message callback
 		debugMessengerCreateInfo.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 		                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 		                                              const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
@@ -66,9 +68,20 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			return static_cast<VkBool32>(VK_FALSE);
 		};
 
-		VkInstanceCreateInfo createInfo {
+		// If debugging is not enabled, remove validation layer from instance layers
+		if (!createInfo.enableDebugging)
+		{
+			auto validationLayerIt = std::find(createInfo.layers.begin(), createInfo.layers.end(), "VK_LAYER_KHRONOS_validation");
+			if (validationLayerIt != createInfo.layers.end())
+			{
+				createInfo.layers.erase(validationLayerIt);
+			}
+		}
+
+		// Create the vulkan instance
+		VkInstanceCreateInfo instanceCreateInfo {
 			.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-			.pNext                   = &debugMessengerCreateInfo,
+			.pNext                   = createInfo.enableDebugging ? &debugMessengerCreateInfo : nullptr,
 			.pApplicationInfo        = &applicationInfo,
 			.enabledLayerCount       = static_cast<uint32_t>(m_Layers.size()),
 			.ppEnabledLayerNames     = m_Layers.data(),
@@ -76,11 +89,10 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.ppEnabledExtensionNames = m_Extensions.data(),
 		};
 
-		VKC(vkCreateInstance(&createInfo, nullptr, &m_Instance));
+		VKC(vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance));
 		volkLoadInstance(m_Instance);
 		m_Surface = window.CreateSurface(m_Instance);
 	}
-
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Iterate through physical devices that supports vulkan, and pick the most suitable one
@@ -165,7 +177,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 				vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionsCount, deviceExtensionsProperties.data());
 
 				bool failed = false;
-				for (const auto& requiredExtensionName : createInfo.deviceExtensions)
+				for (const auto& requiredExtensionName : createInfo.logicalDeviceExtensions)
 				{
 					bool found = false;
 					for (const auto& extension : deviceExtensionsProperties)
@@ -213,7 +225,6 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 				vkGetPhysicalDeviceSurfacePresentModesKHR(device, m_Surface, &presentModeCount, m_SupportedPresentModes.data());
 			}
 
-
 			if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 				score += 69420; // nice
 
@@ -257,8 +268,8 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
 			.queueCreateInfoCount    = static_cast<uint32_t>(queuesCreateInfo.size()),
 			.pQueueCreateInfos       = queuesCreateInfo.data(),
-			.enabledExtensionCount   = static_cast<uint32_t>(createInfo.deviceExtensions.size()),
-			.ppEnabledExtensionNames = createInfo.deviceExtensions.data(),
+			.enabledExtensionCount   = static_cast<uint32_t>(createInfo.logicalDeviceExtensions.size()),
+			.ppEnabledExtensionNames = createInfo.logicalDeviceExtensions.data(),
 			.pEnabledFeatures        = &physicalDeviceFeatures,
 		};
 
@@ -372,7 +383,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Specify the attachments and subpasses and create the renderpass
 	{
-		// Attachments
+		// Attachment
 		VkAttachmentDescription colorAttachmentDesc {
 			.format         = m_SurfaceFormat.format,
 			.samples        = VK_SAMPLE_COUNT_1_BIT,
@@ -384,16 +395,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 		};
 
-		VkSubpassDependency subpassDependency {
-			.srcSubpass    = VK_SUBPASS_EXTERNAL,
-			.dstSubpass    = 0u,
-			.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			.srcAccessMask = 0u,
-			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-		};
-
-		// Subpasses
+		// Subpass
 		VkAttachmentReference colorAttachmentRef {
 			.attachment = 0u,
 			.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -403,6 +405,16 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 			.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount = 1u,
 			.pColorAttachments    = &colorAttachmentRef,
+		};
+
+		// Subpass dependency
+		VkSubpassDependency subpassDependency {
+			.srcSubpass    = VK_SUBPASS_EXTERNAL,
+			.dstSubpass    = 0u,
+			.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			.srcAccessMask = 0u,
+			.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 		};
 
 		// Renderpass
@@ -549,26 +561,22 @@ Device::~Device()
 
 void Device::DrawFrame()
 {
-	// If the frame we're trying to draw to is currently in flight, then wait for it
+	// Wait for fences
 	VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+	VKC(vkResetFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame]));
 
-	uint32_t index; // image index
-	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &index));
+	uint32_t imageIndex; // image index
+	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex));
 
-	if (m_ImageFences[index] != VK_NULL_HANDLE)
-	{
-		VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_ImageFences[index], VK_TRUE, UINT64_MAX));
-	}
-	m_ImageFences[index] = m_FrameFences[m_CurrentFrame];
-
+	// Record commands
 	CommandBufferStartInfo commandBufferStartInfo {
-		.framebuffer = m_Framebuffers[index],
+		.framebuffer = m_Framebuffers[imageIndex],
 		.extent      = m_SwapchainExtent,
-		.imageIndex  = index,
+		.frameIndex  = m_CurrentFrame,
 	};
-
 	VkCommandBuffer firstTriangleCommandBuffer = m_TrianglePipeline->RecordCommandBuffer(commandBufferStartInfo);
 
+	// Submit commands
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo submitInfo {
 		.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -581,20 +589,22 @@ void Device::DrawFrame()
 		.pSignalSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
 	};
 
-	VKC(vkResetFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame]));
 	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_FrameFences[m_CurrentFrame]));
 
+	// Present
 	VkPresentInfoKHR presentInfo {
 		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
 		.waitSemaphoreCount = 1u,
 		.pWaitSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
 		.swapchainCount     = 1u,
 		.pSwapchains        = &m_Swapchain,
-		.pImageIndices      = &index,
+		.pImageIndices      = &imageIndex,
 		.pResults           = nullptr
 	};
 
 	vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+
+	// Increment frame index
 	m_CurrentFrame = (m_CurrentFrame + 1u) % m_MaxFramesInFlight;
 }
 
