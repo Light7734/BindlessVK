@@ -4,6 +4,21 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice), m_RenderPass(createInfo.renderPass)
 {
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create command buffers...
+	{
+		m_CommandBuffers.resize(createInfo.imageCount);
+
+		VkCommandBufferAllocateInfo commandBufferAllocInfo {
+			.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+			.commandPool        = createInfo.commandPool,
+			.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+			.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size()),
+		};
+
+		VKC(vkAllocateCommandBuffers(m_LogicalDevice, &commandBufferAllocInfo, m_CommandBuffers.data()));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Create shader modules
 	{
 		ShaderCreateInfo shaderCreateInfo {
@@ -15,7 +30,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 
 		m_Shader = std::make_unique<Shader>(shaderCreateInfo);
 	}
-
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the pipeline layout
@@ -119,18 +133,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.blendConstants  = { 0.0f, 0.0f, 0.0f, 0.0f },
 		};
 
-		// Dynamic states
-		VkDynamicState dynamicStates[] = {
-			VK_DYNAMIC_STATE_VIEWPORT,
-			VK_DYNAMIC_STATE_LINE_WIDTH,
-		};
-
-		VkPipelineDynamicStateCreateInfo dynamicState {
-			.sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-			.dynamicStateCount = 2u,
-			.pDynamicStates    = dynamicStates,
-		};
-
 		// Create the graphics pipeline
 		VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
 			.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -152,21 +154,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		VKC(vkCreateGraphicsPipelines(m_LogicalDevice, nullptr, 1u, &graphicsPipelineCreateInfo, nullptr, &m_Pipeline));
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create command buffers...
-	{
-		m_CommandBuffers.resize(createInfo.imageCount);
-
-		VkCommandBufferAllocateInfo commandBufferAllocInfo {
-			.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.commandPool        = createInfo.commandPool,
-			.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			.commandBufferCount = static_cast<uint32_t>(m_CommandBuffers.size()),
-		};
-
-		VKC(vkAllocateCommandBuffers(m_LogicalDevice, &commandBufferAllocInfo, m_CommandBuffers.data()));
 	}
 }
 
