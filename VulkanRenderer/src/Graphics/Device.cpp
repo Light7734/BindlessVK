@@ -471,7 +471,6 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		m_AquireImageSemaphores.resize(m_MaxFramesInFlight);
 		m_RenderSemaphores.resize(m_MaxFramesInFlight);
 		m_FrameFences.resize(m_MaxFramesInFlight);
-		m_ImageFences.resize(m_Images.size(), VK_NULL_HANDLE);
 
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
 		{

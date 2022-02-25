@@ -83,7 +83,6 @@ private:
 	std::vector<VkSemaphore> m_AquireImageSemaphores;
 	std::vector<VkSemaphore> m_RenderSemaphores;
 	std::vector<VkFence> m_FrameFences;
-	std::vector<VkFence> m_ImageFences;
 	const uint32_t m_MaxFramesInFlight = 2u;
 	uint32_t m_CurrentFrame            = 0u;
 
