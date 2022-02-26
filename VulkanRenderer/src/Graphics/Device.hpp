@@ -9,6 +9,7 @@ class Window;
 
 struct DeviceCreateInfo
 {
+	Window* window;
 	std::vector<const char*> layers;
 	std::vector<const char*> instanceExtensions;
 	std::vector<const char*> logicalDeviceExtensions;
@@ -21,7 +22,7 @@ struct DeviceCreateInfo
 class Device
 {
 public:
-	Device(DeviceCreateInfo& createInfo, Window& window);
+	Device(DeviceCreateInfo& createInfo);
 	~Device();
 
 	void DrawFrame();
@@ -31,6 +32,13 @@ public:
 	inline uint32_t GetImageCount() const { return m_Images.size(); }
 
 private:
+	void CreateSwapchain();
+	void DestroySwapchain();
+
+private:
+	// Window
+	Window* m_Window;
+
 	// Instance
 	VkInstance m_Instance = VK_NULL_HANDLE;
 

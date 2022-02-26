@@ -161,7 +161,6 @@ Pipeline::~Pipeline()
 {
 	vkDestroyPipeline(m_LogicalDevice, m_Pipeline, nullptr);
 	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
-	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
 }
 
 VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)

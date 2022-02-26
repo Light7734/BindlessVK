@@ -40,6 +40,11 @@ std::vector<const char*> Window::GetRequiredExtensions()
 }
 
 
+void Window::PollEvents()
+{
+	glfwPollEvents();
+}
+
 bool Window::ShouldClose()
 {
 	return glfwWindowShouldClose(m_GlfwWindowHandle);

@@ -26,6 +26,7 @@ public:
 
 	std::vector<const char*> GetRequiredExtensions();
 
+	void PollEvents();
 	bool ShouldClose();
 
 	VkSurfaceKHR CreateSurface(VkInstance instance);

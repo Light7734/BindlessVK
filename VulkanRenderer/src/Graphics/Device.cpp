@@ -4,8 +4,8 @@
 
 #include <vulkan/vulkan_core.h>
 
-Device::Device(DeviceCreateInfo& createInfo, Window& window)
-    : m_Layers(createInfo.layers), m_Extensions(createInfo.instanceExtensions)
+Device::Device(DeviceCreateInfo& createInfo)
+    : m_Layers(createInfo.layers), m_Extensions(createInfo.instanceExtensions), m_Window(createInfo.window)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Initialize volk
@@ -91,7 +91,7 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 		VKC(vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance));
 		volkLoadInstance(m_Instance);
-		m_Surface = window.CreateSurface(m_Instance);
+		m_Surface = m_Window->CreateSurface(m_Instance);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -284,6 +284,161 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 
 
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create sync objects
+	{
+		m_AquireImageSemaphores.resize(m_MaxFramesInFlight);
+		m_RenderSemaphores.resize(m_MaxFramesInFlight);
+		m_FrameFences.resize(m_MaxFramesInFlight);
+
+		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+		{
+			VkSemaphoreCreateInfo semaphoreCreateInfo {
+				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+			};
+
+			VkFenceCreateInfo fenceCreateInfo {
+				.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+				.flags = VK_FENCE_CREATE_SIGNALED_BIT,
+			};
+
+			VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_AquireImageSemaphores[i]));
+			VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderSemaphores[i]));
+			VKC(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_FrameFences[i]));
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create the swapchain & swapchain dependent objects(swapchain, images, image views, renderpass, framebuffers, commandpool, pipelines)
+	CreateSwapchain();
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Log debug information about the selected physical device, layers, extensions, etc.
+	{
+		LOG(info, "Device created:");
+
+		LOG(info, "    PhysicalDevice:");
+		LOG(info, "        apiVersion: {}", m_PhysicalDeviceProperties.apiVersion);
+		LOG(info, "        driverVersion: {}", m_PhysicalDeviceProperties.driverVersion);
+		LOG(info, "        vendorID: {}", m_PhysicalDeviceProperties.vendorID);
+		LOG(info, "        deviceID: {}", m_PhysicalDeviceProperties.deviceID);
+		LOG(info, "        deviceType: {}", m_PhysicalDeviceProperties.deviceType); // #todo: Stringify
+		LOG(info, "        deviceName: {}", m_PhysicalDeviceProperties.deviceName);
+
+		LOG(info, "    Layers:");
+		for (auto layer : m_Layers)
+			LOG(info, "        {}", layer);
+
+		LOG(info, "    Extensions:");
+		for (auto extension : m_Extensions)
+			LOG(info, "        {}", extension);
+
+		LOG(info, "    Queues:");
+		LOG(info, "        Graphics: {}", m_GraphicsQueueIndex);
+		LOG(info, "        Present: {}", m_PresentQueueIndex);
+
+		LOG(info, "    Swapchain:");
+		LOG(info, "        imageCount: {}", m_Images.size());
+		LOG(info, "        extent: {}x{}", m_SwapchainExtent.width, m_SwapchainExtent.height);
+	}
+}
+
+Device::~Device()
+{
+	vkDeviceWaitIdle(m_LogicalDevice);
+
+	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+	{
+		vkDestroySemaphore(m_LogicalDevice, m_AquireImageSemaphores[i], nullptr);
+		vkDestroySemaphore(m_LogicalDevice, m_RenderSemaphores[i], nullptr);
+		vkDestroyFence(m_LogicalDevice, m_FrameFences[i], nullptr);
+	}
+
+	DestroySwapchain();
+
+	vkDestroyDevice(m_LogicalDevice, nullptr);
+
+	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
+	vkDestroyInstance(m_Instance, nullptr);
+}
+
+void Device::DrawFrame()
+{
+	// Wait for the frame fence
+	VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+
+	// Acquire an image
+	uint32_t imageIndex;
+	VkResult result = vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
+	{
+		VKC(vkDeviceWaitIdle(m_LogicalDevice));
+		DestroySwapchain();
+		CreateSwapchain();
+		return;
+	}
+	else
+	{
+		ASSERT(result == VK_SUCCESS, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
+	}
+
+	// Record commands
+	CommandBufferStartInfo commandBufferStartInfo {
+		.framebuffer = m_Framebuffers[imageIndex],
+		.extent      = m_SwapchainExtent,
+		.frameIndex  = m_CurrentFrame,
+	};
+	VkCommandBuffer firstTriangleCommandBuffer = m_TrianglePipeline->RecordCommandBuffer(commandBufferStartInfo);
+
+	// Submit commands (and reset the fence)
+	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	VkSubmitInfo submitInfo {
+		.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.waitSemaphoreCount   = 1u,
+		.pWaitSemaphores      = &m_AquireImageSemaphores[m_CurrentFrame],
+		.pWaitDstStageMask    = &waitStage,
+		.commandBufferCount   = 1u,
+		.pCommandBuffers      = &firstTriangleCommandBuffer,
+		.signalSemaphoreCount = 1u,
+		.pSignalSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
+	};
+
+	VKC(vkResetFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame]));
+	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_FrameFences[m_CurrentFrame]));
+
+	// Present the image
+	VkPresentInfoKHR presentInfo {
+		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+		.waitSemaphoreCount = 1u,
+		.pWaitSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
+		.swapchainCount     = 1u,
+		.pSwapchains        = &m_Swapchain,
+		.pImageIndices      = &imageIndex,
+		.pResults           = nullptr
+	};
+
+	vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+
+	// Increment frame index
+	m_CurrentFrame = (m_CurrentFrame + 1u) % m_MaxFramesInFlight;
+}
+
+void Device::CreateSwapchain()
+{
+	/////////////////////////////////////////////////////////////////////////////////
+	// Fetch the swapchain details
+	{
+		// Fetch surface capabilities
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, m_Surface, &m_SurfcaCapabilities);
+
+		// Fetch swap chain formats
+		uint32_t formatCount;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, nullptr);
+		m_SupportedSurfaceFormats.clear();
+		m_SupportedSurfaceFormats.resize(formatCount);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, m_Surface, &formatCount, m_SupportedSurfaceFormats.data());
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Create the swap chain.
 	{
 		// Select surface format
@@ -311,9 +466,9 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		m_SwapchainExtent = m_SurfcaCapabilities.currentExtent;
 		if (m_SwapchainExtent.width == UINT32_MAX)
 		{
-			VkExtent2D actualExtent = window.GetFramebufferSize();
-			actualExtent.width      = std::clamp(actualExtent.width, m_SurfcaCapabilities.minImageExtent.width, m_SurfcaCapabilities.maxImageExtent.width);
-			actualExtent.height     = std::clamp(actualExtent.height, m_SurfcaCapabilities.minImageExtent.height, m_SurfcaCapabilities.maxImageExtent.height);
+			VkExtent2D framebufferSize = m_Window->GetFramebufferSize();
+			framebufferSize.width      = std::clamp(framebufferSize.width, m_SurfcaCapabilities.minImageExtent.width, m_SurfcaCapabilities.maxImageExtent.width);
+			framebufferSize.height     = std::clamp(framebufferSize.height, m_SurfcaCapabilities.minImageExtent.height, m_SurfcaCapabilities.maxImageExtent.height);
 		}
 
 		// Select image count ; one more than minImageCount, if minImageCount +1 is not higher than maxImageCount (maxImageCount of 0 means no limit)
@@ -451,7 +606,6 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		}
 	}
 
-
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the command pool
 	{
@@ -462,31 +616,6 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		};
 
 		VKC(vkCreateCommandPool(m_LogicalDevice, &commandPoolCreateInfo, nullptr, &m_CommandPool));
-	}
-
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create sync objects
-	{
-		m_AquireImageSemaphores.resize(m_MaxFramesInFlight);
-		m_RenderSemaphores.resize(m_MaxFramesInFlight);
-		m_FrameFences.resize(m_MaxFramesInFlight);
-
-		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
-		{
-			VkSemaphoreCreateInfo semaphoreCreateInfo {
-				.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-			};
-
-			VkFenceCreateInfo fenceCreateInfo {
-				.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-				.flags = VK_FENCE_CREATE_SIGNALED_BIT,
-			};
-
-			VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_AquireImageSemaphores[i]));
-			VKC(vkCreateSemaphore(m_LogicalDevice, &semaphoreCreateInfo, nullptr, &m_RenderSemaphores[i]));
-			VKC(vkCreateFence(m_LogicalDevice, &fenceCreateInfo, nullptr, &m_FrameFences[i]));
-		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -503,107 +632,17 @@ Device::Device(DeviceCreateInfo& createInfo, Window& window)
 		};
 		m_TrianglePipeline = std::make_unique<Pipeline>(pipelineCreateInfo);
 	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Log debug information about the selected physical device, layers, extensions, etc.
-	{
-		LOG(info, "Device created:");
-
-		LOG(info, "    PhysicalDevice:");
-		LOG(info, "        apiVersion: {}", m_PhysicalDeviceProperties.apiVersion);
-		LOG(info, "        driverVersion: {}", m_PhysicalDeviceProperties.driverVersion);
-		LOG(info, "        vendorID: {}", m_PhysicalDeviceProperties.vendorID);
-		LOG(info, "        deviceID: {}", m_PhysicalDeviceProperties.deviceID);
-		LOG(info, "        deviceType: {}", m_PhysicalDeviceProperties.deviceType); // #todo: Stringify
-		LOG(info, "        deviceName: {}", m_PhysicalDeviceProperties.deviceName);
-
-		LOG(info, "    Layers:");
-		for (auto layer : m_Layers)
-			LOG(info, "        {}", layer);
-
-		LOG(info, "    Extensions:");
-		for (auto extension : m_Extensions)
-			LOG(info, "        {}", extension);
-
-		LOG(info, "    Queues:");
-		LOG(info, "        Graphics: {}", m_GraphicsQueueIndex);
-		LOG(info, "        Present: {}", m_PresentQueueIndex);
-
-		LOG(info, "    Swapchain:");
-		LOG(info, "        imageCount: {}", m_Images.size());
-		LOG(info, "        extent: {}x{}", m_SwapchainExtent.width, m_SwapchainExtent.height);
-	}
 }
 
-Device::~Device()
+void Device::DestroySwapchain()
 {
-	vkDeviceWaitIdle(m_LogicalDevice);
-
-	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
-	{
-		vkDestroySemaphore(m_LogicalDevice, m_AquireImageSemaphores[i], nullptr);
-		vkDestroySemaphore(m_LogicalDevice, m_RenderSemaphores[i], nullptr);
-		vkDestroyFence(m_LogicalDevice, m_FrameFences[i], nullptr);
-	}
-
-	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
+	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
 	for (uint32_t i = 0; i < m_Images.size(); i++)
 	{
 		vkDestroyImageView(m_LogicalDevice, m_ImageViews[i], nullptr);
 		vkDestroyFramebuffer(m_LogicalDevice, m_Framebuffers[i], nullptr);
 	}
-
-	vkDestroySwapchainKHR(m_LogicalDevice, m_Swapchain, nullptr);
-	vkDestroyInstance(m_Instance, nullptr);
-	vkDestroyDevice(m_LogicalDevice, nullptr);
+	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
+	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
+	m_TrianglePipeline.reset();
 }
-
-void Device::DrawFrame()
-{
-	// Wait for fences
-	VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
-	VKC(vkResetFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame]));
-
-	uint32_t imageIndex; // image index
-	VKC(vkAcquireNextImageKHR(m_LogicalDevice, m_Swapchain, UINT64_MAX, m_AquireImageSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex));
-
-	// Record commands
-	CommandBufferStartInfo commandBufferStartInfo {
-		.framebuffer = m_Framebuffers[imageIndex],
-		.extent      = m_SwapchainExtent,
-		.frameIndex  = m_CurrentFrame,
-	};
-	VkCommandBuffer firstTriangleCommandBuffer = m_TrianglePipeline->RecordCommandBuffer(commandBufferStartInfo);
-
-	// Submit commands
-	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	VkSubmitInfo submitInfo {
-		.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-		.waitSemaphoreCount   = 1u,
-		.pWaitSemaphores      = &m_AquireImageSemaphores[m_CurrentFrame],
-		.pWaitDstStageMask    = &waitStage,
-		.commandBufferCount   = 1u,
-		.pCommandBuffers      = &firstTriangleCommandBuffer,
-		.signalSemaphoreCount = 1u,
-		.pSignalSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
-	};
-
-	VKC(vkQueueSubmit(m_GraphicsQueue, 1u, &submitInfo, m_FrameFences[m_CurrentFrame]));
-
-	// Present
-	VkPresentInfoKHR presentInfo {
-		.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-		.waitSemaphoreCount = 1u,
-		.pWaitSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
-		.swapchainCount     = 1u,
-		.pSwapchains        = &m_Swapchain,
-		.pImageIndices      = &imageIndex,
-		.pResults           = nullptr
-	};
-
-	vkQueuePresentKHR(m_PresentQueue, &presentInfo);
-
-	// Increment frame index
-	m_CurrentFrame = (m_CurrentFrame + 1u) % m_MaxFramesInFlight;
-}
-

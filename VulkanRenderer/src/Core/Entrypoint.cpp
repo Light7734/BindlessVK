@@ -28,7 +28,6 @@ int main()
 			},
 			.hints = {
 			    { GLFW_CLIENT_API, GLFW_NO_API },
-			    { GLFW_RESIZABLE, GLFW_FALSE },
 			    { GLFW_FLOATING, GLFW_TRUE },
 			},
 		};
@@ -40,6 +39,7 @@ int main()
 		deviceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
 		DeviceCreateInfo deviceCreateInfo {
+			.window                  = &window,
 			.layers                  = { "VK_LAYER_KHRONOS_validation" },
 			.instanceExtensions      = deviceExtensions,
 			.logicalDeviceExtensions = {
@@ -49,7 +49,7 @@ int main()
 			.debugMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
 			.debugMessageTypes    = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 		};
-		Device device(deviceCreateInfo, window);
+		Device device(deviceCreateInfo);
 
 		/////////////////////////////////////////////////////////////////////////////////
 		// Main loop
@@ -57,9 +57,10 @@ int main()
 		Timer fpsTimer;
 		while (!window.ShouldClose())
 		{
-			frames++;
+			window.PollEvents();
 			device.DrawFrame();
 
+			frames++;
 			if (fpsTimer.ElapsedTime() >= 1.0f)
 			{
 				LOG(trace, "FPS: {}", frames);
