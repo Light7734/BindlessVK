@@ -1,5 +1,7 @@
 #include "Graphics/Pipeline.hpp"
 
+#include <glm/glm.hpp>
+
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice), m_RenderPass(createInfo.renderPass)
 {
@@ -29,6 +31,41 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_Shader = std::make_unique<Shader>(shaderCreateInfo);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create vertex buffer
+	{
+		float vertices[] = {
+			0.0f,
+			-0.5f,
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f,
+
+			0.5f,
+			0.5f,
+			0.0f,
+			0.0f,
+			1.0f,
+			0.0f,
+
+			-0.5f,
+			0.5f,
+			0.0f,
+			0.0f,
+			0.0f,
+			1.0f,
+		};
+		VertexBufferCreateInfo vertexBufferCreateInfo {
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = createInfo.physicalDevice,
+			.size           = sizeof(vertices),
+			.startingData   = vertices,
+		};
+
+		m_VertexBuffer = std::make_unique<VertexBuffer>(vertexBufferCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -201,6 +238,10 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 
 	// Bind pipeline
 	vkCmdBindPipeline(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+
+	// Bind vertex buffer
+	static VkDeviceSize offset { 0 };
+	vkCmdBindVertexBuffers(m_CommandBuffers[index], 0, 1, m_VertexBuffer->GetBuffer(), &offset);
 
 	// Draw
 	vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);

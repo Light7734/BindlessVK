@@ -2,12 +2,14 @@
 
 #include "Core/Base.hpp"
 #include "Graphics/Shader.hpp"
+#include "Graphics/VertexBuffer.hpp"
 
 #include <volk.h>
 
 struct PipelineCreateInfo
 {
 	VkDevice logicalDevice;
+	VkPhysicalDevice physicalDevice;
 	VkExtent2D viewportExtent;
 	VkCommandPool commandPool;
 	uint32_t imageCount;
@@ -43,5 +45,7 @@ private:
 	VkRenderPass m_RenderPass;
 
 	std::unique_ptr<Shader> m_Shader;
+	std::unique_ptr<VertexBuffer> m_VertexBuffer;
+
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 };

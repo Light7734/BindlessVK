@@ -624,6 +624,7 @@ void Device::CreateSwapchain()
 	{
 		PipelineCreateInfo pipelineCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = m_PhysicalDevice,
 			.viewportExtent = m_SwapchainExtent,
 			.commandPool    = m_CommandPool,
 			.imageCount     = static_cast<uint32_t>(m_Images.size()),
@@ -647,8 +648,8 @@ void Device::CreateSwapchain()
 			        .offset   = 0u,
 			    },
 			    VkVertexInputAttributeDescription {
-			        .location = 0u,
-			        .binding  = 1u,
+			        .location = 1u,
+			        .binding  = 0u,
 			        .format   = VK_FORMAT_R32G32B32_SFLOAT,
 			        .offset   = sizeof(glm::vec3),
 			    },
