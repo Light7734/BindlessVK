@@ -51,10 +51,10 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		// Vertex input state
 		VkPipelineVertexInputStateCreateInfo vertexInputState {
 			.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount   = 0u,
-			.pVertexBindingDescriptions      = nullptr,
-			.vertexAttributeDescriptionCount = 0u,
-			.pVertexAttributeDescriptions    = nullptr,
+			.vertexBindingDescriptionCount   = 1u,
+			.pVertexBindingDescriptions      = &createInfo.vertexBindingDesc,
+			.vertexAttributeDescriptionCount = static_cast<uint32_t>(createInfo.vertexAttribDescs.size()),
+			.pVertexAttributeDescriptions    = createInfo.vertexAttribDescs.data(),
 		};
 
 		// Input assembly state

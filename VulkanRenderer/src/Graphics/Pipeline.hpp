@@ -15,6 +15,9 @@ struct PipelineCreateInfo
 
 	const std::string vertexShaderPath;
 	const std::string pixelShaderPath;
+
+	VkVertexInputBindingDescription vertexBindingDesc;
+	std::vector<VkVertexInputAttributeDescription> vertexAttribDescs;
 };
 
 struct CommandBufferStartInfo

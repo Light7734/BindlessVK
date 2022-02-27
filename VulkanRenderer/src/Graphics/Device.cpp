@@ -2,6 +2,7 @@
 
 #include "Core/Window.hpp"
 
+#include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 
 Device::Device(DeviceCreateInfo& createInfo)
@@ -622,13 +623,36 @@ void Device::CreateSwapchain()
 	// Create pipelines
 	{
 		PipelineCreateInfo pipelineCreateInfo {
-			.logicalDevice    = m_LogicalDevice,
-			.viewportExtent   = m_SwapchainExtent,
-			.commandPool      = m_CommandPool,
-			.imageCount       = static_cast<uint32_t>(m_Images.size()),
-			.renderPass       = m_RenderPass,
+			.logicalDevice  = m_LogicalDevice,
+			.viewportExtent = m_SwapchainExtent,
+			.commandPool    = m_CommandPool,
+			.imageCount     = static_cast<uint32_t>(m_Images.size()),
+			.renderPass     = m_RenderPass,
+
+			// Shader
 			.vertexShaderPath = "VulkanRenderer/res/vertex.glsl",
 			.pixelShaderPath  = "VulkanRenderer/res/pixel.glsl",
+
+			// Vertex input
+			.vertexBindingDesc = VkVertexInputBindingDescription {
+			    .binding   = 0u,
+			    .stride    = sizeof(glm::vec3) + sizeof(glm::vec3),
+			    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+			},
+			.vertexAttribDescs = {
+			    VkVertexInputAttributeDescription {
+			        .location = 0u,
+			        .binding  = 0u,
+			        .format   = VK_FORMAT_R32G32B32_SFLOAT,
+			        .offset   = 0u,
+			    },
+			    VkVertexInputAttributeDescription {
+			        .location = 0u,
+			        .binding  = 1u,
+			        .format   = VK_FORMAT_R32G32B32_SFLOAT,
+			        .offset   = sizeof(glm::vec3),
+			    },
+			},
 		};
 		m_TrianglePipeline = std::make_unique<Pipeline>(pipelineCreateInfo);
 	}
