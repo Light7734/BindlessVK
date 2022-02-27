@@ -28,6 +28,7 @@ set_property(TARGET VulkanRenderer PROPERTY CXX_STANDARD 20)
 target_include_directories(VulkanRenderer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/
     ${CMAKE_SOURCE_DIR}/Dependencies/glfw/include/
+    ${CMAKE_SOURCE_DIR}/Dependencies/glm/
     ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include/
     ${CMAKE_SOURCE_DIR}/Dependencies/volk/
     ${CMAKE_SOURCE_DIR}/Dependencies/shaderc/libshaderc/include)

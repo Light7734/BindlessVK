@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMNADS ON)
 # Link dependencies to VulkanRenderer
 target_link_libraries(
     VulkanRenderer 
+    PRIVATE glm
     PRIVATE spdlog
     PRIVATE glfw
     PRIVATE volk
