@@ -625,6 +625,7 @@ void Device::CreateSwapchain()
 		PipelineCreateInfo pipelineCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
 			.physicalDevice = m_PhysicalDevice,
+			.graphicsQueue  = m_GraphicsQueue,
 			.viewportExtent = m_SwapchainExtent,
 			.commandPool    = m_CommandPool,
 			.imageCount     = static_cast<uint32_t>(m_Images.size()),

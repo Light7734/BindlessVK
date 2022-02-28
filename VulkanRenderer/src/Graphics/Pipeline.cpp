@@ -61,6 +61,8 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		VertexBufferCreateInfo vertexBufferCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
 			.physicalDevice = createInfo.physicalDevice,
+			.commandPool    = createInfo.commandPool,
+			.graphicsQueue  = createInfo.graphicsQueue,
 			.size           = sizeof(vertices),
 			.startingData   = vertices,
 		};

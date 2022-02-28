@@ -8,6 +8,8 @@ struct VertexBufferCreateInfo
 {
 	VkDevice logicalDevice;
 	VkPhysicalDevice physicalDevice;
+	VkCommandPool commandPool;
+	VkQueue graphicsQueue;
 	VkDeviceSize size;
 	void* startingData = nullptr;
 };
@@ -20,8 +22,11 @@ public:
 
 	inline VkBuffer* GetBuffer() { return &m_Buffer; }
 
-private:
 	VkDevice m_LogicalDevice;
+
 	VkBuffer m_Buffer;
-	VkDeviceMemory m_DeviceMemory;
+	VkDeviceMemory m_BufferMemory;
+
+	VkBuffer m_StagingBuffer;
+	VkDeviceMemory m_StagingBufferMemory;
 };

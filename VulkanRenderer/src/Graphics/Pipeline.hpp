@@ -10,6 +10,7 @@ struct PipelineCreateInfo
 {
 	VkDevice logicalDevice;
 	VkPhysicalDevice physicalDevice;
+	VkQueue graphicsQueue;
 	VkExtent2D viewportExtent;
 	VkCommandPool commandPool;
 	uint32_t imageCount;
