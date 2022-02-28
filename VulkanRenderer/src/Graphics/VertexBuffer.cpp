@@ -1,6 +1,6 @@
 #include "Graphics/VertexBuffer.hpp"
 
-VertexBuffer::VertexBuffer(VertexBufferCreateInfo& createInfo)
+Buffer::Buffer(BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
 {
 	/////////////////////////////////////////////////////////////////////////////////
@@ -9,7 +9,7 @@ VertexBuffer::VertexBuffer(VertexBufferCreateInfo& createInfo)
 		VkBufferCreateInfo bufferCreateInfo {
 			.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
 			.size        = createInfo.size,
-			.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			.usage       = VK_BUFFER_USAGE_TRANSFER_DST_BIT | createInfo.usage,
 			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 		};
 
@@ -118,7 +118,7 @@ VertexBuffer::VertexBuffer(VertexBufferCreateInfo& createInfo)
 	}
 }
 
-VertexBuffer::~VertexBuffer()
+Buffer::~Buffer()
 {
 	vkDestroyBuffer(m_LogicalDevice, m_Buffer, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_BufferMemory, nullptr);

@@ -4,24 +4,26 @@
 
 #include <volk.h>
 
-struct VertexBufferCreateInfo
+struct BufferCreateInfo
 {
 	VkDevice logicalDevice;
 	VkPhysicalDevice physicalDevice;
 	VkCommandPool commandPool;
 	VkQueue graphicsQueue;
+	VkBufferUsageFlags usage;
 	VkDeviceSize size;
 	void* startingData = nullptr;
 };
 
-class VertexBuffer
+class Buffer
 {
 public:
-	VertexBuffer(VertexBufferCreateInfo& createInfo);
-	~VertexBuffer();
+	Buffer(BufferCreateInfo& createInfo);
+	~Buffer();
 
 	inline VkBuffer* GetBuffer() { return &m_Buffer; }
 
+private:
 	VkDevice m_LogicalDevice;
 
 	VkBuffer m_Buffer;

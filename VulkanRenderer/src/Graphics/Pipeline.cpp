@@ -37,37 +37,39 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	// Create vertex buffer
 	{
 		float vertices[] = {
-			0.0f,
-			-0.5f,
-			0.0f,
-			1.0f,
-			0.0f,
-			0.0f,
-
-			0.5f,
-			0.5f,
-			0.0f,
-			0.0f,
-			1.0f,
-			0.0f,
-
-			-0.5f,
-			0.5f,
-			0.0f,
-			0.0f,
-			0.0f,
-			1.0f,
+			// position      -      color
+			-0.5f, -0.5f, 0.0f, 1.0f, 0.6f, 0.0f,
+			0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.6f,
+			0.5f, 0.5f, 0.0f, 0.1f, 1.0f, 0.5f,
+			-0.5f, 0.5f, 0.0f, 0.3f, 0.2f, 1.0f
 		};
-		VertexBufferCreateInfo vertexBufferCreateInfo {
+
+		uint32_t indices[] = {
+			0, 1, 2, 2, 3, 0
+		};
+
+		BufferCreateInfo vertexBufferCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
 			.physicalDevice = createInfo.physicalDevice,
 			.commandPool    = createInfo.commandPool,
 			.graphicsQueue  = createInfo.graphicsQueue,
+			.usage          = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			.size           = sizeof(vertices),
 			.startingData   = vertices,
 		};
 
-		m_VertexBuffer = std::make_unique<VertexBuffer>(vertexBufferCreateInfo);
+		BufferCreateInfo indexBufferCreateInfo {
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = createInfo.physicalDevice,
+			.commandPool    = createInfo.commandPool,
+			.graphicsQueue  = createInfo.graphicsQueue,
+			.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			.size           = sizeof(indices),
+			.startingData   = indices,
+		};
+
+		m_VertexBuffer = std::make_unique<Buffer>(vertexBufferCreateInfo);
+		m_IndexBuffer  = std::make_unique<Buffer>(indexBufferCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -241,12 +243,14 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 	// Bind pipeline
 	vkCmdBindPipeline(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
-	// Bind vertex buffer
+	// Bind vertex & index buffer
 	static VkDeviceSize offset { 0 };
 	vkCmdBindVertexBuffers(m_CommandBuffers[index], 0, 1, m_VertexBuffer->GetBuffer(), &offset);
+	vkCmdBindIndexBuffer(m_CommandBuffers[index], *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
 
 	// Draw
-	vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);
+	// vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);
+	vkCmdDrawIndexed(m_CommandBuffers[index], 6u, 1u, 0u, 0u, 0u);
 
 	// End...
 	vkCmdEndRenderPass(m_CommandBuffers[index]);

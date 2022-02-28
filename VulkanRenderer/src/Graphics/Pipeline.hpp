@@ -46,7 +46,8 @@ private:
 	VkRenderPass m_RenderPass;
 
 	std::unique_ptr<Shader> m_Shader;
-	std::unique_ptr<VertexBuffer> m_VertexBuffer;
+	std::unique_ptr<Buffer> m_VertexBuffer;
+	std::unique_ptr<Buffer> m_IndexBuffer;
 
 	std::vector<VkCommandBuffer> m_CommandBuffers;
 };
