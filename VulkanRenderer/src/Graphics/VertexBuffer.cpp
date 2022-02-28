@@ -122,4 +122,6 @@ VertexBuffer::~VertexBuffer()
 {
 	vkDestroyBuffer(m_LogicalDevice, m_Buffer, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_BufferMemory, nullptr);
+	vkDestroyBuffer(m_LogicalDevice, m_StagingBuffer, nullptr);
+	vkFreeMemory(m_LogicalDevice, m_StagingBufferMemory, nullptr);
 }
