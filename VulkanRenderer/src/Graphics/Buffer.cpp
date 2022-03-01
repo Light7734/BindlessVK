@@ -1,6 +1,86 @@
-#include "Graphics/VertexBuffer.hpp"
 
+#include "Graphics/Buffer.hpp"
 Buffer::Buffer(BufferCreateInfo& createInfo)
+    : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size)
+{
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create vertex and staging buffers
+	{
+		VkBufferCreateInfo bufferCreateInfo {
+			.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+			.size        = createInfo.size,
+			.usage       = createInfo.usage,
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		};
+
+		VKC(vkCreateBuffer(m_LogicalDevice, &bufferCreateInfo, nullptr, &m_Buffer));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Fetch buffer's memory requirements and allocate memory
+	{
+		// Fetch memory requirements
+		VkMemoryRequirements bufferMemReq;
+		vkGetBufferMemoryRequirements(m_LogicalDevice, m_Buffer, &bufferMemReq);
+
+		// Fetch device memory properties
+		VkPhysicalDeviceMemoryProperties physicalMemProps;
+		vkGetPhysicalDeviceMemoryProperties(createInfo.physicalDevice, &physicalMemProps);
+
+		// Find adequate memory type indices
+		uint32_t memTypeIndex = UINT32_MAX;
+
+		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
+		{
+			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+				memTypeIndex = i;
+		}
+
+		ASSERT(memTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
+
+		// Allocate memory
+		VkMemoryAllocateInfo memoryAllocInfo {
+			.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+			.allocationSize  = bufferMemReq.size,
+			.memoryTypeIndex = memTypeIndex,
+		};
+
+		VKC(vkAllocateMemory(m_LogicalDevice, &memoryAllocInfo, nullptr, &m_BufferMemory));
+		VKC(vkBindBufferMemory(m_LogicalDevice, m_Buffer, m_BufferMemory, 0u));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Write starting data to buffer
+	{
+		if (createInfo.startingData)
+		{
+			void* data;
+			VKC(vkMapMemory(m_LogicalDevice, m_BufferMemory, 0u, createInfo.size, 0x0, &data));
+			memcpy(data, createInfo.startingData, static_cast<size_t>(createInfo.size));
+			vkUnmapMemory(m_LogicalDevice, m_BufferMemory);
+		}
+	}
+}
+
+void* Buffer::Map()
+{
+	void* data;
+	VKC(vkMapMemory(m_LogicalDevice, m_BufferMemory, 0u, m_BufferSize, 0x0, &data));
+	return data;
+}
+
+void Buffer::Unmap()
+{
+	vkUnmapMemory(m_LogicalDevice, m_BufferMemory);
+}
+
+Buffer::~Buffer()
+{
+	vkDestroyBuffer(m_LogicalDevice, m_Buffer, nullptr);
+	vkFreeMemory(m_LogicalDevice, m_BufferMemory, nullptr);
+}
+
+StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
 {
 	/////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +198,7 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 	}
 }
 
-Buffer::~Buffer()
+StagingBuffer::~StagingBuffer()
 {
 	vkDestroyBuffer(m_LogicalDevice, m_Buffer, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_BufferMemory, nullptr);

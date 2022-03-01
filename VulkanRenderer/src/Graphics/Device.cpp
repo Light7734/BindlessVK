@@ -1,8 +1,10 @@
 #include "Graphics/Device.hpp"
 
 #include "Core/Window.hpp"
+#include "Utils/Timer.hpp"
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan_core.h>
 
 Device::Device(DeviceCreateInfo& createInfo)
@@ -356,6 +358,8 @@ Device::~Device()
 
 	DestroySwapchain();
 
+	vkDestroyDescriptorSetLayout(m_LogicalDevice, m_DescriptorSetLayout, nullptr);
+
 	vkDestroyDevice(m_LogicalDevice, nullptr);
 
 	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
@@ -364,6 +368,10 @@ Device::~Device()
 
 void Device::DrawFrame()
 {
+	// Timer...
+	static Timer timer;
+	float time = timer.ElapsedTime();
+
 	// Wait for the frame fence
 	VKC(vkWaitForFences(m_LogicalDevice, 1u, &m_FrameFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
 
@@ -382,11 +390,22 @@ void Device::DrawFrame()
 		ASSERT(result == VK_SUCCESS, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
+	// Update model view projection uniform
+	UniformMVP mvp;
+	mvp.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	mvp.view  = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	mvp.proj  = glm::perspective(glm::radians(45.0f), m_SwapchainExtent.width / (float)m_SwapchainExtent.height, 0.1f, 10.0f);
+
+	void* mvpMap = m_MVPUniBuffer[m_CurrentFrame]->Map();
+	memcpy(mvpMap, &mvp, sizeof(UniformMVP));
+	m_MVPUniBuffer[m_CurrentFrame]->Unmap();
+
 	// Record commands
 	CommandBufferStartInfo commandBufferStartInfo {
-		.framebuffer = m_Framebuffers[imageIndex],
-		.extent      = m_SwapchainExtent,
-		.frameIndex  = m_CurrentFrame,
+		.mvpDescriptorSet = &m_MVPDescriptorSet[m_CurrentFrame],
+		.framebuffer      = m_Framebuffers[imageIndex],
+		.extent           = m_SwapchainExtent,
+		.frameIndex       = m_CurrentFrame,
 	};
 	VkCommandBuffer firstTriangleCommandBuffer = m_TrianglePipeline->RecordCommandBuffer(commandBufferStartInfo);
 
@@ -620,6 +639,101 @@ void Device::CreateSwapchain()
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create descriptor pool
+	{
+		VkDescriptorPoolSize descriptorPoolSize {
+			.type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = m_MaxFramesInFlight,
+		};
+
+		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
+			.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets       = m_MaxFramesInFlight,
+			.poolSizeCount = 1u,
+			.pPoolSizes    = &descriptorPoolSize,
+		};
+
+		VKC(vkCreateDescriptorPool(m_LogicalDevice, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
+	}
+	/////////////////////////////////////////////////////////////////////////////////
+	// Specify descriptor set layout bindings and create a DescriptorSetLayout
+	{
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
+
+		// Model view projection
+		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
+		    .binding            = 0u,
+		    .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		    .descriptorCount    = 1u,
+		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
+		    .pImmutableSamplers = nullptr });
+
+		// Create descriptor set layout
+		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+			.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = static_cast<uint32_t>(layoutBindings.size()),
+			.pBindings    = layoutBindings.data(),
+		};
+		VKC(vkCreateDescriptorSetLayout(m_LogicalDevice, &descriptorSetLayoutCreateInfo, nullptr, &m_DescriptorSetLayout));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create uniform buffers
+	{
+		BufferCreateInfo mvpBufferCreateInfo {
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = m_PhysicalDevice,
+			.commandPool    = m_CommandPool,
+			.graphicsQueue  = m_GraphicsQueue,
+			.usage          = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			.size           = sizeof(UniformMVP),
+		};
+
+		m_MVPUniBuffer.resize(m_MaxFramesInFlight);
+		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+		{
+			m_MVPUniBuffer[i] = std::make_unique<Buffer>(mvpBufferCreateInfo);
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create descriptor sets
+	{
+		m_MVPDescriptorSet.resize(m_MaxFramesInFlight);
+
+		VkDescriptorSetAllocateInfo descriptorSetAllocInfo {
+			.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+			.descriptorPool     = m_DescriptorPool,
+			.descriptorSetCount = 1u,
+			.pSetLayouts        = &m_DescriptorSetLayout,
+		};
+
+		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+		{
+			VKC(vkAllocateDescriptorSets(m_LogicalDevice, &descriptorSetAllocInfo, &m_MVPDescriptorSet[i]));
+			VkDescriptorBufferInfo descriptorBufferInfo {
+				.buffer = *m_MVPUniBuffer[i]->GetBuffer(),
+				.offset = 0u,
+				.range  = VK_WHOLE_SIZE, // sizeof(UniformMVP)
+			};
+
+		    VkWriteDescriptorSet writeDescriptorSet {
+			    .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			    .dstSet           = m_MVPDescriptorSet[i],
+			    .dstBinding       = 0u,
+			    .dstArrayElement  = 0u,
+			    .descriptorCount  = 1u,
+			    .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			    .pImageInfo       = VK_NULL_HANDLE,
+			    .pBufferInfo      = &descriptorBufferInfo,
+			    .pTexelBufferView = VK_NULL_HANDLE,
+		    };
+
+			vkUpdateDescriptorSets(m_LogicalDevice, 1u, &writeDescriptorSet, 0u, nullptr);
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Create pipelines
 	{
 		PipelineCreateInfo pipelineCreateInfo {
@@ -632,8 +746,9 @@ void Device::CreateSwapchain()
 			.renderPass     = m_RenderPass,
 
 			// Shader
-			.vertexShaderPath = "VulkanRenderer/res/vertex.glsl",
-			.pixelShaderPath  = "VulkanRenderer/res/pixel.glsl",
+			.descriptorSetLayouts = { m_DescriptorSetLayout },
+			.vertexShaderPath     = "VulkanRenderer/res/vertex.glsl",
+			.pixelShaderPath      = "VulkanRenderer/res/pixel.glsl",
 
 			// Vertex input
 			.vertexBindingDesc = VkVertexInputBindingDescription {
@@ -670,5 +785,7 @@ void Device::DestroySwapchain()
 	}
 	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
+	m_MVPUniBuffer.clear();
+	vkDestroyDescriptorSetLayout(m_LogicalDevice, m_DescriptorSetLayout, nullptr);
 	m_TrianglePipeline.reset();
 }

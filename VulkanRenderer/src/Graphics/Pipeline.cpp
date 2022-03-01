@@ -34,7 +34,7 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create vertex buffer
+	// Create vertex & index buffers
 	{
 		float vertices[] = {
 			// position      -      color
@@ -68,8 +68,17 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.startingData   = indices,
 		};
 
-		m_VertexBuffer = std::make_unique<Buffer>(vertexBufferCreateInfo);
-		m_IndexBuffer  = std::make_unique<Buffer>(indexBufferCreateInfo);
+		BufferCreateInfo uniformBufferCreateInfo {
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = createInfo.physicalDevice,
+			.graphicsQueue  = createInfo.graphicsQueue,
+			.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			.size           = sizeof(indices),
+			.startingData   = indices,
+		};
+
+		m_VertexBuffer = std::make_unique<StagingBuffer>(vertexBufferCreateInfo);
+		m_IndexBuffer  = std::make_unique<StagingBuffer>(indexBufferCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -77,8 +86,8 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	{
 		VkPipelineLayoutCreateInfo pipelineLayout {
 			.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-			.setLayoutCount         = 0u,
-			.pSetLayouts            = nullptr,
+			.setLayoutCount         = static_cast<uint32_t>(createInfo.descriptorSetLayouts.size()),
+			.pSetLayouts            = createInfo.descriptorSetLayouts.data(),
 			.pushConstantRangeCount = 0u,
 			.pPushConstantRanges    = nullptr,
 		};
@@ -247,6 +256,9 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 	static VkDeviceSize offset { 0 };
 	vkCmdBindVertexBuffers(m_CommandBuffers[index], 0, 1, m_VertexBuffer->GetBuffer(), &offset);
 	vkCmdBindIndexBuffer(m_CommandBuffers[index], *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
+
+	// Bind descriptor sets
+	vkCmdBindDescriptorSets(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0u, 1u, startInfo.mvpDescriptorSet, 0, nullptr);
 
 	// Draw
 	// vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);

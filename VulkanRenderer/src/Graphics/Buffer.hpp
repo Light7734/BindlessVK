@@ -23,6 +23,25 @@ public:
 
 	inline VkBuffer* GetBuffer() { return &m_Buffer; }
 
+	void* Map();
+	void Unmap();
+
+private:
+	VkDevice m_LogicalDevice;
+
+	VkBuffer m_Buffer;
+	VkDeviceSize m_BufferSize;
+	VkDeviceMemory m_BufferMemory;
+};
+
+class StagingBuffer
+{
+public:
+	StagingBuffer(BufferCreateInfo& createInfo);
+	~StagingBuffer();
+
+	inline VkBuffer* GetBuffer() { return &m_Buffer; }
+
 private:
 	VkDevice m_LogicalDevice;
 

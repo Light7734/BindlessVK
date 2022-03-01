@@ -5,8 +5,14 @@ layout(location = 1) in vec3 inColor;
 
 layout(location = 0) out vec3 outColor;
 
+layout(binding = 0) uniform uniMVP {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} U_MVP;
+
 void main() {
-    gl_Position = vec4(inPosition, 1.0);
+    gl_Position =  U_MVP.proj * U_MVP.view * U_MVP.model * vec4(inPosition, 1.0);
     outColor = inColor;
 }
 

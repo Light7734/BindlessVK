@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Core/Base.hpp"
+#include "Graphics/Buffer.hpp"
 #include "Graphics/Shader.hpp"
-#include "Graphics/VertexBuffer.hpp"
 
 #include <volk.h>
 
@@ -16,6 +16,8 @@ struct PipelineCreateInfo
 	uint32_t imageCount;
 	VkRenderPass renderPass;
 
+	// Shader
+	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
 	const std::string vertexShaderPath;
 	const std::string pixelShaderPath;
 
@@ -25,6 +27,7 @@ struct PipelineCreateInfo
 
 struct CommandBufferStartInfo
 {
+	VkDescriptorSet* mvpDescriptorSet;
 	VkFramebuffer framebuffer;
 	VkExtent2D extent;
 	uint32_t frameIndex;
@@ -46,8 +49,9 @@ private:
 	VkRenderPass m_RenderPass;
 
 	std::unique_ptr<Shader> m_Shader;
-	std::unique_ptr<Buffer> m_VertexBuffer;
-	std::unique_ptr<Buffer> m_IndexBuffer;
+	std::unique_ptr<StagingBuffer> m_VertexBuffer;
+	std::unique_ptr<StagingBuffer> m_IndexBuffer;
 
 	std::vector<VkCommandBuffer> m_CommandBuffers;
+	std::vector<StagingBuffer> m_UniformBuffers;
 };

@@ -3,9 +3,18 @@
 #include "Core/Base.hpp"
 #include "Graphics/Pipeline.hpp"
 
+#include <glm/glm.hpp>
 #include <volk.h>
 
 class Window;
+
+
+struct UniformMVP
+{
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 proj;
+};
 
 struct DeviceCreateInfo
 {
@@ -93,6 +102,13 @@ private:
 	std::vector<VkFence> m_FrameFences;
 	const uint32_t m_MaxFramesInFlight = 2u;
 	uint32_t m_CurrentFrame            = 0u;
+
+	// Descriptor sets
+	VkDescriptorPool m_DescriptorPool;
+	VkDescriptorSetLayout m_DescriptorSetLayout;
+	std::vector<VkDescriptorSet> m_MVPDescriptorSet;
+
+	std::vector<std::unique_ptr<Buffer>> m_MVPUniBuffer;
 
 	// Pipelines
 	std::unique_ptr<Pipeline> m_TrianglePipeline;
