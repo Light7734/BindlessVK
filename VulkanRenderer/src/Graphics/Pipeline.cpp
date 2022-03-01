@@ -68,15 +68,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.startingData   = indices,
 		};
 
-		BufferCreateInfo uniformBufferCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
-			.graphicsQueue  = createInfo.graphicsQueue,
-			.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			.size           = sizeof(indices),
-			.startingData   = indices,
-		};
-
 		m_VertexBuffer = std::make_unique<StagingBuffer>(vertexBufferCreateInfo);
 		m_IndexBuffer  = std::make_unique<StagingBuffer>(indexBufferCreateInfo);
 	}

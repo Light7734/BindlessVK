@@ -104,9 +104,9 @@ private:
 	uint32_t m_CurrentFrame            = 0u;
 
 	// Descriptor sets
-	VkDescriptorPool m_DescriptorPool;
 	VkDescriptorSetLayout m_DescriptorSetLayout;
-	std::vector<VkDescriptorSet> m_MVPDescriptorSet;
+	VkDescriptorPool m_DescriptorPool;
+	std::vector<VkDescriptorSet> m_DescriptorSets;
 
 	std::vector<std::unique_ptr<Buffer>> m_MVPUniBuffer;
 

@@ -117,16 +117,16 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 		VkPhysicalDeviceMemoryProperties physicalMemProps;
 		vkGetPhysicalDeviceMemoryProperties(createInfo.physicalDevice, &physicalMemProps);
 
-		// Find adequate memory type indices
+		// Find adequate memories' indices
 		uint32_t memTypeIndex = UINT32_MAX;
 		uint32_t stagingMemTypeIndex = UINT32_MAX;
 
 		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
 		{
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 				memTypeIndex = i;
 
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+			if (stagingBufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 				stagingMemTypeIndex = i;
 		}
 
@@ -154,15 +154,17 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Write starting data to buffer
+	// Write starting data to the host local buffer
 	{
-		if (createInfo.startingData)
+		if (createInfo.startingData) // #TODO: Optimize
 		{
+			// Copy starting data to staging buffer
 			void* data;
 			VKC(vkMapMemory(m_LogicalDevice, m_StagingBufferMemory, 0u, createInfo.size, 0u, &data));
 			memcpy(data, createInfo.startingData, static_cast<size_t>(createInfo.size));
 			vkUnmapMemory(m_LogicalDevice, m_StagingBufferMemory);
 
+			// Allocate cmd buffer
 			VkCommandBufferAllocateInfo allocInfo {
 				.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 				.commandPool        = createInfo.commandPool,
@@ -172,6 +174,7 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 			VkCommandBuffer cmdBuffer;
 			VKC(vkAllocateCommandBuffers(m_LogicalDevice, &allocInfo, &cmdBuffer));
 
+			// Record cmd buffer
 			VkCommandBufferBeginInfo beginInfo {
 				.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 				.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -186,12 +189,15 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 			vkCmdCopyBuffer(cmdBuffer, m_StagingBuffer, m_Buffer, 1u, &bufferCopy);
 			vkEndCommandBuffer(cmdBuffer);
 
+			// Submit cmd buffer
 			VkSubmitInfo submitInfo {
 				.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO,
 				.commandBufferCount = 1u,
 				.pCommandBuffers    = &cmdBuffer,
 			};
 			VKC(vkQueueSubmit(createInfo.graphicsQueue, 1u, &submitInfo, VK_NULL_HANDLE));
+
+			// Wait for and free cmd buffer
 			VKC(vkQueueWaitIdle(createInfo.graphicsQueue));
 			vkFreeCommandBuffers(m_LogicalDevice, createInfo.commandPool, 1u, &cmdBuffer);
 		}

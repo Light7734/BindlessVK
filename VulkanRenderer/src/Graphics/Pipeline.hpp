@@ -43,15 +43,16 @@ public:
 
 private:
 	VkDevice m_LogicalDevice;
+	VkRenderPass m_RenderPass;
 
 	VkPipeline m_Pipeline;
+
+	// Layout
 	VkPipelineLayout m_PipelineLayout;
-	VkRenderPass m_RenderPass;
 
 	std::unique_ptr<Shader> m_Shader;
 	std::unique_ptr<StagingBuffer> m_VertexBuffer;
 	std::unique_ptr<StagingBuffer> m_IndexBuffer;
 
 	std::vector<VkCommandBuffer> m_CommandBuffers;
-	std::vector<StagingBuffer> m_UniformBuffers;
 };

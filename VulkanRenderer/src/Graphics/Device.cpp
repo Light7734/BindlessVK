@@ -402,7 +402,7 @@ void Device::DrawFrame()
 
 	// Record commands
 	CommandBufferStartInfo commandBufferStartInfo {
-		.mvpDescriptorSet = &m_MVPDescriptorSet[m_CurrentFrame],
+		.mvpDescriptorSet = &m_DescriptorSets[m_CurrentFrame],
 		.framebuffer      = m_Framebuffers[imageIndex],
 		.extent           = m_SwapchainExtent,
 		.frameIndex       = m_CurrentFrame,
@@ -639,34 +639,18 @@ void Device::CreateSwapchain()
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create descriptor pool
-	{
-		VkDescriptorPoolSize descriptorPoolSize {
-			.type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = m_MaxFramesInFlight,
-		};
-
-		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
-			.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-			.maxSets       = m_MaxFramesInFlight,
-			.poolSizeCount = 1u,
-			.pPoolSizes    = &descriptorPoolSize,
-		};
-
-		VKC(vkCreateDescriptorPool(m_LogicalDevice, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
-	}
-	/////////////////////////////////////////////////////////////////////////////////
 	// Specify descriptor set layout bindings and create a DescriptorSetLayout
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 
-		// Model view projection
+		// [0] Uniform - Model view projection
 		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
 		    .binding            = 0u,
 		    .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
 		    .descriptorCount    = 1u,
 		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
-		    .pImmutableSamplers = nullptr });
+		    .pImmutableSamplers = nullptr,
+		});
 
 		// Create descriptor set layout
 		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
@@ -697,37 +681,57 @@ void Device::CreateSwapchain()
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create descriptor pool
+	{
+		VkDescriptorPoolSize descriptorPoolSize {
+			.type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			.descriptorCount = m_MaxFramesInFlight,
+		};
+
+		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
+			.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.maxSets       = m_MaxFramesInFlight,
+			.poolSizeCount = 1u,
+			.pPoolSizes    = &descriptorPoolSize,
+		};
+
+		VKC(vkCreateDescriptorPool(m_LogicalDevice, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Create descriptor sets
 	{
-		m_MVPDescriptorSet.resize(m_MaxFramesInFlight);
-
-		VkDescriptorSetAllocateInfo descriptorSetAllocInfo {
-			.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-			.descriptorPool     = m_DescriptorPool,
-			.descriptorSetCount = 1u,
-			.pSetLayouts        = &m_DescriptorSetLayout,
-		};
+		m_DescriptorSets.resize(m_MaxFramesInFlight);
 
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
 		{
-			VKC(vkAllocateDescriptorSets(m_LogicalDevice, &descriptorSetAllocInfo, &m_MVPDescriptorSet[i]));
+			// Allocate descriptor sets
+			VkDescriptorSetAllocateInfo descriptorSetAllocInfo {
+				.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.descriptorPool     = m_DescriptorPool,
+				.descriptorSetCount = 1u,
+				.pSetLayouts        = &m_DescriptorSetLayout,
+			};
+			VKC(vkAllocateDescriptorSets(m_LogicalDevice, &descriptorSetAllocInfo, &m_DescriptorSets[i]));
+
+			// Update descriptor sets
 			VkDescriptorBufferInfo descriptorBufferInfo {
 				.buffer = *m_MVPUniBuffer[i]->GetBuffer(),
 				.offset = 0u,
 				.range  = VK_WHOLE_SIZE, // sizeof(UniformMVP)
 			};
 
-		    VkWriteDescriptorSet writeDescriptorSet {
-			    .sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			    .dstSet           = m_MVPDescriptorSet[i],
-			    .dstBinding       = 0u,
-			    .dstArrayElement  = 0u,
-			    .descriptorCount  = 1u,
-			    .descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			    .pImageInfo       = VK_NULL_HANDLE,
-			    .pBufferInfo      = &descriptorBufferInfo,
-			    .pTexelBufferView = VK_NULL_HANDLE,
-		    };
+			VkWriteDescriptorSet writeDescriptorSet {
+				.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+				.dstSet           = m_DescriptorSets[i],
+				.dstBinding       = 0u,
+				.dstArrayElement  = 0u,
+				.descriptorCount  = 1u,
+				.descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+				.pImageInfo       = VK_NULL_HANDLE,
+				.pBufferInfo      = &descriptorBufferInfo,
+				.pTexelBufferView = VK_NULL_HANDLE,
+			};
 
 			vkUpdateDescriptorSets(m_LogicalDevice, 1u, &writeDescriptorSet, 0u, nullptr);
 		}
