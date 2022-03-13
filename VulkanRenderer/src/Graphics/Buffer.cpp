@@ -50,13 +50,13 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Write starting data to buffer
+	// Write initial data to the buffer
 	{
-		if (createInfo.startingData)
+		if (createInfo.initialData)
 		{
 			void* data;
 			VKC(vkMapMemory(m_LogicalDevice, m_BufferMemory, 0u, createInfo.size, 0x0, &data));
-			memcpy(data, createInfo.startingData, static_cast<size_t>(createInfo.size));
+			memcpy(data, createInfo.initialData, static_cast<size_t>(createInfo.size));
 			vkUnmapMemory(m_LogicalDevice, m_BufferMemory);
 		}
 	}
@@ -118,7 +118,7 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 		vkGetPhysicalDeviceMemoryProperties(createInfo.physicalDevice, &physicalMemProps);
 
 		// Find adequate memories' indices
-		uint32_t memTypeIndex = UINT32_MAX;
+		uint32_t memTypeIndex        = UINT32_MAX;
 		uint32_t stagingMemTypeIndex = UINT32_MAX;
 
 		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
@@ -146,6 +146,7 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 			.memoryTypeIndex = stagingMemTypeIndex,
 		};
 
+		// Bind memory
 		VKC(vkAllocateMemory(m_LogicalDevice, &memoryAllocInfo, nullptr, &m_BufferMemory));
 		VKC(vkBindBufferMemory(m_LogicalDevice, m_Buffer, m_BufferMemory, 0u));
 
@@ -154,14 +155,14 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Write starting data to the host local buffer
+	// Write initial data to the host local buffer
 	{
-		if (createInfo.startingData) // #TODO: Optimize
+		if (createInfo.initialData) // #TODO: Optimize
 		{
 			// Copy starting data to staging buffer
 			void* data;
 			VKC(vkMapMemory(m_LogicalDevice, m_StagingBufferMemory, 0u, createInfo.size, 0u, &data));
-			memcpy(data, createInfo.startingData, static_cast<size_t>(createInfo.size));
+			memcpy(data, createInfo.initialData, static_cast<size_t>(createInfo.size));
 			vkUnmapMemory(m_LogicalDevice, m_StagingBufferMemory);
 
 			// Allocate cmd buffer

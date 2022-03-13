@@ -55,7 +55,7 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.graphicsQueue  = createInfo.graphicsQueue,
 			.usage          = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 			.size           = sizeof(vertices),
-			.startingData   = vertices,
+			.initialData    = vertices,
 		};
 
 		BufferCreateInfo indexBufferCreateInfo {
@@ -65,11 +65,25 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.graphicsQueue  = createInfo.graphicsQueue,
 			.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 			.size           = sizeof(indices),
-			.startingData   = indices,
+			.initialData    = indices,
 		};
 
 		m_VertexBuffer = std::make_unique<StagingBuffer>(vertexBufferCreateInfo);
 		m_IndexBuffer  = std::make_unique<StagingBuffer>(indexBufferCreateInfo);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create the texture
+	{
+		TextureCreateInfo textureCreateInfo {
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = createInfo.physicalDevice,
+			.graphicsQueue  = createInfo.graphicsQueue,
+			.commandPool    = createInfo.commandPool,
+			.imagePath      = "VulkanRenderer/res/texture.jpg",
+		};
+
+		m_Texture = std::make_unique<Texture>(textureCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////

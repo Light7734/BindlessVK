@@ -18,6 +18,7 @@ set(SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Shader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Buffer.cpp
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp
@@ -32,6 +33,8 @@ target_include_directories(VulkanRenderer PRIVATE
     ${CMAKE_SOURCE_DIR}/Dependencies/glm/
     ${CMAKE_SOURCE_DIR}/Dependencies/spdlog/include/
     ${CMAKE_SOURCE_DIR}/Dependencies/volk/
-    ${CMAKE_SOURCE_DIR}/Dependencies/shaderc/libshaderc/include)
+    ${CMAKE_SOURCE_DIR}/Dependencies/shaderc/libshaderc/include
+    ${CMAKE_SOURCE_DIR}/Dependencies/stb_image
+    )
 
 target_precompile_headers(VulkanRenderer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp)
