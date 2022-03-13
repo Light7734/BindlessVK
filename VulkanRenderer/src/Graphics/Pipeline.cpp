@@ -75,12 +75,16 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the texture
 	{
+		VkPhysicalDeviceProperties physicalDeviceProps;
+		vkGetPhysicalDeviceProperties(createInfo.physicalDevice, &physicalDeviceProps);
 		TextureCreateInfo textureCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
-			.graphicsQueue  = createInfo.graphicsQueue,
-			.commandPool    = createInfo.commandPool,
-			.imagePath      = "VulkanRenderer/res/texture.jpg",
+			.logicalDevice     = m_LogicalDevice,
+			.physicalDevice    = createInfo.physicalDevice,
+			.graphicsQueue     = createInfo.graphicsQueue,
+			.commandPool       = createInfo.commandPool,
+			.imagePath         = "VulkanRenderer/res/texture.jpg",
+			.anisotropyEnabled = VK_TRUE,
+			.maxAnisotropy     = physicalDeviceProps.limits.maxSamplerAnisotropy,
 		};
 
 		m_Texture = std::make_unique<Texture>(textureCreateInfo);

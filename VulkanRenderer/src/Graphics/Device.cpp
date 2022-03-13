@@ -120,7 +120,8 @@ Device::Device(DeviceCreateInfo& createInfo)
 			vkGetPhysicalDeviceProperties(device, &properties);
 			vkGetPhysicalDeviceFeatures(device, &features);
 
-			if (!features.geometryShader)
+			// Check if device supports required features
+			if (!features.geometryShader || !features.samplerAnisotropy)
 				continue;
 
 			/** Check if the device supports the required queues **/
@@ -265,7 +266,10 @@ Device::Device(DeviceCreateInfo& createInfo)
 		}
 
 		// No features needed ATM
-		VkPhysicalDeviceFeatures physicalDeviceFeatures {}; // #TODO
+		VkPhysicalDeviceFeatures physicalDeviceFeatures {
+			.samplerAnisotropy = VK_TRUE,
+		};
+
 
 		VkDeviceCreateInfo logicalDeviceCreateInfo {
 			.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,

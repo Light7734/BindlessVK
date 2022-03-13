@@ -146,9 +146,59 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		VKC(vkQueueWaitIdle(createInfo.graphicsQueue));
 		vkFreeCommandBuffers(m_LogicalDevice, createInfo.commandPool, 1u, &cmdBuffer);
 
-
 		// Free image data
 		stbi_image_free(imageData);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create image views
+	{
+		VkImageViewCreateInfo imageViewCreateInfo {
+			.sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image      = m_Image,
+			.viewType   = VK_IMAGE_VIEW_TYPE_2D,
+			.format     = VK_FORMAT_R8G8B8A8_SRGB,
+			.components = {
+			    // Don't swizzle the colors around...
+			    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+			    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+			    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+			    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+			},
+			.subresourceRange = {
+			    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+			    .baseMipLevel   = 0u,
+			    .levelCount     = 1u,
+			    .baseArrayLayer = 0u,
+			    .layerCount     = 1u,
+			},
+		};
+
+		VKC(vkCreateImageView(m_LogicalDevice, &imageViewCreateInfo, nullptr, &m_ImageView));
+	}
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create image samplers
+	{
+		VkSamplerCreateInfo sammplerCreateInfo {
+			.sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+			.magFilter               = VK_FILTER_LINEAR,
+			.minFilter               = VK_FILTER_LINEAR,
+			.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+			.addressModeU            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			.addressModeV            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			.addressModeW            = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			.mipLodBias              = 0.0f,
+			.anisotropyEnable        = createInfo.anisotropyEnabled,
+			.maxAnisotropy           = createInfo.maxAnisotropy,
+			.compareEnable           = VK_FALSE,
+			.compareOp               = VK_COMPARE_OP_ALWAYS,
+			.minLod                  = 0.0f,
+			.maxLod                  = 1.0f,
+			.borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+			.unnormalizedCoordinates = VK_FALSE,
+		};
+
+		VKC(vkCreateSampler(m_LogicalDevice, &sammplerCreateInfo, nullptr, &m_Sampler));
 	}
 }
 
@@ -157,6 +207,8 @@ Texture::~Texture()
 	vkDestroyBuffer(m_LogicalDevice, m_StagingBuffer, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_StagingBufferMemory, nullptr);
 
+	vkDestroySampler(m_LogicalDevice, m_Sampler, nullptr);
+	vkDestroyImageView(m_LogicalDevice, m_ImageView, nullptr);
 	vkDestroyImage(m_LogicalDevice, m_Image, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_ImageMemory, nullptr);
 }

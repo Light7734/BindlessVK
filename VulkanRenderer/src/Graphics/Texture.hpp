@@ -13,6 +13,8 @@ struct TextureCreateInfo
 	VkCommandPool commandPool;
 
 	const std::string imagePath;
+	bool anisotropyEnabled;
+	float maxAnisotropy;
 };
 
 class Texture
@@ -31,9 +33,12 @@ private:
 	int m_Width, m_Height, m_Channels;
 	VkDeviceSize m_ImageSize;
 
-	VkImage m_Image;
-	VkDeviceMemory m_ImageMemory;
+	VkImage m_Image              = VK_NULL_HANDLE;
+	VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
 
-	VkBuffer m_StagingBuffer;
-	VkDeviceMemory m_StagingBufferMemory;
+	VkImageView m_ImageView = VK_NULL_HANDLE;
+	VkSampler m_Sampler     = VK_NULL_HANDLE;
+
+	VkBuffer m_StagingBuffer             = VK_NULL_HANDLE;
+	VkDeviceMemory m_StagingBufferMemory = VK_NULL_HANDLE;
 };
