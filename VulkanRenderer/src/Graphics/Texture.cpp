@@ -204,13 +204,13 @@ Texture::Texture(TextureCreateInfo& createInfo)
 
 Texture::~Texture()
 {
-	vkDestroyBuffer(m_LogicalDevice, m_StagingBuffer, nullptr);
-	vkFreeMemory(m_LogicalDevice, m_StagingBufferMemory, nullptr);
-
 	vkDestroySampler(m_LogicalDevice, m_Sampler, nullptr);
 	vkDestroyImageView(m_LogicalDevice, m_ImageView, nullptr);
 	vkDestroyImage(m_LogicalDevice, m_Image, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_ImageMemory, nullptr);
+
+	vkDestroyBuffer(m_LogicalDevice, m_StagingBuffer, nullptr);
+	vkFreeMemory(m_LogicalDevice, m_StagingBufferMemory, nullptr);
 }
 
 void Texture::TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout oldLayout, VkImageLayout newLayout)

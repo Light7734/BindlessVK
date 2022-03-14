@@ -2,6 +2,7 @@
 
 #include "Core/Base.hpp"
 #include "Graphics/Pipeline.hpp"
+#include "Graphics/Texture.hpp"
 
 #include <glm/glm.hpp>
 #include <volk.h>
@@ -56,7 +57,7 @@ private:
 	std::vector<const char*> m_Extensions;
 
 	// Device
-	VkPhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+	VkPhysicalDevice m_PhysicalDevice                     = VK_NULL_HANDLE;
 	VkPhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 
 	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
@@ -72,7 +73,7 @@ private:
 	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
 	uint32_t m_PresentQueueIndex  = UINT32_MAX;
 
-    // Swapchain
+	// Swapchain
 	VkSwapchainKHR m_Swapchain;
 
 	VkSurfaceFormatKHR m_SurfaceFormat;
@@ -112,4 +113,5 @@ private:
 
 	// Pipelines
 	std::unique_ptr<Pipeline> m_TrianglePipeline;
+	std::unique_ptr<Texture> m_StatueTexture;
 };

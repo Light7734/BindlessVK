@@ -362,8 +362,6 @@ Device::~Device()
 
 	DestroySwapchain();
 
-	vkDestroyDescriptorSetLayout(m_LogicalDevice, m_DescriptorSetLayout, nullptr);
-
 	vkDestroyDevice(m_LogicalDevice, nullptr);
 
 	vkDestroySurfaceKHR(m_Instance, m_Surface, nullptr);
@@ -656,6 +654,15 @@ void Device::CreateSwapchain()
 		    .pImmutableSamplers = nullptr,
 		});
 
+		// [1] Sampler - Statue texture
+		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
+		    .binding            = 1u,
+		    .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		    .descriptorCount    = 1u,
+		    .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+		    .pImmutableSamplers = nullptr,
+		});
+
 		// Create descriptor set layout
 		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
 			.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -685,18 +692,40 @@ void Device::CreateSwapchain()
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create the texture
+	{
+		TextureCreateInfo textureCreateInfo {
+			.logicalDevice     = m_LogicalDevice,
+			.physicalDevice    = m_PhysicalDevice,
+			.graphicsQueue     = m_GraphicsQueue,
+			.commandPool       = m_CommandPool,
+			.imagePath         = "VulkanRenderer/res/texture.jpg",
+			.anisotropyEnabled = VK_TRUE,
+			.maxAnisotropy     = m_PhysicalDeviceProperties.limits.maxSamplerAnisotropy,
+		};
+
+		m_StatueTexture = std::make_unique<Texture>(textureCreateInfo);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Create descriptor pool
 	{
-		VkDescriptorPoolSize descriptorPoolSize {
-			.type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			.descriptorCount = m_MaxFramesInFlight,
-		};
+		std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
+		descriptorPoolSizes.push_back(VkDescriptorPoolSize {
+		    .type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		    .descriptorCount = m_MaxFramesInFlight,
+		});
+
+		descriptorPoolSizes.push_back(VkDescriptorPoolSize {
+		    .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		    .descriptorCount = m_MaxFramesInFlight,
+		});
 
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
 			.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 			.maxSets       = m_MaxFramesInFlight,
-			.poolSizeCount = 1u,
-			.pPoolSizes    = &descriptorPoolSize,
+			.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
+			.pPoolSizes    = descriptorPoolSizes.data(),
 		};
 
 		VKC(vkCreateDescriptorPool(m_LogicalDevice, &descriptorPoolCreateInfo, nullptr, &m_DescriptorPool));
@@ -725,19 +754,34 @@ void Device::CreateSwapchain()
 				.range  = VK_WHOLE_SIZE, // sizeof(UniformMVP)
 			};
 
-			VkWriteDescriptorSet writeDescriptorSet {
-				.sType            = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-				.dstSet           = m_DescriptorSets[i],
-				.dstBinding       = 0u,
-				.dstArrayElement  = 0u,
-				.descriptorCount  = 1u,
-				.descriptorType   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-				.pImageInfo       = VK_NULL_HANDLE,
-				.pBufferInfo      = &descriptorBufferInfo,
-				.pTexelBufferView = VK_NULL_HANDLE,
+			VkDescriptorImageInfo descriptorImageInfo {
+				.sampler     = m_StatueTexture->GetSampler(),
+				.imageView   = m_StatueTexture->GetImageView(),
+				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			};
 
-			vkUpdateDescriptorSets(m_LogicalDevice, 1u, &writeDescriptorSet, 0u, nullptr);
+			std::vector<VkWriteDescriptorSet> writeDescriptorSets;
+			writeDescriptorSets.push_back(VkWriteDescriptorSet {
+			    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			    .dstSet          = m_DescriptorSets[i],
+			    .dstBinding      = 0u,
+			    .dstArrayElement = 0u,
+			    .descriptorCount = 1u,
+			    .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+			    .pBufferInfo     = &descriptorBufferInfo,
+			});
+
+			writeDescriptorSets.push_back(VkWriteDescriptorSet {
+			    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+			    .dstSet          = m_DescriptorSets[i],
+			    .dstBinding      = 1u,
+			    .dstArrayElement = 0u,
+			    .descriptorCount = 1u,
+			    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			    .pImageInfo      = &descriptorImageInfo,
+			});
+
+			vkUpdateDescriptorSets(m_LogicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
 		}
 	}
 
@@ -761,7 +805,7 @@ void Device::CreateSwapchain()
 			// Vertex input
 			.vertexBindingDesc = VkVertexInputBindingDescription {
 			    .binding   = 0u,
-			    .stride    = sizeof(glm::vec3) + sizeof(glm::vec3),
+			    .stride    = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2),
 			    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
 			},
 			.vertexAttribDescs = {
@@ -776,6 +820,12 @@ void Device::CreateSwapchain()
 			        .binding  = 0u,
 			        .format   = VK_FORMAT_R32G32B32_SFLOAT,
 			        .offset   = sizeof(glm::vec3),
+			    },
+			    VkVertexInputAttributeDescription {
+			        .location = 2u,
+			        .binding  = 0u,
+			        .format   = VK_FORMAT_R32G32_SFLOAT,
+			        .offset   = sizeof(glm::vec3) + sizeof(glm::vec3),
 			    },
 			},
 		};
@@ -793,7 +843,9 @@ void Device::DestroySwapchain()
 	}
 	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
+	vkDestroyDescriptorPool(m_LogicalDevice, m_DescriptorPool, nullptr);
 	m_MVPUniBuffer.clear();
 	vkDestroyDescriptorSetLayout(m_LogicalDevice, m_DescriptorSetLayout, nullptr);
+	m_StatueTexture.reset();
 	m_TrianglePipeline.reset();
 }

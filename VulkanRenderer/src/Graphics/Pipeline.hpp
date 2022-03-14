@@ -3,7 +3,6 @@
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Shader.hpp"
-#include "Graphics/Texture.hpp"
 
 #include <volk.h>
 
@@ -47,8 +46,6 @@ private:
 	VkRenderPass m_RenderPass;
 
 	VkPipeline m_Pipeline;
-
-	std::unique_ptr<Texture> m_Texture;
 
 	// Layout
 	VkPipelineLayout m_PipelineLayout;

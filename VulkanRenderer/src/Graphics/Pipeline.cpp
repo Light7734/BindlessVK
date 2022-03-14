@@ -37,11 +37,11 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	// Create vertex & index buffers
 	{
 		float vertices[] = {
-			// position      -      color
-			-0.5f, -0.5f, 0.0f, 1.0f, 0.6f, 0.0f,
-			0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.6f,
-			0.5f, 0.5f, 0.0f, 0.1f, 1.0f, 0.5f,
-			-0.5f, 0.5f, 0.0f, 0.3f, 0.2f, 1.0f
+			// X    Y      Z  -   R     G     B  -  U    V
+			-0.5f, -0.5f, 0.0f, 1.0f, 0.6f, 0.0f, 1.0f, 0.0f,
+			0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.6f, 0.0f, 0.0f,
+			0.5f, 0.5f, 0.0f, 0.1f, 1.0f, 0.5f, 0.0f, 1.0f,
+			-0.5f, 0.5f, 0.0f, 0.3f, 0.2f, 1.0f, 1.0f, 1.0f
 		};
 
 		uint32_t indices[] = {
@@ -70,24 +70,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 
 		m_VertexBuffer = std::make_unique<StagingBuffer>(vertexBufferCreateInfo);
 		m_IndexBuffer  = std::make_unique<StagingBuffer>(indexBufferCreateInfo);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create the texture
-	{
-		VkPhysicalDeviceProperties physicalDeviceProps;
-		vkGetPhysicalDeviceProperties(createInfo.physicalDevice, &physicalDeviceProps);
-		TextureCreateInfo textureCreateInfo {
-			.logicalDevice     = m_LogicalDevice,
-			.physicalDevice    = createInfo.physicalDevice,
-			.graphicsQueue     = createInfo.graphicsQueue,
-			.commandPool       = createInfo.commandPool,
-			.imagePath         = "VulkanRenderer/res/texture.jpg",
-			.anisotropyEnabled = VK_TRUE,
-			.maxAnisotropy     = physicalDeviceProps.limits.maxSamplerAnisotropy,
-		};
-
-		m_Texture = std::make_unique<Texture>(textureCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////

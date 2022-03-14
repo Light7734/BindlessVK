@@ -23,6 +23,9 @@ public:
 	Texture(TextureCreateInfo& createInfo);
 	~Texture();
 
+	inline VkImageView GetImageView() { return m_ImageView; }
+	inline VkSampler GetSampler() { return m_Sampler; }
+
 private:
 	void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void CopyBufferToImage(VkCommandBuffer cmdBuffer);
