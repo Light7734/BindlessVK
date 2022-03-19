@@ -111,6 +111,12 @@ private:
 
 	std::vector<std::unique_ptr<Buffer>> m_MVPUniBuffer;
 
+	// Depth buffer
+	VkFormat m_DepthFormat;
+	VkImage m_DepthImage;
+	VkDeviceMemory m_DepthImageMemory;
+	VkImageView m_DepthImageView;
+
 	// Pipelines
 	std::unique_ptr<Pipeline> m_TrianglePipeline;
 	std::unique_ptr<Texture> m_StatueTexture;

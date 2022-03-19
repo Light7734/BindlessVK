@@ -38,14 +38,19 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	{
 		float vertices[] = {
 			// X    Y      Z  -   R     G     B  -  U    V
-			-0.5f, -0.5f, 0.0f, 1.0f, 0.6f, 0.0f, 1.0f, 0.0f,
-			0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.6f, 0.0f, 0.0f,
-			0.5f, 0.5f, 0.0f, 0.1f, 1.0f, 0.5f, 0.0f, 1.0f,
-			-0.5f, 0.5f, 0.0f, 0.3f, 0.2f, 1.0f, 1.0f, 1.0f
+			-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+			0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+			0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+			-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+			-0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+			0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+			0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
+			-0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f
 		};
 
 		uint32_t indices[] = {
-			0, 1, 2, 2, 3, 0
+			0, 1, 2, 2, 3, 0,
+			4, 5, 6, 6, 7, 4
 		};
 
 		BufferCreateInfo vertexBufferCreateInfo {
@@ -153,6 +158,20 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.alphaToOneEnable      = VK_FALSE,
 		};
 
+		// Depth-stencil state
+		VkPipelineDepthStencilStateCreateInfo depthStencilState {
+			.sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+			.depthTestEnable       = VK_TRUE,
+			.depthWriteEnable      = VK_TRUE,
+			.depthCompareOp        = VK_COMPARE_OP_LESS,
+			.depthBoundsTestEnable = VK_FALSE,
+			.stencilTestEnable     = VK_FALSE,
+			.front                 = {},
+			.back                  = {},
+			.minDepthBounds        = 0.0f,
+			.maxDepthBounds        = 1.0,
+		};
+
 		// Color blend state
 		VkPipelineColorBlendAttachmentState colorBlendAttachment {
 			.blendEnable         = VK_FALSE,
@@ -184,7 +203,7 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.pViewportState      = &viewportState,
 			.pRasterizationState = &rasterizationState,
 			.pMultisampleState   = &multisampleState,
-			.pDepthStencilState  = nullptr,
+			.pDepthStencilState  = &depthStencilState,
 			.pColorBlendState    = &colorBlendState,
 			.pDynamicState       = nullptr,
 			.layout              = m_PipelineLayout,
@@ -219,12 +238,9 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 	VKC(vkBeginCommandBuffer(m_CommandBuffers[index], &commandBufferBeginInfo));
 
 	// Begin renderpass
-	VkClearValue clearValue { { {
-		0.0f,
-		0.0f,
-		0.0f,
-		1.0f,
-	} } };
+	std::vector<VkClearValue> clearValues;
+	clearValues.push_back(VkClearValue { .color = { 0.0f, 0.0f, 0.0f, 1.0f } });
+	clearValues.push_back(VkClearValue { .depthStencil = { 1.0f, 0 } });
 
 	VkRenderPassBeginInfo renderpassBeginInfo {
 		.sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -234,8 +250,8 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 		    .offset = { 0, 0 },
 		    .extent = startInfo.extent,
 		},
-		.clearValueCount = 1u,
-		.pClearValues    = &clearValue,
+		.clearValueCount = static_cast<uint32_t>(clearValues.size()),
+		.pClearValues    = clearValues.data(),
 	};
 
 	vkCmdBeginRenderPass(m_CommandBuffers[index], &renderpassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -253,7 +269,7 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 
 	// Draw
 	// vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);
-	vkCmdDrawIndexed(m_CommandBuffers[index], 6u, 1u, 0u, 0u, 0u);
+	vkCmdDrawIndexed(m_CommandBuffers[index], 12u, 2u, 0u, 0u, 0u);
 
 	// End...
 	vkCmdEndRenderPass(m_CommandBuffers[index]);
