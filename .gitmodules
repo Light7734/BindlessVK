@@ -1,18 +1,3 @@
-[submodule "Dependencies/glfw"]
-	path = Dependencies/glfw
-	url = https://github.com/glfw/glfw
-[submodule "Dependencies/volk"]
-	path = Dependencies/volk
-	url = https://github.com/zeux/volk
-[submodule "Dependencies/shaderc"]
-	path = Dependencies/shaderc
-	url = https://github.com/google/shaderc
-[submodule "Dependencies/glm"]
-	path = Dependencies/glm
-	url = https://github.com/g-truc/glm
-[submodule "Dependencies/stb_image"]
-	path = Dependencies/stb_image
-	url = https://github.com/nothings/stb
 [submodule "Dependencies/imgui"]
 	path = Dependencies/imgui
 	url = git@github.com:ocornut/imgui.git

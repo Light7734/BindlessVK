@@ -1,0 +1,13 @@
+[requires]
+glfw/3.3.7
+glm/0.9.9.8
+spdlog/1.10.0
+shaderc/2021.1
+volk/1.3.216.0
+stb/cci.20210910
+shaderc/2021.1
+
+[generators]
+CMakeDeps
+CMakeToolchain
+cmake

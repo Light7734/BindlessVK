@@ -19,8 +19,13 @@ IncludeCategories:
     # Custom Project Categories...
 
     # Dependecies
+    - Regex: '<volk.h>'
+      Priority: 400
+
+    # Dependecies
     - Regex: '<'
       Priority: 500
+
     
     # Custom Deependencies Categories...
 
