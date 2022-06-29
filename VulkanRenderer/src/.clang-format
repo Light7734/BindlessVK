@@ -4,7 +4,7 @@ Language: Cpp
 Standard: Cpp11
 ColumnLimit: '0' # No limit
 
-### Bin pack ###
+# Bin pack
 BinPackArguments: 'true'
 BinPackParameters: 'true'
 
@@ -19,8 +19,13 @@ IncludeCategories:
     # Custom Project Categories...
 
     # Dependecies
+    - Regex: '<volk.h>'
+      Priority: 400
+
+    # Dependecies
     - Regex: '<'
       Priority: 500
+
     
     # Custom Deependencies Categories...
 
@@ -82,7 +87,7 @@ SpacesInContainerLiterals: 'false'
 SpacesInParentheses: 'false'
 SpacesInSquareBrackets: 'false'
 
-### Alignment ###
+# Alignment 
 PointerAlignment: Left
 DerivePointerAlignment: 'false'
 AlignAfterOpenBracket: Align
@@ -93,7 +98,7 @@ AlignConsecutiveMacros: 'true'
 AlignOperands: 'true'
 AlignTrailingComments: 'true'
 
-### Single Line ###
+# Single Line 
 AllowShortCaseLabelsOnASingleLine: 'true'
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortLambdasOnASingleLine: Inline
@@ -103,7 +108,7 @@ AllowShortBlocksOnASingleLine: 'false'
 AllowAllParametersOfDeclarationOnNextLine: 'false'
 AllowShortIfStatementsOnASingleLine: Never
 
-### Break ###
+# Break 
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: 'false'
 AlwaysBreakTemplateDeclarations: 'Yes'
