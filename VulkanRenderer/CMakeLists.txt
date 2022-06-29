@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.14)
 
-if(UNIX)
-    add_definitions(-DVULKANRENDERER_PLATFORM_LINUX)
-elseif(WIN32)
-    add_definitions(-DVULKANRENDERER_PLATFORM_WINDOWS)
-endif()
+add_executable(
+    VulkanRenderer
 
-set(SRC_FILES
+    # PCH
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp
 
     # Core
@@ -27,14 +24,39 @@ set(SRC_FILES
 
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Timer.cpp)
-add_executable(VulkanRenderer ${SRC_FILES})
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Timer.cpp
+)
 
-set_property(TARGET VulkanRenderer PROPERTY CXX_STANDARD 20)
+set_target_properties(
+    VulkanRenderer PROPERTIES
+    CXX_STANDARD 20
+)
 
+target_include_directories(
+    VulkanRenderer
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/imgui/
+)
 
-target_include_directories(VulkanRenderer PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/
-    ${CMAKE_SOURCE_DIR}/Dependencies/imgui/)
+target_link_libraries(
+    VulkanRenderer 
+    PRIVATE imgui
+    PRIVATE ${CONAN_LIBS}
+)
 
-target_precompile_headers(VulkanRenderer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp)
+target_precompile_headers(
+    VulkanRenderer 
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp
+)
+
+if(UNIX)
+    target_compile_definitions(
+        VulkanRenderer
+        PRIVATE VULKANRENDERER_PLATFORM=LINUX
+    )
+elseif(WIN32)
+    target_compile_definitions(
+        VulkanRenderer
+        PRIVATE VULKANRENDERER_PLATFORM=WINDOWS
+    )
+endif()

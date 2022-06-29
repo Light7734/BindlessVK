@@ -8,6 +8,4 @@ stb/cci.20210910
 shaderc/2021.1
 
 [generators]
-CMakeDeps
-CMakeToolchain
 cmake

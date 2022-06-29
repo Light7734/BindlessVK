@@ -3,22 +3,18 @@
 // Note: files that are included by this file should not #include "Base.hpp"
 #include "Debug/Logger.hpp"
 
-
 // Platform specific
-#if defined(VULKANRENDERER_PLATFORM_LINUX)
-	#define VULKANRENDERER_PLATFORM "Linux"
+#if VULKANRENDERER_PLATFORM == Linux
 	#include <signal.h>
 	#define DEBUG_TRAP() raise(SIGTRAP)
 
-#elif defined(VULKANRENDERER_PLATFORM_WINDOWS)
-	#define VULKANRENDERER_PLATFORM "Windows"
-	#define DEBUG_TRAP()            __debugbreak()
+#elif VULKANRENDERER_PLATFORM == Windows
+	#define DEBUG_TRAP() __debugbreak()
 
 #else
 	#error "Unsupported platform"
-	#define DEBUG_TRPA()
+	#define DEBUG_TRAP()
 #endif
-
 
 // Exceptions
 #include <exception>
@@ -62,4 +58,3 @@ struct vkException: std::exception
 	{                                                     \
 		throw vkException(#x, vkr##line, __FILE__, line); \
 	}
-
