@@ -1,12 +1,35 @@
-
-
 # Vulkan-Renderer [![forthebadge](https://forthebadge.com/images/badges/works-on-my-machine.svg)](https://forthebadge.com)
-3D Realtime renderer using the Vulkan graphics API, this project is for learning purposes
+Realtime 3d renderer developed using the Vulkan graphics API and C++, built mostly for learning purposes.
 
-Ultimately I will transition what I learned here to my [Light Engine](<https://github.com/light7734/light>) project
+## Setting up the project
+Prerequisites:
+* git
+* conan
+* cmake
+* vulkan-drivers
 
-# Plan
-Here's the [Trello board](https://trello.com/b/idJempUN/vulkan-renderer) of this project
+```
+git clone --recurse-submodules 'git@github.com:light7734/vulkan-renderer.git' vulkan-renderer
+mkdir vulkan-renderer/build
+cd vulkan-renderer/build
+conan install .. --build=missing
+cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_BUILD_TYPE=DEBUG
+cmake --build . -j`nproc`
+cd ..
+ln -s ./build/compile_commands.json ./compile_commands.json
+```
 
-# Contact
-HMU anytime on discord @Light7734#4652 if you want to talk about vulkan or just chat.
+## Development
+**Commit syntax: Category(scope): Description**
+
+Branches:
+* main: The main development branch
+* stable: This branch will most-likely build
+* backup: The old vulkan-renderer (re did the project because I forgot everything)
+
+You can checkout the roadmap of this project on [Trello board](https://trello.com/b/idJempUN/vulkan-renderer)
+
+I have a list of learning resoruces on my [homepage](https://mohammad-hm.com/about)
+
+## Contact
+Feel free to HMU anytime on discord @Light7734#4652 to chat about programming or whatever.
