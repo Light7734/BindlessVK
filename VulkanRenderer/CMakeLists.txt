@@ -13,7 +13,6 @@ add_executable(
 
     # Debug
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/UserInterface.cpp
 
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
