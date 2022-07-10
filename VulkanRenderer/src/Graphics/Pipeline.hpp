@@ -17,6 +17,7 @@ struct PipelineCreateInfo
 	VkExtent2D viewportExtent;
 	VkCommandPool commandPool;
 	uint32_t imageCount;
+	VkSampleCountFlagBits sampleCount;
 	VkRenderPass renderPass;
 
 	Model* model;

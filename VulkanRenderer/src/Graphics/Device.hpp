@@ -64,6 +64,8 @@ private:
 
 	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
 
+	VkSampleCountFlagBits m_MaxSupportedSampleCount;
+
 	// Queue
 	VkQueue m_GraphicsQueue;
 	VkQueue m_PresentQueue;
@@ -89,6 +91,10 @@ private:
 	// Swapcain images & framebuffers
 	std::vector<VkImage> m_Images;
 	std::vector<VkImageView> m_ImageViews;
+
+	VkImage m_ColorImage;
+	VkDeviceMemory m_ColorImageMemory;
+	VkImageView m_ColorImageView;
 
 	std::vector<VkFramebuffer> m_Framebuffers;
 

@@ -240,6 +240,17 @@ Device::Device(DeviceCreateInfo& createInfo)
 
 		// Store the selected physical device's properties
 		vkGetPhysicalDeviceProperties(m_PhysicalDevice, &m_PhysicalDeviceProperties);
+
+		// Determine max sample counts
+		VkSampleCountFlags counts = m_PhysicalDeviceProperties.limits.framebufferColorSampleCounts & m_PhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
+		// m_MaxSupportedSampleCount = VK_SAMPLE_COUNT_1_BIT;
+		m_MaxSupportedSampleCount = counts & VK_SAMPLE_COUNT_64_BIT ? VK_SAMPLE_COUNT_64_BIT :
+		                            counts & VK_SAMPLE_COUNT_32_BIT ? VK_SAMPLE_COUNT_32_BIT :
+		                            counts & VK_SAMPLE_COUNT_16_BIT ? VK_SAMPLE_COUNT_16_BIT :
+		                            counts & VK_SAMPLE_COUNT_8_BIT  ? VK_SAMPLE_COUNT_8_BIT :
+		                            counts & VK_SAMPLE_COUNT_4_BIT  ? VK_SAMPLE_COUNT_4_BIT :
+		                            counts & VK_SAMPLE_COUNT_2_BIT  ? VK_SAMPLE_COUNT_2_BIT :
+		                                                              VK_SAMPLE_COUNT_1_BIT;
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -395,7 +406,7 @@ void Device::DrawFrame()
 	// Update model view projection uniform
 	UniformMVP mvp;
 	mvp.model = glm::rotate(glm::mat4(1.0f), std::cos(time) * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	mvp.view  = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	mvp.view  = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
 	mvp.proj  = glm::perspective(glm::radians(45.0f), m_SwapchainExtent.width / (float)m_SwapchainExtent.height, 0.1f, 10.0f);
 
 	void* mvpMap = m_MVPUniBuffer[m_CurrentFrame]->Map();
@@ -558,6 +569,89 @@ void Device::CreateSwapchain()
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
+	// Create color image
+	{
+		VkImageCreateInfo imageCreateInfo {
+			.sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.flags     = 0x0,
+			.imageType = VK_IMAGE_TYPE_2D,
+			.format    = m_SurfaceFormat.format,
+			.extent    = {
+			       .width  = m_SwapchainExtent.width,
+			       .height = m_SwapchainExtent.height,
+			       .depth  = 1u,
+            },
+			.mipLevels     = 1u,
+			.arrayLayers   = 1u,
+			.samples       = m_MaxSupportedSampleCount,
+			.tiling        = VK_IMAGE_TILING_OPTIMAL,
+			.usage         = VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+			.sharingMode   = VK_SHARING_MODE_EXCLUSIVE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		};
+
+		VKC(vkCreateImage(m_LogicalDevice, &imageCreateInfo, nullptr, &m_ColorImage));
+
+		/* Alloacte and bind the color image memory */
+		{
+			// Fetch memory requirements
+			VkMemoryRequirements imageMemReq;
+			vkGetImageMemoryRequirements(m_LogicalDevice, m_ColorImage, &imageMemReq);
+
+			// Fetch device memory properties
+			VkPhysicalDeviceMemoryProperties physicalMemProps;
+			vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &physicalMemProps);
+
+			// Find adequate memory indices
+			uint32_t imageMemTypeIndex = UINT32_MAX;
+
+			for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
+			{
+				if (imageMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+				{
+					imageMemTypeIndex = i;
+				}
+			}
+
+			ASSERT(imageMemTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
+
+			// Alloacte memory
+			VkMemoryAllocateInfo imageMemAllocInfo {
+				.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+				.allocationSize  = imageMemReq.size,
+				.memoryTypeIndex = imageMemTypeIndex,
+			};
+
+			// Bind memory
+			VKC(vkAllocateMemory(m_LogicalDevice, &imageMemAllocInfo, nullptr, &m_ColorImageMemory));
+			VKC(vkBindImageMemory(m_LogicalDevice, m_ColorImage, m_ColorImageMemory, 0u));
+		}
+		// Create color image-view
+		VkImageViewCreateInfo imageViewCreateInfo {
+			.sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image      = m_ColorImage,
+			.viewType   = VK_IMAGE_VIEW_TYPE_2D,
+			.format     = m_SurfaceFormat.format,
+			.components = {
+			    // Don't swizzle the colors around...
+			    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+			    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+			    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+			    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+			},
+			.subresourceRange = {
+			    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+			    .baseMipLevel   = 0u,
+			    .levelCount     = 1u,
+			    .baseArrayLayer = 0u,
+			    .layerCount     = 1u,
+			},
+		};
+
+		VKC(vkCreateImageView(m_LogicalDevice, &imageViewCreateInfo, nullptr, &m_ColorImageView));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	// Create depth buffer
 	{
 		// Find depth format
@@ -587,7 +681,7 @@ void Device::CreateSwapchain()
             },
 			.mipLevels     = 1u,
 			.arrayLayers   = 1u,
-			.samples       = VK_SAMPLE_COUNT_1_BIT,
+			.samples       = m_MaxSupportedSampleCount,
 			.tiling        = VK_IMAGE_TILING_OPTIMAL,
 			.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 			.sharingMode   = VK_SHARING_MODE_EXCLUSIVE,
@@ -630,7 +724,6 @@ void Device::CreateSwapchain()
 			VKC(vkAllocateMemory(m_LogicalDevice, &imageMemAllocInfo, nullptr, &m_DepthImageMemory));
 			VKC(vkBindImageMemory(m_LogicalDevice, m_DepthImage, m_DepthImageMemory, 0u));
 		}
-
 		// Create depth image-view
 		VkImageViewCreateInfo imageViewCreateInfo {
 			.sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -663,24 +756,35 @@ void Device::CreateSwapchain()
 		std::vector<VkAttachmentDescription> attachments;
 		attachments.push_back(VkAttachmentDescription {
 		    .format         = m_SurfaceFormat.format,
-		    .samples        = VK_SAMPLE_COUNT_1_BIT,
+		    .samples        = m_MaxSupportedSampleCount,
 		    .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		    .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
 		    .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		    .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-		    .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+		    .finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		});
 
 		attachments.push_back(VkAttachmentDescription {
 		    .format         = m_DepthFormat,
-		    .samples        = VK_SAMPLE_COUNT_1_BIT,
+		    .samples        = m_MaxSupportedSampleCount,
 		    .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
 		    .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
 		    .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		    .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
 		    .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		});
+
+		attachments.push_back(VkAttachmentDescription {
+		    .format         = m_SurfaceFormat.format,
+		    .samples        = VK_SAMPLE_COUNT_1_BIT,
+		    .loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		    .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+		    .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		    .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+		    .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 		});
 
 		// Subpass
@@ -694,10 +798,16 @@ void Device::CreateSwapchain()
 			.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		};
 
+		VkAttachmentReference colorAttachmentResolveRef {
+			.attachment = 2u,
+			.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+		};
+
 		VkSubpassDescription subpassDesc {
 			.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
 			.colorAttachmentCount    = 1u,
 			.pColorAttachments       = &colorAttachmentRef,
+			.pResolveAttachments     = &colorAttachmentResolveRef,
 			.pDepthStencilAttachment = &depthAttachmentRef,
 		};
 
@@ -731,7 +841,7 @@ void Device::CreateSwapchain()
 		m_Framebuffers.resize(m_Images.size());
 		for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
 		{
-			std::vector<VkImageView> imageViews = { m_ImageViews[i], m_DepthImageView };
+			std::vector<VkImageView> imageViews = { m_ColorImageView, m_DepthImageView, m_ImageViews[i] };
 			VkFramebufferCreateInfo framebufferCreateInfo {
 				.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 				.renderPass      = m_RenderPass,
@@ -919,6 +1029,7 @@ void Device::CreateSwapchain()
 			.viewportExtent = m_SwapchainExtent,
 			.commandPool    = m_CommandPool,
 			.imageCount     = static_cast<uint32_t>(m_Images.size()),
+			.sampleCount    = m_MaxSupportedSampleCount,
 			.renderPass     = m_RenderPass,
 			.model          = m_VikingRoom.get(),
 
@@ -967,8 +1078,11 @@ void Device::DestroySwapchain()
 		vkDestroyFramebuffer(m_LogicalDevice, m_Framebuffers[i], nullptr);
 	}
 	vkDestroyImageView(m_LogicalDevice, m_DepthImageView, nullptr);
+	vkDestroyImageView(m_LogicalDevice, m_ColorImageView, nullptr);
+	vkDestroyImage(m_LogicalDevice, m_ColorImage, nullptr);
 	vkDestroyImage(m_LogicalDevice, m_DepthImage, nullptr);
 	vkFreeMemory(m_LogicalDevice, m_DepthImageMemory, nullptr);
+	vkFreeMemory(m_LogicalDevice, m_ColorImageMemory, nullptr);
 	vkDestroyRenderPass(m_LogicalDevice, m_RenderPass, nullptr);
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
 	vkDestroyDescriptorPool(m_LogicalDevice, m_DescriptorPool, nullptr);

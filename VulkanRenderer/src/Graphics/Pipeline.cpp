@@ -134,7 +134,7 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		// Multi-sample state
 		VkPipelineMultisampleStateCreateInfo multisampleState {
 			.sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-			.rasterizationSamples  = VK_SAMPLE_COUNT_1_BIT,
+			.rasterizationSamples  = createInfo.sampleCount,
 			.sampleShadingEnable   = VK_FALSE,
 			.pSampleMask           = nullptr,
 			.alphaToCoverageEnable = VK_FALSE,
