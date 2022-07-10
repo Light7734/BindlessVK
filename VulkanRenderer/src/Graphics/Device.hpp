@@ -1,11 +1,13 @@
 #pragma once
 
 #include "Core/Base.hpp"
+#include "Graphics/Model.hpp"
 #include "Graphics/Pipeline.hpp"
 #include "Graphics/Texture.hpp"
 
-#include <glm/glm.hpp>
 #include <volk.h>
+
+#include <glm/glm.hpp>
 
 class Window;
 
@@ -120,4 +122,6 @@ private:
 	// Pipelines
 	std::unique_ptr<Pipeline> m_TrianglePipeline;
 	std::unique_ptr<Texture> m_StatueTexture;
+
+	std::unique_ptr<Model> m_VikingRoom;
 };

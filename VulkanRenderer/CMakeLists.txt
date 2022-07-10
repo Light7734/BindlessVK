@@ -20,6 +20,7 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Buffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Model.cpp
 
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp

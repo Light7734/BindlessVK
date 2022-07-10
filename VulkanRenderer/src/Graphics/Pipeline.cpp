@@ -3,7 +3,7 @@
 #include <glm/glm.hpp>
 
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_RenderPass(createInfo.renderPass)
+    : m_LogicalDevice(createInfo.logicalDevice), m_RenderPass(createInfo.renderPass), m_Model(createInfo.model)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create command buffers...
@@ -36,31 +36,14 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create vertex & index buffers
 	{
-		float vertices[] = {
-			// X    Y      Z  -   R     G     B  -  U    V
-			-0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-			0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-			0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-			-0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-			-0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-			0.5f, -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-			0.5f, 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-			-0.5f, 0.5f, -0.5f, 1.0f, 1.0f, 1.0f, 0.0f, 1.0f
-		};
-
-		uint32_t indices[] = {
-			0, 1, 2, 2, 3, 0,
-			4, 5, 6, 6, 7, 4
-		};
-
 		BufferCreateInfo vertexBufferCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
 			.physicalDevice = createInfo.physicalDevice,
 			.commandPool    = createInfo.commandPool,
 			.graphicsQueue  = createInfo.graphicsQueue,
 			.usage          = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			.size           = sizeof(vertices),
-			.initialData    = vertices,
+			.size           = createInfo.model->GetVerticesSize(),
+			.initialData    = createInfo.model->GetVertices(),
 		};
 
 		BufferCreateInfo indexBufferCreateInfo {
@@ -69,8 +52,8 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 			.commandPool    = createInfo.commandPool,
 			.graphicsQueue  = createInfo.graphicsQueue,
 			.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			.size           = sizeof(indices),
-			.initialData    = indices,
+			.size           = createInfo.model->GetIndicesSize(),
+			.initialData    = createInfo.model->GetIndices(),
 		};
 
 		m_VertexBuffer = std::make_unique<StagingBuffer>(vertexBufferCreateInfo);
@@ -269,7 +252,7 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 
 	// Draw
 	// vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);
-	vkCmdDrawIndexed(m_CommandBuffers[index], 12u, 2u, 0u, 0u, 0u);
+	vkCmdDrawIndexed(m_CommandBuffers[index], m_Model->GetIndicesCount(), 1u, 0u, 0u, 0u);
 
 	// End...
 	vkCmdEndRenderPass(m_CommandBuffers[index]);

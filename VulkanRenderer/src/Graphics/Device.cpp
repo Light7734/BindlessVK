@@ -394,8 +394,8 @@ void Device::DrawFrame()
 
 	// Update model view projection uniform
 	UniformMVP mvp;
-	mvp.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	mvp.view  = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	mvp.model = glm::rotate(glm::mat4(1.0f), std::cos(time) * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	mvp.view  = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
 	mvp.proj  = glm::perspective(glm::radians(45.0f), m_SwapchainExtent.width / (float)m_SwapchainExtent.height, 0.1f, 10.0f);
 
 	void* mvpMap = m_MVPUniBuffer[m_CurrentFrame]->Map();
@@ -817,7 +817,7 @@ void Device::CreateSwapchain()
 			.physicalDevice    = m_PhysicalDevice,
 			.graphicsQueue     = m_GraphicsQueue,
 			.commandPool       = m_CommandPool,
-			.imagePath         = "VulkanRenderer/res/texture.jpg",
+			.imagePath         = "VulkanRenderer/res/viking_room.png",
 			.anisotropyEnabled = VK_TRUE,
 			.maxAnisotropy     = m_PhysicalDeviceProperties.limits.maxSamplerAnisotropy,
 		};
@@ -906,6 +906,12 @@ void Device::CreateSwapchain()
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create pipelines
 	{
+		ModelCreateInfo modelCreateInfo {
+			.texturePath = "VulkanRenderer/res/viking_room.png",
+			.modelPath   = "VulkanRenderer/res/viking_room.obj",
+		};
+		m_VikingRoom = std::make_unique<Model>(modelCreateInfo);
+
 		PipelineCreateInfo pipelineCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
 			.physicalDevice = m_PhysicalDevice,
@@ -914,6 +920,7 @@ void Device::CreateSwapchain()
 			.commandPool    = m_CommandPool,
 			.imageCount     = static_cast<uint32_t>(m_Images.size()),
 			.renderPass     = m_RenderPass,
+			.model          = m_VikingRoom.get(),
 
 			// Shader
 			.descriptorSetLayouts = { m_DescriptorSetLayout },

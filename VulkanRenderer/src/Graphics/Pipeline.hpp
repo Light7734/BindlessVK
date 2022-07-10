@@ -2,9 +2,12 @@
 
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
+#include "Graphics/Model.hpp"
 #include "Graphics/Shader.hpp"
 
 #include <volk.h>
+
+#include <glm/glm.hpp>
 
 struct PipelineCreateInfo
 {
@@ -15,6 +18,8 @@ struct PipelineCreateInfo
 	VkCommandPool commandPool;
 	uint32_t imageCount;
 	VkRenderPass renderPass;
+
+	Model* model;
 
 	// Shader
 	std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
@@ -55,4 +60,6 @@ private:
 	std::unique_ptr<StagingBuffer> m_IndexBuffer;
 
 	std::vector<VkCommandBuffer> m_CommandBuffers;
+
+	Model* m_Model;
 };

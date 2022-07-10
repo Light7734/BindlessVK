@@ -12,7 +12,7 @@ struct BufferCreateInfo
 	VkQueue graphicsQueue;
 	VkBufferUsageFlags usage;
 	VkDeviceSize size;
-	void* initialData = nullptr;
+	const void* initialData = nullptr;
 };
 
 class Buffer

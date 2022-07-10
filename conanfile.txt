@@ -6,6 +6,7 @@ shaderc/2021.1
 volk/1.3.216.0
 stb/cci.20210910
 shaderc/2021.1
+tinyobjloader/1.0.6
 
 [generators]
 cmake
