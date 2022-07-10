@@ -34,6 +34,7 @@ private:
 	VkDevice m_LogicalDevice;
 
 	int m_Width, m_Height, m_Channels;
+	uint32_t m_MipLevels;
 	VkDeviceSize m_ImageSize;
 
 	VkImage m_Image              = VK_NULL_HANDLE;
