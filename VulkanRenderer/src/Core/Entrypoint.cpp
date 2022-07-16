@@ -2,6 +2,7 @@
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Pipeline.hpp"
+#include "Graphics/Renderer.hpp"
 #include "Graphics/Shader.hpp"
 #include "Utils/Timer.hpp"
 #define GLFW_INCLUDE_VULKAN
@@ -11,15 +12,29 @@
 
 int main()
 {
-	// Initialize Logger
 	Logger::Init();
+	// Create window (hidden)
 
+	// Create Device
+	// Create Renderer
+
+	// Load objects to render
+
+	// Show window
+	// While loop
+	// {
+	// HandleWindowEvents
+	// Loop through objects and render them
+	// Print FPS every second
+	// }
 
 	int exitCode = 0;
 	try
 	{
 		/////////////////////////////////////////////////////////////////////////////////
-		// Create window
+		// Create objects
+
+		// window
 		WindowCreateInfo windowCreateInfo {
 			.specs = {
 			    .title  = "Vulkan renderer",
@@ -33,11 +48,10 @@ int main()
 		};
 		Window window(windowCreateInfo);
 
-		/////////////////////////////////////////////////////////////////////////////////
-		// Create device
+
+		// device
 		auto deviceExtensions = window.GetRequiredExtensions();
 		deviceExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
 		DeviceCreateInfo deviceCreateInfo {
 			.window                  = &window,
 			.layers                  = { "VK_LAYER_KHRONOS_validation" },
@@ -51,15 +65,39 @@ int main()
 		};
 		Device device(deviceCreateInfo);
 
+		// renderer
+		RendererCreateInfo rendererCreateInfo {
+			.logicalDevice            = device.GetLogicalDevice(),
+			.physicalDevice           = device.GetPhysicalDevice(),
+			.physicalDeviceProperties = device.GetPhysicalDeviceProperties(),
+			.sampleCount              = device.GetMaxSupportedSampleCount(),
+			.surfaceInfo              = device.FetchSurfaceInfo(),
+			.queueInfo                = device.GetQueueInfo(),
+		};
+		std::unique_ptr<Renderer> renderer = std::make_unique<Renderer>(rendererCreateInfo);
+
 		/////////////////////////////////////////////////////////////////////////////////
 		// Main loop
 		uint32_t frames = 0u;
 		Timer fpsTimer;
 		while (!window.ShouldClose())
 		{
+			// Window events
 			window.PollEvents();
-			device.DrawFrame();
 
+			// Draw scene
+			// renderer->BeginFrame();
+			// renderer->Draw();
+			renderer->EndFrame();
+
+			// Re-create the renderer
+			if (renderer->IsSwapchainInvalidated())
+			{
+				renderer.reset();
+				renderer = std::make_unique<Renderer>(rendererCreateInfo);
+			}
+
+			// FPS Counter
 			frames++;
 			if (fpsTimer.ElapsedTime() >= 1.0f)
 			{
@@ -69,8 +107,6 @@ int main()
 			}
 		}
 	}
-
-	// Report unexpected termination
 	catch (FailedAsssertionException exception)
 	{
 		LOG(critical, "Terminating due FailedAssertionException");
@@ -78,7 +114,5 @@ int main()
 	}
 
 	// Cleanup...
-
-	// Return
 	return exitCode;
 }

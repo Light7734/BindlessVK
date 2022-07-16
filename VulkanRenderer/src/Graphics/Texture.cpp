@@ -191,7 +191,7 @@ Texture::Texture(TextureCreateInfo& createInfo)
 					    .baseArrayLayer = 0u,
 					    .layerCount     = 1u,
 					},
-					.dstOffsets = { { 0, 0, 0 }, { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1 } },
+					.dstOffsets = { { 0, 0, 0 }, { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 } },
 				};
 
 				vkCmdBlitImage(cmdBuffer,

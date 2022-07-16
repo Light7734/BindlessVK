@@ -11,12 +11,32 @@
 
 class Window;
 
-
 struct UniformMVP
 {
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
+};
+
+struct SurfaceInfo
+{
+	VkSurfaceKHR surface = VK_NULL_HANDLE;
+	VkSurfaceCapabilitiesKHR capabilities;
+	VkSurfaceFormatKHR format;
+	VkPresentModeKHR presentMode;
+
+	std::vector<VkSurfaceFormatKHR> supportedFormats;
+	std::vector<VkPresentModeKHR> supportedPresentModes;
+};
+
+struct QueueInfo
+{
+	// WARN!: These should be coherent in memory
+	uint32_t graphicsQueueIndex;
+	uint32_t presentQueueIndex;
+
+	VkQueue graphicsQueue;
+	VkQueue presentQueue;
 };
 
 struct DeviceCreateInfo
@@ -37,20 +57,20 @@ public:
 	Device(DeviceCreateInfo& createInfo);
 	~Device();
 
+	void LogDebugInfo();
+
+	SurfaceInfo FetchSurfaceInfo();
+
 	void DrawFrame();
 
+	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
+
 	inline VkDevice GetLogicalDevice() const { return m_LogicalDevice; }
-	inline VkCommandPool GetCommandPool() const { return m_CommandPool; }
-	inline uint32_t GetImageCount() const { return m_Images.size(); }
+	inline VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
+	inline VkPhysicalDeviceProperties GetPhysicalDeviceProperties() const { return m_PhysicalDeviceProperties; }
+	inline VkSampleCountFlagBits GetMaxSupportedSampleCount() const { return m_MaxSupportedSampleCount; }
 
 private:
-	void CreateSwapchain();
-	void DestroySwapchain();
-
-private:
-	// Window
-	Window* m_Window;
-
 	// Instance
 	VkInstance m_Instance = VK_NULL_HANDLE;
 
@@ -59,75 +79,12 @@ private:
 	std::vector<const char*> m_Extensions;
 
 	// Device
+	VkDevice m_LogicalDevice                              = VK_NULL_HANDLE;
 	VkPhysicalDevice m_PhysicalDevice                     = VK_NULL_HANDLE;
 	VkPhysicalDeviceProperties m_PhysicalDeviceProperties = {};
+	VkSampleCountFlagBits m_MaxSupportedSampleCount       = VK_SAMPLE_COUNT_1_BIT;
 
-	VkDevice m_LogicalDevice = VK_NULL_HANDLE;
-
-	VkSampleCountFlagBits m_MaxSupportedSampleCount;
-
-	// Queue
-	VkQueue m_GraphicsQueue;
-	VkQueue m_PresentQueue;
-
-	// Surface
-	VkSurfaceKHR m_Surface;
-
-	// Queues #WARNING: Don't change the order of these 2 variables, they should be coherent in the memory
-	uint32_t m_GraphicsQueueIndex = UINT32_MAX;
-	uint32_t m_PresentQueueIndex  = UINT32_MAX;
-
-	// Swapchain
-	VkSwapchainKHR m_Swapchain;
-
-	VkSurfaceFormatKHR m_SurfaceFormat;
-	VkPresentModeKHR m_PresentMode;
-	VkExtent2D m_SwapchainExtent;
-
-	VkSurfaceCapabilitiesKHR m_SurfcaCapabilities;
-	std::vector<VkSurfaceFormatKHR> m_SupportedSurfaceFormats;
-	std::vector<VkPresentModeKHR> m_SupportedPresentModes;
-
-	// Swapcain images & framebuffers
-	std::vector<VkImage> m_Images;
-	std::vector<VkImageView> m_ImageViews;
-
-	VkImage m_ColorImage;
-	VkDeviceMemory m_ColorImageMemory;
-	VkImageView m_ColorImageView;
-
-	std::vector<VkFramebuffer> m_Framebuffers;
-
-	// RenderPass
-	VkRenderPass m_RenderPass;
-
-	// Commands
-	VkCommandPool m_CommandPool;
-	std::vector<VkCommandBuffer> m_CommandBuffers;
-
-	//Synchronization
-	std::vector<VkSemaphore> m_AquireImageSemaphores;
-	std::vector<VkSemaphore> m_RenderSemaphores;
-	std::vector<VkFence> m_FrameFences;
-	const uint32_t m_MaxFramesInFlight = 2u;
-	uint32_t m_CurrentFrame            = 0u;
-
-	// Descriptor sets
-	VkDescriptorSetLayout m_DescriptorSetLayout;
-	VkDescriptorPool m_DescriptorPool;
-	std::vector<VkDescriptorSet> m_DescriptorSets;
-
-	std::vector<std::unique_ptr<Buffer>> m_MVPUniBuffer;
-
-	// Depth buffer
-	VkFormat m_DepthFormat;
-	VkImage m_DepthImage;
-	VkDeviceMemory m_DepthImageMemory;
-	VkImageView m_DepthImageView;
-
-	// Pipelines
-	std::unique_ptr<Pipeline> m_TrianglePipeline;
-	std::unique_ptr<Texture> m_StatueTexture;
-
-	std::unique_ptr<Model> m_VikingRoom;
+	// Queue & Surface
+	QueueInfo m_QueueInfo;
+	SurfaceInfo m_SurfaceInfo;
 };
