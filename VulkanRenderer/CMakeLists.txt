@@ -7,8 +7,9 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp
 
     # Core
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Entrypoint.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Base.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Entrypoint.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/UUID.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Window.cpp
 
     # Debug
