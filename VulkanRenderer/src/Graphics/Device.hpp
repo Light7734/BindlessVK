@@ -1,9 +1,6 @@
 #pragma once
 
 #include "Core/Base.hpp"
-#include "Graphics/Model.hpp"
-#include "Graphics/Pipeline.hpp"
-#include "Graphics/Texture.hpp"
 
 #include <volk.h>
 

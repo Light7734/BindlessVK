@@ -3,8 +3,8 @@
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
-#include "Graphics/Model.hpp"
 #include "Graphics/Pipeline.hpp"
+#include "Graphics/Renderable.hpp"
 #include "Graphics/Texture.hpp"
 
 #include <volk.h>
@@ -73,7 +73,7 @@ private:
 	VkDescriptorPool m_DescriptorPool             = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> m_DescriptorSets = {};
 
-	std::vector<std::unique_ptr<Buffer>> m_MVPUniBuffer = {};
+	std::vector<std::shared_ptr<Buffer>> m_MVPUniBuffer = {};
 
 	// Depth buffer
 	VkFormat m_DepthFormat;
@@ -82,8 +82,6 @@ private:
 	VkImageView m_DepthImageView;
 
 	// Pipelines
-	std::unique_ptr<Pipeline> m_TrianglePipeline;
-	std::unique_ptr<Texture> m_StatueTexture;
-
-	std::unique_ptr<Model> m_VikingRoom;
+	std::vector<std::shared_ptr<Pipeline>> m_Pipelines = {};
+	std::shared_ptr<Texture> m_StatueTexture; // #TEMP
 };

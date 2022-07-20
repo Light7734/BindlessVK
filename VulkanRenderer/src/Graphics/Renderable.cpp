@@ -1,14 +1,16 @@
-#include "Graphics/Model.hpp"
+#include "Graphics/Renderable.hpp"
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
-Model::Model(ModelCreateInfo& createInfo)
+Renderable::Renderable(RenderableCreateInfo& createInfo)
+    : m_Textures(createInfo.textures)
 {
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
 
+	std::unordered_map<Vertex, uint32_t> uniqueVertices = {};
 	std::string warn, err;
 
 	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, createInfo.modelPath.c_str()))
@@ -26,22 +28,22 @@ Model::Model(ModelCreateInfo& createInfo)
 				                attrib.vertices[3 * index.vertex_index + 1],
 				                attrib.vertices[3 * index.vertex_index + 2] };
 
-			vertex.color = glm::vec4({ 1.0, 1.0, 1.0, 1.0 });
+			vertex.color = glm::vec4({ 0.0, 1.0, 1.0, 1.0 });
 
 			vertex.uv = { attrib.texcoords[2 * index.texcoord_index + 0],
 				          1.0 - attrib.texcoords[2 * index.texcoord_index + 1] };
 
-			if (m_UniqueVertices.count(vertex) == 0u)
+			if (uniqueVertices.count(vertex) == 0u)
 			{
-				m_UniqueVertices[vertex] = static_cast<uint32_t>(m_Vertices.size());
+				uniqueVertices[vertex] = static_cast<uint32_t>(m_Vertices.size());
 				m_Vertices.push_back(vertex);
 			}
 
-			m_Indices.push_back(m_UniqueVertices[vertex]);
+			m_Indices.push_back(uniqueVertices[vertex]);
 		}
 	}
 }
 
-Model::~Model()
+Renderable::~Renderable()
 {
 }

@@ -18,8 +18,8 @@ add_executable(
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Model.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Renderable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Texture.cpp

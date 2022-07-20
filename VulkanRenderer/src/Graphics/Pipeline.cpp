@@ -1,9 +1,10 @@
 #include "Graphics/Pipeline.hpp"
 
 #include <glm/glm.hpp>
+#include <unordered_set>
 
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_RenderPass(createInfo.renderPass), m_Model(createInfo.model)
+    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_ViewProjectionBuffers(createInfo.viewProjectionBuffers), m_QueueInfo(createInfo.queueInfo)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create command buffers...
@@ -34,30 +35,57 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create vertex & index buffers
+	// Create descriptor sets
 	{
-		BufferCreateInfo vertexBufferCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
-			.commandPool    = createInfo.commandPool,
-			.graphicsQueue  = createInfo.graphicsQueue,
-			.usage          = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			.size           = createInfo.model->GetVerticesSize(),
-			.initialData    = createInfo.model->GetVertices(),
-		};
+		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 
-		BufferCreateInfo indexBufferCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
-			.commandPool    = createInfo.commandPool,
-			.graphicsQueue  = createInfo.graphicsQueue,
-			.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			.size           = createInfo.model->GetIndicesSize(),
-			.initialData    = createInfo.model->GetIndices(),
-		};
+		// [0] Uniform - Model view projection
+		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
+		    .binding            = 0u,
+		    .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		    .descriptorCount    = 1u,
+		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
+		    .pImmutableSamplers = nullptr,
+		});
 
-		m_VertexBuffer = std::make_unique<StagingBuffer>(vertexBufferCreateInfo);
-		m_IndexBuffer  = std::make_unique<StagingBuffer>(indexBufferCreateInfo);
+		// [1] Sampler - Statue texture
+		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
+		    .binding            = 1u,
+		    .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		    .descriptorCount    = 1u,
+		    .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
+		    .pImmutableSamplers = nullptr,
+		});
+
+		// [2] Storage - Per Object Data
+		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
+		    .binding            = 2u,
+		    .descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		    .descriptorCount    = 1u,
+		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
+		    .pImmutableSamplers = nullptr,
+		});
+
+		// Create descriptor set layout
+		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+			.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = static_cast<uint32_t>(layoutBindings.size()),
+			.pBindings    = layoutBindings.data(),
+		};
+		VKC(vkCreateDescriptorSetLayout(m_LogicalDevice, &descriptorSetLayoutCreateInfo, nullptr, &m_DescriptorSetLayout));
+
+		m_DescriptorSets.resize(m_MaxFramesInFlight);
+		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+		{
+			// Allocate descriptor sets
+			VkDescriptorSetAllocateInfo descriptorSetAllocInfo {
+				.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+				.descriptorPool     = createInfo.descriptorPool,
+				.descriptorSetCount = 1u,
+				.pSetLayouts        = &m_DescriptorSetLayout,
+			};
+			VKC(vkAllocateDescriptorSets(m_LogicalDevice, &descriptorSetAllocInfo, &m_DescriptorSets[i]));
+		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -65,8 +93,8 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	{
 		VkPipelineLayoutCreateInfo pipelineLayout {
 			.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-			.setLayoutCount         = static_cast<uint32_t>(createInfo.descriptorSetLayouts.size()),
-			.pSetLayouts            = createInfo.descriptorSetLayouts.data(),
+			.setLayoutCount         = 1,
+			.pSetLayouts            = &m_DescriptorSetLayout,
 			.pushConstantRangeCount = 0u,
 			.pPushConstantRanges    = nullptr,
 		};
@@ -80,8 +108,8 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		// Vertex input state
 		VkPipelineVertexInputStateCreateInfo vertexInputState {
 			.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-			.vertexBindingDescriptionCount   = 1u,
-			.pVertexBindingDescriptions      = &createInfo.vertexBindingDesc,
+			.vertexBindingDescriptionCount   = static_cast<uint32_t>(createInfo.vertexBindingDescs.size()),
+			.pVertexBindingDescriptions      = createInfo.vertexBindingDescs.data(),
 			.vertexAttributeDescriptionCount = static_cast<uint32_t>(createInfo.vertexAttribDescs.size()),
 			.pVertexAttributeDescriptions    = createInfo.vertexAttribDescs.data(),
 		};
@@ -206,6 +234,144 @@ Pipeline::~Pipeline()
 	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
 }
 
+void Pipeline::CreateRenderable(RenderableCreateInfo& createInfo)
+{
+	m_Renderables.emplace_back(createInfo);
+	LOG(trace, "Added renderable with id: {}", m_Renderables.back().m_Id);
+}
+
+void Pipeline::RemoveRenderable(UUID renderableId)
+{
+	auto it = std::find_if(m_Renderables.begin(), m_Renderables.end(), [renderableId](const Renderable& renderable) { return renderable.m_Id == renderableId; });
+
+	if (it != m_Renderables.end())
+	{
+		m_Renderables.erase(it);
+	}
+
+	LOG(trace, "Removed renderable with id: {}", renderableId);
+}
+
+void Pipeline::RecreateBuffers()
+{
+	m_IndicesCount = 0u;
+	m_VertexBuffer.reset();
+	m_IndexBuffer.reset();
+	m_StorageBuffer.reset();
+
+	std::vector<Vertex> vertices;
+	std::vector<ObjectData> objects;
+	std::vector<uint32_t> indices;
+	std::unordered_set<std::shared_ptr<Texture>> textures;
+
+	uint32_t index = 0;
+	for (auto& renderable : m_Renderables)
+	{
+		for (auto& vertex : renderable.GetVertices())
+			vertex.objectIndex = index;
+
+		vertices.insert(vertices.end(), renderable.GetVertices().begin(), renderable.GetVertices().end());
+		indices.insert(indices.end(), renderable.GetIndices().begin(), renderable.GetIndices().end());
+
+		m_IndicesCount += renderable.GetIndicesCount();
+
+		// #TODO
+		objects.push_back(ObjectData { .transform = glm::mat4(1.0) });
+	}
+
+	// vertex buffer
+	BufferCreateInfo vbufferCreateInfo {
+		.logicalDevice  = m_LogicalDevice,
+		.physicalDevice = m_PhysicalDevice,
+		.commandPool    = m_CommandPool,
+		.graphicsQueue  = m_QueueInfo.graphicsQueue,
+		.usage          = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		.size           = vertices.size() * sizeof(Vertex),
+		.initialData    = vertices.data(),
+	};
+	m_VertexBuffer = std::make_unique<StagingBuffer>(vbufferCreateInfo);
+
+	// index buffer
+	BufferCreateInfo ibufferCreateInfo {
+		.logicalDevice  = m_LogicalDevice,
+		.physicalDevice = m_PhysicalDevice,
+		.commandPool    = m_CommandPool,
+		.graphicsQueue  = m_QueueInfo.graphicsQueue,
+		.usage          = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		.size           = indices.size() * sizeof(uint32_t),
+		.initialData    = indices.data(),
+	};
+	m_IndexBuffer = std::make_unique<StagingBuffer>(ibufferCreateInfo);
+
+	// texture indices vertex buffer
+	BufferCreateInfo storageBufferCreateInfo {
+		.logicalDevice  = m_LogicalDevice,
+		.physicalDevice = m_PhysicalDevice,
+		.commandPool    = m_CommandPool,
+		.graphicsQueue  = m_QueueInfo.graphicsQueue,
+		.usage          = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+		.size           = objects.size() * sizeof(ObjectData),
+		.initialData    = objects.data(),
+	};
+	m_StorageBuffer = std::make_unique<Buffer>(storageBufferCreateInfo);
+
+	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+	{
+		// Update descriptor sets
+		std::vector<VkWriteDescriptorSet> writeDescriptorSets;
+		VkDescriptorBufferInfo descriptorBufferInfo {
+			.buffer = *m_ViewProjectionBuffers[i]->GetBuffer(),
+			.offset = 0u,
+			.range  = VK_WHOLE_SIZE, // sizeof(UniformMVP)
+		};
+
+		VkDescriptorBufferInfo descriptorStorageInfo {
+			.buffer = *m_StorageBuffer->GetBuffer(),
+			.offset = 0u,
+			.range  = VK_WHOLE_SIZE,
+		};
+
+		VkDescriptorImageInfo descriptorImageInfo {
+			// #TODO:
+			.sampler     = m_Renderables[0].GetTextures()[0]->GetSampler(),
+			.imageView   = m_Renderables[0].GetTextures()[0]->GetImageView(),
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		};
+
+		writeDescriptorSets.push_back(VkWriteDescriptorSet {
+		    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		    .dstSet          = m_DescriptorSets[i],
+		    .dstBinding      = 0u,
+		    .dstArrayElement = 0u,
+		    .descriptorCount = 1u,
+		    .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		    .pBufferInfo     = &descriptorBufferInfo,
+		});
+
+		writeDescriptorSets.push_back(VkWriteDescriptorSet {
+		    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		    .dstSet          = m_DescriptorSets[i],
+		    .dstBinding      = 1u,
+		    .dstArrayElement = 0u,
+		    .descriptorCount = 1u,
+		    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		    .pImageInfo      = &descriptorImageInfo,
+		});
+
+		writeDescriptorSets.push_back(VkWriteDescriptorSet {
+		    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+		    .dstSet          = m_DescriptorSets[i],
+		    .dstBinding      = 2u,
+		    .dstArrayElement = 0u,
+		    .descriptorCount = 1u,
+		    .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		    .pBufferInfo     = &descriptorStorageInfo,
+		});
+
+		vkUpdateDescriptorSets(m_LogicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
+	}
+}
+
 VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 {
 	uint32_t index = startInfo.frameIndex; // alias
@@ -248,11 +414,10 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 	vkCmdBindIndexBuffer(m_CommandBuffers[index], *m_IndexBuffer->GetBuffer(), 0u, VK_INDEX_TYPE_UINT32);
 
 	// Bind descriptor sets
-	vkCmdBindDescriptorSets(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0u, 1u, startInfo.mvpDescriptorSet, 0, nullptr);
+	vkCmdBindDescriptorSets(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0u, 1u, &m_DescriptorSets[index], 0, nullptr);
 
 	// Draw
-	// vkCmdDraw(m_CommandBuffers[index], 3, 1, 0, 0);
-	vkCmdDrawIndexed(m_CommandBuffers[index], m_Model->GetIndicesCount(), 1u, 0u, 0u, 0u);
+	vkCmdDrawIndexed(m_CommandBuffers[index], m_IndicesCount, 1u, 0u, 0u, 0u);
 
 	// End...
 	vkCmdEndRenderPass(m_CommandBuffers[index]);

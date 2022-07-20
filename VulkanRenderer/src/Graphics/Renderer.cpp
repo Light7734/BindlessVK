@@ -401,38 +401,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Specify descriptor set layout bindings and create a DescriptorSetLayout
-	{
-		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-
-		// [0] Uniform - Model view projection
-		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
-		    .binding            = 0u,
-		    .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		    .descriptorCount    = 1u,
-		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
-		    .pImmutableSamplers = nullptr,
-		});
-
-		// [1] Sampler - Statue texture
-		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
-		    .binding            = 1u,
-		    .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		    .descriptorCount    = 1u,
-		    .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
-		    .pImmutableSamplers = nullptr,
-		});
-
-		// Create descriptor set layout
-		VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
-			.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-			.bindingCount = static_cast<uint32_t>(layoutBindings.size()),
-			.pBindings    = layoutBindings.data(),
-		};
-		VKC(vkCreateDescriptorSetLayout(m_LogicalDevice, &descriptorSetLayoutCreateInfo, nullptr, &m_DescriptorSetLayout));
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
 	// Create uniform buffers
 	{
 		BufferCreateInfo mvpBufferCreateInfo {
@@ -447,7 +415,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		m_MVPUniBuffer.resize(m_MaxFramesInFlight);
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
 		{
-			m_MVPUniBuffer[i] = std::make_unique<Buffer>(mvpBufferCreateInfo);
+			m_MVPUniBuffer[i] = std::make_shared<Buffer>(mvpBufferCreateInfo);
 		}
 	}
 
@@ -464,27 +432,24 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			.maxAnisotropy     = createInfo.physicalDeviceProperties.limits.maxSamplerAnisotropy,
 		};
 
-		m_StatueTexture = std::make_unique<Texture>(textureCreateInfo);
+		m_StatueTexture = std::make_shared<Texture>(textureCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create descriptor pool
 	{
-		std::vector<VkDescriptorPoolSize> descriptorPoolSizes;
-		descriptorPoolSizes.push_back(VkDescriptorPoolSize {
-		    .type            = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		    .descriptorCount = m_MaxFramesInFlight,
-		});
+		std::vector<VkDescriptorPoolSize> descriptorPoolSizes = {
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 20 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 20 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 20 },
+		};
 
-		descriptorPoolSizes.push_back(VkDescriptorPoolSize {
-		    .type            = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		    .descriptorCount = m_MaxFramesInFlight,
-		});
+		descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
 		VkDescriptorPoolCreateInfo descriptorPoolCreateInfo {
 			.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
 			.maxSets       = m_MaxFramesInFlight,
-			.poolSizeCount = static_cast<uint32_t>(descriptorPoolSizes.size()),
+			.poolSizeCount = 3u,
 			.pPoolSizes    = descriptorPoolSizes.data(),
 		};
 
@@ -492,89 +457,47 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create descriptor sets
-	{
-		m_DescriptorSets.resize(m_MaxFramesInFlight);
-
-		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
-		{
-			// Allocate descriptor sets
-			VkDescriptorSetAllocateInfo descriptorSetAllocInfo {
-				.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-				.descriptorPool     = m_DescriptorPool,
-				.descriptorSetCount = 1u,
-				.pSetLayouts        = &m_DescriptorSetLayout,
-			};
-			VKC(vkAllocateDescriptorSets(m_LogicalDevice, &descriptorSetAllocInfo, &m_DescriptorSets[i]));
-
-			// Update descriptor sets
-			VkDescriptorBufferInfo descriptorBufferInfo {
-				.buffer = *m_MVPUniBuffer[i]->GetBuffer(),
-				.offset = 0u,
-				.range  = VK_WHOLE_SIZE, // sizeof(UniformMVP)
-			};
-
-			VkDescriptorImageInfo descriptorImageInfo {
-				.sampler     = m_StatueTexture->GetSampler(),
-				.imageView   = m_StatueTexture->GetImageView(),
-				.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			};
-
-			std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-			writeDescriptorSets.push_back(VkWriteDescriptorSet {
-			    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			    .dstSet          = m_DescriptorSets[i],
-			    .dstBinding      = 0u,
-			    .dstArrayElement = 0u,
-			    .descriptorCount = 1u,
-			    .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-			    .pBufferInfo     = &descriptorBufferInfo,
-			});
-
-			writeDescriptorSets.push_back(VkWriteDescriptorSet {
-			    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-			    .dstSet          = m_DescriptorSets[i],
-			    .dstBinding      = 1u,
-			    .dstArrayElement = 0u,
-			    .descriptorCount = 1u,
-			    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-			    .pImageInfo      = &descriptorImageInfo,
-			});
-
-			vkUpdateDescriptorSets(m_LogicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
-		}
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
 	// Create pipelines
 	{
-		ModelCreateInfo modelCreateInfo {
-			.texturePath = "VulkanRenderer/res/viking_room.png",
-			.modelPath   = "VulkanRenderer/res/viking_room.obj",
+		// Update model view projection uniform
+		UniformMVP mvp;
+		mvp.model = glm::rotate(glm::mat4(1.0f), std::cos(1.0f) * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		mvp.view  = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+		mvp.proj  = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
+
+		void* mvpMap = m_MVPUniBuffer[m_CurrentFrame]->Map();
+		memcpy(mvpMap, &mvp, sizeof(UniformMVP));
+		m_MVPUniBuffer[m_CurrentFrame]->Unmap();
+
+		RenderableCreateInfo renderableCreateInfo {
+			.modelPath = "VulkanRenderer/res/viking_room.obj",
+			.textures  = { m_StatueTexture } // #TODO
 		};
-		m_VikingRoom = std::make_unique<Model>(modelCreateInfo);
 
 		PipelineCreateInfo pipelineCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
-			.graphicsQueue  = m_QueueInfo.graphicsQueue,
-			.viewportExtent = m_SurfaceInfo.capabilities.currentExtent,
-			.commandPool    = m_CommandPool,
-			.imageCount     = static_cast<uint32_t>(m_Images.size()),
-			.sampleCount    = createInfo.sampleCount,
-			.renderPass     = m_RenderPass,
-			.model          = m_VikingRoom.get(),
+			.logicalDevice         = m_LogicalDevice,
+			.physicalDevice        = createInfo.physicalDevice,
+			.maxFramesInFlight     = m_MaxFramesInFlight,
+			.queueInfo             = m_QueueInfo,
+			.viewportExtent        = m_SurfaceInfo.capabilities.currentExtent,
+			.commandPool           = m_CommandPool,
+			.imageCount            = static_cast<uint32_t>(m_Images.size()),
+			.sampleCount           = createInfo.sampleCount,
+			.renderPass            = m_RenderPass,
+			.viewProjectionBuffers = m_MVPUniBuffer,
+			.descriptorPool        = m_DescriptorPool,
 
 			// Shader
-			.descriptorSetLayouts = { m_DescriptorSetLayout },
-			.vertexShaderPath     = "VulkanRenderer/res/vertex.glsl",
-			.pixelShaderPath      = "VulkanRenderer/res/pixel.glsl",
+			.vertexShaderPath = "VulkanRenderer/res/vertex.glsl",
+			.pixelShaderPath  = "VulkanRenderer/res/pixel.glsl",
 
 			// Vertex input
-			.vertexBindingDesc = VkVertexInputBindingDescription {
-			    .binding   = 0u,
-			    .stride    = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2),
-			    .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+			.vertexBindingDescs = {
+			    VkVertexInputBindingDescription {
+			        .binding   = 0u,
+			        .stride    = sizeof(Vertex),
+			        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+			    },
 			},
 			.vertexAttribDescs = {
 			    VkVertexInputAttributeDescription {
@@ -595,9 +518,18 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			        .format   = VK_FORMAT_R32G32_SFLOAT,
 			        .offset   = sizeof(glm::vec3) + sizeof(glm::vec3),
 			    },
+			    VkVertexInputAttributeDescription {
+			        .location = 3u,
+			        .binding  = 0u,
+			        .format   = VK_FORMAT_R32_UINT,
+			        .offset   = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2),
+			    },
 			},
 		};
-		m_TrianglePipeline = std::make_unique<Pipeline>(pipelineCreateInfo);
+
+		m_Pipelines.push_back(std::make_shared<Pipeline>(pipelineCreateInfo));
+		m_Pipelines.back()->CreateRenderable(renderableCreateInfo);
+		m_Pipelines.back()->RecreateBuffers();
 	}
 }
 
@@ -646,12 +578,17 @@ void Renderer::EndFrame()
 
 	// Record commands
 	CommandBufferStartInfo commandBufferStartInfo {
-		.mvpDescriptorSet = &m_DescriptorSets[m_CurrentFrame],
-		.framebuffer      = m_Framebuffers[imageIndex],
-		.extent           = m_SurfaceInfo.capabilities.currentExtent,
-		.frameIndex       = m_CurrentFrame,
+		.descriptorSet = &m_DescriptorSets[m_CurrentFrame],
+		.framebuffer   = m_Framebuffers[imageIndex],
+		.extent        = m_SurfaceInfo.capabilities.currentExtent,
+		.frameIndex    = m_CurrentFrame,
 	};
-	VkCommandBuffer firstTriangleCommandBuffer = m_TrianglePipeline->RecordCommandBuffer(commandBufferStartInfo);
+
+	std::vector<VkCommandBuffer> cmdBuffers = {};
+	for (auto& pipeline : m_Pipelines)
+	{
+		cmdBuffers.push_back(pipeline->RecordCommandBuffer(commandBufferStartInfo));
+	}
 
 	// Submit commands (and reset the fence)
 	VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -660,8 +597,8 @@ void Renderer::EndFrame()
 		.waitSemaphoreCount   = 1u,
 		.pWaitSemaphores      = &m_AquireImageSemaphores[m_CurrentFrame],
 		.pWaitDstStageMask    = &waitStage,
-		.commandBufferCount   = 1u,
-		.pCommandBuffers      = &firstTriangleCommandBuffer,
+		.commandBufferCount   = static_cast<uint32_t>(cmdBuffers.size()),
+		.pCommandBuffers      = cmdBuffers.data(),
 		.signalSemaphoreCount = 1u,
 		.pSignalSemaphores    = &m_RenderSemaphores[m_CurrentFrame],
 	};
@@ -717,6 +654,4 @@ Renderer::~Renderer()
 
 	m_MVPUniBuffer.clear();
 	vkDestroyDescriptorSetLayout(m_LogicalDevice, m_DescriptorSetLayout, nullptr);
-	m_StatueTexture.reset();
-	m_TrianglePipeline.reset();
 }
