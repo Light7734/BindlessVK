@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_ViewProjectionBuffers(createInfo.viewProjectionBuffers), m_QueueInfo(createInfo.queueInfo)
+    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_QueueInfo(createInfo.queueInfo)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create command buffers...
@@ -39,30 +39,22 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	{
 		std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
 
-		// [0] Uniform - Model view projection
+		// [0] Storage - Per Object Data
 		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
 		    .binding            = 0u,
-		    .descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		    .descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
 		    .descriptorCount    = 1u,
 		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
 		    .pImmutableSamplers = nullptr,
 		});
 
 		// [1] Sampler - Statue texture
+
 		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
 		    .binding            = 1u,
 		    .descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		    .descriptorCount    = 1u,
 		    .stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT,
-		    .pImmutableSamplers = nullptr,
-		});
-
-		// [2] Storage - Per Object Data
-		layoutBindings.push_back(VkDescriptorSetLayoutBinding {
-		    .binding            = 2u,
-		    .descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		    .descriptorCount    = 1u,
-		    .stageFlags         = VK_SHADER_STAGE_VERTEX_BIT,
 		    .pImmutableSamplers = nullptr,
 		});
 
@@ -91,12 +83,18 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the pipeline layout
 	{
+		VkPushConstantRange pushConstantRange {
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.offset     = 0u,
+			.size       = sizeof(glm::mat4) * 2u,
+		};
+
 		VkPipelineLayoutCreateInfo pipelineLayout {
 			.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 			.setLayoutCount         = 1,
 			.pSetLayouts            = &m_DescriptorSetLayout,
-			.pushConstantRangeCount = 0u,
-			.pPushConstantRanges    = nullptr,
+			.pushConstantRangeCount = 1u,
+			.pPushConstantRanges    = &pushConstantRange,
 		};
 
 		VKC(vkCreatePipelineLayout(m_LogicalDevice, &pipelineLayout, nullptr, &m_PipelineLayout));
@@ -234,10 +232,11 @@ Pipeline::~Pipeline()
 	vkDestroyPipelineLayout(m_LogicalDevice, m_PipelineLayout, nullptr);
 }
 
-void Pipeline::CreateRenderable(RenderableCreateInfo& createInfo)
+UUID Pipeline::CreateRenderable(RenderableCreateInfo& createInfo)
 {
 	m_Renderables.emplace_back(createInfo);
 	LOG(trace, "Added renderable with id: {}", m_Renderables.back().m_Id);
+	return m_Renderables.back().m_Id;
 }
 
 void Pipeline::RemoveRenderable(UUID renderableId)
@@ -319,11 +318,6 @@ void Pipeline::RecreateBuffers()
 	{
 		// Update descriptor sets
 		std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-		VkDescriptorBufferInfo descriptorBufferInfo {
-			.buffer = *m_ViewProjectionBuffers[i]->GetBuffer(),
-			.offset = 0u,
-			.range  = VK_WHOLE_SIZE, // sizeof(UniformMVP)
-		};
 
 		VkDescriptorBufferInfo descriptorStorageInfo {
 			.buffer = *m_StorageBuffer->GetBuffer(),
@@ -332,7 +326,6 @@ void Pipeline::RecreateBuffers()
 		};
 
 		VkDescriptorImageInfo descriptorImageInfo {
-			// #TODO:
 			.sampler     = m_Renderables[0].GetTextures()[0]->GetSampler(),
 			.imageView   = m_Renderables[0].GetTextures()[0]->GetImageView(),
 			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -344,8 +337,8 @@ void Pipeline::RecreateBuffers()
 		    .dstBinding      = 0u,
 		    .dstArrayElement = 0u,
 		    .descriptorCount = 1u,
-		    .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		    .pBufferInfo     = &descriptorBufferInfo,
+		    .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		    .pBufferInfo     = &descriptorStorageInfo,
 		});
 
 		writeDescriptorSets.push_back(VkWriteDescriptorSet {
@@ -356,16 +349,6 @@ void Pipeline::RecreateBuffers()
 		    .descriptorCount = 1u,
 		    .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
 		    .pImageInfo      = &descriptorImageInfo,
-		});
-
-		writeDescriptorSets.push_back(VkWriteDescriptorSet {
-		    .sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-		    .dstSet          = m_DescriptorSets[i],
-		    .dstBinding      = 2u,
-		    .dstArrayElement = 0u,
-		    .descriptorCount = 1u,
-		    .descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-		    .pBufferInfo     = &descriptorStorageInfo,
 		});
 
 		vkUpdateDescriptorSets(m_LogicalDevice, static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
@@ -415,6 +398,9 @@ VkCommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 
 	// Bind descriptor sets
 	vkCmdBindDescriptorSets(m_CommandBuffers[index], VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout, 0u, 1u, &m_DescriptorSets[index], 0, nullptr);
+
+	// Push constants
+	vkCmdPushConstants(m_CommandBuffers[index], m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0u, sizeof(PushConstants), startInfo.pushConstants);
 
 	// Draw
 	vkCmdDrawIndexed(m_CommandBuffers[index], m_IndicesCount, 1u, 0u, 0u, 0u);

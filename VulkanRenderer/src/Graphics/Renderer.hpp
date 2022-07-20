@@ -39,6 +39,7 @@ private:
 	QueueInfo m_QueueInfo     = {};
 	SurfaceInfo m_SurfaceInfo = {};
 
+	PushConstants m_ViewProjection;
 	bool m_SwapchainInvalidated = false;
 
 	// Swapchain
@@ -72,8 +73,6 @@ private:
 	VkDescriptorSetLayout m_DescriptorSetLayout   = VK_NULL_HANDLE;
 	VkDescriptorPool m_DescriptorPool             = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSet> m_DescriptorSets = {};
-
-	std::vector<std::shared_ptr<Buffer>> m_MVPUniBuffer = {};
 
 	// Depth buffer
 	VkFormat m_DepthFormat;

@@ -400,26 +400,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		VKC(vkCreateCommandPool(m_LogicalDevice, &commandPoolCreateInfo, nullptr, &m_CommandPool));
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create uniform buffers
-	{
-		BufferCreateInfo mvpBufferCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
-			.commandPool    = m_CommandPool,
-			.graphicsQueue  = m_QueueInfo.graphicsQueue,
-			.usage          = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			.size           = sizeof(UniformMVP),
-		};
-
-		m_MVPUniBuffer.resize(m_MaxFramesInFlight);
-		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
-		{
-			m_MVPUniBuffer[i] = std::make_shared<Buffer>(mvpBufferCreateInfo);
-		}
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
 	// Create the texture
 	{
 		TextureCreateInfo textureCreateInfo {
@@ -460,14 +440,8 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	// Create pipelines
 	{
 		// Update model view projection uniform
-		UniformMVP mvp;
-		mvp.model = glm::rotate(glm::mat4(1.0f), std::cos(1.0f) * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		mvp.view  = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-		mvp.proj  = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
-
-		void* mvpMap = m_MVPUniBuffer[m_CurrentFrame]->Map();
-		memcpy(mvpMap, &mvp, sizeof(UniformMVP));
-		m_MVPUniBuffer[m_CurrentFrame]->Unmap();
+		m_ViewProjection.view       = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+		m_ViewProjection.projection = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
 
 		RenderableCreateInfo renderableCreateInfo {
 			.modelPath = "VulkanRenderer/res/viking_room.obj",
@@ -475,17 +449,16 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		PipelineCreateInfo pipelineCreateInfo {
-			.logicalDevice         = m_LogicalDevice,
-			.physicalDevice        = createInfo.physicalDevice,
-			.maxFramesInFlight     = m_MaxFramesInFlight,
-			.queueInfo             = m_QueueInfo,
-			.viewportExtent        = m_SurfaceInfo.capabilities.currentExtent,
-			.commandPool           = m_CommandPool,
-			.imageCount            = static_cast<uint32_t>(m_Images.size()),
-			.sampleCount           = createInfo.sampleCount,
-			.renderPass            = m_RenderPass,
-			.viewProjectionBuffers = m_MVPUniBuffer,
-			.descriptorPool        = m_DescriptorPool,
+			.logicalDevice     = m_LogicalDevice,
+			.physicalDevice    = createInfo.physicalDevice,
+			.maxFramesInFlight = m_MaxFramesInFlight,
+			.queueInfo         = m_QueueInfo,
+			.viewportExtent    = m_SurfaceInfo.capabilities.currentExtent,
+			.commandPool       = m_CommandPool,
+			.imageCount        = static_cast<uint32_t>(m_Images.size()),
+			.sampleCount       = createInfo.sampleCount,
+			.renderPass        = m_RenderPass,
+			.descriptorPool    = m_DescriptorPool,
 
 			// Shader
 			.vertexShaderPath = "VulkanRenderer/res/vertex.glsl",
@@ -528,6 +501,8 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_Pipelines.push_back(std::make_shared<Pipeline>(pipelineCreateInfo));
+
+		m_Pipelines.back()->CreateRenderable(renderableCreateInfo);
 		m_Pipelines.back()->CreateRenderable(renderableCreateInfo);
 		m_Pipelines.back()->RecreateBuffers();
 	}
@@ -567,14 +542,8 @@ void Renderer::EndFrame()
 	}
 
 	// Update model view projection uniform
-	UniformMVP mvp;
-	mvp.model = glm::rotate(glm::mat4(1.0f), std::cos(time) * glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	mvp.view  = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-	mvp.proj  = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
-
-	void* mvpMap = m_MVPUniBuffer[m_CurrentFrame]->Map();
-	memcpy(mvpMap, &mvp, sizeof(UniformMVP));
-	m_MVPUniBuffer[m_CurrentFrame]->Unmap();
+	m_ViewProjection.view       = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	m_ViewProjection.projection = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
 
 	// Record commands
 	CommandBufferStartInfo commandBufferStartInfo {
@@ -582,6 +551,7 @@ void Renderer::EndFrame()
 		.framebuffer   = m_Framebuffers[imageIndex],
 		.extent        = m_SurfaceInfo.capabilities.currentExtent,
 		.frameIndex    = m_CurrentFrame,
+		.pushConstants = &m_ViewProjection,
 	};
 
 	std::vector<VkCommandBuffer> cmdBuffers = {};
@@ -652,6 +622,5 @@ Renderer::~Renderer()
 	vkDestroyCommandPool(m_LogicalDevice, m_CommandPool, nullptr);
 	vkDestroyDescriptorPool(m_LogicalDevice, m_DescriptorPool, nullptr);
 
-	m_MVPUniBuffer.clear();
 	vkDestroyDescriptorSetLayout(m_LogicalDevice, m_DescriptorSetLayout, nullptr);
 }
