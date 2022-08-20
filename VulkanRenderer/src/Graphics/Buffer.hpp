@@ -2,16 +2,16 @@
 
 #include "Core/Base.hpp"
 
-#include <volk.h>
+#include <vulkan/vulkan.hpp>
 
 struct BufferCreateInfo
 {
-	VkDevice logicalDevice;
-	VkPhysicalDevice physicalDevice;
-	VkCommandPool commandPool;
-	VkQueue graphicsQueue;
-	VkBufferUsageFlags usage;
-	VkDeviceSize size;
+	vk::Device logicalDevice;
+	vk::PhysicalDevice physicalDevice;
+	vk::CommandPool commandPool;
+	vk::Queue graphicsQueue;
+	vk::BufferUsageFlags usage;
+	vk::DeviceSize size;
 	const void* initialData = nullptr;
 };
 
@@ -21,17 +21,17 @@ public:
 	Buffer(BufferCreateInfo& createInfo);
 	~Buffer();
 
-	inline VkBuffer* GetBuffer() { return &m_Buffer; }
+	inline vk::Buffer* GetBuffer() { return &m_Buffer; }
 
 	void* Map();
 	void Unmap();
 
 private:
-	VkDevice m_LogicalDevice;
+	vk::Device m_LogicalDevice;
 
-	VkBuffer m_Buffer;
-	VkDeviceSize m_BufferSize;
-	VkDeviceMemory m_BufferMemory;
+	vk::Buffer m_Buffer;
+	vk::DeviceSize m_BufferSize;
+	vk::DeviceMemory m_BufferMemory;
 };
 
 class StagingBuffer
@@ -40,14 +40,14 @@ public:
 	StagingBuffer(BufferCreateInfo& createInfo);
 	~StagingBuffer();
 
-	inline VkBuffer* GetBuffer() { return &m_Buffer; }
+	inline vk::Buffer* GetBuffer() { return &m_Buffer; }
 
 private:
-	VkDevice m_LogicalDevice;
+	vk::Device m_LogicalDevice;
 
-	VkBuffer m_Buffer;
-	VkDeviceMemory m_BufferMemory;
+	vk::Buffer m_Buffer;
+	vk::DeviceMemory m_BufferMemory;
 
-	VkBuffer m_StagingBuffer;
-	VkDeviceMemory m_StagingBufferMemory;
+	vk::Buffer m_StagingBuffer;
+	vk::DeviceMemory m_StagingBufferMemory;
 };

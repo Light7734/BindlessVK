@@ -1,5 +1,7 @@
 #pragma once
 
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+
 // Note: files that are included by this file should not #include "Base.hpp"
 #include "Debug/Logger.hpp"
 
@@ -52,9 +54,9 @@ struct vkException: std::exception
 // ye wtf C++
 #define VKC(x)                       VKC_NO_REDIFINITION(x, __LINE__)
 #define VKC_NO_REDIFINITION(x, line) VKC_NO_REDIFINITION2(x, line)
-#define VKC_NO_REDIFINITION2(x, line)                     \
-	VkResult vkr##line;                                   \
-	if ((vkr##line = x) != VK_SUCCESS)                    \
-	{                                                     \
-		throw vkException(#x, vkr##line, __FILE__, line); \
+#define VKC_NO_REDIFINITION2(x, line)                                       \
+	vk::Result vkr##line;                                                   \
+	if ((vkr##line = x) != vk::Result::eSuccess)                            \
+	{                                                                       \
+		throw vkException(#x, static_cast<int>(vkr##line), __FILE__, line); \
 	}

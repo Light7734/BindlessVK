@@ -50,19 +50,21 @@ bool Window::ShouldClose()
 	return glfwWindowShouldClose(m_GlfwWindowHandle);
 }
 
-VkSurfaceKHR Window::CreateSurface(VkInstance instance)
+vk::SurfaceKHR Window::CreateSurface(vk::Instance instance)
 {
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
-	VKC(glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface));
+	VkResult result      = glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface);
+	if (result != VK_SUCCESS)
+		throw vkException("glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface)", result, __FILE__, __LINE__);
 	ASSERT(surface, "Failed to create window surface");
 	return surface;
 }
 
-VkExtent2D Window::GetFramebufferSize()
+vk::Extent2D Window::GetFramebufferSize()
 {
 	int width, height;
 	glfwGetFramebufferSize(m_GlfwWindowHandle, &width, &height);
-	return VkExtent2D { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
+	return vk::Extent2D { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 }
 
 void Window::BindCallbacks()
@@ -72,5 +74,11 @@ void Window::BindCallbacks()
 		if (key == GLFW_KEY_ESCAPE)
 			glfwSetWindowShouldClose(window, true);
 		LOG(trace, "Key pressed: {}", key);
+	});
+
+	glfwSetWindowSizeCallback(m_GlfwWindowHandle, [](GLFWwindow* window, int width, int height) {
+		WindowSpecs* specs = (WindowSpecs*)glfwGetWindowUserPointer(window);
+		specs->width       = width;
+		specs->height      = height;
 	});
 }

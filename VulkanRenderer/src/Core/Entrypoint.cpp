@@ -1,3 +1,4 @@
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
@@ -60,8 +61,8 @@ int main()
 			    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 			},
 			.enableDebugging      = true,
-			.debugMessageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
-			.debugMessageTypes    = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+			.debugMessageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
+			.debugMessageTypes    = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
 		};
 		Device device(deviceCreateInfo);
 
@@ -94,6 +95,16 @@ int main()
 			if (renderer->IsSwapchainInvalidated())
 			{
 				renderer.reset();
+
+				// renderer
+				RendererCreateInfo rendererCreateInfo {
+					.logicalDevice            = device.GetLogicalDevice(),
+					.physicalDevice           = device.GetPhysicalDevice(),
+					.physicalDeviceProperties = device.GetPhysicalDeviceProperties(),
+					.sampleCount              = device.GetMaxSupportedSampleCount(),
+					.surfaceInfo              = device.FetchSurfaceInfo(),
+					.queueInfo                = device.GetQueueInfo(),
+				};
 				renderer = std::make_unique<Renderer>(rendererCreateInfo);
 			}
 

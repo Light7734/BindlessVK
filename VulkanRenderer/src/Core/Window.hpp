@@ -2,7 +2,7 @@
 
 #include "Core/Base.hpp"
 
-#include <volk.h>
+#include <vulkan/vulkan.hpp>
 
 struct GLFWwindow;
 
@@ -29,8 +29,8 @@ public:
 	void PollEvents();
 	bool ShouldClose();
 
-	VkSurfaceKHR CreateSurface(VkInstance instance);
-	VkExtent2D GetFramebufferSize();
+	vk::SurfaceKHR CreateSurface(vk::Instance instance);
+	vk::Extent2D GetFramebufferSize();
 
 private:
 	GLFWwindow* m_GlfwWindowHandle = nullptr;

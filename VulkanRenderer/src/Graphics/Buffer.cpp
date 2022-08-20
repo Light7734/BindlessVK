@@ -1,52 +1,50 @@
-
 #include "Graphics/Buffer.hpp"
+
 Buffer::Buffer(BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size)
 {
+	LOG(warn, "Buffer size: {}", createInfo.size);
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create vertex and staging buffers
 	{
-		VkBufferCreateInfo bufferCreateInfo {
-			.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-			.size        = createInfo.size,
-			.usage       = createInfo.usage,
-			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		vk::BufferCreateInfo bufferCreateInfo {
+			{},                          //flags
+			createInfo.size,             // size
+			createInfo.usage,            // usage
+			vk::SharingMode::eExclusive, // sharingMode
 		};
 
-		VKC(vkCreateBuffer(m_LogicalDevice, &bufferCreateInfo, nullptr, &m_Buffer));
+		m_Buffer = m_LogicalDevice.createBuffer(bufferCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Fetch buffer's memory requirements and allocate memory
 	{
 		// Fetch memory requirements
-		VkMemoryRequirements bufferMemReq;
-		vkGetBufferMemoryRequirements(m_LogicalDevice, m_Buffer, &bufferMemReq);
+		vk::MemoryRequirements bufferMemReq = m_LogicalDevice.getBufferMemoryRequirements(m_Buffer);
 
 		// Fetch device memory properties
-		VkPhysicalDeviceMemoryProperties physicalMemProps;
-		vkGetPhysicalDeviceMemoryProperties(createInfo.physicalDevice, &physicalMemProps);
+		vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
 
 		// Find adequate memory type indices
 		uint32_t memTypeIndex = UINT32_MAX;
 
 		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
 		{
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
 				memTypeIndex = i;
 		}
 
 		ASSERT(memTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
 
 		// Allocate memory
-		VkMemoryAllocateInfo memoryAllocInfo {
-			.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.allocationSize  = bufferMemReq.size,
-			.memoryTypeIndex = memTypeIndex,
+		vk::MemoryAllocateInfo memoryAllocInfo {
+			bufferMemReq.size, // allocationSize
+			memTypeIndex,      // memoryTypeIndex
 		};
 
-		VKC(vkAllocateMemory(m_LogicalDevice, &memoryAllocInfo, nullptr, &m_BufferMemory));
-		VKC(vkBindBufferMemory(m_LogicalDevice, m_Buffer, m_BufferMemory, 0u));
+		m_BufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
+		m_LogicalDevice.bindBufferMemory(m_Buffer, m_BufferMemory, 0u);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -54,30 +52,28 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 	{
 		if (createInfo.initialData)
 		{
-			void* data;
-			VKC(vkMapMemory(m_LogicalDevice, m_BufferMemory, 0u, createInfo.size, 0x0, &data));
+			void* data = m_LogicalDevice.mapMemory(m_BufferMemory, 0u, createInfo.size);
+
 			memcpy(data, createInfo.initialData, static_cast<size_t>(createInfo.size));
-			vkUnmapMemory(m_LogicalDevice, m_BufferMemory);
+			m_LogicalDevice.unmapMemory(m_BufferMemory);
 		}
 	}
 }
 
 void* Buffer::Map()
 {
-	void* data;
-	VKC(vkMapMemory(m_LogicalDevice, m_BufferMemory, 0u, m_BufferSize, 0x0, &data));
-	return data;
+	return m_LogicalDevice.mapMemory(m_BufferMemory, 0u, m_BufferSize);
 }
 
 void Buffer::Unmap()
 {
-	vkUnmapMemory(m_LogicalDevice, m_BufferMemory);
+	m_LogicalDevice.unmapMemory(m_BufferMemory);
 }
 
 Buffer::~Buffer()
 {
-	vkDestroyBuffer(m_LogicalDevice, m_Buffer, nullptr);
-	vkFreeMemory(m_LogicalDevice, m_BufferMemory, nullptr);
+	m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
+	m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
 }
 
 StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
@@ -86,36 +82,33 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create vertex and staging buffers
 	{
-		VkBufferCreateInfo bufferCreateInfo {
-			.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-			.size        = createInfo.size,
-			.usage       = VK_BUFFER_USAGE_TRANSFER_DST_BIT | createInfo.usage,
-			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		vk::BufferCreateInfo bufferCreateInfo {
+			{},                                                       //flags
+			createInfo.size,                                          // size
+			vk::BufferUsageFlagBits::eTransferDst | createInfo.usage, // usage
+			vk::SharingMode::eExclusive,                              // sharingMode
 		};
 
-		VkBufferCreateInfo stagingBufferCrateInfo {
-			.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-			.size        = createInfo.size,
-			.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		vk::BufferCreateInfo stagingBufferCrateInfo {
+			{},                                    //flags
+			createInfo.size,                       // size
+			vk::BufferUsageFlagBits::eTransferSrc, // usage
+			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
-		VKC(vkCreateBuffer(m_LogicalDevice, &bufferCreateInfo, nullptr, &m_Buffer));
-		VKC(vkCreateBuffer(m_LogicalDevice, &stagingBufferCrateInfo, nullptr, &m_StagingBuffer));
+		m_Buffer        = m_LogicalDevice.createBuffer(bufferCreateInfo);
+		m_StagingBuffer = m_LogicalDevice.createBuffer(stagingBufferCrateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Fetch buffer's memory requirements and allocate memory
 	{
 		// Fetch memory requirements
-		VkMemoryRequirements bufferMemReq;
-		VkMemoryRequirements stagingBufferMemReq;
-		vkGetBufferMemoryRequirements(m_LogicalDevice, m_Buffer, &bufferMemReq);
-		vkGetBufferMemoryRequirements(m_LogicalDevice, m_StagingBuffer, &stagingBufferMemReq);
+		vk::MemoryRequirements bufferMemReq        = m_LogicalDevice.getBufferMemoryRequirements(m_Buffer);
+		vk::MemoryRequirements stagingBufferMemReq = m_LogicalDevice.getBufferMemoryRequirements(m_Buffer);
 
 		// Fetch device memory properties
-		VkPhysicalDeviceMemoryProperties physicalMemProps;
-		vkGetPhysicalDeviceMemoryProperties(createInfo.physicalDevice, &physicalMemProps);
+		vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
 
 		// Find adequate memories' indices
 		uint32_t memTypeIndex        = UINT32_MAX;
@@ -123,10 +116,10 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 
 		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
 		{
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
 				memTypeIndex = i;
 
-			if (stagingBufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
+			if (stagingBufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
 				stagingMemTypeIndex = i;
 		}
 
@@ -134,24 +127,22 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 		ASSERT(stagingMemTypeIndex != UINT32_MAX, "Failed to find suitable staging memory type");
 
 		// Allocate memory
-		VkMemoryAllocateInfo memoryAllocInfo {
-			.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.allocationSize  = bufferMemReq.size,
-			.memoryTypeIndex = memTypeIndex,
+		vk::MemoryAllocateInfo memoryAllocInfo {
+			bufferMemReq.size, // allocationSize
+			memTypeIndex,      // memoryTypeIndex
 		};
 
-		VkMemoryAllocateInfo stagingMemoryAllocInfo {
-			.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.allocationSize  = stagingBufferMemReq.size,
-			.memoryTypeIndex = stagingMemTypeIndex,
+		vk::MemoryAllocateInfo stagingMemoryAllocInfo {
+			stagingBufferMemReq.size, // allocationSize
+			stagingMemTypeIndex,      // memoryTypeIndex
 		};
 
 		// Bind memory
-		VKC(vkAllocateMemory(m_LogicalDevice, &memoryAllocInfo, nullptr, &m_BufferMemory));
-		VKC(vkBindBufferMemory(m_LogicalDevice, m_Buffer, m_BufferMemory, 0u));
+		m_BufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
+		m_LogicalDevice.bindBufferMemory(m_Buffer, m_BufferMemory, 0u);
 
-		VKC(vkAllocateMemory(m_LogicalDevice, &stagingMemoryAllocInfo, nullptr, &m_StagingBufferMemory));
-		VKC(vkBindBufferMemory(m_LogicalDevice, m_StagingBuffer, m_StagingBufferMemory, 0u));
+		m_StagingBufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
+		m_LogicalDevice.bindBufferMemory(m_StagingBuffer, m_StagingBufferMemory, 0u);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -160,55 +151,55 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 		if (createInfo.initialData) // #TODO: Optimize
 		{
 			// Copy starting data to staging buffer
-			void* data;
-			VKC(vkMapMemory(m_LogicalDevice, m_StagingBufferMemory, 0u, createInfo.size, 0u, &data));
+			void* data = m_LogicalDevice.mapMemory(m_StagingBufferMemory, 0u, createInfo.size);
 			memcpy(data, createInfo.initialData, static_cast<size_t>(createInfo.size));
-			vkUnmapMemory(m_LogicalDevice, m_StagingBufferMemory);
+			m_LogicalDevice.unmapMemory(m_StagingBufferMemory);
 
 			// Allocate cmd buffer
-			VkCommandBufferAllocateInfo allocInfo {
-				.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-				.commandPool        = createInfo.commandPool,
-				.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-				.commandBufferCount = 1u,
+			vk::CommandBufferAllocateInfo allocInfo {
+				createInfo.commandPool,           // commandPool
+				vk::CommandBufferLevel::ePrimary, // level
+				1u,                               // commandBufferCount
 			};
-			VkCommandBuffer cmdBuffer;
-			VKC(vkAllocateCommandBuffers(m_LogicalDevice, &allocInfo, &cmdBuffer));
+			vk::CommandBuffer cmdBuffer = m_LogicalDevice.allocateCommandBuffers(allocInfo)[0];
 
 			// Record cmd buffer
-			VkCommandBufferBeginInfo beginInfo {
-				.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-				.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+			vk::CommandBufferBeginInfo beginInfo {
+				vk::CommandBufferUsageFlagBits::eOneTimeSubmit, // flags
 			};
 
-			VKC(vkBeginCommandBuffer(cmdBuffer, &beginInfo));
-			VkBufferCopy bufferCopy {
-				.srcOffset = 0u,
-				.dstOffset = 0u,
-				.size      = createInfo.size,
+			cmdBuffer.begin(beginInfo);
+			vk::BufferCopy bufferCopy {
+				0u,              // srcOffset
+				0u,              // dstOffset
+				createInfo.size, // size
 			};
-			vkCmdCopyBuffer(cmdBuffer, m_StagingBuffer, m_Buffer, 1u, &bufferCopy);
-			vkEndCommandBuffer(cmdBuffer);
+			cmdBuffer.copyBuffer(m_StagingBuffer, m_Buffer, 1u, &bufferCopy);
+			cmdBuffer.end();
 
 			// Submit cmd buffer
-			VkSubmitInfo submitInfo {
-				.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-				.commandBufferCount = 1u,
-				.pCommandBuffers    = &cmdBuffer,
+			vk::SubmitInfo submitInfo {
+				0u,         // waitSemaphoreCount
+				nullptr,    // pWaitSemaphores
+				nullptr,    // pWaitDstStageMask
+				1u,         // commandBufferCount
+				&cmdBuffer, // pCommandBuffers
+				0u,         // signalSemaphoreCount
+				nullptr,    // pSignalSemaphores
 			};
-			VKC(vkQueueSubmit(createInfo.graphicsQueue, 1u, &submitInfo, VK_NULL_HANDLE));
+			VKC(createInfo.graphicsQueue.submit(1u, &submitInfo, VK_NULL_HANDLE));
 
 			// Wait for and free cmd buffer
-			VKC(vkQueueWaitIdle(createInfo.graphicsQueue));
-			vkFreeCommandBuffers(m_LogicalDevice, createInfo.commandPool, 1u, &cmdBuffer);
+			createInfo.graphicsQueue.waitIdle();
+			m_LogicalDevice.freeCommandBuffers(createInfo.commandPool, 1u, &cmdBuffer);
 		}
 	}
 }
 
 StagingBuffer::~StagingBuffer()
 {
-	vkDestroyBuffer(m_LogicalDevice, m_Buffer, nullptr);
-	vkFreeMemory(m_LogicalDevice, m_BufferMemory, nullptr);
-	vkDestroyBuffer(m_LogicalDevice, m_StagingBuffer, nullptr);
-	vkFreeMemory(m_LogicalDevice, m_StagingBufferMemory, nullptr);
+	m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
+	m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
+	m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
+	m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
 }

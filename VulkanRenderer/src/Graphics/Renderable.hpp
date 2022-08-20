@@ -4,9 +4,8 @@
 #include "Core/UUID.hpp"
 #include "Graphics/Texture.hpp"
 
-#include <volk.h>
-
 #include <glm/glm.hpp>
+#include <vulkan/vulkan.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>

@@ -2,11 +2,11 @@
 
 #include "Core/Base.hpp"
 
-#include <volk.h>
+#include <vulkan/vulkan.hpp>
 
-    class Stringifier
+class Stringifier
 {
 public:
-	static const char* VkMsgSeverity(VkDebugUtilsMessageSeverityFlagBitsEXT severity);
-	static const char* VkMsgType(VkDebugUtilsMessageTypeFlagBitsEXT type);
+	static const char* VkMsgSeverity(vk::DebugUtilsMessageSeverityFlagBitsEXT severity);
+	static const char* VkMsgType(vk::DebugUtilsMessageTypeFlagBitsEXT type);
 };

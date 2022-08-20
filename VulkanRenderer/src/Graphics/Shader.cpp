@@ -10,43 +10,43 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 	// Compile vertex shader and create shader module create-info
 	auto vertexSpv = CompileGlslToSpv(createInfo.vertexPath, Stage::Vertex, createInfo.optimizationLevel);
 
-	VkShaderModuleCreateInfo vertexCreateInfo {
-		.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = static_cast<size_t>(vertexSpv.end() - vertexSpv.begin()) * 4ull,
-		.pCode    = vertexSpv.begin(),
+	vk::ShaderModuleCreateInfo vertexCreateInfo {
+		{},                                                              // flags
+		static_cast<size_t>(vertexSpv.end() - vertexSpv.begin()) * 4ull, // codeSize
+		vertexSpv.begin(),                                               // pCode
 	};
-	VKC(vkCreateShaderModule(m_LogicalDevice, &vertexCreateInfo, nullptr, &m_VertexShaderModule));
+	m_VertexShaderModule = m_LogicalDevice.createShaderModule(vertexCreateInfo, nullptr);
 
 	m_PipelineShaderCreateInfos[0] = {
-		.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage  = VK_SHADER_STAGE_VERTEX_BIT,
-		.module = m_VertexShaderModule,
-		.pName  = "main",
+		{},                               // flags
+		vk::ShaderStageFlagBits::eVertex, // stage
+		m_VertexShaderModule,             // module
+		"main",                           // pName
 	};
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Compile pixel shader and create shader module create-info
 	auto pixelSpv = CompileGlslToSpv(createInfo.pixelPath, Stage::Pixel, createInfo.optimizationLevel);
 
-	VkShaderModuleCreateInfo pixelCreateInfo {
-		.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-		.codeSize = static_cast<size_t>(pixelSpv.end() - pixelSpv.begin()) * 4ull,
-		.pCode    = pixelSpv.begin(),
+	vk::ShaderModuleCreateInfo pixelCreateInfo {
+		{},                                                            // flags
+		static_cast<size_t>(pixelSpv.end() - pixelSpv.begin()) * 4ull, // codeSize
+		pixelSpv.begin(),                                              // pCode
 	};
-	VKC(vkCreateShaderModule(m_LogicalDevice, &pixelCreateInfo, nullptr, &m_PixelShaderModule));
+	m_PixelShaderModule = m_LogicalDevice.createShaderModule(pixelCreateInfo, nullptr);
 
 	m_PipelineShaderCreateInfos[1] = {
-		.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.module = m_PixelShaderModule,
-		.pName  = "main",
+		{},                                 // flags
+		vk::ShaderStageFlagBits::eFragment, // stage
+		m_PixelShaderModule,                // module
+		"main",                             // pName
 	};
 }
 
 Shader::~Shader()
 {
-	vkDestroyShaderModule(m_LogicalDevice, m_VertexShaderModule, nullptr);
-	vkDestroyShaderModule(m_LogicalDevice, m_PixelShaderModule, nullptr);
+	m_LogicalDevice.destroyShaderModule(m_VertexShaderModule, nullptr);
+	m_LogicalDevice.destroyShaderModule(m_PixelShaderModule, nullptr);
 }
 
 shaderc::SpvCompilationResult Shader::CompileGlslToSpv(const std::string& path, Stage stage, shaderc_optimization_level optimizationLevel)
@@ -83,4 +83,3 @@ shaderc::SpvCompilationResult Shader::CompileGlslToSpv(const std::string& path, 
 
 	return result;
 }
-

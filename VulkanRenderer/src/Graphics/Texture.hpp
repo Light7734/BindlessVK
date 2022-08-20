@@ -2,15 +2,16 @@
 
 #include "Core/Base.hpp"
 
-#include <volk.h>
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <vulkan/vulkan.hpp>
 
 struct TextureCreateInfo
 {
-	VkDevice logicalDevice;
-	VkPhysicalDevice physicalDevice;
-	VkQueue graphicsQueue;
+	vk::Device logicalDevice;
+	vk::PhysicalDevice physicalDevice;
+	vk::Queue graphicsQueue;
 
-	VkCommandPool commandPool;
+	vk::CommandPool commandPool;
 
 	const std::string imagePath;
 	bool anisotropyEnabled;
@@ -23,26 +24,26 @@ public:
 	Texture(TextureCreateInfo& createInfo);
 	~Texture();
 
-	inline VkImageView GetImageView() { return m_ImageView; }
-	inline VkSampler GetSampler() { return m_Sampler; }
+	inline vk::ImageView GetImageView() { return m_ImageView; }
+	inline vk::Sampler GetSampler() { return m_Sampler; }
 
 private:
-	void TransitionLayout(VkCommandBuffer cmdBuffer, VkImageLayout oldLayout, VkImageLayout newLayout);
-	void CopyBufferToImage(VkCommandBuffer cmdBuffer);
+	void TransitionLayout(vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
+	void CopyBufferToImage(vk::CommandBuffer cmdBuffer);
 
 private:
-	VkDevice m_LogicalDevice;
+	vk::Device m_LogicalDevice;
 
 	int m_Width, m_Height, m_Channels;
 	uint32_t m_MipLevels;
-	VkDeviceSize m_ImageSize;
+	vk::DeviceSize m_ImageSize;
 
-	VkImage m_Image              = VK_NULL_HANDLE;
-	VkDeviceMemory m_ImageMemory = VK_NULL_HANDLE;
+	vk::Image m_Image              = VK_NULL_HANDLE;
+	vk::DeviceMemory m_ImageMemory = VK_NULL_HANDLE;
 
-	VkImageView m_ImageView = VK_NULL_HANDLE;
-	VkSampler m_Sampler     = VK_NULL_HANDLE;
+	vk::ImageView m_ImageView = VK_NULL_HANDLE;
+	vk::Sampler m_Sampler     = VK_NULL_HANDLE;
 
-	VkBuffer m_StagingBuffer             = VK_NULL_HANDLE;
-	VkDeviceMemory m_StagingBufferMemory = VK_NULL_HANDLE;
+	vk::Buffer m_StagingBuffer             = VK_NULL_HANDLE;
+	vk::DeviceMemory m_StagingBufferMemory = VK_NULL_HANDLE;
 };
