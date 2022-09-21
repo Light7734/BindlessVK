@@ -360,8 +360,6 @@ void Pipeline::RecreateBuffers()
 
 vk::CommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInfo)
 {
-	m_StorageBuffer->Unmap();
-
 	uint32_t index = startInfo.frameIndex; // alias
 	m_CommandBuffers[index].reset({});
 

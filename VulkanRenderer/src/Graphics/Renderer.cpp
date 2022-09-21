@@ -604,7 +604,7 @@ void Renderer::EndFrame()
 	try
 	{
 		result = m_QueueInfo.presentQueue.presentKHR(presentInfo);
-		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
+		if (result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
 		{
 			m_LogicalDevice.waitIdle();
 			m_SwapchainInvalidated = true;
