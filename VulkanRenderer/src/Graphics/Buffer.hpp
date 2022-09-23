@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Base.hpp"
+#include "Core/DeletionQueue.hpp"
 
 #include <vulkan/vulkan.hpp>
 
@@ -32,6 +33,8 @@ private:
 	vk::Buffer m_Buffer;
 	vk::DeviceSize m_BufferSize;
 	vk::DeviceMemory m_BufferMemory;
+
+	DeletionQueue m_DeletionQueue;
 };
 
 class StagingBuffer
@@ -50,4 +53,6 @@ private:
 
 	vk::Buffer m_StagingBuffer;
 	vk::DeviceMemory m_StagingBufferMemory;
+
+	DeletionQueue m_DeletionQueue;
 };

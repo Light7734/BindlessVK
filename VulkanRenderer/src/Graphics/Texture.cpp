@@ -4,7 +4,7 @@
 #include <stb_image.h>
 
 Texture::Texture(TextureCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice)
+    : m_LogicalDevice(createInfo.logicalDevice), m_DeletionQueue("Texture")
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Load the image
@@ -41,6 +41,10 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		};
 
 		m_Image = m_LogicalDevice.createImage(imageCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyImage(m_Image, nullptr);
+		});
+
 
 		// Staging buffer
 		vk::BufferCreateInfo stagingBufferCrateInfo {
@@ -51,6 +55,9 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		};
 
 		m_StagingBuffer = m_LogicalDevice.createBuffer(stagingBufferCrateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -95,9 +102,17 @@ Texture::Texture(TextureCreateInfo& createInfo)
 
 		// Bind memory
 		m_ImageMemory = m_LogicalDevice.allocateMemory(imageMemAllocInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.freeMemory(m_ImageMemory, nullptr);
+		});
+
 		m_LogicalDevice.bindImageMemory(m_Image, m_ImageMemory, 0u);
 
 		m_StagingBufferMemory = m_LogicalDevice.allocateMemory(bufferMemAllocInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
+		});
+
 		m_LogicalDevice.bindBufferMemory(m_StagingBuffer, m_StagingBufferMemory, 0u);
 	}
 
@@ -128,7 +143,6 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		// Move data from staging buffer to image
 		TransitionLayout(cmdBuffer, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 		CopyBufferToImage(cmdBuffer);
-
 
 		/////////////////////////////////////////////////////////////////////////////////
 		// Generate mipmaps
@@ -167,8 +181,8 @@ Texture::Texture(TextureCreateInfo& createInfo)
 				barrier.subresourceRange.baseMipLevel = i - 1;
 				barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
 				barrier.newLayout                     = vk::ImageLayout::eTransferSrcOptimal;
-				barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferWrite;
 				barrier.dstAccessMask                 = vk::AccessFlagBits::eTransferRead;
+				barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferWrite;
 
 				cmdBuffer.pipelineBarrier(
 				    vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
@@ -294,6 +308,9 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		};
 
 		m_ImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyImageView(m_ImageView, nullptr);
+		});
 	}
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create image samplers
@@ -318,18 +335,14 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		};
 
 		m_Sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroySampler(m_Sampler, nullptr);
+		});
 	}
 }
-
 Texture::~Texture()
 {
-	m_LogicalDevice.destroySampler(m_Sampler, nullptr);
-	m_LogicalDevice.destroyImageView(m_ImageView, nullptr);
-	m_LogicalDevice.destroyImage(m_Image, nullptr);
-	m_LogicalDevice.freeMemory(m_ImageMemory, nullptr);
-
-	m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
-	m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
+    m_DeletionQueue.Flush();
 }
 
 void Texture::TransitionLayout(vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)

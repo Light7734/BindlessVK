@@ -1,7 +1,7 @@
 #include "Graphics/Buffer.hpp"
 
 Buffer::Buffer(BufferCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size)
+    : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size), m_DeletionQueue("Buffer")
 {
 	LOG(warn, "Buffer size: {}", createInfo.size);
 	/////////////////////////////////////////////////////////////////////////////////
@@ -15,6 +15,9 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 		};
 
 		m_Buffer = m_LogicalDevice.createBuffer(bufferCreateInfo);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +47,11 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 		};
 
 		m_BufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
+		});
+
+
 		m_LogicalDevice.bindBufferMemory(m_Buffer, m_BufferMemory, 0u);
 	}
 
@@ -60,6 +68,11 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 	}
 }
 
+Buffer::~Buffer()
+{
+	m_DeletionQueue.Flush();
+}
+
 void* Buffer::Map()
 {
 	return m_LogicalDevice.mapMemory(m_BufferMemory, 0u, m_BufferSize);
@@ -70,14 +83,8 @@ void Buffer::Unmap()
 	m_LogicalDevice.unmapMemory(m_BufferMemory);
 }
 
-Buffer::~Buffer()
-{
-	m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
-	m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
-}
-
 StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice)
+    : m_LogicalDevice(createInfo.logicalDevice), m_DeletionQueue("StagingBuffer")
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create vertex and staging buffers
@@ -96,8 +103,15 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
-		m_Buffer        = m_LogicalDevice.createBuffer(bufferCreateInfo);
+		m_Buffer = m_LogicalDevice.createBuffer(bufferCreateInfo);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
+		});
+
 		m_StagingBuffer = m_LogicalDevice.createBuffer(stagingBufferCrateInfo);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -139,9 +153,17 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 
 		// Bind memory
 		m_BufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
+		});
+
 		m_LogicalDevice.bindBufferMemory(m_Buffer, m_BufferMemory, 0u);
 
 		m_StagingBufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
+		});
+
 		m_LogicalDevice.bindBufferMemory(m_StagingBuffer, m_StagingBufferMemory, 0u);
 	}
 
@@ -198,8 +220,5 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 
 StagingBuffer::~StagingBuffer()
 {
-	m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
-	m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
-	m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
-	m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
+    m_DeletionQueue.Flush();
 }

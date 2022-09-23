@@ -251,8 +251,6 @@ Device::Device(DeviceCreateInfo& createInfo)
 			});
 		}
 
-		// No features needed ATM
-
 		vk::PhysicalDeviceFeatures physicalDeviceFeatures {
 			VK_FALSE, // robustBufferAccess
 			VK_FALSE, // fullDrawIndexUint32

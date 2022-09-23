@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Base.hpp"
+#include "Core/DeletionQueue.hpp"
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
@@ -22,7 +23,7 @@ class Texture
 {
 public:
 	Texture(TextureCreateInfo& createInfo);
-	~Texture();
+        ~Texture();
 
 	inline vk::ImageView GetImageView() { return m_ImageView; }
 	inline vk::Sampler GetSampler() { return m_Sampler; }
@@ -46,4 +47,6 @@ private:
 
 	vk::Buffer m_StagingBuffer             = VK_NULL_HANDLE;
 	vk::DeviceMemory m_StagingBufferMemory = VK_NULL_HANDLE;
+
+	DeletionQueue m_DeletionQueue;
 };

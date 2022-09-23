@@ -2,6 +2,7 @@
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "Core/Base.hpp"
+#include "Core/DeletionQueue.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Renderable.hpp"
@@ -88,4 +89,6 @@ private:
 	uint32_t m_CurrentObjectLimit = 64u;
 	uint32_t m_MaxDeadObjects     = std::floor(64 / 10.0);
 	uint32_t m_MaxObjectLimit     = 2048;
+
+	DeletionQueue m_DeletionQueue;
 };

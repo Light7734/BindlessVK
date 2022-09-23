@@ -4,7 +4,8 @@
 #include <unordered_set>
 
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_QueueInfo(createInfo.queueInfo)
+    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_QueueInfo(createInfo.queueInfo), m_DeletionQueue("Pipeline")
+
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create command buffers...
@@ -29,6 +30,9 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_Shader = std::make_unique<Shader>(shaderCreateInfo);
+		m_DeletionQueue.Enqueue([=]() {
+			m_Shader.reset();
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -63,6 +67,10 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_DescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyDescriptorSetLayout(m_DescriptorSetLayout, nullptr);
+		});
+
 		m_DescriptorSets.resize(m_MaxFramesInFlight); // #TODO
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
 		{
@@ -94,6 +102,9 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_PipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayout, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyPipelineLayout(m_PipelineLayout, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -221,16 +232,17 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 
 		vk::ResultValue<vk::Pipeline> pipeline = m_LogicalDevice.createGraphicsPipeline({}, graphicsPipelineCreateInfo);
 		VKC(pipeline.result);
+
 		m_Pipeline = pipeline.value;
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyPipeline(m_Pipeline, nullptr);
+		});
 	}
 }
 
 Pipeline::~Pipeline()
 {
-	m_Shader.reset();
-	m_LogicalDevice.destroyDescriptorSetLayout(m_DescriptorSetLayout);
-	m_LogicalDevice.destroyPipeline(m_Pipeline, nullptr);
-	m_LogicalDevice.destroyPipelineLayout(m_PipelineLayout, nullptr);
+	m_DeletionQueue.Flush();
 }
 
 UUID Pipeline::CreateRenderable(RenderableCreateInfo& createInfo)

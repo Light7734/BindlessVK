@@ -3,7 +3,7 @@
 #include "Utils/Timer.hpp"
 
 Renderer::Renderer(const RendererCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_SurfaceInfo(createInfo.surfaceInfo), m_QueueInfo(createInfo.queueInfo), m_SampleCount(createInfo.sampleCount)
+    : m_LogicalDevice(createInfo.logicalDevice), m_SurfaceInfo(createInfo.surfaceInfo), m_QueueInfo(createInfo.queueInfo), m_SampleCount(createInfo.sampleCount), m_DeletionQueue("Renderer")
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create sync objects
@@ -21,8 +21,19 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			};
 
 			m_AquireImageSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-			m_RenderSemaphores[i]      = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-			m_FrameFences[i]           = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.destroySemaphore(m_AquireImageSemaphores[i], nullptr);
+			});
+
+			m_RenderSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
+			});
+
+			m_FrameFences[i] = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.destroyFence(m_FrameFences[i], nullptr);
+			});
 		}
 	}
 
@@ -58,6 +69,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_Swapchain = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroySwapchainKHR(m_Swapchain, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -95,6 +109,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			};
 
 			m_ImageViews[i] = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.destroyImageView(m_ImageViews[i], nullptr);
+			});
 		}
 	}
 
@@ -125,6 +142,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_ColorImage = m_LogicalDevice.createImage(imageCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyImage(m_ColorImage, nullptr);
+		});
 
 		/* Alloacte and bind the color image memory */
 		{
@@ -155,6 +175,10 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 			// Bind memory
 			m_ColorImageMemory = m_LogicalDevice.allocateMemory(imageMemAllocInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.freeMemory(m_ColorImageMemory, nullptr);
+			});
+
 			m_LogicalDevice.bindImageMemory(m_ColorImage, m_ColorImageMemory, {});
 		}
 		// Create color image-view
@@ -183,6 +207,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			},
 		};
 		m_ColorImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyImageView(m_ColorImageView, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -226,6 +253,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_DepthImage = m_LogicalDevice.createImage(imageCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyImage(m_DepthImage, nullptr);
+		});
 
 		/* Alloacte and bind the depth image memory */
 		{
@@ -256,6 +286,10 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 			// Bind memory
 			m_DepthImageMemory = m_LogicalDevice.allocateMemory(imageMemAllocInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.freeMemory(m_DepthImageMemory, nullptr);
+			});
+
 			m_LogicalDevice.bindImageMemory(m_DepthImage, m_DepthImageMemory, {});
 		}
 		// Create depth image-view
@@ -284,6 +318,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_DepthImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyImageView(m_DepthImageView, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -378,6 +415,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_RenderPass = m_LogicalDevice.createRenderPass(renderPassCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyRenderPass(m_RenderPass, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -398,6 +438,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			};
 
 			m_Framebuffers[i] = m_LogicalDevice.createFramebuffer(framebufferCreateInfo, nullptr);
+			m_DeletionQueue.Enqueue([=]() {
+				m_LogicalDevice.destroyFramebuffer(m_Framebuffers[i], nullptr);
+			});
 		}
 	}
 
@@ -410,6 +453,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_CommandPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
+		});
 	}
 
 	// Create the texture
@@ -446,6 +492,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+		m_DeletionQueue.Enqueue([=]() {
+			m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
+		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -625,31 +674,5 @@ void Renderer::EndFrame()
 Renderer::~Renderer()
 {
 	m_LogicalDevice.waitIdle();
-
-	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
-	{
-		m_LogicalDevice.destroySemaphore(m_AquireImageSemaphores[i], nullptr);
-		m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
-		m_LogicalDevice.destroyFence(m_FrameFences[i], nullptr);
-	}
-
-	m_LogicalDevice.destroySwapchainKHR(m_Swapchain, nullptr);
-	for (uint32_t i = 0; i < m_Images.size(); i++)
-	{
-		m_LogicalDevice.destroyImageView(m_ImageViews[i], nullptr);
-		m_LogicalDevice.destroyFramebuffer(m_Framebuffers[i], nullptr);
-	}
-
-	m_LogicalDevice.destroyImageView(m_DepthImageView, nullptr);
-	m_LogicalDevice.destroyImageView(m_ColorImageView, nullptr);
-	m_LogicalDevice.destroyImage(m_DepthImage, nullptr);
-	m_LogicalDevice.destroyImage(m_ColorImage, nullptr);
-	m_LogicalDevice.freeMemory(m_DepthImageMemory, nullptr);
-	m_LogicalDevice.freeMemory(m_ColorImageMemory, nullptr);
-
-	m_LogicalDevice.destroyRenderPass(m_RenderPass, nullptr);
-	m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
-	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
-
-	m_LogicalDevice.destroyDescriptorSetLayout(m_DescriptorSetLayout, nullptr);
+	m_DeletionQueue.Flush();
 }

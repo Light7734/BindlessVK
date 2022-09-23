@@ -3,12 +3,15 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
 #include "Core/Base.hpp"
+#include "Core/DeletionQueue.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderable.hpp"
 #include "Graphics/Texture.hpp"
 
+#include <functional>
+#include <vector>
 #include <vulkan/vulkan.hpp>
 
 struct RendererCreateInfo
@@ -19,6 +22,10 @@ struct RendererCreateInfo
 	vk::SampleCountFlagBits sampleCount;
 	SurfaceInfo surfaceInfo;
 	QueueInfo queueInfo;
+};
+
+struct FrameInfo
+{
 };
 
 class Renderer
@@ -37,15 +44,16 @@ public:
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
 
 private:
+	DeletionQueue m_DeletionQueue;
 	vk::Device m_LogicalDevice = VK_NULL_HANDLE;
 	QueueInfo m_QueueInfo      = {};
 	SurfaceInfo m_SurfaceInfo  = {};
 
-	PushConstants m_ViewProjection;
-	bool m_SwapchainInvalidated = false;
+	PushConstants m_ViewProjection = {};
+	bool m_SwapchainInvalidated    = false;
 
 	// Swapchain
-	vk::SwapchainKHR m_Swapchain = VK_NULL_HANDLE;
+	vk::SwapchainKHR m_Swapchain = {};
 
 	std::vector<vk::Image> m_Images             = {};
 	std::vector<vk::ImageView> m_ImageViews     = {};
@@ -72,7 +80,6 @@ private:
 	uint32_t m_CurrentFrame                            = 0u;
 
 	// Descriptor sets
-	vk::DescriptorSetLayout m_DescriptorSetLayout   = VK_NULL_HANDLE;
 	vk::DescriptorPool m_DescriptorPool             = VK_NULL_HANDLE;
 	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
 
@@ -80,6 +87,7 @@ private:
 	vk::Format m_DepthFormat;
 	vk::Image m_DepthImage;
 	vk::DeviceMemory m_DepthImageMemory;
+
 	vk::ImageView m_DepthImageView;
 
 	// Pipelines
