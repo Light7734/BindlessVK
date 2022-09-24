@@ -1,9 +1,10 @@
 #include "Graphics/Renderer.hpp"
 
+#include "Graphics/Types.hpp"
 #include "Utils/Timer.hpp"
 
 Renderer::Renderer(const RendererCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_SurfaceInfo(createInfo.surfaceInfo), m_QueueInfo(createInfo.queueInfo), m_SampleCount(createInfo.sampleCount), m_DeletionQueue("Renderer")
+    : m_LogicalDevice(createInfo.logicalDevice), m_SurfaceInfo(createInfo.surfaceInfo), m_QueueInfo(createInfo.queueInfo), m_SampleCount(createInfo.sampleCount), m_Allocator(createInfo.allocator)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create sync objects
@@ -21,19 +22,10 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			};
 
 			m_AquireImageSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.destroySemaphore(m_AquireImageSemaphores[i], nullptr);
-			});
 
 			m_RenderSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
-			});
 
 			m_FrameFences[i] = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.destroyFence(m_FrameFences[i], nullptr);
-			});
 		}
 	}
 
@@ -69,9 +61,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_Swapchain = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroySwapchainKHR(m_Swapchain, nullptr);
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -109,9 +98,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			};
 
 			m_ImageViews[i] = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.destroyImageView(m_ImageViews[i], nullptr);
-			});
 		}
 	}
 
@@ -141,46 +127,11 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			vk::ImageLayout::eUndefined,                                                             // initialLayout
 		};
 
-		m_ColorImage = m_LogicalDevice.createImage(imageCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyImage(m_ColorImage, nullptr);
-		});
+		vma::AllocationCreateInfo imageAllocInfo({},
+		                                         vma::MemoryUsage::eGpuOnly,
+		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
+		m_ColorImage = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
-		/* Alloacte and bind the color image memory */
-		{
-			// Fetch memory requirements
-			vk::MemoryRequirements imageMemReq = m_LogicalDevice.getImageMemoryRequirements(m_ColorImage);
-
-			// Fetch device memory properties
-			vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
-
-			// Find adequate memory indices
-			uint32_t imageMemTypeIndex = UINT32_MAX;
-
-			for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
-			{
-				if (imageMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eDeviceLocal))
-				{
-					imageMemTypeIndex = i;
-				}
-			}
-
-			ASSERT(imageMemTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
-
-			// Alloacte memory
-			vk::MemoryAllocateInfo imageMemAllocInfo {
-				imageMemReq.size,  // allocationSize
-				imageMemTypeIndex, // memoryTypeIndex
-			};
-
-			// Bind memory
-			m_ColorImageMemory = m_LogicalDevice.allocateMemory(imageMemAllocInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.freeMemory(m_ColorImageMemory, nullptr);
-			});
-
-			m_LogicalDevice.bindImageMemory(m_ColorImage, m_ColorImageMemory, {});
-		}
 		// Create color image-view
 		vk::ImageViewCreateInfo imageViewCreateInfo {
 			{},                          // flags
@@ -206,10 +157,8 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			    1u,                              // layerCount
 			},
 		};
+
 		m_ColorImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyImageView(m_ColorImageView, nullptr);
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -252,46 +201,12 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			vk::ImageLayout::eUndefined,                     // initialLayout
 		};
 
-		m_DepthImage = m_LogicalDevice.createImage(imageCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyImage(m_DepthImage, nullptr);
-		});
+		vma::AllocationCreateInfo imageAllocInfo({},
+		                                         vma::MemoryUsage::eGpuOnly,
+		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-		/* Alloacte and bind the depth image memory */
-		{
-			// Fetch memory requirements
-			vk::MemoryRequirements imageMemReq = m_LogicalDevice.getImageMemoryRequirements(m_DepthImage);
+		m_DepthImage = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
-			// Fetch device memory properties
-			vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
-
-			// Find adequate memory indices
-			uint32_t imageMemTypeIndex = UINT32_MAX;
-
-			for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
-			{
-				if (imageMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eDeviceLocal))
-				{
-					imageMemTypeIndex = i;
-				}
-			}
-
-			ASSERT(imageMemTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
-
-			// Alloacte memory
-			vk::MemoryAllocateInfo imageMemAllocInfo {
-				imageMemReq.size,  // allocationSize
-				imageMemTypeIndex, // memoryTypeIndex
-			};
-
-			// Bind memory
-			m_DepthImageMemory = m_LogicalDevice.allocateMemory(imageMemAllocInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.freeMemory(m_DepthImageMemory, nullptr);
-			});
-
-			m_LogicalDevice.bindImageMemory(m_DepthImage, m_DepthImageMemory, {});
-		}
 		// Create depth image-view
 		vk::ImageViewCreateInfo imageViewCreateInfo {
 			{},                     // flags
@@ -318,9 +233,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_DepthImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyImageView(m_DepthImageView, nullptr);
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -351,7 +263,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		    vk::ImageLayout::eUndefined,                     // initialLayout
 		    vk::ImageLayout::eDepthStencilAttachmentOptimal, // finalLayout
 		});
-
 
 		attachments.push_back({
 		    {},                               // flags
@@ -415,9 +326,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_RenderPass = m_LogicalDevice.createRenderPass(renderPassCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyRenderPass(m_RenderPass, nullptr);
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -438,9 +346,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			};
 
 			m_Framebuffers[i] = m_LogicalDevice.createFramebuffer(framebufferCreateInfo, nullptr);
-			m_DeletionQueue.Enqueue([=]() {
-				m_LogicalDevice.destroyFramebuffer(m_Framebuffers[i], nullptr);
-			});
 		}
 	}
 
@@ -453,9 +358,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_CommandPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
-		});
 	}
 
 	// Create the texture
@@ -464,6 +366,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			m_LogicalDevice,                                                 // logicalDevice
 			createInfo.physicalDevice,                                       // physicalDevice
 			m_QueueInfo.graphicsQueue,                                       // graphicsQueue
+			m_Allocator,                                                     // allocator
 			m_CommandPool,                                                   // commandPool
 			"VulkanRenderer/res/viking_room.png",                            // imagePath
 			VK_TRUE,                                                         // anisotropyEnabled
@@ -492,9 +395,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -513,6 +413,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		PipelineCreateInfo pipelineCreateInfo {
 			.logicalDevice     = m_LogicalDevice,
 			.physicalDevice    = createInfo.physicalDevice,
+			.allocator         = m_Allocator,
 			.maxFramesInFlight = m_MaxFramesInFlight,
 			.queueInfo         = m_QueueInfo,
 			.viewportExtent    = m_SurfaceInfo.capabilities.currentExtent,
@@ -674,5 +575,31 @@ void Renderer::EndFrame()
 Renderer::~Renderer()
 {
 	m_LogicalDevice.waitIdle();
-	m_DeletionQueue.Flush();
+	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
+	m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
+
+	for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
+	{
+		m_LogicalDevice.destroyFramebuffer(m_Framebuffers[i], nullptr);
+	}
+
+	m_LogicalDevice.destroyRenderPass(m_RenderPass, nullptr);
+	m_LogicalDevice.destroyImageView(m_DepthImageView, nullptr);
+	m_Allocator.destroyImage(m_DepthImage, m_DepthImage);
+	m_LogicalDevice.destroyImageView(m_ColorImageView, nullptr);
+	m_Allocator.destroyImage(m_ColorImage, m_ColorImage);
+
+	for (uint32_t i = 0; i < m_ImageViews.size(); i++)
+	{
+		m_LogicalDevice.destroyImageView(m_ImageViews[i], nullptr);
+	}
+
+	m_LogicalDevice.destroySwapchainKHR(m_Swapchain, nullptr);
+
+	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+	{
+		m_LogicalDevice.destroyFence(m_FrameFences[i], nullptr);
+		m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
+		m_LogicalDevice.destroySemaphore(m_AquireImageSemaphores[i], nullptr);
+	}
 }

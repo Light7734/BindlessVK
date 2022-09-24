@@ -3,15 +3,16 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
 #include "Core/Base.hpp"
-#include "Core/DeletionQueue.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderable.hpp"
 #include "Graphics/Texture.hpp"
+#include "Graphics/Types.hpp"
 
 #include <functional>
 #include <vector>
+#include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan.hpp>
 
 struct RendererCreateInfo
@@ -19,6 +20,7 @@ struct RendererCreateInfo
 	vk::Device logicalDevice;
 	vk::PhysicalDevice physicalDevice;
 	vk::PhysicalDeviceProperties physicalDeviceProperties;
+	vma::Allocator allocator;
 	vk::SampleCountFlagBits sampleCount;
 	SurfaceInfo surfaceInfo;
 	QueueInfo queueInfo;
@@ -44,10 +46,11 @@ public:
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
 
 private:
-	DeletionQueue m_DeletionQueue;
-	vk::Device m_LogicalDevice = VK_NULL_HANDLE;
+	vk::Device m_LogicalDevice = {};
 	QueueInfo m_QueueInfo      = {};
 	SurfaceInfo m_SurfaceInfo  = {};
+
+	vma::Allocator m_Allocator;
 
 	PushConstants m_ViewProjection = {};
 	bool m_SwapchainInvalidated    = false;
@@ -60,37 +63,36 @@ private:
 	std::vector<vk::Framebuffer> m_Framebuffers = {};
 
 	// Multisampling
-	vk::Image m_ColorImage;
-	vk::DeviceMemory m_ColorImageMemory;
-	vk::ImageView m_ColorImageView;
+	AllocatedImage m_ColorImage    = {};
+	vk::ImageView m_ColorImageView = {};
 
 	// RenderPass
-	vk::RenderPass m_RenderPass = VK_NULL_HANDLE;
+	vk::RenderPass m_RenderPass = {};
 
 	vk::SampleCountFlagBits m_SampleCount = vk::SampleCountFlagBits::e1;
 	// Commands
-	vk::CommandPool m_CommandPool                   = VK_NULL_HANDLE;
+	vk::CommandPool m_CommandPool                   = {};
 	std::vector<vk::CommandBuffer> m_CommandBuffers = {};
 
 	// Synchronization
 	std::vector<vk::Semaphore> m_AquireImageSemaphores = {};
 	std::vector<vk::Semaphore> m_RenderSemaphores      = {};
 	std::vector<vk::Fence> m_FrameFences               = {};
-	const uint32_t m_MaxFramesInFlight                 = 2u;
-	uint32_t m_CurrentFrame                            = 0u;
+
+	const uint32_t m_MaxFramesInFlight = 2u;
+	uint32_t m_CurrentFrame            = 0u;
 
 	// Descriptor sets
-	vk::DescriptorPool m_DescriptorPool             = VK_NULL_HANDLE;
+	vk::DescriptorPool m_DescriptorPool             = {};
 	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
 
 	// Depth buffer
-	vk::Format m_DepthFormat;
-	vk::Image m_DepthImage;
-	vk::DeviceMemory m_DepthImageMemory;
+	vk::Format m_DepthFormat    = {};
+	AllocatedImage m_DepthImage = {};
 
-	vk::ImageView m_DepthImageView;
+	vk::ImageView m_DepthImageView = {};
 
 	// Pipelines
 	std::vector<std::shared_ptr<Pipeline>> m_Pipelines = {};
-	std::shared_ptr<Texture> m_StatueTexture; // #TEMP
+	std::shared_ptr<Texture> m_StatueTexture           = {}; // #TEMP
 };

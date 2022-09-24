@@ -2,7 +2,6 @@
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "Core/Base.hpp"
-#include "Core/DeletionQueue.hpp"
 
 #include <shaderc/shaderc.hpp>
 #include <vulkan/vulkan.hpp>
@@ -19,9 +18,9 @@ class Shader
 {
 public:
 	Shader(ShaderCreateInfo& createInfo);
-        ~Shader();
+	~Shader();
 
-	inline uint32_t GetStageCount() const { return 2u; }; //TODO: Geometry shader
+	inline uint32_t GetStageCount() const { return 2u; }; // TODO: Geometry shader
 	inline vk::PipelineShaderStageCreateInfo* GetShaderStageCreateInfos() { return &m_PipelineShaderCreateInfos[0]; }
 
 private:
@@ -35,16 +34,14 @@ private:
 	};
 
 	// Device
-	vk::Device m_LogicalDevice;
+	vk::Device m_LogicalDevice = {};
 
 	// Modules
-	vk::ShaderModule m_VertexShaderModule;
-	vk::ShaderModule m_PixelShaderModule;
+	vk::ShaderModule m_VertexShaderModule = {};
+	vk::ShaderModule m_PixelShaderModule  = {};
 
 	// Pipeline
-	vk::PipelineShaderStageCreateInfo m_PipelineShaderCreateInfos[2];
+	vk::PipelineShaderStageCreateInfo m_PipelineShaderCreateInfos[2] = {};
 
 	shaderc::SpvCompilationResult CompileGlslToSpv(const std::string& path, Stage stage, shaderc_optimization_level optimizationLevel);
-
-	DeletionQueue m_DeletionQueue;
 };

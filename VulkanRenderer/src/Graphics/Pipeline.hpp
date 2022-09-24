@@ -2,7 +2,6 @@
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "Core/Base.hpp"
-#include "Core/DeletionQueue.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Renderable.hpp"
@@ -15,6 +14,7 @@ struct PipelineCreateInfo
 {
 	vk::Device logicalDevice;
 	vk::PhysicalDevice physicalDevice;
+	vma::Allocator allocator;
 	uint32_t maxFramesInFlight;
 	QueueInfo queueInfo;
 	vk::Extent2D viewportExtent;
@@ -60,35 +60,35 @@ public:
 	void RecreateBuffers();
 
 private:
-	vk::Device m_LogicalDevice          = VK_NULL_HANDLE;
-	vk::PhysicalDevice m_PhysicalDevice = VK_NULL_HANDLE;
+	vk::Device m_LogicalDevice          = {};
+	vk::PhysicalDevice m_PhysicalDevice = {};
 
-	vk::RenderPass m_RenderPass = VK_NULL_HANDLE;
+	vma::Allocator m_Allocator = {};
 
-	vk::Pipeline m_Pipeline             = VK_NULL_HANDLE;
-	vk::PipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
+	vk::RenderPass m_RenderPass = {};
+
+	vk::Pipeline m_Pipeline             = {};
+	vk::PipelineLayout m_PipelineLayout = {};
 
 	QueueInfo m_QueueInfo        = {};
-	uint32_t m_MaxFramesInFlight = 0u;
+	uint32_t m_MaxFramesInFlight = {};
 
 	// Shader
-	std::unique_ptr<Shader> m_Shader = nullptr;
+	std::unique_ptr<Shader> m_Shader = {};
 
-	std::unique_ptr<StagingBuffer> m_VertexBuffer = nullptr;
-	std::unique_ptr<StagingBuffer> m_IndexBuffer  = nullptr;
+	std::unique_ptr<StagingBuffer> m_VertexBuffer = {};
+	std::unique_ptr<StagingBuffer> m_IndexBuffer  = {};
 
 	std::unique_ptr<Buffer> m_StorageBuffer = {};
 
-	vk::CommandPool m_CommandPool                   = VK_NULL_HANDLE;
+	vk::CommandPool m_CommandPool                   = {};
 	std::vector<vk::CommandBuffer> m_CommandBuffers = {};
 	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
-	vk::DescriptorSetLayout m_DescriptorSetLayout   = VK_NULL_HANDLE;
+	vk::DescriptorSetLayout m_DescriptorSetLayout   = {};
 
 	std::vector<Renderable> m_Renderables;
 	uint32_t m_IndicesCount       = 0;
 	uint32_t m_CurrentObjectLimit = 64u;
 	uint32_t m_MaxDeadObjects     = std::floor(64 / 10.0);
 	uint32_t m_MaxObjectLimit     = 2048;
-
-	DeletionQueue m_DeletionQueue;
 };

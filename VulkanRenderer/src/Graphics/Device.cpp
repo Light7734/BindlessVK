@@ -1,3 +1,5 @@
+#define VMA_IMPLEMENTATION
+
 #include "Graphics/Device.hpp"
 
 #include "Core/Window.hpp"
@@ -5,6 +7,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan_core.h>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
@@ -329,6 +332,53 @@ Device::Device(DeviceCreateInfo& createInfo)
 		ASSERT(m_QueueInfo.graphicsQueue, "Failed to fetch graphics queue");
 		ASSERT(m_QueueInfo.presentQueue, "Failed to fetch present queue");
 	}
+
+
+	////////////////////////////////////////////////////////////////
+	/// Initializes VMA
+	{
+		vma::VulkanFunctions vulkanFunctions(
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceProperties,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkAllocateMemory,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkFreeMemory,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkMapMemory,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkUnmapMemory,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkFlushMappedMemoryRanges,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkInvalidateMappedMemoryRanges,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateBuffer,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyBuffer,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateImage,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyImage,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdCopyBuffer,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements2KHR,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements2KHR,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory2KHR,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory2KHR,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties2KHR,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceBufferMemoryRequirements,
+		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceImageMemoryRequirements);
+
+		vma::AllocatorCreateInfo allocCreateInfo({},               // flags
+		                                         m_PhysicalDevice, // physicalDevice
+		                                         m_LogicalDevice,  // device
+		                                         {},               // preferredLargeHeapBlockSize
+		                                         {},               // pAllocationCallbacks
+		                                         {},               // pDeviceMemoryCallbacks
+		                                         {},               // pHeapSizeLimit
+		                                         &vulkanFunctions, // pVulkanFunctions
+		                                         m_Instance,       // instance
+		                                         {});              // vulkanApiVersion
+
+
+		m_Allocator = vma::createAllocator(allocCreateInfo);
+	}
 }
 
 SurfaceInfo Device::FetchSurfaceInfo()
@@ -365,6 +415,7 @@ SurfaceInfo Device::FetchSurfaceInfo()
 Device::~Device()
 {
 	m_LogicalDevice.waitIdle();
+	m_Allocator.destroy();
 
 	m_LogicalDevice.destroy(nullptr);
 

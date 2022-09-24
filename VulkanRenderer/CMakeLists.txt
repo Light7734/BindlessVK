@@ -38,6 +38,8 @@ target_include_directories(
     VulkanRenderer
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
     PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/imgui/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/vma-hpp/VulkanMemoryAllocator/include/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/vma-hpp/include/
 )
 
 target_link_libraries(

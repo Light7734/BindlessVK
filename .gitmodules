@@ -2,3 +2,6 @@
 	path = Dependencies/imgui
 	url = git@github.com:light7734/imgui.git
 	branch = docking
+[submodule "Dependencies/vma-hpp"]
+	path = Dependencies/vma-hpp
+	url = git@github.com:YaaZ/VulkanMemoryAllocator-Hpp

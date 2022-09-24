@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/Base.hpp"
-#include "Core/DeletionQueue.hpp"
+#include "Graphics/Types.hpp"
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
@@ -11,6 +11,8 @@ struct TextureCreateInfo
 	vk::Device logicalDevice;
 	vk::PhysicalDevice physicalDevice;
 	vk::Queue graphicsQueue;
+
+	vma::Allocator allocator;
 
 	vk::CommandPool commandPool;
 
@@ -23,7 +25,7 @@ class Texture
 {
 public:
 	Texture(TextureCreateInfo& createInfo);
-        ~Texture();
+	~Texture();
 
 	inline vk::ImageView GetImageView() { return m_ImageView; }
 	inline vk::Sampler GetSampler() { return m_Sampler; }
@@ -33,20 +35,19 @@ private:
 	void CopyBufferToImage(vk::CommandBuffer cmdBuffer);
 
 private:
-	vk::Device m_LogicalDevice;
+	vk::Device m_LogicalDevice = {};
 
-	int m_Width, m_Height, m_Channels;
-	uint32_t m_MipLevels;
-	vk::DeviceSize m_ImageSize;
+	vma::Allocator m_Allocator = {};
 
-	vk::Image m_Image              = VK_NULL_HANDLE;
-	vk::DeviceMemory m_ImageMemory = VK_NULL_HANDLE;
+	int m_Width                = {};
+	int m_Height               = {};
+	int m_Channels             = {};
+	uint32_t m_MipLevels       = {};
+	vk::DeviceSize m_ImageSize = {};
 
-	vk::ImageView m_ImageView = VK_NULL_HANDLE;
-	vk::Sampler m_Sampler     = VK_NULL_HANDLE;
+	AllocatedImage m_Image    = {};
+	vk::ImageView m_ImageView = {};
+	vk::Sampler m_Sampler     = {};
 
-	vk::Buffer m_StagingBuffer             = VK_NULL_HANDLE;
-	vk::DeviceMemory m_StagingBufferMemory = VK_NULL_HANDLE;
-
-	DeletionQueue m_DeletionQueue;
+	AllocatedBuffer m_StagingBuffer = {};
 };

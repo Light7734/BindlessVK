@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan.hpp>
 
 class Window;
@@ -68,21 +69,25 @@ public:
 	inline vk::PhysicalDeviceProperties GetPhysicalDeviceProperties() const { return m_PhysicalDeviceProperties; }
 	inline vk::SampleCountFlagBits GetMaxSupportedSampleCount() const { return m_MaxSupportedSampleCount; }
 
+	inline vma::Allocator GetAllocator() const { return m_Allocator; }
+
 private:
 	// Instance
-	vk::Instance m_Instance = VK_NULL_HANDLE;
+	vk::Instance m_Instance = {};
 
 	// Layers & Extensions
-	std::vector<const char*> m_Layers;
-	std::vector<const char*> m_Extensions;
+	std::vector<const char*> m_Layers     = {};
+	std::vector<const char*> m_Extensions = {};
 
 	// Device
-	vk::Device m_LogicalDevice                              = VK_NULL_HANDLE;
-	vk::PhysicalDevice m_PhysicalDevice                     = VK_NULL_HANDLE;
+	vk::Device m_LogicalDevice                              = {};
+	vk::PhysicalDevice m_PhysicalDevice                     = {};
 	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 	vk::SampleCountFlagBits m_MaxSupportedSampleCount       = vk::SampleCountFlagBits::e1;
 
 	// Queue & Surface
-	QueueInfo m_QueueInfo;
-	SurfaceInfo m_SurfaceInfo;
+	QueueInfo m_QueueInfo     = {};
+	SurfaceInfo m_SurfaceInfo = {};
+
+	vma::Allocator m_Allocator = {};
 };

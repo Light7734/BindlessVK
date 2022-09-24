@@ -4,7 +4,7 @@
 #include <fstream>
 
 Shader::Shader(ShaderCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_DeletionQueue("Shader")
+    : m_LogicalDevice(createInfo.logicalDevice)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Compile vertex shader and create shader module create-info
@@ -16,9 +16,6 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 		vertexSpv.begin(),                                               // pCode
 	};
 	m_VertexShaderModule = m_LogicalDevice.createShaderModule(vertexCreateInfo, nullptr);
-	m_DeletionQueue.Enqueue([=]() {
-		m_LogicalDevice.destroyShaderModule(m_VertexShaderModule, nullptr);
-	});
 
 	m_PipelineShaderCreateInfos[0] = {
 		{},                               // flags
@@ -37,9 +34,6 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 		pixelSpv.begin(),                                              // pCode
 	};
 	m_PixelShaderModule = m_LogicalDevice.createShaderModule(pixelCreateInfo, nullptr);
-	m_DeletionQueue.Enqueue([=]() {
-		m_LogicalDevice.destroyShaderModule(m_PixelShaderModule, nullptr);
-	});
 
 	m_PipelineShaderCreateInfos[1] = {
 		{},                                 // flags
@@ -51,7 +45,8 @@ Shader::Shader(ShaderCreateInfo& createInfo)
 
 Shader::~Shader()
 {
-    m_DeletionQueue.Flush();
+	m_LogicalDevice.destroyShaderModule(m_VertexShaderModule, nullptr);
+	m_LogicalDevice.destroyShaderModule(m_PixelShaderModule, nullptr);
 }
 
 shaderc::SpvCompilationResult Shader::CompileGlslToSpv(const std::string& path, Stage stage, shaderc_optimization_level optimizationLevel)

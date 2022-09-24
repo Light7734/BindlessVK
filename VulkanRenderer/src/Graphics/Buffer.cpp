@@ -1,11 +1,11 @@
 #include "Graphics/Buffer.hpp"
 
 Buffer::Buffer(BufferCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size), m_DeletionQueue("Buffer")
+    : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size), m_Allocator(createInfo.allocator)
 {
 	LOG(warn, "Buffer size: {}", createInfo.size);
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create vertex and staging buffers
+	// Create buffer and write the initial data to it(if any)
 	{
 		vk::BufferCreateInfo bufferCreateInfo {
 			{},                          //flags
@@ -14,80 +14,36 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 			vk::SharingMode::eExclusive, // sharingMode
 		};
 
-		m_Buffer = m_LogicalDevice.createBuffer(bufferCreateInfo);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
-		});
-	}
+		m_Buffer = m_Allocator.createBuffer(bufferCreateInfo, { {}, vma::MemoryUsage::eCpuToGpu });
 
-	/////////////////////////////////////////////////////////////////////////////////
-	// Fetch buffer's memory requirements and allocate memory
-	{
-		// Fetch memory requirements
-		vk::MemoryRequirements bufferMemReq = m_LogicalDevice.getBufferMemoryRequirements(m_Buffer);
-
-		// Fetch device memory properties
-		vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
-
-		// Find adequate memory type indices
-		uint32_t memTypeIndex = UINT32_MAX;
-
-		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
-		{
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
-				memTypeIndex = i;
-		}
-
-		ASSERT(memTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
-
-		// Allocate memory
-		vk::MemoryAllocateInfo memoryAllocInfo {
-			bufferMemReq.size, // allocationSize
-			memTypeIndex,      // memoryTypeIndex
-		};
-
-		m_BufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
-		});
-
-
-		m_LogicalDevice.bindBufferMemory(m_Buffer, m_BufferMemory, 0u);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Write initial data to the buffer
-	{
 		if (createInfo.initialData)
 		{
-			void* data = m_LogicalDevice.mapMemory(m_BufferMemory, 0u, createInfo.size);
-
-			memcpy(data, createInfo.initialData, static_cast<size_t>(createInfo.size));
-			m_LogicalDevice.unmapMemory(m_BufferMemory);
+			memcpy(m_Allocator.mapMemory(m_Buffer), createInfo.initialData, static_cast<size_t>(createInfo.size));
+			m_Allocator.unmapMemory(m_Buffer);
 		}
 	}
 }
 
 Buffer::~Buffer()
 {
-	m_DeletionQueue.Flush();
+	m_Allocator.destroyBuffer(m_Buffer, m_Buffer);
 }
 
 void* Buffer::Map()
 {
-	return m_LogicalDevice.mapMemory(m_BufferMemory, 0u, m_BufferSize);
+	return m_Allocator.mapMemory(m_Buffer);
 }
 
 void Buffer::Unmap()
 {
-	m_LogicalDevice.unmapMemory(m_BufferMemory);
+	m_Allocator.unmapMemory(m_Buffer);
 }
 
 StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_DeletionQueue("StagingBuffer")
+    : m_LogicalDevice(createInfo.logicalDevice), m_Allocator(createInfo.allocator)
 {
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create vertex and staging buffers
+	// Create buffer & staging buffer, then write the initial data to it(if any)
 	{
 		vk::BufferCreateInfo bufferCreateInfo {
 			{},                                                       //flags
@@ -103,80 +59,16 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
-		m_Buffer = m_LogicalDevice.createBuffer(bufferCreateInfo);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyBuffer(m_Buffer, nullptr);
-		});
+		m_Buffer        = m_Allocator.createBuffer(bufferCreateInfo, { {}, vma::MemoryUsage::eGpuOnly });
+		m_StagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, { {}, vma::MemoryUsage::eCpuOnly });
 
-		m_StagingBuffer = m_LogicalDevice.createBuffer(stagingBufferCrateInfo);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
-		});
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Fetch buffer's memory requirements and allocate memory
-	{
-		// Fetch memory requirements
-		vk::MemoryRequirements bufferMemReq        = m_LogicalDevice.getBufferMemoryRequirements(m_Buffer);
-		vk::MemoryRequirements stagingBufferMemReq = m_LogicalDevice.getBufferMemoryRequirements(m_Buffer);
-
-		// Fetch device memory properties
-		vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
-
-		// Find adequate memories' indices
-		uint32_t memTypeIndex        = UINT32_MAX;
-		uint32_t stagingMemTypeIndex = UINT32_MAX;
-
-		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
-		{
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal)
-				memTypeIndex = i;
-
-			if (stagingBufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
-				stagingMemTypeIndex = i;
-		}
-
-		ASSERT(memTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
-		ASSERT(stagingMemTypeIndex != UINT32_MAX, "Failed to find suitable staging memory type");
-
-		// Allocate memory
-		vk::MemoryAllocateInfo memoryAllocInfo {
-			bufferMemReq.size, // allocationSize
-			memTypeIndex,      // memoryTypeIndex
-		};
-
-		vk::MemoryAllocateInfo stagingMemoryAllocInfo {
-			stagingBufferMemReq.size, // allocationSize
-			stagingMemTypeIndex,      // memoryTypeIndex
-		};
-
-		// Bind memory
-		m_BufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.freeMemory(m_BufferMemory, nullptr);
-		});
-
-		m_LogicalDevice.bindBufferMemory(m_Buffer, m_BufferMemory, 0u);
-
-		m_StagingBufferMemory = m_LogicalDevice.allocateMemory(memoryAllocInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
-		});
-
-		m_LogicalDevice.bindBufferMemory(m_StagingBuffer, m_StagingBufferMemory, 0u);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Write initial data to the host local buffer
-	{
-		if (createInfo.initialData) // #TODO: Optimize
+		if (createInfo.initialData)
 		{
 			// Copy starting data to staging buffer
-			void* data = m_LogicalDevice.mapMemory(m_StagingBufferMemory, 0u, createInfo.size);
-			memcpy(data, createInfo.initialData, static_cast<size_t>(createInfo.size));
-			m_LogicalDevice.unmapMemory(m_StagingBufferMemory);
+			memcpy(m_Allocator.mapMemory(m_StagingBuffer), createInfo.initialData, static_cast<size_t>(createInfo.size));
+			m_Allocator.unmapMemory(m_StagingBuffer);
 
+			// #TODO: Make simpler by calling an InstantSubmit function
 			// Allocate cmd buffer
 			vk::CommandBufferAllocateInfo allocInfo {
 				createInfo.commandPool,           // commandPool
@@ -220,5 +112,6 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 
 StagingBuffer::~StagingBuffer()
 {
-    m_DeletionQueue.Flush();
+	m_Allocator.destroyBuffer(m_Buffer, m_Buffer);
+	m_Allocator.destroyBuffer(m_StagingBuffer, m_StagingBuffer);
 }

@@ -4,7 +4,7 @@
 #include <stb_image.h>
 
 Texture::Texture(TextureCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_DeletionQueue("Texture")
+    : m_LogicalDevice(createInfo.logicalDevice), m_Allocator(createInfo.allocator)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Load the image
@@ -40,11 +40,10 @@ Texture::Texture(TextureCreateInfo& createInfo)
 			vk::ImageLayout::eUndefined,                                                                                    // initialLayout
 		};
 
-		m_Image = m_LogicalDevice.createImage(imageCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyImage(m_Image, nullptr);
-		});
-
+		vma::AllocationCreateInfo imageAllocInfo({},
+		                                         vma::MemoryUsage::eGpuOnly,
+		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
+		m_Image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		// Staging buffer
 		vk::BufferCreateInfo stagingBufferCrateInfo {
@@ -54,75 +53,17 @@ Texture::Texture(TextureCreateInfo& createInfo)
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
-		m_StagingBuffer = m_LogicalDevice.createBuffer(stagingBufferCrateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyBuffer(m_StagingBuffer, nullptr);
-		});
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Alloacte and bind the image and buffer memory
-	{
-		// Fetch memory requirements
-		vk::MemoryRequirements imageMemReq  = m_LogicalDevice.getImageMemoryRequirements(m_Image);
-		vk::MemoryRequirements bufferMemReq = m_LogicalDevice.getBufferMemoryRequirements(m_StagingBuffer);
-
-		// Fetch device memory properties
-		vk::PhysicalDeviceMemoryProperties physicalMemProps = createInfo.physicalDevice.getMemoryProperties();
-
-		// Find adequate memories' indices
-		uint32_t imageMemTypeIndex  = UINT32_MAX;
-		uint32_t bufferMemTypeIndex = UINT32_MAX;
-
-		for (uint32_t i = 0; i < physicalMemProps.memoryTypeCount; i++)
-		{
-			if (imageMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eDeviceLocal))
-			{
-				imageMemTypeIndex = i;
-			}
-
-			if (bufferMemReq.memoryTypeBits & (1 << i) && physicalMemProps.memoryTypes[i].propertyFlags & (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
-			{
-				bufferMemTypeIndex = i;
-			}
-		}
-
-		ASSERT(imageMemTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
-		ASSERT(bufferMemTypeIndex != UINT32_MAX, "Failed to find suitable memory type");
-
-		// Alloacte memory
-		vk::MemoryAllocateInfo imageMemAllocInfo {
-			imageMemReq.size,  // allocationSize
-			imageMemTypeIndex, // memoryTypeIndex
-		};
-		vk::MemoryAllocateInfo bufferMemAllocInfo {
-			bufferMemReq.size,  // allocationSize
-			bufferMemTypeIndex, // memoryTypeIndex
-		};
-
-		// Bind memory
-		m_ImageMemory = m_LogicalDevice.allocateMemory(imageMemAllocInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.freeMemory(m_ImageMemory, nullptr);
-		});
-
-		m_LogicalDevice.bindImageMemory(m_Image, m_ImageMemory, 0u);
-
-		m_StagingBufferMemory = m_LogicalDevice.allocateMemory(bufferMemAllocInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.freeMemory(m_StagingBufferMemory, nullptr);
-		});
-
-		m_LogicalDevice.bindBufferMemory(m_StagingBuffer, m_StagingBufferMemory, 0u);
+		vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, {});
+		m_StagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Write the image data
 	{
 		// Copy data to staging buffer
-		void* stagingMap = m_LogicalDevice.mapMemory(m_StagingBufferMemory, 0u, m_ImageSize);
+		void* stagingMap = m_Allocator.mapMemory(m_StagingBuffer);
 		memcpy(stagingMap, imageData, m_ImageSize);
-		m_LogicalDevice.unmapMemory(m_StagingBufferMemory);
+		m_Allocator.unmapMemory(m_StagingBuffer);
 
 		// Allocate cmd buffer
 		vk::CommandBufferAllocateInfo allocInfo {
@@ -308,9 +249,6 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		};
 
 		m_ImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyImageView(m_ImageView, nullptr);
-		});
 	}
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create image samplers
@@ -335,14 +273,15 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		};
 
 		m_Sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroySampler(m_Sampler, nullptr);
-		});
 	}
 }
+
 Texture::~Texture()
 {
-    m_DeletionQueue.Flush();
+	m_LogicalDevice.destroySampler(m_Sampler, nullptr);
+	m_LogicalDevice.destroyImageView(m_ImageView, nullptr);
+	m_Allocator.destroyBuffer(m_StagingBuffer, m_StagingBuffer);
+	m_Allocator.destroyImage(m_Image, m_Image);
 }
 
 void Texture::TransitionLayout(vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)

@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 Pipeline::Pipeline(PipelineCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_QueueInfo(createInfo.queueInfo), m_DeletionQueue("Pipeline")
+    : m_LogicalDevice(createInfo.logicalDevice), m_PhysicalDevice(createInfo.physicalDevice), m_CommandPool(createInfo.commandPool), m_RenderPass(createInfo.renderPass), m_MaxFramesInFlight(createInfo.maxFramesInFlight), m_QueueInfo(createInfo.queueInfo), m_Allocator(createInfo.allocator)
 
 {
 	/////////////////////////////////////////////////////////////////////////////////
@@ -30,9 +30,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_Shader = std::make_unique<Shader>(shaderCreateInfo);
-		m_DeletionQueue.Enqueue([=]() {
-			m_Shader.reset();
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -67,9 +64,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_DescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyDescriptorSetLayout(m_DescriptorSetLayout, nullptr);
-		});
 
 		m_DescriptorSets.resize(m_MaxFramesInFlight); // #TODO
 		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
@@ -102,9 +96,6 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		};
 
 		m_PipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayout, nullptr);
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyPipelineLayout(m_PipelineLayout, nullptr);
-		});
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -234,15 +225,15 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 		VKC(pipeline.result);
 
 		m_Pipeline = pipeline.value;
-		m_DeletionQueue.Enqueue([=]() {
-			m_LogicalDevice.destroyPipeline(m_Pipeline, nullptr);
-		});
 	}
 }
 
 Pipeline::~Pipeline()
 {
-	m_DeletionQueue.Flush();
+	m_Shader.reset();
+	m_LogicalDevice.destroyDescriptorSetLayout(m_DescriptorSetLayout, nullptr);
+	m_LogicalDevice.destroyPipelineLayout(m_PipelineLayout, nullptr);
+	m_LogicalDevice.destroyPipeline(m_Pipeline, nullptr);
 }
 
 UUID Pipeline::CreateRenderable(RenderableCreateInfo& createInfo)
@@ -295,6 +286,7 @@ void Pipeline::RecreateBuffers()
 	BufferCreateInfo vbufferCreateInfo {
 		.logicalDevice  = m_LogicalDevice,
 		.physicalDevice = m_PhysicalDevice,
+		.allocator      = m_Allocator,
 		.commandPool    = m_CommandPool,
 		.graphicsQueue  = m_QueueInfo.graphicsQueue,
 		.usage          = vk::BufferUsageFlagBits::eVertexBuffer,
@@ -307,6 +299,7 @@ void Pipeline::RecreateBuffers()
 	BufferCreateInfo ibufferCreateInfo {
 		.logicalDevice  = m_LogicalDevice,
 		.physicalDevice = m_PhysicalDevice,
+		.allocator      = m_Allocator,
 		.commandPool    = m_CommandPool,
 		.graphicsQueue  = m_QueueInfo.graphicsQueue,
 		.usage          = vk::BufferUsageFlagBits::eIndexBuffer,
@@ -319,6 +312,7 @@ void Pipeline::RecreateBuffers()
 	BufferCreateInfo storageBufferCreateInfo {
 		.logicalDevice  = m_LogicalDevice,
 		.physicalDevice = m_PhysicalDevice,
+		.allocator      = m_Allocator,
 		.commandPool    = m_CommandPool,
 		.graphicsQueue  = m_QueueInfo.graphicsQueue,
 		.usage          = vk::BufferUsageFlagBits::eStorageBuffer,

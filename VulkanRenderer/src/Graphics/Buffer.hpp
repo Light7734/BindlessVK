@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core/Base.hpp"
-#include "Core/DeletionQueue.hpp"
+#include "Graphics/Types.hpp"
 
 #include <vulkan/vulkan.hpp>
 
@@ -9,11 +9,12 @@ struct BufferCreateInfo
 {
 	vk::Device logicalDevice;
 	vk::PhysicalDevice physicalDevice;
+	vma::Allocator allocator;
 	vk::CommandPool commandPool;
 	vk::Queue graphicsQueue;
 	vk::BufferUsageFlags usage;
 	vk::DeviceSize size;
-	const void* initialData = nullptr;
+	const void* initialData = {};
 };
 
 class Buffer
@@ -22,19 +23,18 @@ public:
 	Buffer(BufferCreateInfo& createInfo);
 	~Buffer();
 
-	inline vk::Buffer* GetBuffer() { return &m_Buffer; }
+	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
 
 	void* Map();
 	void Unmap();
 
 private:
-	vk::Device m_LogicalDevice;
+	vk::Device m_LogicalDevice = {};
 
-	vk::Buffer m_Buffer;
-	vk::DeviceSize m_BufferSize;
-	vk::DeviceMemory m_BufferMemory;
+	vma::Allocator m_Allocator = {};
 
-	DeletionQueue m_DeletionQueue;
+	AllocatedBuffer m_Buffer    = {};
+	vk::DeviceSize m_BufferSize = {};
 };
 
 class StagingBuffer
@@ -43,16 +43,13 @@ public:
 	StagingBuffer(BufferCreateInfo& createInfo);
 	~StagingBuffer();
 
-	inline vk::Buffer* GetBuffer() { return &m_Buffer; }
+	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
 
 private:
-	vk::Device m_LogicalDevice;
+	vk::Device m_LogicalDevice = {};
 
-	vk::Buffer m_Buffer;
-	vk::DeviceMemory m_BufferMemory;
+	vma::Allocator m_Allocator = {};
 
-	vk::Buffer m_StagingBuffer;
-	vk::DeviceMemory m_StagingBufferMemory;
-
-	DeletionQueue m_DeletionQueue;
+	AllocatedBuffer m_Buffer        = {};
+	AllocatedBuffer m_StagingBuffer = {};
 };
