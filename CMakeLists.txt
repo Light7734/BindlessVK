@@ -5,4 +5,4 @@ include(${CMAKE_SOURCE_DIR}/build/conanbuildinfo.cmake)
 conan_basic_setup()
 
 add_subdirectory(VulkanRenderer/)
-add_subdirectory(Dependencies/imgui)
+add_subdirectory(Dependencies/configurations/imgui)

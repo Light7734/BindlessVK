@@ -1,4 +1,5 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
@@ -14,20 +15,6 @@
 int main()
 {
 	Logger::Init();
-	// Create window (hidden)
-
-	// Create Device
-	// Create Renderer
-
-	// Load objects to render
-
-	// Show window
-	// While loop
-	// {
-	// HandleWindowEvents
-	// Loop through objects and render them
-	// Print FPS every second
-	// }
 
 	int exitCode = 0;
 	try
@@ -68,6 +55,9 @@ int main()
 
 		// renderer
 		RendererCreateInfo rendererCreateInfo {
+			.window                   = &window,
+			.procAddr                 = device.GetInstanceProcAddr(),
+			.instance                 = device.GetInstance(),
 			.logicalDevice            = device.GetLogicalDevice(),
 			.physicalDevice           = device.GetPhysicalDevice(),
 			.physicalDeviceProperties = device.GetPhysicalDeviceProperties(),
@@ -87,9 +77,7 @@ int main()
 			// Window events
 			window.PollEvents();
 
-			// Draw scene
-			// renderer->BeginFrame();
-			// renderer->Draw();
+			renderer->BeginFrame();
 			renderer->EndFrame();
 
 			// Re-create the renderer
@@ -99,6 +87,9 @@ int main()
 
 				// renderer
 				RendererCreateInfo rendererCreateInfo {
+					.window                   = &window,
+					.procAddr                 = device.GetInstanceProcAddr(),
+					.instance                 = device.GetInstance(),
 					.logicalDevice            = device.GetLogicalDevice(),
 					.physicalDevice           = device.GetPhysicalDevice(),
 					.physicalDeviceProperties = device.GetPhysicalDeviceProperties(),

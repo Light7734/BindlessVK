@@ -17,10 +17,8 @@ Device::Device(DeviceCreateInfo& createInfo)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Initialize volk
-	vk::DynamicLoader dl;
-	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(vkGetInstanceProcAddr);
-
+	m_GetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_GetInstanceProcAddr);
 	/////////////////////////////////////////////////////////////////////////////////
 	// Check if the required layers exist.
 	{

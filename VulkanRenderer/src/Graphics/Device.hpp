@@ -64,6 +64,8 @@ public:
 
 	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
 
+	inline PFN_vkGetInstanceProcAddr GetInstanceProcAddr() const { return m_GetInstanceProcAddr; }
+	inline vk::Instance GetInstance() const { return m_Instance; }
 	inline vk::Device GetLogicalDevice() const { return m_LogicalDevice; }
 	inline vk::PhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
 	inline vk::PhysicalDeviceProperties GetPhysicalDeviceProperties() const { return m_PhysicalDeviceProperties; }
@@ -72,6 +74,9 @@ public:
 	inline vma::Allocator GetAllocator() const { return m_Allocator; }
 
 private:
+	vk::DynamicLoader m_DynamicLoader;
+	PFN_vkGetInstanceProcAddr m_GetInstanceProcAddr;
+
 	// Instance
 	vk::Instance m_Instance = {};
 

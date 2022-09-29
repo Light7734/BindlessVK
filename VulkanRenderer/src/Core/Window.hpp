@@ -32,9 +32,11 @@ public:
 	vk::SurfaceKHR CreateSurface(vk::Instance instance);
 	vk::Extent2D GetFramebufferSize();
 
+	inline GLFWwindow* GetGlfwHandle() { return m_GlfwWindowHandle; }
+
 private:
-	GLFWwindow* m_GlfwWindowHandle = nullptr;
-	WindowSpecs m_Specs;
+	GLFWwindow* m_GlfwWindowHandle = {};
+	WindowSpecs m_Specs            = {};
 
 	void BindCallbacks();
 };

@@ -15,8 +15,13 @@
 #include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan.hpp>
 
+class Window;
+
 struct RendererCreateInfo
 {
+	Window* window;
+	PFN_vkGetInstanceProcAddr procAddr;
+	vk::Instance instance;
 	vk::Device logicalDevice;
 	vk::PhysicalDevice physicalDevice;
 	vk::PhysicalDeviceProperties physicalDeviceProperties;
@@ -24,6 +29,13 @@ struct RendererCreateInfo
 	vk::SampleCountFlagBits sampleCount;
 	SurfaceInfo surfaceInfo;
 	QueueInfo queueInfo;
+};
+
+struct UploadContext
+{
+	vk::CommandBuffer cmdBuffer;
+	vk::CommandPool cmdPool;
+	vk::Fence fence;
 };
 
 struct FrameInfo
@@ -39,6 +51,8 @@ public:
 	void BeginFrame();
 	void Draw();
 	void EndFrame();
+
+	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
 
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
 	inline uint32_t GetImageCount() const { return m_Images.size(); }
@@ -67,7 +81,8 @@ private:
 	vk::ImageView m_ColorImageView = {};
 
 	// RenderPass
-	vk::RenderPass m_RenderPass = {};
+	vk::RenderPass m_RenderPass                          = {};
+	std::vector<vk::CommandBuffer> m_RenderPassCmdBuffer = {};
 
 	vk::SampleCountFlagBits m_SampleCount = vk::SampleCountFlagBits::e1;
 	// Commands
@@ -91,6 +106,12 @@ private:
 	AllocatedImage m_DepthImage = {};
 
 	vk::ImageView m_DepthImageView = {};
+
+	// ImGui
+	vk::DescriptorPool m_ImguiPool                   = {};
+	std::vector<vk::CommandBuffer> m_ImguiCmdBuffers = {};
+
+	UploadContext m_UploadContext = {};
 
 	// Pipelines
 	std::vector<std::shared_ptr<Pipeline>> m_Pipelines = {};

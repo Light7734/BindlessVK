@@ -11,9 +11,9 @@ Pipeline::Pipeline(PipelineCreateInfo& createInfo)
 	// Create command buffers...
 	{
 		vk::CommandBufferAllocateInfo commandBufferAllocInfo {
-			createInfo.commandPool,           // commandPool
-			vk::CommandBufferLevel::ePrimary, // level
-			createInfo.imageCount,            // commandBufferCount
+			createInfo.commandPool,             // commandPool
+			vk::CommandBufferLevel::eSecondary, // level
+			createInfo.imageCount,              // commandBufferCount
 		};
 
 		m_CommandBuffers = m_LogicalDevice.allocateCommandBuffers(commandBufferAllocInfo);
@@ -369,33 +369,22 @@ vk::CommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInf
 	uint32_t index = startInfo.frameIndex; // alias
 	m_CommandBuffers[index].reset({});
 
+	vk::CommandBufferInheritanceInfo inheritanceInfo {
+		m_RenderPass,
+		0u,
+		startInfo.framebuffer,
+		{},
+		{},
+		{}
+	};
+
 	// Begin command buffer
 	vk::CommandBufferBeginInfo commandBufferBeginInfo {
-		{},     // flags
-		nullptr // pInheritanceInfo
+		vk::CommandBufferUsageFlagBits::eRenderPassContinue, // flags
+		&inheritanceInfo                                     // pInheritanceInfo
 	};
 
 	m_CommandBuffers[index].begin(commandBufferBeginInfo);
-
-	// Begin renderpass
-	std::vector<vk::ClearValue> clearValues;
-	clearValues.push_back(vk::ClearValue { vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } });
-	clearValues.push_back(vk::ClearValue { vk::ClearDepthStencilValue { 1.0f, 0 } });
-
-	vk::RenderPassBeginInfo renderpassBeginInfo {
-		m_RenderPass,          // renderPass
-		startInfo.framebuffer, // framebuffer
-
-		/* renderArea */
-		vk::Rect2D {
-		    { 0, 0 },         // offset
-		    startInfo.extent, // extent
-		},
-		static_cast<uint32_t>(clearValues.size()), // clearValueCount
-		clearValues.data(),                        // pClearValues
-	};
-
-	m_CommandBuffers[index].beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eInline);
 
 	// Bind pipeline
 	m_CommandBuffers[index].bindPipeline(vk::PipelineBindPoint::eGraphics, m_Pipeline);
@@ -416,7 +405,6 @@ vk::CommandBuffer Pipeline::RecordCommandBuffer(CommandBufferStartInfo& startInf
 	m_CommandBuffers[index].drawIndexed(m_IndicesCount, 1u, 0u, 0u, 0u);
 
 	// End...
-	m_CommandBuffers[index].endRenderPass();
 	m_CommandBuffers[index].end();
 
 	return m_CommandBuffers[index];

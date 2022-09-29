@@ -25,3 +25,5 @@ target_link_libraries(
     imgui
     PRIVATE volk
 )
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/imconfig.h ${CMAKE_SOURCE_DIR}/Dependencies/imgui/imconfig.h)

@@ -1,7 +1,12 @@
 #include "Graphics/Renderer.hpp"
 
+#include "Core/Window.hpp"
 #include "Graphics/Types.hpp"
 #include "Utils/Timer.hpp"
+
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
+#include <imgui.h>
 
 Renderer::Renderer(const RendererCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice), m_SurfaceInfo(createInfo.surfaceInfo), m_QueueInfo(createInfo.queueInfo), m_SampleCount(createInfo.sampleCount), m_Allocator(createInfo.allocator)
@@ -27,6 +32,8 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 			m_FrameFences[i] = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
 		}
+
+		m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -356,8 +363,29 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
 			m_QueueInfo.graphicsQueueIndex,                     // queueFamilyIndex
 		};
+		m_CommandPool           = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
 
-		m_CommandPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		vk::CommandBufferAllocateInfo cmdAllocInfo {
+			m_UploadContext.cmdPool,
+			vk::CommandBufferLevel::ePrimary,
+			1u,
+		};
+		m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(cmdAllocInfo)[0];
+
+		vk::CommandBufferAllocateInfo commandBufferAllocInfo {
+			m_CommandPool,                    // commandPool
+			vk::CommandBufferLevel::ePrimary, // level
+			m_MaxFramesInFlight,              // commandBufferCount
+		};
+		m_RenderPassCmdBuffer = m_LogicalDevice.allocateCommandBuffers(commandBufferAllocInfo);
+
+		vk::CommandBufferAllocateInfo imguiCommandBufferAllocInfo {
+			m_CommandPool,                      // commandPool
+			vk::CommandBufferLevel::eSecondary, // level
+			m_MaxFramesInFlight,                // commandBufferCount
+		};
+		m_ImguiCmdBuffers = m_LogicalDevice.allocateCommandBuffers(imguiCommandBufferAllocInfo);
 	}
 
 	// Create the texture
@@ -469,11 +497,84 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		m_Pipelines.back()->CreateRenderable(renderableCreateInfo);
 		m_Pipelines.back()->RecreateBuffers();
 	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Initialize Dear ImGui
+	{
+		vk::DescriptorPoolSize poolSizes[] = {
+			{ vk::DescriptorType::eSampler, 1000 },
+			{ vk::DescriptorType::eCombinedImageSampler, 1000 },
+			{ vk::DescriptorType::eSampledImage, 1000 },
+			{ vk::DescriptorType::eStorageImage, 1000 },
+			{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
+			{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
+			{ vk::DescriptorType::eUniformBuffer, 1000 },
+			{ vk::DescriptorType::eStorageBuffer, 1000 },
+			{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
+			{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
+			{ vk::DescriptorType::eInputAttachment, 1000 }
+		};
+
+		vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
+			vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+			1000ull,
+			std::size(poolSizes),
+			poolSizes
+		};
+
+		m_ImguiPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+
+		ImGui::CreateContext();
+
+		ImGui_ImplGlfw_InitForVulkan(createInfo.window->GetGlfwHandle(), true);
+
+		ImGui_ImplVulkan_InitInfo initInfo {
+			.Instance       = createInfo.instance,
+			.PhysicalDevice = createInfo.physicalDevice,
+			.Device         = m_LogicalDevice,
+			.Queue          = m_QueueInfo.graphicsQueue,
+			.DescriptorPool = m_ImguiPool,
+			.MinImageCount  = m_MaxFramesInFlight,
+			.ImageCount     = m_MaxFramesInFlight,
+			.MSAASamples    = static_cast<VkSampleCountFlagBits>(m_SampleCount),
+		};
+
+
+		vk::DynamicLoader dl;
+		PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+		vkGetInstanceProcAddr(NULL, "");
+
+		static struct Payload
+		{
+			PFN_vkGetInstanceProcAddr vkGetProcAddr;
+			vk::Instance instance;
+		} payload = { createInfo.procAddr, createInfo.instance };
+
+		ASSERT(ImGui_ImplVulkan_LoadFunctions([](const char* func, void* data) {
+			       Payload pload = *(Payload*)data;
+			       return payload.vkGetProcAddr(payload.instance, func);
+		       },
+		                                      (void*)&payload),
+		       "ImGui failed to load vulkan functions");
+
+		ImGui_ImplVulkan_Init(&initInfo, m_RenderPass);
+
+
+		ImmediateSubmit([](vk::CommandBuffer cmd) {
+			ImGui_ImplVulkan_CreateFontsTexture(cmd);
+		});
+		ImGui_ImplVulkan_DestroyFontUploadObjects();
+	}
 }
 
 void Renderer::BeginFrame()
 {
-	LOG(critical, "Not implemented!");
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+
+	ImGui::ShowDemoWindow();
 }
 
 void Renderer::Draw()
@@ -485,6 +586,14 @@ void Renderer::EndFrame()
 {
 	if (m_SwapchainInvalidated)
 		return;
+
+	static float fov     = 45.0f;
+	static glm::vec3 eye = { 4.0f, 4.0f, 2.0f };
+
+	ImGui::SliderFloat("Field of view", &fov, 0.0f, 90.0f);
+	ImGui::SliderFloat3("Camera Position", &eye.x, 0.5f, 8.5f);
+
+	ImGui::Render();
 
 	// Timer...
 	static Timer timer;
@@ -508,8 +617,8 @@ void Renderer::EndFrame()
 	}
 
 	// Update model view projection uniform
-	m_ViewProjection.view       = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-	m_ViewProjection.projection = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
+	m_ViewProjection.view       = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	m_ViewProjection.projection = glm::perspective(glm::radians(fov), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
 
 	// Record commands
 	CommandBufferStartInfo commandBufferStartInfo {
@@ -520,20 +629,69 @@ void Renderer::EndFrame()
 		&m_ViewProjection,                        // pushConstants
 	};
 
+	vk::CommandBufferBeginInfo beginInfo { {}, nullptr };
+
+	std::array<vk::ClearValue, 2> clearValues {
+		vk::ClearValue { vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } },
+		vk::ClearValue { vk::ClearDepthStencilValue { 1.0f, 0 } },
+	};
+
+	vk::RenderPassBeginInfo renderpassBeginInfo {
+		m_RenderPass,               // renderPass
+		m_Framebuffers[imageIndex], // framebuffer
+
+		/* renderArea */
+		vk::Rect2D {
+		    { 0, 0 },                                 // offset
+		    m_SurfaceInfo.capabilities.currentExtent, // extent
+		},
+		static_cast<uint32_t>(clearValues.size()), // clearValueCount
+		clearValues.data(),                        // pClearValues
+	};
+
+	m_RenderPassCmdBuffer[m_CurrentFrame].begin(beginInfo);
+	m_RenderPassCmdBuffer[m_CurrentFrame].beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
+
 	std::vector<vk::CommandBuffer> cmdBuffers = {};
 	for (auto& pipeline : m_Pipelines)
 	{
 		cmdBuffers.push_back(pipeline->RecordCommandBuffer(commandBufferStartInfo));
 	}
 
+
+	vk::CommandBufferInheritanceInfo inheritanceInfo {
+		m_RenderPass,
+		0u,
+		m_Framebuffers[imageIndex],
+		{},
+		{},
+		{}
+	};
+	vk::CommandBufferBeginInfo imguiCmdBeginInfo {
+		vk::CommandBufferUsageFlagBits::eRenderPassContinue, // flags
+		&inheritanceInfo                                     // pInheritanceInfo
+	};
+
+	m_ImguiCmdBuffers[m_CurrentFrame].begin(imguiCmdBeginInfo);
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_ImguiCmdBuffers[m_CurrentFrame]);
+	m_ImguiCmdBuffers[m_CurrentFrame].end();
+
+	cmdBuffers.push_back(m_ImguiCmdBuffers[m_CurrentFrame]);
+
+	m_RenderPassCmdBuffer[m_CurrentFrame].executeCommands(cmdBuffers);
+
+	m_RenderPassCmdBuffer[m_CurrentFrame].endRenderPass();
+	m_RenderPassCmdBuffer[m_CurrentFrame].end();
+
+	//
 	// Submit commands (and reset the fence)
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submitInfo {
 		1u,                                       // waitSemaphoreCount
 		&m_AquireImageSemaphores[m_CurrentFrame], // pWaitSemaphores
 		&waitStage,                               // pWaitDstStageMask
-		static_cast<uint32_t>(cmdBuffers.size()), // commandBufferCount
-		cmdBuffers.data(),                        // pCommandBuffers
+		1ull,                                     // commandBufferCount
+		&m_RenderPassCmdBuffer[m_CurrentFrame],   // pCommandBuffers
 		1u,                                       // signalSemaphoreCount
 		&m_RenderSemaphores[m_CurrentFrame],      // pSignalSemaphores
 	};
@@ -572,9 +730,49 @@ void Renderer::EndFrame()
 	m_CurrentFrame = (m_CurrentFrame + 1u) % m_MaxFramesInFlight;
 }
 
+void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
+{
+	vk::CommandBuffer cmd = m_UploadContext.cmdBuffer;
+
+	vk::CommandBufferBeginInfo beginInfo {
+		vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
+	};
+
+	cmd.begin(beginInfo);
+
+	function(cmd);
+
+	cmd.end();
+
+	vk::SubmitInfo submitInfo {
+		0u,
+		{},
+		{},
+		1u,
+		&cmd,
+		0u,
+		{},
+		{}
+	};
+
+	m_QueueInfo.graphicsQueue.submit(submitInfo, m_UploadContext.fence);
+	VKC(m_LogicalDevice.waitForFences(m_UploadContext.fence, true, UINT_MAX));
+	m_LogicalDevice.resetFences(m_UploadContext.fence);
+
+	m_LogicalDevice.resetCommandPool(m_CommandPool, {});
+}
+
 Renderer::~Renderer()
 {
 	m_LogicalDevice.waitIdle();
+
+	m_LogicalDevice.destroyCommandPool(m_UploadContext.cmdPool);
+	m_LogicalDevice.destroyFence(m_UploadContext.fence);
+
+	m_LogicalDevice.destroyDescriptorPool(m_ImguiPool, nullptr);
+	ImGui_ImplVulkan_Shutdown();
+	ImGui::DestroyContext();
+
 	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
 	m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
 
