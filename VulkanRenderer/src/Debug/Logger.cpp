@@ -2,8 +2,8 @@
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-std::shared_ptr<spdlog::logger> Logger::s_RendererLogger = nullptr;
-std::shared_ptr<spdlog::logger> Logger::s_VkLogger       = nullptr;
+std::shared_ptr<spdlog::logger> Logger::s_RendererLogger = {};
+std::shared_ptr<spdlog::logger> Logger::s_VkLogger       = {};
 
 void Logger::Init()
 {

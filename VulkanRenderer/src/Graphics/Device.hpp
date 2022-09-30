@@ -50,6 +50,20 @@ struct DeviceCreateInfo
 	vk::DebugUtilsMessageTypeFlagsEXT debugMessageTypes;
 };
 
+struct DeviceContext
+{
+	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+	vk::Instance instance;
+	vk::Device logicalDevice;
+	vk::PhysicalDevice physicalDevice;
+	vk::PhysicalDeviceProperties physicalDeviceProperties;
+	vk::SampleCountFlagBits maxSupportedSampleCount;
+	vma::Allocator allocator;
+
+	QueueInfo queueInfo;
+	SurfaceInfo surfaceInfo;
+};
+
 class Device
 {
 public:
@@ -58,24 +72,29 @@ public:
 
 	void LogDebugInfo();
 
-	SurfaceInfo FetchSurfaceInfo();
-
 	void DrawFrame();
 
-	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
+	inline DeviceContext GetContext()
+	{
+		return DeviceContext {
+			m_VkGetInstanceProcAddr,
+			m_Instance,
+			m_LogicalDevice,
+			m_PhysicalDevice,
+			m_PhysicalDeviceProperties,
+			m_MaxSupportedSampleCount,
+			m_Allocator,
+			m_QueueInfo,
+			FetchSurfaceInfo(),
+		};
+	}
 
-	inline PFN_vkGetInstanceProcAddr GetInstanceProcAddr() const { return m_GetInstanceProcAddr; }
-	inline vk::Instance GetInstance() const { return m_Instance; }
-	inline vk::Device GetLogicalDevice() const { return m_LogicalDevice; }
-	inline vk::PhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
-	inline vk::PhysicalDeviceProperties GetPhysicalDeviceProperties() const { return m_PhysicalDeviceProperties; }
-	inline vk::SampleCountFlagBits GetMaxSupportedSampleCount() const { return m_MaxSupportedSampleCount; }
-
-	inline vma::Allocator GetAllocator() const { return m_Allocator; }
+private:
+	SurfaceInfo FetchSurfaceInfo();
 
 private:
 	vk::DynamicLoader m_DynamicLoader;
-	PFN_vkGetInstanceProcAddr m_GetInstanceProcAddr;
+	PFN_vkGetInstanceProcAddr m_VkGetInstanceProcAddr;
 
 	// Instance
 	vk::Instance m_Instance = {};

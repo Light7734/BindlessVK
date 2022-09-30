@@ -28,7 +28,7 @@ Renderable::Renderable(RenderableCreateInfo& createInfo)
 				                attrib.vertices[3 * index.vertex_index + 1],
 				                attrib.vertices[3 * index.vertex_index + 2] };
 
-			vertex.color = glm::vec4({ 0.0, 1.0, 1.0, 1.0 });
+			vertex.color = glm::vec4({ 1.0, 1.0, 1.0, 1.0 });
 
 			vertex.uv = { attrib.texcoords[2 * index.texcoord_index + 0],
 				          1.0 - attrib.texcoords[2 * index.texcoord_index + 1] };

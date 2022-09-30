@@ -22,6 +22,7 @@ struct PipelineCreateInfo
 	uint32_t imageCount;
 	vk::SampleCountFlagBits sampleCount;
 	vk::RenderPass renderPass;
+	std::vector<vk::DescriptorSetLayout> descriptorSetLayouts;
 
 	// Shader
 	vk::DescriptorPool descriptorPool;
@@ -32,11 +33,6 @@ struct PipelineCreateInfo
 	std::vector<vk::VertexInputAttributeDescription> vertexAttribDescs;
 };
 
-struct PushConstants
-{
-	glm::mat4 projection;
-	glm::mat4 view;
-};
 
 struct CommandBufferStartInfo
 {
@@ -44,7 +40,6 @@ struct CommandBufferStartInfo
 	vk::Framebuffer framebuffer;
 	vk::Extent2D extent;
 	uint32_t frameIndex;
-	PushConstants* pushConstants;
 };
 
 class Pipeline
@@ -53,7 +48,7 @@ public:
 	Pipeline(PipelineCreateInfo& createInfo);
 	~Pipeline();
 
-	vk::CommandBuffer RecordCommandBuffer(CommandBufferStartInfo& startInfo);
+	void RecordCommandBuffer(vk::CommandBuffer cmd);
 
 	UUID CreateRenderable(RenderableCreateInfo& createInfo);
 	void RemoveRenderable(UUID renderableId);

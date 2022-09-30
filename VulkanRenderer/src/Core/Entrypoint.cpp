@@ -55,16 +55,8 @@ int main()
 
 		// renderer
 		RendererCreateInfo rendererCreateInfo {
-			.window                   = &window,
-			.procAddr                 = device.GetInstanceProcAddr(),
-			.instance                 = device.GetInstance(),
-			.logicalDevice            = device.GetLogicalDevice(),
-			.physicalDevice           = device.GetPhysicalDevice(),
-			.physicalDeviceProperties = device.GetPhysicalDeviceProperties(),
-			.allocator                = device.GetAllocator(),
-			.sampleCount              = device.GetMaxSupportedSampleCount(),
-			.surfaceInfo              = device.FetchSurfaceInfo(),
-			.queueInfo                = device.GetQueueInfo(),
+			.window        = &window,
+			.deviceContext = device.GetContext(),
 		};
 		std::unique_ptr<Renderer> renderer = std::make_unique<Renderer>(rendererCreateInfo);
 
@@ -87,16 +79,8 @@ int main()
 
 				// renderer
 				RendererCreateInfo rendererCreateInfo {
-					.window                   = &window,
-					.procAddr                 = device.GetInstanceProcAddr(),
-					.instance                 = device.GetInstance(),
-					.logicalDevice            = device.GetLogicalDevice(),
-					.physicalDevice           = device.GetPhysicalDevice(),
-					.physicalDeviceProperties = device.GetPhysicalDeviceProperties(),
-					.allocator                = device.GetAllocator(),
-					.sampleCount              = device.GetMaxSupportedSampleCount(),
-					.surfaceInfo              = device.FetchSurfaceInfo(),
-					.queueInfo                = device.GetQueueInfo(),
+					.window        = &window,
+					.deviceContext = device.GetContext(),
 				};
 				renderer = std::make_unique<Renderer>(rendererCreateInfo);
 			}

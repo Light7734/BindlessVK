@@ -2,23 +2,23 @@
 
 #include "Core/Window.hpp"
 #include "Graphics/Types.hpp"
-#include "Utils/Timer.hpp"
 
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 
 Renderer::Renderer(const RendererCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_SurfaceInfo(createInfo.surfaceInfo), m_QueueInfo(createInfo.queueInfo), m_SampleCount(createInfo.sampleCount), m_Allocator(createInfo.allocator)
+    : m_LogicalDevice(createInfo.deviceContext.logicalDevice)
+    , m_SurfaceInfo(createInfo.deviceContext.surfaceInfo)
+    , m_QueueInfo(createInfo.deviceContext.queueInfo)
+    , m_SampleCount(createInfo.deviceContext.maxSupportedSampleCount)
+    , m_Allocator(createInfo.deviceContext.allocator)
 {
+	LOG(err, "FUCKKK!");
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create sync objects
+	///Create sync objects
 	{
-		m_AquireImageSemaphores.resize(m_MaxFramesInFlight);
-		m_RenderSemaphores.resize(m_MaxFramesInFlight);
-		m_FrameFences.resize(m_MaxFramesInFlight);
-
-		for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			vk::SemaphoreCreateInfo semaphoreCreateInfo {};
 
@@ -26,11 +26,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				vk::FenceCreateFlagBits::eSignaled, // flags
 			};
 
-			m_AquireImageSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-
-			m_RenderSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-
-			m_FrameFences[i] = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
+			m_Frames[i].renderFence      = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
+			m_Frames[i].renderSemaphore  = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+			m_Frames[i].presentSemaphore = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
 		}
 
 		m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
@@ -177,7 +175,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		vk::FormatProperties formatProperties;
 		for (vk::Format format : { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint })
 		{
-			formatProperties = createInfo.physicalDevice.getFormatProperties(format);
+			formatProperties = createInfo.deviceContext.physicalDevice.getFormatProperties(format);
 			if ((formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) == vk::FormatFeatureFlagBits::eDepthStencilAttachment)
 			{
 				m_DepthFormat       = format;
@@ -243,7 +241,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Specify the attachments and subpasses and create the renderpass
+	// Specify the attachments and subpasses and create the forward pass
 	{
 		// Attachments
 		std::vector<vk::AttachmentDescription> attachments;
@@ -332,19 +330,19 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			&subpassDependency,                        // pDependencies
 		};
 
-		m_RenderPass = m_LogicalDevice.createRenderPass(renderPassCreateInfo, nullptr);
+		m_ForwardPass.renderpass = m_LogicalDevice.createRenderPass(renderPassCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the framebuffers
 	{
-		m_Framebuffers.resize(m_Images.size());
-		for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
+		m_ForwardPass.framebuffers.resize(m_Images.size());
+		for (uint32_t i = 0; i < m_ForwardPass.framebuffers.size(); i++)
 		{
 			std::vector<vk::ImageView> imageViews = { m_ColorImageView, m_DepthImageView, m_ImageViews[i] };
 			vk::FramebufferCreateInfo framebufferCreateInfo {
 				{},                                              //flags
-				m_RenderPass,                                    // renderPass
+				m_ForwardPass.renderpass,                        // renderPass
 				static_cast<uint32_t>(imageViews.size()),        // attachmentCount
 				imageViews.data(),                               // pAttachments
 				m_SurfaceInfo.capabilities.currentExtent.width,  // width
@@ -352,104 +350,263 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				1u,                                              // layers
 			};
 
-			m_Framebuffers[i] = m_LogicalDevice.createFramebuffer(framebufferCreateInfo, nullptr);
+			m_ForwardPass.framebuffers[i] = m_LogicalDevice.createFramebuffer(framebufferCreateInfo, nullptr);
 		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the command pool
 	{
+		// renderer
 		vk::CommandPoolCreateInfo commandPoolCreateInfo {
 			vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
 			m_QueueInfo.graphicsQueueIndex,                     // queueFamilyIndex
 		};
+
 		m_CommandPool           = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		m_ForwardPass.cmdPool   = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
 		m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
 
-		vk::CommandBufferAllocateInfo cmdAllocInfo {
+		vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
 			m_UploadContext.cmdPool,
 			vk::CommandBufferLevel::ePrimary,
 			1u,
 		};
-		m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(cmdAllocInfo)[0];
+		m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
 
-		vk::CommandBufferAllocateInfo commandBufferAllocInfo {
-			m_CommandPool,                    // commandPool
-			vk::CommandBufferLevel::ePrimary, // level
-			m_MaxFramesInFlight,              // commandBufferCount
-		};
-		m_RenderPassCmdBuffer = m_LogicalDevice.allocateCommandBuffers(commandBufferAllocInfo);
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			vk::CommandBufferAllocateInfo primaryCmdBufferAllocInfo {
+				m_ForwardPass.cmdPool,            // commandPool
+				vk::CommandBufferLevel::ePrimary, // level
+				1ull,                             // commandBufferCount
+			};
 
-		vk::CommandBufferAllocateInfo imguiCommandBufferAllocInfo {
-			m_CommandPool,                      // commandPool
-			vk::CommandBufferLevel::eSecondary, // level
-			m_MaxFramesInFlight,                // commandBufferCount
-		};
-		m_ImguiCmdBuffers = m_LogicalDevice.allocateCommandBuffers(imguiCommandBufferAllocInfo);
+			vk::CommandBufferAllocateInfo secondaryCmdBuffersAllocInfo {
+				m_CommandPool,                      // commandPool
+				vk::CommandBufferLevel::eSecondary, // level
+				MAX_FRAMES_IN_FLIGHT,               // commandBufferCount
+			};
+
+			m_ForwardPass.cmdBuffers[i].primary     = m_LogicalDevice.allocateCommandBuffers(primaryCmdBufferAllocInfo)[0];
+			m_ForwardPass.cmdBuffers[i].secondaries = m_LogicalDevice.allocateCommandBuffers(secondaryCmdBuffersAllocInfo);
+		}
 	}
 
-	// Create the texture
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create texture - @todo wtf is this doing here?
 	{
 		TextureCreateInfo textureCreateInfo {
-			m_LogicalDevice,                                                 // logicalDevice
-			createInfo.physicalDevice,                                       // physicalDevice
-			m_QueueInfo.graphicsQueue,                                       // graphicsQueue
-			m_Allocator,                                                     // allocator
-			m_CommandPool,                                                   // commandPool
-			"VulkanRenderer/res/viking_room.png",                            // imagePath
-			VK_TRUE,                                                         // anisotropyEnabled
-			createInfo.physicalDeviceProperties.limits.maxSamplerAnisotropy, // maxAnisotropy
+			m_LogicalDevice,                                                               // logicalDevice
+			createInfo.deviceContext.physicalDevice,                                       // physicalDevice
+			m_QueueInfo.graphicsQueue,                                                     // graphicsQueue
+			m_Allocator,                                                                   // allocator
+			m_CommandPool,                                                                 // commandPool
+			"VulkanRenderer/res/viking_room.png",                                          // imagePath
+			VK_TRUE,                                                                       // anisotropyEnabled
+			createInfo.deviceContext.physicalDeviceProperties.limits.maxSamplerAnisotropy, // maxAnisotropy
 		};
 
-		m_StatueTexture = std::make_shared<Texture>(textureCreateInfo);
+		m_TempTexture = std::make_shared<Texture>(textureCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create descriptor pool
 	{
-		std::vector<vk::DescriptorPoolSize> descriptorPoolSizes = {
-			{ vk::DescriptorType::eUniformBuffer, 20 },
-			{ vk::DescriptorType::eCombinedImageSampler, 20 },
-			{ vk::DescriptorType::eStorageBuffer, 20 },
+		std::vector<vk::DescriptorPoolSize> poolSizes = {
+			{ vk::DescriptorType::eSampler, 1000 },
+			{ vk::DescriptorType::eCombinedImageSampler, 1000 },
+			{ vk::DescriptorType::eSampledImage, 1000 },
+			{ vk::DescriptorType::eStorageImage, 1000 },
+			{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
+			{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
+			{ vk::DescriptorType::eUniformBuffer, 1000 },
+			{ vk::DescriptorType::eStorageBuffer, 1000 },
+			{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
+			{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
+			{ vk::DescriptorType::eInputAttachment, 1000 }
 		};
-
-		descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
+		// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
 		vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-			{},                         // flags
-			m_MaxFramesInFlight,        // maxSets
-			3u,                         // poolSizeCount
-			descriptorPoolSizes.data(), // pPoolSizes
+			{},                                      // flags
+			100,                                     // maxSets
+			static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
+			poolSizes.data(),                        // pPoolSizes
 		};
 
 		m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 	}
 
+
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create pipelines
+	/// Create camera data buffer
+	{
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			BufferCreateInfo createInfo {
+
+				m_LogicalDevice,                         // logicalDevice
+				createInfo.physicalDevice,               // physicalDevice
+				m_Allocator,                             // vmaallocator
+				m_CommandPool,                           // commandPool
+				m_QueueInfo.graphicsQueue,               // graphicsQueue
+				vk::BufferUsageFlagBits::eUniformBuffer, // usage
+				sizeof(glm::mat4) * 2ul,                 // size
+				{}                                       // inital data
+			};
+
+			m_Frames[i].cameraData.buffer = std::make_unique<Buffer>(createInfo);
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create frame descriptor sets
+	{
+		std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+			// [0] UniformBuffer - View Projection
+			vk::DescriptorSetLayoutBinding {
+			    0ul,
+			    vk::DescriptorType::eUniformBuffer,
+			    1ul,
+			    vk::ShaderStageFlagBits::eVertex,
+			    nullptr,
+			},
+		};
+
+		vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
+			{},
+			static_cast<uint32_t>(descriptorSetLayoutBindings.size()),
+			descriptorSetLayoutBindings.data(),
+		};
+		LOG(warn, "Creating frame descriptor set layout");
+		m_FramesDescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			vk::DescriptorSetAllocateInfo allocInfo {
+				m_DescriptorPool,
+				1ul,
+				&m_FramesDescriptorSetLayout,
+			};
+			m_Frames[i].descriptorSet = m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create forward pass descriptor sets
+	{
+		std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
+			// [0] StorageBuffer - Object Data
+			vk::DescriptorSetLayoutBinding {
+			    0ul,                                // binding
+			    vk::DescriptorType::eStorageBuffer, // descriptorType
+			    1ul,                                // descriptorCount
+			    vk::ShaderStageFlagBits::eVertex,   // stageFlags
+			    nullptr,                            // pImmutableSamplers
+			},
+
+			// [1] Sampler - Texture
+			vk::DescriptorSetLayoutBinding {
+			    1u,                                        // binding
+			    vk::DescriptorType::eCombinedImageSampler, // descriptorType
+			    1u,                                        // descriptorCount
+			    vk::ShaderStageFlagBits::eFragment,        // stageFlags
+			    nullptr,                                   // pImmutableSamplers
+			},
+		};
+
+		vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
+			{},                                                        // flags
+			static_cast<uint32_t>(descriptorSetLayoutBindings.size()), // bindingCount
+			descriptorSetLayoutBindings.data(),                        // pBindings
+		};
+
+		LOG(warn, "Creating forward pass descriptor set layout");
+		m_ForwardPass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
+		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			vk::DescriptorSetAllocateInfo allocInfo {
+				m_DescriptorPool,
+				1ul,
+				&m_ForwardPass.descriptorSetLayout,
+			};
+
+			m_ForwardPass.descriptorSets[i] = m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create forward pass pipeline layout
+	{
+		vk::PushConstantRange pushConstantRange {
+			{},   // stageFlags
+			0ul,  // offset
+			0ull, // size
+		};
+
+		std::vector<vk::DescriptorSetLayout> setLayouts = {
+			m_FramesDescriptorSetLayout,
+			m_ForwardPass.descriptorSetLayout,
+		};
+		vk::PipelineLayoutCreateInfo pipelineLayout {
+			{},                                       // flags
+			static_cast<uint32_t>(setLayouts.size()), // setLayoutCount
+			setLayouts.data(),                        //// pSetLayouts
+			0ull,                                     // pushConstantRangeCount
+			{},                                       // pPushConstantRanges
+		};
+
+		LOG(warn, "Creating forward pass pipe layout...");
+		m_ForwardPass.pipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayout, nullptr);
+	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create forward pass storage buffer
+	{
+		BufferCreateInfo createInfo {
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = createInfo.physicalDevice,
+			.allocator      = m_Allocator,
+			.commandPool    = m_CommandPool,
+			.graphicsQueue  = m_QueueInfo.graphicsQueue,
+			.usage          = vk::BufferUsageFlagBits::eStorageBuffer,
+			.size           = sizeof(glm::mat4) * 100,
+			.initialData    = {},
+		};
+
+		m_ForwardPass.storageBuffer = std::make_unique<Buffer>(createInfo);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create pipelines @todo automate this??
 	{
 		// Update model view projection uniform
-		m_ViewProjection.view       = glm::lookAt(glm::vec3(4.0f, 4.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-		m_ViewProjection.projection = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
-
 		RenderableCreateInfo renderableCreateInfo {
 			"VulkanRenderer/res/viking_room.obj", // modelPath
-			{ m_StatueTexture }                   // #TODO // textures
+			{ m_TempTexture }                     // #TODO // textures
+		};
+
+		std::vector<vk::DescriptorSetLayout> setLayouts = {
+			m_FramesDescriptorSetLayout,
+			m_ForwardPass.descriptorSetLayout,
 		};
 
 		// #TODO:
+		LOG(warn, "Creating pipeline...");
 		PipelineCreateInfo pipelineCreateInfo {
-			.logicalDevice     = m_LogicalDevice,
-			.physicalDevice    = createInfo.physicalDevice,
-			.allocator         = m_Allocator,
-			.maxFramesInFlight = m_MaxFramesInFlight,
-			.queueInfo         = m_QueueInfo,
-			.viewportExtent    = m_SurfaceInfo.capabilities.currentExtent,
-			.commandPool       = m_CommandPool,
-			.imageCount        = static_cast<uint32_t>(m_Images.size()),
-			.sampleCount       = createInfo.sampleCount,
-			.renderPass        = m_RenderPass,
-			.descriptorPool    = m_DescriptorPool,
+			.logicalDevice        = m_LogicalDevice,
+			.physicalDevice       = createInfo.deviceContext.physicalDevice,
+			.allocator            = m_Allocator,
+			.maxFramesInFlight    = MAX_FRAMES_IN_FLIGHT,
+			.queueInfo            = m_QueueInfo,
+			.viewportExtent       = m_SurfaceInfo.capabilities.currentExtent,
+			.commandPool          = m_CommandPool,
+			.imageCount           = static_cast<uint32_t>(m_Images.size()),
+			.sampleCount          = createInfo.deviceContext.maxSupportedSampleCount,
+			.renderPass           = m_ForwardPass.renderpass,
+			.descriptorSetLayouts = setLayouts,
+			.descriptorPool       = m_DescriptorPool,
 
 			// Shader
 			.vertexShaderPath = "VulkanRenderer/res/vertex.glsl",
@@ -498,67 +655,34 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		m_Pipelines.back()->RecreateBuffers();
 	}
 
-
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Initialize Dear ImGui
 	{
-		vk::DescriptorPoolSize poolSizes[] = {
-			{ vk::DescriptorType::eSampler, 1000 },
-			{ vk::DescriptorType::eCombinedImageSampler, 1000 },
-			{ vk::DescriptorType::eSampledImage, 1000 },
-			{ vk::DescriptorType::eStorageImage, 1000 },
-			{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
-			{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
-			{ vk::DescriptorType::eUniformBuffer, 1000 },
-			{ vk::DescriptorType::eStorageBuffer, 1000 },
-			{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
-			{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
-			{ vk::DescriptorType::eInputAttachment, 1000 }
-		};
-
-		vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-			vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-			1000ull,
-			std::size(poolSizes),
-			poolSizes
-		};
-
-		m_ImguiPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
-
 		ImGui::CreateContext();
 
 		ImGui_ImplGlfw_InitForVulkan(createInfo.window->GetGlfwHandle(), true);
 
 		ImGui_ImplVulkan_InitInfo initInfo {
-			.Instance       = createInfo.instance,
-			.PhysicalDevice = createInfo.physicalDevice,
+			.Instance       = createInfo.deviceContext.instance,
+			.PhysicalDevice = createInfo.deviceContext.physicalDevice,
 			.Device         = m_LogicalDevice,
 			.Queue          = m_QueueInfo.graphicsQueue,
-			.DescriptorPool = m_ImguiPool,
-			.MinImageCount  = m_MaxFramesInFlight,
-			.ImageCount     = m_MaxFramesInFlight,
+			.DescriptorPool = m_DescriptorPool,
+			.MinImageCount  = MAX_FRAMES_IN_FLIGHT,
+			.ImageCount     = MAX_FRAMES_IN_FLIGHT,
 			.MSAASamples    = static_cast<VkSampleCountFlagBits>(m_SampleCount),
 		};
 
-
-		vk::DynamicLoader dl;
-		PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr = dl.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-		vkGetInstanceProcAddr(NULL, "");
-
-		static struct Payload
-		{
-			PFN_vkGetInstanceProcAddr vkGetProcAddr;
-			vk::Instance instance;
-		} payload = { createInfo.procAddr, createInfo.instance };
+		std::pair userData = std::make_pair(createInfo.deviceContext.vkGetInstanceProcAddr, createInfo.deviceContext.instance);
 
 		ASSERT(ImGui_ImplVulkan_LoadFunctions([](const char* func, void* data) {
-			       Payload pload = *(Payload*)data;
-			       return payload.vkGetProcAddr(payload.instance, func);
+			       auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
+			       return vkGetProcAddr(instance, func);
 		       },
-		                                      (void*)&payload),
+		                                      (void*)&userData),
 		       "ImGui failed to load vulkan functions");
 
-		ImGui_ImplVulkan_Init(&initInfo, m_RenderPass);
+		ImGui_ImplVulkan_Init(&initInfo, m_ForwardPass.renderpass);
 
 
 		ImmediateSubmit([](vk::CommandBuffer cmd) {
@@ -587,24 +711,18 @@ void Renderer::EndFrame()
 	if (m_SwapchainInvalidated)
 		return;
 
-	static float fov     = 45.0f;
-	static glm::vec3 eye = { 4.0f, 4.0f, 2.0f };
-
-	ImGui::SliderFloat("Field of view", &fov, 0.0f, 90.0f);
-	ImGui::SliderFloat3("Camera Position", &eye.x, 0.5f, 8.5f);
-
 	ImGui::Render();
 
-	// Timer...
-	static Timer timer;
-	float time = timer.ElapsedTime();
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Get frame & image data
+	const FrameData& frame = m_Frames[m_CurrentFrame];
 
 	// Wait for the frame fence
-	VKC(m_LogicalDevice.waitForFences(1u, &m_FrameFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+	VKC(m_LogicalDevice.waitForFences(1u, &frame.renderFence, VK_TRUE, UINT64_MAX));
 
 	// Acquire an image
 	uint32_t imageIndex;
-	vk::Result result = m_LogicalDevice.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_AquireImageSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+	vk::Result result = m_LogicalDevice.acquireNextImageKHR(m_Swapchain, UINT64_MAX, frame.renderSemaphore, VK_NULL_HANDLE, &imageIndex);
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
 	{
 		m_LogicalDevice.waitIdle();
@@ -616,118 +734,183 @@ void Renderer::EndFrame()
 		ASSERT(result == vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
-	// Update model view projection uniform
-	m_ViewProjection.view       = glm::lookAt(eye, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-	m_ViewProjection.projection = glm::perspective(glm::radians(fov), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
-
-	// Record commands
-	CommandBufferStartInfo commandBufferStartInfo {
-		&m_DescriptorSets[m_CurrentFrame],        // descriptorSet
-		m_Framebuffers[imageIndex],               // framebuffer
-		m_SurfaceInfo.capabilities.currentExtent, // extent
-		m_CurrentFrame,                           // frameIndex
-		&m_ViewProjection,                        // pushConstants
-	};
-
-	vk::CommandBufferBeginInfo beginInfo { {}, nullptr };
-
-	std::array<vk::ClearValue, 2> clearValues {
-		vk::ClearValue { vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } },
-		vk::ClearValue { vk::ClearDepthStencilValue { 1.0f, 0 } },
-	};
-
-	vk::RenderPassBeginInfo renderpassBeginInfo {
-		m_RenderPass,               // renderPass
-		m_Framebuffers[imageIndex], // framebuffer
-
-		/* renderArea */
-		vk::Rect2D {
-		    { 0, 0 },                                 // offset
-		    m_SurfaceInfo.capabilities.currentExtent, // extent
-		},
-		static_cast<uint32_t>(clearValues.size()), // clearValueCount
-		clearValues.data(),                        // pClearValues
-	};
-
-	m_RenderPassCmdBuffer[m_CurrentFrame].begin(beginInfo);
-	m_RenderPassCmdBuffer[m_CurrentFrame].beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
-
-	std::vector<vk::CommandBuffer> cmdBuffers = {};
-	for (auto& pipeline : m_Pipelines)
+	////////////////////////////////////////////////////////////////
+	/// Update frame descriptor set
 	{
-		cmdBuffers.push_back(pipeline->RecordCommandBuffer(commandBufferStartInfo));
+		glm::mat4* map = (glm::mat4*)frame.cameraData.buffer->Map();
+		map[0]         = glm::perspective(glm::radians(45.0f), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
+		map[1]         = glm::lookAt({ 4.0f, 4.0f, 2.0f }, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+		frame.cameraData.buffer->Unmap();
+
+		vk::DescriptorBufferInfo viewProjectionBufferInfo {
+			*frame.cameraData.buffer->GetBuffer(),
+			0ul,
+			VK_WHOLE_SIZE,
+		};
+
+		std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {
+			vk::WriteDescriptorSet {
+			    m_Frames[m_CurrentFrame].descriptorSet,
+			    0ul,
+			    0ul,
+			    1ul,
+			    vk::DescriptorType::eUniformBuffer,
+			    nullptr,
+			    &viewProjectionBufferInfo,
+			    nullptr,
+			},
+		};
+
+		m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0ul, nullptr);
 	}
 
-
-	vk::CommandBufferInheritanceInfo inheritanceInfo {
-		m_RenderPass,
-		0u,
-		m_Framebuffers[imageIndex],
-		{},
-		{},
-		{}
-	};
-	vk::CommandBufferBeginInfo imguiCmdBeginInfo {
-		vk::CommandBufferUsageFlagBits::eRenderPassContinue, // flags
-		&inheritanceInfo                                     // pInheritanceInfo
-	};
-
-	m_ImguiCmdBuffers[m_CurrentFrame].begin(imguiCmdBeginInfo);
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_ImguiCmdBuffers[m_CurrentFrame]);
-	m_ImguiCmdBuffers[m_CurrentFrame].end();
-
-	cmdBuffers.push_back(m_ImguiCmdBuffers[m_CurrentFrame]);
-
-	m_RenderPassCmdBuffer[m_CurrentFrame].executeCommands(cmdBuffers);
-
-	m_RenderPassCmdBuffer[m_CurrentFrame].endRenderPass();
-	m_RenderPassCmdBuffer[m_CurrentFrame].end();
-
-	//
-	// Submit commands (and reset the fence)
-	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	vk::SubmitInfo submitInfo {
-		1u,                                       // waitSemaphoreCount
-		&m_AquireImageSemaphores[m_CurrentFrame], // pWaitSemaphores
-		&waitStage,                               // pWaitDstStageMask
-		1ull,                                     // commandBufferCount
-		&m_RenderPassCmdBuffer[m_CurrentFrame],   // pCommandBuffers
-		1u,                                       // signalSemaphoreCount
-		&m_RenderSemaphores[m_CurrentFrame],      // pSignalSemaphores
-	};
-
-	VKC(m_LogicalDevice.resetFences(1u, &m_FrameFences[m_CurrentFrame]));
-	VKC(m_QueueInfo.graphicsQueue.submit(1u, &submitInfo, m_FrameFences[m_CurrentFrame]));
-
-	// Present the image
-	vk::PresentInfoKHR presentInfo {
-		1u,                                  // waitSemaphoreCount
-		&m_RenderSemaphores[m_CurrentFrame], // pWaitSemaphores
-		1u,                                  // swapchainCount
-		&m_Swapchain,                        // pSwapchains
-		&imageIndex,                         // pImageIndices
-		nullptr                              // pResults
-	};
-
-	try
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Forward Render Pass
 	{
-		result = m_QueueInfo.presentQueue.presentKHR(presentInfo);
-		if (result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
+		const std::array<vk::ClearValue, 2> clearValues {
+			vk::ClearValue { vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } },
+			vk::ClearValue { vk::ClearDepthStencilValue { 1.0f, 0 } },
+		};
+
+		const vk::Framebuffer framebuffer = m_ForwardPass.framebuffers[imageIndex];
+
+		const vk::CommandBufferInheritanceInfo inheritanceInfo {
+			m_ForwardPass.renderpass, // renderpass
+			0u,                       // subpass
+			framebuffer,              // framebuffer
+		};
+
+		const vk::CommandBufferBeginInfo primaryCmdBufferBeginInfo {
+			{},     // flags
+			nullptr // pInheritanceInfo
+		};
+
+		const vk::CommandBufferBeginInfo secondaryCmdBufferBeginInfo {
+			vk::CommandBufferUsageFlagBits::eRenderPassContinue, // flags
+			&inheritanceInfo                                     // pInheritanceInfo
+		};
+
+		const vk::RenderPassBeginInfo renderpassBeginInfo {
+			m_ForwardPass.renderpass, // renderPass
+			framebuffer,              // framebuffer
+
+			/* renderArea */
+			vk::Rect2D {
+			    { 0, 0 },                                 // offset
+			    m_SurfaceInfo.capabilities.currentExtent, // extent
+			},
+			static_cast<uint32_t>(clearValues.size()), // clearValueCount
+			clearValues.data(),                        // pClearValues
+		};
+
+		// Record commnads @todo multi-thread secondary commands
+		const auto primaryCmd    = m_ForwardPass.cmdBuffers[m_CurrentFrame].primary;
+		const auto secondaryCmds = m_ForwardPass.cmdBuffers[m_CurrentFrame].secondaries[m_CurrentFrame];
+
+		primaryCmd.reset();
+		primaryCmd.begin(primaryCmdBufferBeginInfo);
+		primaryCmd.beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
+
+		// Update descriptor sets
+		const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
+
+		vk::DescriptorImageInfo descriptorImageInfo {
+			m_TempTexture->GetSampler(),             // sampler
+			m_TempTexture->GetImageView(),           // imageView
+			vk::ImageLayout::eShaderReadOnlyOptimal, // imageLayout
+		};
+
+		std::vector<vk::WriteDescriptorSet> writeDescriptorSets {
+			vk::WriteDescriptorSet {
+			    descriptorSet,
+			    1u,
+			    0u,
+			    1u,
+			    vk::DescriptorType::eCombinedImageSampler,
+			    &descriptorImageInfo,
+			    nullptr,
+			    nullptr,
+			},
+		};
+		secondaryCmds.reset();
+
+		// #TODO WTF??
+		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
+		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
+		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
+		m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
+
+		// Record pipeline commands
+		for (auto& pipeline : m_Pipelines)
+		{
+			pipeline->RecordCommandBuffer(secondaryCmds);
+		}
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), secondaryCmds);
+		secondaryCmds.end();
+
+		primaryCmd.executeCommands(1ul, &secondaryCmds);
+		primaryCmd.endRenderPass();
+		primaryCmd.end();
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// UserInterface Render Pass
+	{}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Submit commands (and reset the fence)
+	{
+		std::vector<vk::CommandBuffer> primaryCmdBuffers {
+			m_ForwardPass.cmdBuffers[m_CurrentFrame].primary,
+		};
+
+		vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		vk::SubmitInfo submitInfo {
+			1u,                                              // waitSemaphoreCount
+			&frame.renderSemaphore,                          // pWaitSemaphores
+			&waitStage,                                      // pWaitDstStageMask
+			static_cast<uint32_t>(primaryCmdBuffers.size()), // commandBufferCount
+			primaryCmdBuffers.data(),                        // pCommandBuffers
+			1u,                                              // signalSemaphoreCount
+			&frame.presentSemaphore,                         // pSignalSemaphores
+		};
+
+		VKC(m_LogicalDevice.resetFences(1u, &frame.renderFence));
+		VKC(m_QueueInfo.graphicsQueue.submit(1u, &submitInfo, frame.renderFence));
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Present the frame
+	{
+		vk::PresentInfoKHR presentInfo {
+			1u,                      // waitSemaphoreCount
+			&frame.presentSemaphore, // pWaitSemaphores
+			1u,                      // swapchainCount
+			&m_Swapchain,            // pSwapchains
+			&imageIndex,             // pImageIndices
+			nullptr                  // pResults
+		};
+
+		try
+		{
+			result = m_QueueInfo.presentQueue.presentKHR(presentInfo);
+			if (result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
+			{
+				m_LogicalDevice.waitIdle();
+				m_SwapchainInvalidated = true;
+				return;
+			}
+		}
+		catch (vk::OutOfDateKHRError err) // OutOfDateKHR is not considered a success value and throws an error (presentKHR)
 		{
 			m_LogicalDevice.waitIdle();
 			m_SwapchainInvalidated = true;
 			return;
 		}
 	}
-	catch (vk::OutOfDateKHRError err) // OutOfDateKHR is not considered a success value and throws an error (presentKHR)
-	{
-		m_LogicalDevice.waitIdle();
-		m_SwapchainInvalidated = true;
-		return;
-	}
 
 	// Increment frame index
-	m_CurrentFrame = (m_CurrentFrame + 1u) % m_MaxFramesInFlight;
+	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
@@ -776,12 +959,12 @@ Renderer::~Renderer()
 	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
 	m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
 
-	for (uint32_t i = 0; i < m_Framebuffers.size(); i++)
+	for (uint32_t i = 0; i < m_ForwardPass.framebuffers.size(); i++)
 	{
-		m_LogicalDevice.destroyFramebuffer(m_Framebuffers[i], nullptr);
+		m_LogicalDevice.destroyFramebuffer(m_ForwardPass.framebuffers[i], nullptr);
 	}
 
-	m_LogicalDevice.destroyRenderPass(m_RenderPass, nullptr);
+	m_LogicalDevice.destroyRenderPass(m_ForwardPass.renderpass, nullptr);
 	m_LogicalDevice.destroyImageView(m_DepthImageView, nullptr);
 	m_Allocator.destroyImage(m_DepthImage, m_DepthImage);
 	m_LogicalDevice.destroyImageView(m_ColorImageView, nullptr);
@@ -794,10 +977,10 @@ Renderer::~Renderer()
 
 	m_LogicalDevice.destroySwapchainKHR(m_Swapchain, nullptr);
 
-	for (uint32_t i = 0; i < m_MaxFramesInFlight; i++)
+	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		m_LogicalDevice.destroyFence(m_FrameFences[i], nullptr);
-		m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
-		m_LogicalDevice.destroySemaphore(m_AquireImageSemaphores[i], nullptr);
+		m_LogicalDevice.destroyFence(m_Frames[i].renderFence, nullptr);
+		m_LogicalDevice.destroySemaphore(m_Frames[i].renderSemaphore, nullptr);
+		m_LogicalDevice.destroySemaphore(m_Frames[i].presentSemaphore, nullptr);
 	}
 }

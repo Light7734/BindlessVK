@@ -13,12 +13,13 @@
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 Device::Device(DeviceCreateInfo& createInfo)
-    : m_Layers(createInfo.layers), m_Extensions(createInfo.instanceExtensions)
+    : m_Layers(createInfo.layers)
+    , m_Extensions(createInfo.instanceExtensions)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Initialize volk
-	m_GetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_GetInstanceProcAddr);
+	m_VkGetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_VkGetInstanceProcAddr);
 	/////////////////////////////////////////////////////////////////////////////////
 	// Check if the required layers exist.
 	{

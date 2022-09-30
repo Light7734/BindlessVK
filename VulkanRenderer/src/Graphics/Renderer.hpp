@@ -15,20 +15,23 @@
 #include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan.hpp>
 
+#ifndef MAX_FRAMES_IN_FLIGHT
+	#define MAX_FRAMES_IN_FLIGHT 3
+#endif
+
 class Window;
 
 struct RendererCreateInfo
 {
 	Window* window;
-	PFN_vkGetInstanceProcAddr procAddr;
-	vk::Instance instance;
-	vk::Device logicalDevice;
-	vk::PhysicalDevice physicalDevice;
-	vk::PhysicalDeviceProperties physicalDeviceProperties;
-	vma::Allocator allocator;
-	vk::SampleCountFlagBits sampleCount;
-	SurfaceInfo surfaceInfo;
-	QueueInfo queueInfo;
+	DeviceContext deviceContext;
+};
+
+struct CameraData
+{
+	std::unique_ptr<Buffer> buffer;
+	glm::mat4 projection;
+	glm::mat4 view;
 };
 
 struct UploadContext
@@ -38,8 +41,44 @@ struct UploadContext
 	vk::Fence fence;
 };
 
-struct FrameInfo
+struct FrameData
 {
+	vk::Semaphore renderSemaphore;
+	vk::Semaphore presentSemaphore;
+	vk::Fence renderFence;
+
+	CameraData cameraData;
+
+	vk::DescriptorSet descriptorSet; // Binding 0
+};
+
+// @todo Multi-threading
+struct RenderPassData
+{
+	struct CmdBuffers
+	{
+		vk::CommandBuffer primary;
+		std::vector<vk::CommandBuffer> secondaries; // secondary command buffers for each thread
+	};
+
+	vk::RenderPass renderpass;
+	std::vector<vk::Framebuffer> framebuffers;
+
+	vk::CommandPool cmdPool;                                 // Pools for threads @todo Multi-threading
+	std::array<CmdBuffers, MAX_FRAMES_IN_FLIGHT> cmdBuffers; // Command buffers for each frame
+
+	std::unique_ptr<Buffer> storageBuffer;
+
+
+	std::array<vk::DescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // Binding 1
+	vk::DescriptorSetLayout descriptorSetLayout;
+	vk::PipelineLayout pipelineLayout;
+};
+
+
+struct PipelineData
+{
+	vk::DescriptorSet descriptorSet; // Bindig 2
 };
 
 class Renderer
@@ -66,40 +105,35 @@ private:
 
 	vma::Allocator m_Allocator;
 
-	PushConstants m_ViewProjection = {};
-	bool m_SwapchainInvalidated    = false;
+	std::array<FrameData, MAX_FRAMES_IN_FLIGHT> m_Frames = {};
+	vk::DescriptorSetLayout m_FramesDescriptorSetLayout;
+
+	// Render Passes
+	RenderPassData m_ForwardPass = {};
+	// RenderPassData m_UIPass;
+
+	bool m_SwapchainInvalidated = false;
 
 	// Swapchain
 	vk::SwapchainKHR m_Swapchain = {};
 
-	std::vector<vk::Image> m_Images             = {};
-	std::vector<vk::ImageView> m_ImageViews     = {};
-	std::vector<vk::Framebuffer> m_Framebuffers = {};
+	std::vector<vk::Image> m_Images         = {};
+	std::vector<vk::ImageView> m_ImageViews = {};
 
 	// Multisampling
 	AllocatedImage m_ColorImage    = {};
 	vk::ImageView m_ColorImageView = {};
 
-	// RenderPass
-	vk::RenderPass m_RenderPass                          = {};
-	std::vector<vk::CommandBuffer> m_RenderPassCmdBuffer = {};
-
 	vk::SampleCountFlagBits m_SampleCount = vk::SampleCountFlagBits::e1;
+
 	// Commands
 	vk::CommandPool m_CommandPool                   = {};
 	std::vector<vk::CommandBuffer> m_CommandBuffers = {};
 
-	// Synchronization
-	std::vector<vk::Semaphore> m_AquireImageSemaphores = {};
-	std::vector<vk::Semaphore> m_RenderSemaphores      = {};
-	std::vector<vk::Fence> m_FrameFences               = {};
-
-	const uint32_t m_MaxFramesInFlight = 2u;
-	uint32_t m_CurrentFrame            = 0u;
+	uint32_t m_CurrentFrame = 0ul;
 
 	// Descriptor sets
-	vk::DescriptorPool m_DescriptorPool             = {};
-	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
+	vk::DescriptorPool m_DescriptorPool = {};
 
 	// Depth buffer
 	vk::Format m_DepthFormat    = {};
@@ -115,5 +149,6 @@ private:
 
 	// Pipelines
 	std::vector<std::shared_ptr<Pipeline>> m_Pipelines = {};
-	std::shared_ptr<Texture> m_StatueTexture           = {}; // #TEMP
+	std::shared_ptr<Texture> m_TempTexture             = {}; // #TEMP
+	                                                         //
 };

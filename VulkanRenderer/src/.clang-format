@@ -129,7 +129,7 @@ PenaltyReturnTypeOnItsOwnLine: '999999999' # Nope
 
 # Constructor Initializers
 ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'
-AllowAllConstructorInitializersOnNextLine: 'true'
+AllowAllConstructorInitializersOnNextLine: 'false'
 BreakConstructorInitializers: BeforeComma
 
 # Comments
