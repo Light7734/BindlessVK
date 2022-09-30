@@ -536,30 +536,35 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Create forward pass pipeline layout
+	/// Create frame pipeline layout
 	{
-		vk::PushConstantRange pushConstantRange {
-			{},   // stageFlags
-			0ul,  // offset
-			0ull, // size
+		std::array<vk::DescriptorSetLayout, 1> setLayouts = {
+			m_FramesDescriptorSetLayout,
+		};
+		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
+			{},                // flags
+			setLayouts.size(), // setLayoutCount
+			setLayouts.data(), //// pSetLayouts
 		};
 
-		std::vector<vk::DescriptorSetLayout> setLayouts = {
+		m_FramePipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create forward pass pipeline layout
+	{
+		std::array<vk::DescriptorSetLayout, 2> setLayouts = {
 			m_FramesDescriptorSetLayout,
 			m_ForwardPass.descriptorSetLayout,
 		};
-		vk::PipelineLayoutCreateInfo pipelineLayout {
-			{},                                       // flags
-			static_cast<uint32_t>(setLayouts.size()), // setLayoutCount
-			setLayouts.data(),                        //// pSetLayouts
-			0ull,                                     // pushConstantRangeCount
-			{},                                       // pPushConstantRanges
+		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
+			{},                // flags
+			setLayouts.size(), // setLayoutCount
+			setLayouts.data(), //// pSetLayouts
 		};
 
-		LOG(warn, "Creating forward pass pipe layout...");
-		m_ForwardPass.pipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayout, nullptr);
+		m_ForwardPass.pipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
 	}
-
 
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Create forward pass storage buffer
@@ -836,7 +841,7 @@ void Renderer::EndFrame()
 
 		// #TODO WTF??
 		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
-		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
+		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
 		m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
 

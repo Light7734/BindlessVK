@@ -149,6 +149,7 @@ private:
 
 	// Pipelines
 	std::vector<std::shared_ptr<Pipeline>> m_Pipelines = {};
+	vk::PipelineLayout m_FramePipelineLayout= {};
 	std::shared_ptr<Texture> m_TempTexture             = {}; // #TEMP
 	                                                         //
 };
