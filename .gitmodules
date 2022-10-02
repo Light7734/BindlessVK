@@ -1,6 +1,6 @@
 [submodule "Dependencies/vma-hpp"]
-	path = Dependencies/vma-hpp
+	path = Vendor/vma-hpp
 	url = git@github.com:YaaZ/VulkanMemoryAllocator-Hpp
 [submodule "Dependencies/imgui"]
-	path = Dependencies/imgui
+	path = Vendor/imgui
 	url = git@github.com:ocornut/imgui

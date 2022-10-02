@@ -4,30 +4,30 @@ add_executable(
     VulkanRenderer
 
     # PCH
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
 
     # Core
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Base.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Entrypoint.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/UUID.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Window.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Base.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Entrypoint.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/UUID.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Window.cpp
 
     # Debug
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Debug/Logger.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Debug/Logger.cpp
 
     # Graphics
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Device.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Pipeline.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Renderable.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Renderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Shader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Buffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Device.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Renderable.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Shader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Texture.cpp
 
     # Utils
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/CVar.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Timer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Utils/CVar.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Utils/Stringifier.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Utils/Timer.cpp
 )
 
 set_target_properties(
@@ -37,10 +37,10 @@ set_target_properties(
 
 target_include_directories(
     VulkanRenderer
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
-    PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/imgui/
-    PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/vma-hpp/VulkanMemoryAllocator/include/
-    PRIVATE ${CMAKE_SOURCE_DIR}/Dependencies/vma-hpp/include/
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
 )
 
 target_link_libraries(
@@ -51,7 +51,7 @@ target_link_libraries(
 
 target_precompile_headers(
     VulkanRenderer 
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/pch.hpp
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
 )
 
 if(UNIX)
