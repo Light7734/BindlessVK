@@ -7,16 +7,20 @@
 
 enum class CVarType : uint8_t
 {
-	Int,
-	Float,
-	String,
 	Boolean,
+	Float,
+	Int,
+	String,
 };
-
 
 class CVarVal
 {
 public:
+	CVarVal(bool value)
+	{
+		m_Value = value;
+	}
+
 	CVarVal(float value)
 	{
 		m_Value = value;
@@ -61,7 +65,6 @@ public:
 		GetInstance()->SetImpl(name, value);
 	}
 
-
 	static inline void Reset(const char* name)
 	{
 		GetInstance()->ResetImpl(name);
@@ -78,16 +81,17 @@ public:
 	}
 
 private:
+	static CVar* GetInstance();
+
 	void CreateImpl(CVarType type, const char* name, const char* description, CVarVal defaultValue, CVarVal currentValue);
 
 	void SetImpl(const char* name, CVarVal value);
+
 	void ResetImpl(const char* name);
 
 	CVarVal GetImpl(const char* name);
 
 	void DrawImguiEditorImpl();
-
-	static CVar* GetInstance();
 
 private:
 	struct CVarEntry
@@ -121,7 +125,6 @@ class AutoCVar
 public:
 	AutoCVar(CVarType type, const char* name, const char* description, CVarVal defaultValue, CVarVal currentValue)
 	{
-		std::cout << "Should this work????" << std::endl;
 		CVar::Create(type, name, description, defaultValue, currentValue);
 	}
 };
