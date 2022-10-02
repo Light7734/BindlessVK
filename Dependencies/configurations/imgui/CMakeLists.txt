@@ -13,6 +13,10 @@ add_library(
     # Backends
     ${CMAKE_SOURCE_DIR}/Dependencies/imgui/backends/imgui_impl_vulkan.cpp
     ${CMAKE_SOURCE_DIR}/Dependencies/imgui/backends/imgui_impl_glfw.cpp
+
+    # Misc
+    ${CMAKE_SOURCE_DIR}/Dependencies/imgui/misc/cpp/imgui_stdlib.cpp
+
 )
 
 target_include_directories(

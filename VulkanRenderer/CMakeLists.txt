@@ -25,6 +25,7 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Graphics/Texture.cpp
 
     # Utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/CVar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Stringifier.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils/Timer.cpp
 )
