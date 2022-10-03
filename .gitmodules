@@ -4,3 +4,9 @@
 [submodule "Dependencies/imgui"]
 	path = Vendor/imgui
 	url = git@github.com:ocornut/imgui
+[submodule "Vendor/nlohmann"]
+	path = Vendor/nlohmann
+	url = https://github.com/nlohmann/json
+[submodule "Vendor/lz4"]
+	path = Vendor/lz4
+	url = git@github.com:lz4/lz4
