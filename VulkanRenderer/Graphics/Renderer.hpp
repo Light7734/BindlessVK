@@ -69,16 +69,9 @@ struct RenderPassData
 
 	std::unique_ptr<Buffer> storageBuffer;
 
-
 	std::array<vk::DescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // Binding 1
 	vk::DescriptorSetLayout descriptorSetLayout;
 	vk::PipelineLayout pipelineLayout;
-};
-
-
-struct PipelineData
-{
-	vk::DescriptorSet descriptorSet; // Bindig 2
 };
 
 class Renderer

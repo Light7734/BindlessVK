@@ -39,6 +39,7 @@ target_include_directories(
     VulkanRenderer
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui/
+    PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
 )
@@ -46,6 +47,7 @@ target_include_directories(
 target_link_libraries(
     VulkanRenderer 
     PRIVATE imgui
+    PRIVATE AssetParser
     PRIVATE ${CONAN_LIBS}
 )
 

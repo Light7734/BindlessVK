@@ -1,18 +1,23 @@
 #include "Graphics/Texture.hpp"
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
+#include <AssetParser.hpp>
+#include <TextureAsset.hpp>
 
 Texture::Texture(TextureCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_Allocator(createInfo.allocator)
+    : m_LogicalDevice(createInfo.logicalDevice)
+    , m_Allocator(createInfo.allocator)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Load the image
-	uint8_t* imageData = stbi_load(createInfo.imagePath.c_str(), &m_Width, &m_Height, &m_Channels, 4u);
-	ASSERT(imageData, "Failed to load image at: {}", createInfo.imagePath);
-	m_ImageSize = m_Width * m_Height * 4u;
+	Assets::AssetFile file;
+	ASSERT(Assets::LoadBinaryFile(createInfo.imagePath.c_str(), file), "Failed to load image at: {}", createInfo.imagePath);
 
+	Assets::TextureInfo textureInfo = Assets::ReadTextureInfo(&file);
+
+	m_Width     = textureInfo.pixelsSize[0];
+	m_Height    = textureInfo.pixelsSize[1];
 	m_MipLevels = std::floor(std::log2(std::max(m_Width, m_Height))) + 1;
+	m_ImageSize = textureInfo.size;
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the image and staging buffer
@@ -53,7 +58,7 @@ Texture::Texture(TextureCreateInfo& createInfo)
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
-		vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, {});
+		vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, { vk::MemoryPropertyFlagBits::eHostCached });
 		m_StagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 	}
 
@@ -62,7 +67,7 @@ Texture::Texture(TextureCreateInfo& createInfo)
 	{
 		// Copy data to staging buffer
 		void* stagingMap = m_Allocator.mapMemory(m_StagingBuffer);
-		memcpy(stagingMap, imageData, m_ImageSize);
+		Assets::UnpackTexture(&textureInfo, file.blob.data(), file.blob.size(), stagingMap);
 		m_Allocator.unmapMemory(m_StagingBuffer);
 
 		// Allocate cmd buffer
@@ -215,9 +220,6 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		// Wait for and free cmd buffer
 		createInfo.graphicsQueue.waitIdle();
 		m_LogicalDevice.freeCommandBuffers(createInfo.commandPool, 1u, &cmdBuffer);
-
-		// Free image data
-		stbi_image_free(imageData);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////

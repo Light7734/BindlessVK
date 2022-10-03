@@ -444,7 +444,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			m_QueueInfo.graphicsQueue,               // graphicsQueue
 			m_Allocator,                             // allocator
 			m_CommandPool,                           // commandPool
-			"Assets/viking_room.png",                // imagePath
+			"Assets/viking_room.asset_texture",      // imagePath
 			VK_TRUE,                                 // anisotropyEnabled
 			createInfo.deviceContext.physicalDeviceProperties.limits
 			    .maxSamplerAnisotropy, // maxAnisotropy
