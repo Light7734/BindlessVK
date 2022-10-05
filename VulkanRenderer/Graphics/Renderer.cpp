@@ -8,8 +8,7 @@
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 
-AutoCVar ACV_CameraFOV(CVarType::Float, "CameraFOV", "Camera's field of view",
-                       45.0f, 45.0f);
+AutoCVar ACV_CameraFOV(CVarType::Float, "CameraFOV", "Camera's field of view", 45.0f, 45.0f);
 
 Renderer::Renderer(const RendererCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.deviceContext.logicalDevice)
@@ -18,7 +17,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
     , m_SampleCount(createInfo.deviceContext.maxSupportedSampleCount)
     , m_Allocator(createInfo.deviceContext.allocator)
 {
-	LOG(err, "FUCKKK!");
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Create sync objects
 	{
@@ -30,12 +28,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				vk::FenceCreateFlagBits::eSignaled, // flags
 			};
 
-			m_Frames[i].renderFence =
-			    m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
-			m_Frames[i].renderSemaphore =
-			    m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-			m_Frames[i].presentSemaphore =
-			    m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+			m_Frames[i].renderFence      = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
+			m_Frames[i].renderSemaphore  = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+			m_Frames[i].presentSemaphore = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
 		}
 
 		m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
@@ -48,16 +43,12 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 		// Select image count ; one more than minImageCount, if minImageCount +1 is
 		// not higher than maxImageCount (maxImageCount of 0 means no limit)
-		uint32_t imageCount =
-		    m_SurfaceInfo.capabilities.maxImageCount > 0 &&
-		            m_SurfaceInfo.capabilities.minImageCount + 1 >
-		                m_SurfaceInfo.capabilities.maxImageCount ?
-		        m_SurfaceInfo.capabilities.maxImageCount :    // TRUE
-		        m_SurfaceInfo.capabilities.minImageCount + 1; // FALSE
+		uint32_t imageCount = m_SurfaceInfo.capabilities.maxImageCount > 0 && m_SurfaceInfo.capabilities.minImageCount + 1 > m_SurfaceInfo.capabilities.maxImageCount ?
+		                          m_SurfaceInfo.capabilities.maxImageCount :    // TRUE
+		                          m_SurfaceInfo.capabilities.minImageCount + 1; // FALSE
 
 		// Create swapchain
-		bool sameQueueIndex =
-		    m_QueueInfo.graphicsQueueIndex == m_QueueInfo.presentQueueIndex;
+		bool sameQueueIndex = m_QueueInfo.graphicsQueueIndex == m_QueueInfo.presentQueueIndex;
 		vk::SwapchainCreateInfoKHR swapchainCreateInfo {
 			{},                                       // flags
 			m_SurfaceInfo.surface,                    // surface
@@ -82,8 +73,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			VK_NULL_HANDLE,                                                              // oldSwapchain
 		};
 
-		m_Swapchain =
-		    m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
+		m_Swapchain = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -121,8 +111,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				},
 			};
 
-			m_ImageViews[i] =
-			    m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+			m_ImageViews[i] = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 		}
 	}
 
@@ -184,8 +173,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			},
 		};
 
-		m_ColorImageView =
-		    m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		m_ColorImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -265,8 +253,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			},
 		};
 
-		m_DepthImageView =
-		    m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		m_DepthImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -399,12 +386,9 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			m_QueueInfo.graphicsQueueIndex,                     // queueFamilyIndex
 		};
 
-		m_CommandPool =
-		    m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
-		m_ForwardPass.cmdPool =
-		    m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
-		m_UploadContext.cmdPool =
-		    m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		m_CommandPool           = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		m_ForwardPass.cmdPool   = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+		m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
 
 		vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
 			m_UploadContext.cmdPool,
@@ -428,10 +412,8 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				MAX_FRAMES_IN_FLIGHT,               // commandBufferCount
 			};
 
-			m_ForwardPass.cmdBuffers[i].primary =
-			    m_LogicalDevice.allocateCommandBuffers(primaryCmdBufferAllocInfo)[0];
-			m_ForwardPass.cmdBuffers[i].secondaries =
-			    m_LogicalDevice.allocateCommandBuffers(secondaryCmdBuffersAllocInfo);
+			m_ForwardPass.cmdBuffers[i].primary     = m_LogicalDevice.allocateCommandBuffers(primaryCmdBufferAllocInfo)[0];
+			m_ForwardPass.cmdBuffers[i].secondaries = m_LogicalDevice.allocateCommandBuffers(secondaryCmdBuffersAllocInfo);
 		}
 	}
 
@@ -478,8 +460,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			poolSizes.data(),                        // pPoolSizes
 		};
 
-		m_DescriptorPool =
-		    m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+		m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -532,8 +513,28 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				1ul,
 				&m_FramesDescriptorSetLayout,
 			};
-			m_Frames[i].descriptorSet =
-			    m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
+			m_Frames[i].descriptorSet = m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
+
+			vk::DescriptorBufferInfo viewProjectionBufferInfo {
+				*m_Frames[i].cameraData.buffer->GetBuffer(),
+				0ul,
+				VK_WHOLE_SIZE,
+			};
+
+			std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {
+				vk::WriteDescriptorSet {
+				    m_Frames[i].descriptorSet,
+				    0ul,
+				    0ul,
+				    1ul,
+				    vk::DescriptorType::eUniformBuffer,
+				    nullptr,
+				    &viewProjectionBufferInfo,
+				    nullptr,
+				},
+			};
+
+			m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0ul, nullptr);
 		}
 	}
 
@@ -561,16 +562,13 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		};
 
 		vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
-			{}, // flags
-			static_cast<uint32_t>(
-			    descriptorSetLayoutBindings.size()), // bindingCount
-			descriptorSetLayoutBindings.data(),      // pBindings
+			{},                                                        // flags
+			static_cast<uint32_t>(descriptorSetLayoutBindings.size()), // bindingCount
+			descriptorSetLayoutBindings.data(),                        // pBindings
 		};
 
 		LOG(warn, "Creating forward pass descriptor set layout");
-		m_ForwardPass.descriptorSetLayout =
-		    m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo,
-		                                              nullptr);
+		m_ForwardPass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			vk::DescriptorSetAllocateInfo allocInfo {
@@ -579,10 +577,14 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 				&m_ForwardPass.descriptorSetLayout,
 			};
 
-			m_ForwardPass.descriptorSets[i] =
-			    m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
+			m_ForwardPass.descriptorSets[i] = m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
 		}
 	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Write descriptor sets
+
 
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Create frame pipeline layout
@@ -590,14 +592,14 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		std::array<vk::DescriptorSetLayout, 1> setLayouts = {
 			m_FramesDescriptorSetLayout,
 		};
+
 		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
 			{},                // flags
 			setLayouts.size(), // setLayoutCount
 			setLayouts.data(), //// pSetLayouts
 		};
 
-		m_FramePipelineLayout =
-		    m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
+		m_FramePipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -613,8 +615,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			setLayouts.data(), //// pSetLayouts
 		};
 
-		m_ForwardPass.pipelineLayout =
-		    m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
+		m_ForwardPass.pipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -735,8 +736,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 		ASSERT(ImGui_ImplVulkan_LoadFunctions(
 		           [](const char* func, void* data) {
-			           auto [vkGetProcAddr, instance] = *(
-			               std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
+			           auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
 			           return vkGetProcAddr(instance, func);
 		           },
 		           (void*)&userData),
@@ -778,16 +778,12 @@ void Renderer::EndFrame()
 	const FrameData& frame = m_Frames[m_CurrentFrame];
 
 	// Wait for the frame fence
-	VKC(m_LogicalDevice.waitForFences(1u, &frame.renderFence, VK_TRUE,
-	                                  UINT64_MAX));
+	VKC(m_LogicalDevice.waitForFences(1u, &frame.renderFence, VK_TRUE, UINT64_MAX));
 
 	// Acquire an image
 	uint32_t imageIndex;
-	vk::Result result = m_LogicalDevice.acquireNextImageKHR(
-	    m_Swapchain, UINT64_MAX, frame.renderSemaphore, VK_NULL_HANDLE,
-	    &imageIndex);
-	if (result == vk::Result::eErrorOutOfDateKHR ||
-	    result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
+	vk::Result result = m_LogicalDevice.acquireNextImageKHR(m_Swapchain, UINT64_MAX, frame.renderSemaphore, VK_NULL_HANDLE, &imageIndex);
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
 	{
 		m_LogicalDevice.waitIdle();
 		m_SwapchainInvalidated = true;
@@ -795,54 +791,23 @@ void Renderer::EndFrame()
 	}
 	else
 	{
-		ASSERT(result == vk::Result::eSuccess,
-		       "VkAcquireNextImage failed without returning "
-		       "VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
+		ASSERT(result == vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
 	////////////////////////////////////////////////////////////////
 	/// Update frame descriptor set
 	{
 		glm::mat4* map = (glm::mat4*)frame.cameraData.buffer->Map();
-		map[0]         = glm::perspective(
-		            glm::radians((float)CVar::Get("CameraFOV")),
-		            m_SurfaceInfo.capabilities.currentExtent.width /
-		                (float)m_SurfaceInfo.capabilities.currentExtent.height,
-		            0.1f, 10.0f);
-		map[1] = glm::lookAt({ 4.0f, 4.0f, 2.0f }, glm::vec3(0.0f, 0.0f, 0.0f),
-		                     glm::vec3(0.0f, 0.0f, -1.0f));
+		map[0]         = glm::perspective(glm::radians((float)CVar::Get("CameraFOV")), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
+		map[1]         = glm::lookAt({ 4.0f, 4.0f, 2.0f }, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
 		frame.cameraData.buffer->Unmap();
-
-		vk::DescriptorBufferInfo viewProjectionBufferInfo {
-			*frame.cameraData.buffer->GetBuffer(),
-			0ul,
-			VK_WHOLE_SIZE,
-		};
-
-		std::vector<vk::WriteDescriptorSet> writeDescriptorSets = {
-			vk::WriteDescriptorSet {
-			    m_Frames[m_CurrentFrame].descriptorSet,
-			    0ul,
-			    0ul,
-			    1ul,
-			    vk::DescriptorType::eUniformBuffer,
-			    nullptr,
-			    &viewProjectionBufferInfo,
-			    nullptr,
-			},
-		};
-
-		m_LogicalDevice.updateDescriptorSets(
-		    static_cast<uint32_t>(writeDescriptorSets.size()),
-		    writeDescriptorSets.data(), 0ul, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Forward Render Pass
 	{
 		const std::array<vk::ClearValue, 2> clearValues {
-			vk::ClearValue {
-			    vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } },
+			vk::ClearValue { vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } },
 			vk::ClearValue { vk::ClearDepthStencilValue { 1.0f, 0 } },
 		};
 
@@ -878,18 +843,15 @@ void Renderer::EndFrame()
 		};
 
 		// Record commnads @todo multi-thread secondary commands
-		const auto primaryCmd = m_ForwardPass.cmdBuffers[m_CurrentFrame].primary;
-		const auto secondaryCmds =
-		    m_ForwardPass.cmdBuffers[m_CurrentFrame].secondaries[m_CurrentFrame];
+		const auto primaryCmd    = m_ForwardPass.cmdBuffers[m_CurrentFrame].primary;
+		const auto secondaryCmds = m_ForwardPass.cmdBuffers[m_CurrentFrame].secondaries[m_CurrentFrame];
 
 		primaryCmd.reset();
 		primaryCmd.begin(primaryCmdBufferBeginInfo);
-		primaryCmd.beginRenderPass(renderpassBeginInfo,
-		                           vk::SubpassContents::eSecondaryCommandBuffers);
+		primaryCmd.beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
 
 		// Update descriptor sets
-		const vk::DescriptorSet descriptorSet =
-		    m_ForwardPass.descriptorSets[m_CurrentFrame];
+		const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
 
 		vk::DescriptorImageInfo descriptorImageInfo {
 			m_TempTexture->GetSampler(),             // sampler
@@ -913,15 +875,9 @@ void Renderer::EndFrame()
 
 		// #TODO WTF??
 		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
-		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                                 m_FramePipelineLayout, 0ul, 1ul,
-		                                 &frame.descriptorSet, 0ul, nullptr);
-		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                                 m_ForwardPass.pipelineLayout, 1ul, 1ul,
-		                                 &descriptorSet, 0ul, nullptr);
-		m_LogicalDevice.updateDescriptorSets(
-		    static_cast<uint32_t>(writeDescriptorSets.size()),
-		    writeDescriptorSets.data(), 0u, nullptr);
+		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
+		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
+		m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
 
 		// Record pipeline commands
 		for (auto& pipeline : m_Pipelines)
@@ -947,8 +903,7 @@ void Renderer::EndFrame()
 			m_ForwardPass.cmdBuffers[m_CurrentFrame].primary,
 		};
 
-		vk::PipelineStageFlags waitStage =
-		    vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 		vk::SubmitInfo submitInfo {
 			1u,                                              // waitSemaphoreCount
 			&frame.renderSemaphore,                          // pWaitSemaphores
@@ -985,9 +940,7 @@ void Renderer::EndFrame()
 				return;
 			}
 		}
-		catch (
-		    vk::OutOfDateKHRError err) // OutOfDateKHR is not considered a success
-		                               // value and throws an error (presentKHR)
+		catch (vk::OutOfDateKHRError err) // OutOfDateKHR is not considered a success value and throws an error (presentKHR)
 		{
 			m_LogicalDevice.waitIdle();
 			m_SwapchainInvalidated = true;
@@ -999,8 +952,7 @@ void Renderer::EndFrame()
 	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::ImmediateSubmit(
-    std::function<void(vk::CommandBuffer)>&& function)
+void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
 {
 	vk::CommandBuffer cmd = m_UploadContext.cmdBuffer;
 
