@@ -10,3 +10,6 @@
 [submodule "Vendor/lz4"]
 	path = Vendor/lz4
 	url = git@github.com:lz4/lz4
+[submodule "Vendor/spirv-reflect"]
+	path = Vendor/spirv-reflect
+	url = git@github.com:KhronosGroup/SPIRV-Reflect
