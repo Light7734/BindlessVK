@@ -1,12 +1,13 @@
 #pragma once
+#include "Graphics/MaterialSystem.hpp"
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
-#include "Graphics/Pipeline.hpp"
-#include "Graphics/Renderable.hpp"
+#include "Graphics/Mesh.hpp"
+// #include "Graphics/Pipeline.hpp"
 #include "Graphics/Texture.hpp"
 #include "Graphics/Types.hpp"
 
@@ -20,6 +21,14 @@
 #endif
 
 class Window;
+
+struct DrawIndirectData
+{
+	class Mesh* mesh;
+	class Material* material;
+	uint32_t first;
+	uint32_t count;
+};
 
 struct RendererCreateInfo
 {
@@ -82,9 +91,14 @@ public:
 
 	void BeginFrame();
 	void Draw();
-	void EndFrame();
+	void DrawScene(class Scene* scene);
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
+
+
+	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
+
+	Material* GetMaterial(const char* name) { return m_MaterialSystem.GetMaterial(name); }
 
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
 	inline uint32_t GetImageCount() const { return m_Images.size(); }
@@ -97,6 +111,8 @@ private:
 	SurfaceInfo m_SurfaceInfo  = {};
 
 	vma::Allocator m_Allocator;
+
+	MaterialSystem m_MaterialSystem;
 
 	std::array<FrameData, MAX_FRAMES_IN_FLIGHT> m_Frames = {};
 	vk::DescriptorSetLayout m_FramesDescriptorSetLayout;
@@ -141,8 +157,7 @@ private:
 	UploadContext m_UploadContext = {};
 
 	// Pipelines
-	std::vector<std::shared_ptr<Pipeline>> m_Pipelines = {};
-	vk::PipelineLayout m_FramePipelineLayout           = {};
-	std::shared_ptr<Texture> m_TempTexture             = {}; // #TEMP
-	                                                         //
+	vk::PipelineLayout m_FramePipelineLayout = {};
+	std::shared_ptr<Texture> m_TempTexture   = {}; // #TEMP
+	                                               //
 };

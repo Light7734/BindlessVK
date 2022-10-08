@@ -1,5 +1,6 @@
 #pragma once
 
+#define VULKAN_HPP_USE_REFLECT             1
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
 // Note: files that are included by this file should not #include "Base.hpp"
@@ -51,6 +52,17 @@ struct vkException: std::exception
 		throw FailedAsssertionException(#x, __FILE__, __LINE__); \
 	}
 
+#define SPVASSERT(x, ...)                                            \
+	{                                                                \
+		SpvReflectResult res = x;                                    \
+		if (res)                                                     \
+		{                                                            \
+			LOG(critical, "{}", (int)res);                           \
+			LOG(critical, __VA_ARGS__);                              \
+			throw FailedAsssertionException(#x, __FILE__, __LINE__); \
+		}                                                            \
+	}
+
 // ye wtf C++
 #define VKC(x)                       VKC_NO_REDIFINITION(x, __LINE__)
 #define VKC_NO_REDIFINITION(x, line) VKC_NO_REDIFINITION2(x, line)
@@ -60,3 +72,9 @@ struct vkException: std::exception
 	{                                                                       \
 		throw vkException(#x, static_cast<int>(vkr##line), __FILE__, line); \
 	}
+
+
+uint64_t constexpr HashStr(const char* str)
+{
+	return *str ? static_cast<uint64_t>(*str) + 33 * HashStr(str + 1) : 5381;
+}

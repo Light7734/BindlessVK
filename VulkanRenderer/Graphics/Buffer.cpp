@@ -1,7 +1,9 @@
 #include "Graphics/Buffer.hpp"
 
 Buffer::Buffer(BufferCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_BufferSize(createInfo.size), m_Allocator(createInfo.allocator)
+    : m_LogicalDevice(createInfo.logicalDevice)
+    , m_BufferSize(createInfo.size)
+    , m_Allocator(createInfo.allocator)
 {
 	LOG(warn, "Buffer size: {}", createInfo.size);
 	/////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +42,8 @@ void Buffer::Unmap()
 }
 
 StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice), m_Allocator(createInfo.allocator)
+    : m_LogicalDevice(createInfo.logicalDevice)
+    , m_Allocator(createInfo.allocator)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create buffer & staging buffer, then write the initial data to it(if any)
@@ -112,6 +115,9 @@ StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
 
 StagingBuffer::~StagingBuffer()
 {
-	m_Allocator.destroyBuffer(m_Buffer, m_Buffer);
-	m_Allocator.destroyBuffer(m_StagingBuffer, m_StagingBuffer);
+	if (m_Buffer.buffer)
+	{
+		m_Allocator.destroyBuffer(m_Buffer, m_Buffer);
+		m_Allocator.destroyBuffer(m_StagingBuffer, m_StagingBuffer);
+	}
 }

@@ -1,13 +1,15 @@
 #pragma once
 
 #include "Core/Base.hpp"
-#include "glm/ext/matrix_transform.hpp"
-#include "glm/trigonometric.hpp"
+#include "Graphics/MaterialSystem.hpp"
+#include "Graphics/Mesh.hpp"
 
 #include <entt/entt.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/trigonometric.hpp>
 
 struct TransformComponent
 {
@@ -15,8 +17,12 @@ struct TransformComponent
 	glm::vec3 scale;
 	glm::vec3 rotation;
 
+	TransformComponent(const TransformComponent&) = default;
+
 	TransformComponent(const glm::vec3& _translation, const glm::vec3& _scale = glm::vec3(1.0), const glm::vec3& _rotation = glm::vec3(0.0f))
-	    : translation(_translation), scale(_scale), rotation(_rotation)
+	    : translation(_translation)
+	    , scale(_scale)
+	    , rotation(_rotation)
 	{
 	}
 
@@ -32,8 +38,16 @@ struct TransformComponent
 	inline operator glm::mat4() const { return GetTransform(); }
 };
 
-struct StaticMeshComponent
+struct StaticMeshRendererComponent
 {
-	uint32_t objectIndex;
-	// reference to a mesh
+	StaticMeshRendererComponent(const StaticMeshRendererComponent&) = default;
+
+	StaticMeshRendererComponent(Material* _material, Mesh* _mesh)
+	    : material(_material)
+	    , mesh(_mesh)
+	{
+	}
+
+	Material* material;
+	Mesh* mesh;
 };

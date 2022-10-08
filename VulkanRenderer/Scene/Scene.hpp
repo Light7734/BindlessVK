@@ -16,19 +16,21 @@ public:
 	{
 	}
 	~Scene()
-{
-        }
-
-	void OnRender()
 	{
-		m_Registry.group(entt::get<StaticMeshComponent, TransformComponent>).each([&](StaticMeshComponent& pipelineComponent, TransformComponent& transformComp) {
-			// renderer.
-		});
 	}
+
+	inline entt::registry* GetRegistry() { return &m_Registry; }
 
 	inline Entity CreateEntity()
 	{
 		return m_Registry.create();
+	}
+
+	void SortComponents()
+	{
+		m_Registry.sort<StaticMeshRendererComponent>([](const StaticMeshRendererComponent& lhs, const StaticMeshRendererComponent& rhs) {
+			return ((uint64_t)lhs.mesh->hash << 32 | (uint32_t)lhs.material->sortKey) > ((uint64_t)rhs.mesh->hash << 32 | (uint32_t)rhs.material->sortKey);
+		});
 	}
 
 	template<typename T, typename... Args>

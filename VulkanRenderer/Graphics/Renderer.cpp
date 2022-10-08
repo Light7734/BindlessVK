@@ -2,10 +2,12 @@
 
 #include "Core/Window.hpp"
 #include "Graphics/Types.hpp"
+#include "Scene/Scene.hpp"
 #include "Utils/CVar.hpp"
 
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
+#include <filesystem>
 #include <imgui.h>
 
 AutoCVar ACV_CameraFOV(CVarType::Float, "CameraFOV", "Camera's field of view", 45.0f, 45.0f);
@@ -36,6 +38,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
 	}
 
+
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the swap chain.
 	{
@@ -50,26 +53,21 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		// Create swapchain
 		bool sameQueueIndex = m_QueueInfo.graphicsQueueIndex == m_QueueInfo.presentQueueIndex;
 		vk::SwapchainCreateInfoKHR swapchainCreateInfo {
-			{},                                       // flags
-			m_SurfaceInfo.surface,                    // surface
-			imageCount,                               // minImageCount
-			m_SurfaceInfo.format.format,              // imageFormat
-			m_SurfaceInfo.format.colorSpace,          // imageColorSpace
-			m_SurfaceInfo.capabilities.currentExtent, // imageExtent
-			1u,                                       // imageArrayLayers
-			vk::ImageUsageFlagBits::
-			    eColorAttachment,                                                        // Write directly to the image (we would use a
-			                                                                             // value like VK_IMAGE_USAGE_TRANSFER_DST_BIT if
-			                                                                             // we wanted to do post-processing) // imageUsage
+			{},                                                                          // flags
+			m_SurfaceInfo.surface,                                                       // surface
+			imageCount,                                                                  // minImageCount
+			m_SurfaceInfo.format.format,                                                 // imageFormat
+			m_SurfaceInfo.format.colorSpace,                                             // imageColorSpace
+			m_SurfaceInfo.capabilities.currentExtent,                                    // imageExtent
+			1u,                                                                          // imageArrayLayers
+			vk::ImageUsageFlagBits::eColorAttachment,                                    // imageUsage -> Write directly to the image (use VK_IMAGE_USAGE_TRANSFER_DST_BIT for post-processing) ??
 			sameQueueIndex ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent, // imageSharingMode
 			sameQueueIndex ? 0u : 2u,                                                    // queueFamilyIndexCount
 			sameQueueIndex ? nullptr : &m_QueueInfo.graphicsQueueIndex,                  // pQueueFamilyIndices
 			m_SurfaceInfo.capabilities.currentTransform,                                 // preTransform
-			vk::CompositeAlphaFlagBitsKHR::eOpaque,                                      // No alpha-blending between
-			                                                                             // multiple windows //
-			                                                                             // compositeAlpha
+			vk::CompositeAlphaFlagBitsKHR::eOpaque,                                      // compositeAlpha -> No alpha-blending between multiple windows
 			m_SurfaceInfo.presentMode,                                                   // presentMode
-			VK_TRUE,                                                                     // Don't render the obsecured pixels // clipped
+			VK_TRUE,                                                                     // clipped -> Don't render the obsecured pixels
 			VK_NULL_HANDLE,                                                              // oldSwapchain
 		};
 
@@ -326,16 +324,13 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 		// Subpass dependency
 		vk::SubpassDependency subpassDependency {
-			VK_SUBPASS_EXTERNAL, // srcSubpass
-			0u,                  // dstSubpass
-			vk::PipelineStageFlagBits::eColorAttachmentOutput |
-			    vk::PipelineStageFlagBits::eEarlyFragmentTests, // srcStageMask
-			vk::PipelineStageFlagBits::eColorAttachmentOutput |
-			    vk::PipelineStageFlagBits::eEarlyFragmentTests, // dstStageMask
-			{},                                                 // srcAccessMask
-			vk::AccessFlagBits::eColorAttachmentWrite |
-			    vk::AccessFlagBits::eDepthStencilAttachmentWrite, // dstAccessMask
-			{},                                                   // dependencytFlags
+			VK_SUBPASS_EXTERNAL,                                                                                // srcSubpass
+			0u,                                                                                                 // dstSubpass
+			vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests, // srcStageMask
+			vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests, // dstStageMask
+			{},                                                                                                 // srcAccessMask
+			vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,       // dstAccessMask
+			{},                                                                                                 // dependencytFlags
 		};
 
 		// Renderpass
@@ -636,83 +631,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	// Create pipelines @todo automate this??
-	{
-		// Update model view projection uniform
-		RenderableCreateInfo renderableCreateInfo {
-			"Assets/viking_room.obj", // modelPath
-			{ m_TempTexture }         // #TODO // textures
-		};
-
-		std::vector<vk::DescriptorSetLayout> setLayouts = {
-			m_FramesDescriptorSetLayout,
-			m_ForwardPass.descriptorSetLayout,
-		};
-
-		// #TODO:
-		LOG(warn, "Creating pipeline...");
-		PipelineCreateInfo pipelineCreateInfo {
-			.logicalDevice        = m_LogicalDevice,
-			.physicalDevice       = createInfo.deviceContext.physicalDevice,
-			.allocator            = m_Allocator,
-			.maxFramesInFlight    = MAX_FRAMES_IN_FLIGHT,
-			.queueInfo            = m_QueueInfo,
-			.viewportExtent       = m_SurfaceInfo.capabilities.currentExtent,
-			.commandPool          = m_CommandPool,
-			.imageCount           = static_cast<uint32_t>(m_Images.size()),
-			.sampleCount          = createInfo.deviceContext.maxSupportedSampleCount,
-			.renderPass           = m_ForwardPass.renderpass,
-			.descriptorSetLayouts = setLayouts,
-			.descriptorPool       = m_DescriptorPool,
-
-			// Shader
-			.vertexShaderPath = "Shaders/vertex.glsl",
-			.pixelShaderPath  = "Shaders/pixel.glsl",
-
-			// Vertex input
-			.vertexBindingDescs = {
-			    VkVertexInputBindingDescription {
-			        .binding   = 0u,
-			        .stride    = sizeof(Vertex),
-			        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
-			    },
-			},
-			.vertexAttribDescs = {
-			    VkVertexInputAttributeDescription {
-			        .location = 0u,
-			        .binding  = 0u,
-			        .format   = VK_FORMAT_R32G32B32_SFLOAT,
-			        .offset   = 0u,
-			    },
-			    VkVertexInputAttributeDescription {
-			        .location = 1u,
-			        .binding  = 0u,
-			        .format   = VK_FORMAT_R32G32B32_SFLOAT,
-			        .offset   = sizeof(glm::vec3),
-			    },
-			    VkVertexInputAttributeDescription {
-			        .location = 2u,
-			        .binding  = 0u,
-			        .format   = VK_FORMAT_R32G32_SFLOAT,
-			        .offset   = sizeof(glm::vec3) + sizeof(glm::vec3),
-			    },
-			    VkVertexInputAttributeDescription {
-			        .location = 3u,
-			        .binding  = 0u,
-			        .format   = VK_FORMAT_R32_UINT,
-			        .offset   = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2),
-			    },
-			},
-		};
-
-		m_Pipelines.push_back(std::make_shared<Pipeline>(pipelineCreateInfo));
-
-		m_Pipelines.back()->CreateRenderable(renderableCreateInfo);
-		m_Pipelines.back()->CreateRenderable(renderableCreateInfo);
-		m_Pipelines.back()->RecreateBuffers();
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
 	/// Initialize Dear ImGui
 	{
 		ImGui::CreateContext();
@@ -749,6 +667,209 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		});
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Initialize material system
+	{
+		LOG(warn, "Creating MaterialSystem");
+		m_MaterialSystem = MaterialSystem({ m_LogicalDevice });
+
+		// load shaders
+		for (auto& shader : std::filesystem::directory_iterator("Shaders/"))
+		{
+			LOG(warn, "Processing {}", shader.path().filename().c_str());
+			if (shader.path().extension() == ".spv_vs")
+			{
+				std::string name(shader.path().filename().replace_extension().c_str());
+
+				Shader::CreateInfo shaderCreateInfo {
+					name.c_str(),
+					shader.path().c_str(),
+					vk::ShaderStageFlagBits::eVertex,
+				};
+				m_MaterialSystem.LoadShader(shaderCreateInfo);
+			}
+			else if (shader.path().extension() == ".spv_fs")
+			{
+				std::string name(shader.path().filename().replace_extension().c_str());
+
+				Shader::CreateInfo shaderCreateInfo {
+					name.c_str(),
+					shader.path().c_str(),
+					vk::ShaderStageFlagBits::eFragment,
+				};
+				m_MaterialSystem.LoadShader(shaderCreateInfo);
+			}
+		}
+
+		// create shader efffects
+		ShaderEffect::CreateInfo shaderEffectCreateInfo {
+			"default",
+			{
+			    m_MaterialSystem.GetShader("defaultVertex"),
+			    m_MaterialSystem.GetShader("defaultFragment"),
+			},
+		};
+
+		LOG(warn, "Creating ShaderEffect");
+		m_MaterialSystem.CreateShaderEffect(shaderEffectCreateInfo);
+		LOG(warn, "CREATED! ShaderEffect");
+
+		std::vector<vk::VertexInputBindingDescription> inputBindings {
+			vk::VertexInputBindingDescription {
+			    0u,                                    // binding
+			    static_cast<uint32_t>(sizeof(Vertex)), // stride
+			    vk::VertexInputRate::eVertex,          // inputRate
+			},
+		};
+		std::vector<vk::VertexInputAttributeDescription> inputAttributes {
+			vk::VertexInputAttributeDescription {
+			    0u,                           // location
+			    0u,                           // binding
+			    vk::Format::eR32G32B32Sfloat, // format
+			    0u,                           // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    1u,                           // location
+			    0u,                           // binding
+			    vk::Format::eR32G32B32Sfloat, // format
+			    sizeof(glm::vec3),            // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    2u,                                    // location
+			    0u,                                    // binding
+			    vk::Format::eR32G32Sfloat,             // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    3u,                                                        // location
+			    0u,                                                        // binding
+			    vk::Format::eR32Uint,                                      // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2), // offset
+			},
+		};
+
+		// Viewport state
+		vk::Viewport viewport {
+			0.0f,                                                               // x
+			0.0f,                                                               // y
+			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.width), // width
+			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.width), // height
+			0.0f,                                                               // minDepth
+			1.0f,                                                               // maxDepth
+		};
+
+		vk::Rect2D scissors {
+			{ 0, 0 },                                // offset
+			m_SurfaceInfo.capabilities.currentExtent // extent
+		};
+
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment {
+			VK_FALSE,                           // blendEnable
+			vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
+			vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
+			vk::BlendOp::eAdd,                  // colorBlendOp
+			vk::BlendFactor::eOne,              // srcAlphaBlendFactor
+			vk::BlendFactor::eZero,             // dstAlphaBlendFactor
+			vk::BlendOp::eAdd,                  // alphaBlendOp
+
+			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA, // colorWriteMask
+		};
+
+		PipelineConfiguration defaultPassPipelineConfigurations {
+			vk::PipelineVertexInputStateCreateInfo {
+			    {},
+			    static_cast<uint32_t>(inputBindings.size()),
+			    inputBindings.data(),
+			    static_cast<uint32_t>(inputAttributes.size()),
+			    inputAttributes.data(),
+			},
+			vk::PipelineInputAssemblyStateCreateInfo {
+			    {},
+			    vk::PrimitiveTopology::eTriangleList,
+			    VK_FALSE,
+			},
+			vk::PipelineTessellationStateCreateInfo {},
+			vk::PipelineViewportStateCreateInfo {
+			    {},
+			    1u,
+			    &viewport,
+			    1u,
+			    &scissors,
+			},
+			vk::PipelineRasterizationStateCreateInfo {
+			    {},
+			    VK_FALSE,
+			    VK_FALSE,
+			    vk::PolygonMode::eFill,
+			    vk::CullModeFlagBits::eBack,
+			    vk::FrontFace::eClockwise,
+			    VK_FALSE,
+			    0.0f,
+			    0.0f,
+			    0.0f,
+			    1.0f,
+			},
+			vk::PipelineMultisampleStateCreateInfo {
+			    {},
+			    m_SampleCount,
+			    VK_FALSE,
+			    {},
+			    VK_FALSE,
+			    VK_FALSE,
+			},
+			vk::PipelineDepthStencilStateCreateInfo {
+			    {},
+			    VK_TRUE,              // depthTestEnable
+			    VK_TRUE,              // depthWriteEnable
+			    vk::CompareOp::eLess, // depthCompareOp
+			    VK_FALSE,             // depthBoundsTestEnable
+			    VK_FALSE,             // stencilTestEnable
+			    {},                   // front
+			    {},                   // back
+			    0.0f,                 // minDepthBounds
+			    1.0,                  // maxDepthBounds
+			},
+			vk::PipelineColorBlendStateCreateInfo {
+			    {},                         // flags
+			    VK_FALSE,                   // logicOpEnable
+			    vk::LogicOp::eCopy,         // logicOp
+			    1u,                         // attachmentCount
+			    &colorBlendAttachment,      // pAttachments
+			    { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
+			},
+			vk::PipelineDynamicStateCreateInfo {},
+		};
+
+		// create shader passes
+		ShaderPass::CreateInfo shaderPassCreateInfo {
+			"default",
+			defaultPassPipelineConfigurations,
+			m_MaterialSystem.GetShaderEffect("default"),
+			m_ForwardPass.renderpass,
+			0ull,
+		};
+
+		LOG(warn, "Creating ShaderPass");
+		m_MaterialSystem.CreateShaderPass(shaderPassCreateInfo);
+
+
+		LOG(warn, "Creating MasterMaterial");
+		m_MaterialSystem.CreateMasterMaterial({
+		    "default",
+		    m_MaterialSystem.GetShaderPass("default"),
+		    {},
+		});
+
+		LOG(warn, "Creating Material");
+		m_MaterialSystem.CreateMaterial({
+		    "default",
+		    m_MaterialSystem.GetMasterMaterial("default"),
+		    {},
+		    {},
+		});
+		LOG(warn, "CREATED! MATERIAL");
+	}
 }
 
 void Renderer::BeginFrame()
@@ -761,12 +882,7 @@ void Renderer::BeginFrame()
 	CVar::DrawImguiEditor();
 }
 
-void Renderer::Draw()
-{
-	LOG(critical, "Not implemented!");
-}
-
-void Renderer::EndFrame()
+void Renderer::DrawScene(Scene* scene)
 {
 	if (m_SwapchainInvalidated)
 		return;
@@ -879,11 +995,18 @@ void Renderer::EndFrame()
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
 		m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
 
-		// Record pipeline commands
-		for (auto& pipeline : m_Pipelines)
-		{
-			pipeline->RecordCommandBuffer(secondaryCmds);
-		}
+		VkDeviceSize offset { 0 };
+
+		secondaryCmds.bindPipeline(vk::PipelineBindPoint::eGraphics,
+		                           m_MaterialSystem.GetMaterial("default")->base->shader->pipeline);
+
+		scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+			secondaryCmds.bindVertexBuffers(0, 1, renderComp.mesh->vertexBuffer.GetBuffer(), &offset);
+			secondaryCmds.bindIndexBuffer(*(renderComp.mesh->indexBufer.GetBuffer()), 0u, vk::IndexType::eUint32);
+			secondaryCmds.drawIndexed(renderComp.mesh->indices.size(),1u, 0u, 0u, 0u);
+			// LOG(trace, "{} - {}", renderComp.mesh->indices.size(), renderComp.mesh->vertices.size());
+		});
+
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), secondaryCmds);
 		secondaryCmds.end();
 

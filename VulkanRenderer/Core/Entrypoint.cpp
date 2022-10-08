@@ -3,9 +3,10 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
-#include "Graphics/Pipeline.hpp"
+// #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderer.hpp"
-#include "Graphics/Shader.hpp"
+// #include "Graphics/Shader.hpp"
+#include "Scene/Scene.hpp"
 #include "Utils/Timer.hpp"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -21,7 +22,6 @@ int main()
 	{
 		/////////////////////////////////////////////////////////////////////////////////
 		// Create objects
-
 		// window
 		WindowCreateInfo windowCreateInfo {
 			.specs = {
@@ -60,6 +60,40 @@ int main()
 		};
 		std::unique_ptr<Renderer> renderer = std::make_unique<Renderer>(rendererCreateInfo);
 
+
+		/////////////////////////////////////////////////////////////////////////////////
+		// Load Meshes
+
+		MeshSystem::CreateInfo meshSystemInfo {
+			device.GetContext(),
+			renderer->GetCommandPool(),
+			renderer->GetQueueInfo().graphicsQueue,
+		};
+		MeshSystem meshSystem(meshSystemInfo);
+
+		Mesh::CreateInfo defaultMeshInfo {
+			"default",
+			"Assets/viking_room.obj",
+			{}
+		};
+		meshSystem.LoadMesh(defaultMeshInfo);
+		/////////////////////////////////////////////////////////////////////////////////
+		/// Populate scene
+		Scene scene;
+
+			Entity entity = scene.CreateEntity();
+
+			scene.AddComponent<TransformComponent>(entity,
+			                                       glm::vec3(0.0f), // Translation
+			                                       glm::vec3(1.0f), // Scale
+			                                       glm::vec3(0.0f)  // Rotation
+			);
+
+			scene.AddComponent<StaticMeshRendererComponent>(entity,
+			                                                renderer->GetMaterial("default"), // Material
+			                                                meshSystem.GetMesh("default")     // Mesh
+			);
+
 		/////////////////////////////////////////////////////////////////////////////////
 		// Main loop
 		uint32_t frames = 0u;
@@ -70,7 +104,7 @@ int main()
 			window.PollEvents();
 
 			renderer->BeginFrame();
-			renderer->EndFrame();
+			renderer->DrawScene(&scene);
 
 			// Re-create the renderer
 			if (renderer->IsSwapchainInvalidated())

@@ -4,7 +4,7 @@
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
-#include "Graphics/Renderable.hpp"
+#include "Graphics/Mesh.hpp"
 #include "Graphics/Shader.hpp"
 
 #include <glm/glm.hpp>
@@ -50,7 +50,7 @@ public:
 
 	void RecordCommandBuffer(vk::CommandBuffer cmd);
 
-	UUID CreateRenderable(RenderableCreateInfo& createInfo);
+	UUID CreateRenderable(MeshCreateInfo& createInfo);
 	void RemoveRenderable(UUID renderableId);
 	void RecreateBuffers();
 

@@ -18,10 +18,11 @@ add_executable(
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Device.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Pipeline.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Renderable.cpp
+    # ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Renderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Shader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/MaterialSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Mesh.cpp
+    # ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Texture.cpp
 
     # Utils
@@ -42,12 +43,14 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
 )
 
 target_link_libraries(
     VulkanRenderer 
     PRIVATE imgui
     PRIVATE AssetParser
+    PRIVATE spirv-reflect-static
     PRIVATE ${CONAN_LIBS}
 )
 
