@@ -5,7 +5,6 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
     , m_BufferSize(createInfo.size)
     , m_Allocator(createInfo.allocator)
 {
-	LOG(warn, "Buffer size: {}", createInfo.size);
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create buffer and write the initial data to it(if any)
 	{

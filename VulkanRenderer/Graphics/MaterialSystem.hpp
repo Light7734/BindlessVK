@@ -72,7 +72,6 @@ struct ShaderPass
 
 	vk::RenderPass renderPass;
 	vk::Pipeline pipeline;
-	vk::PipelineLayout layout;
 };
 
 /// @brief Template for materials to base themselves off of
@@ -118,8 +117,13 @@ public:
 	};
 
 public:
-	MaterialSystem(const MaterialSystem::CreateInfo& info);
 	MaterialSystem() = default;
+
+	void Init(const MaterialSystem::CreateInfo& info);
+
+	~MaterialSystem();
+
+	void DestroyAllMaterials();
 
 	inline Shader* GetShader(const char* name) { return &m_Shaders[HashStr(name)]; }
 	inline ShaderEffect* GetShaderEffect(const char* name) { return &m_ShaderEffects[HashStr(name)]; }

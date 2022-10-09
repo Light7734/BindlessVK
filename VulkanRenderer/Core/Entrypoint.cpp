@@ -58,16 +58,15 @@ int main()
 			.window        = &window,
 			.deviceContext = device.GetContext(),
 		};
-		std::unique_ptr<Renderer> renderer = std::make_unique<Renderer>(rendererCreateInfo);
+		Renderer renderer = Renderer(rendererCreateInfo);
 
 
 		/////////////////////////////////////////////////////////////////////////////////
 		// Load Meshes
-
 		MeshSystem::CreateInfo meshSystemInfo {
 			device.GetContext(),
-			renderer->GetCommandPool(),
-			renderer->GetQueueInfo().graphicsQueue,
+			renderer.GetCommandPool(),
+			renderer.GetQueueInfo().graphicsQueue,
 		};
 		MeshSystem meshSystem(meshSystemInfo);
 
@@ -81,42 +80,34 @@ int main()
 		/// Populate scene
 		Scene scene;
 
-			Entity entity = scene.CreateEntity();
+		Entity entity = scene.CreateEntity();
 
-			scene.AddComponent<TransformComponent>(entity,
-			                                       glm::vec3(0.0f), // Translation
-			                                       glm::vec3(1.0f), // Scale
-			                                       glm::vec3(0.0f)  // Rotation
-			);
+		scene.AddComponent<TransformComponent>(entity,
+		                                       glm::vec3(0.0f), // Translation
+		                                       glm::vec3(1.0f), // Scale
+		                                       glm::vec3(0.0f)  // Rotation
+		);
 
-			scene.AddComponent<StaticMeshRendererComponent>(entity,
-			                                                renderer->GetMaterial("default"), // Material
-			                                                meshSystem.GetMesh("default")     // Mesh
-			);
+		scene.AddComponent<StaticMeshRendererComponent>(entity,
+		                                                renderer.GetMaterial("default"), // Material
+		                                                meshSystem.GetMesh("default")    // Mesh
+		);
 
 		/////////////////////////////////////////////////////////////////////////////////
-		// Main loop
+		/// Main loop
 		uint32_t frames = 0u;
 		Timer fpsTimer;
 		while (!window.ShouldClose())
 		{
-			// Window events
 			window.PollEvents();
 
-			renderer->BeginFrame();
-			renderer->DrawScene(&scene);
+			renderer.BeginFrame();
+			renderer.DrawScene(&scene);
 
-			// Re-create the renderer
-			if (renderer->IsSwapchainInvalidated())
+			if (renderer.IsSwapchainInvalidated())
 			{
-				renderer.reset();
-
-				// renderer
-				RendererCreateInfo rendererCreateInfo {
-					.window        = &window,
-					.deviceContext = device.GetContext(),
-				};
-				renderer = std::make_unique<Renderer>(rendererCreateInfo);
+				renderer.RecreateSwapchain(&window, device.GetContext());
+				continue;
 			}
 
 			// FPS Counter

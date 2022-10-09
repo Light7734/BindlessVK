@@ -82,7 +82,7 @@ void MeshSystem::LoadMesh(const Mesh::CreateInfo& info)
 	};
 
 	m_Meshes.emplace(HashStr(info.name),
-	                 Mesh{ hash, StagingBuffer(vertexBufferCreateInfo), StagingBuffer(indexBufferCreateInfo), vertices, indices, {} });
+	                 Mesh { hash, StagingBuffer(vertexBufferCreateInfo), StagingBuffer(indexBufferCreateInfo), vertices, indices, {} });
 }
 
 MeshSystem::~MeshSystem()

@@ -58,7 +58,7 @@ struct Mesh
 
 	uint32_t hash;
 
-	StagingBuffer vertexBuffer ;
+	StagingBuffer vertexBuffer;
 	StagingBuffer indexBufer;
 
 	std::vector<Vertex> vertices;

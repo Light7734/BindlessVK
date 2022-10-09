@@ -20,6 +20,10 @@
 	#define MAX_FRAMES_IN_FLIGHT 3
 #endif
 
+#ifndef DESIRED_SWAPCHAIN_IMAGES
+	#define DESIRED_SWAPCHAIN_IMAGES 3
+#endif
+
 class Window;
 
 struct DrawIndirectData
@@ -89,12 +93,14 @@ public:
 	Renderer(const RendererCreateInfo& createInfo);
 	~Renderer();
 
+	void RecreateSwapchain(Window* window, DeviceContext context);
+	void DestroySwapchain();
+
 	void BeginFrame();
 	void Draw();
 	void DrawScene(class Scene* scene);
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
-
 
 	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
 
@@ -149,10 +155,6 @@ private:
 	AllocatedImage m_DepthImage = {};
 
 	vk::ImageView m_DepthImageView = {};
-
-	// ImGui
-	vk::DescriptorPool m_ImguiPool                   = {};
-	std::vector<vk::CommandBuffer> m_ImguiCmdBuffers = {};
 
 	UploadContext m_UploadContext = {};
 

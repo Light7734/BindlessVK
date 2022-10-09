@@ -6,9 +6,10 @@
 
 static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't");
 
-MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
-    : m_LogicalDevice(info.logicalDevice)
+void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 {
+	m_LogicalDevice = info.logicalDevice;
+
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{ vk::DescriptorType::eSampler, 1000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 1000 },
@@ -33,6 +34,45 @@ MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
 
 	m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 	LOG(warn, "Created Descriptor Pool");
+}
+
+MaterialSystem::~MaterialSystem()
+{
+	DestroyAllMaterials();
+
+	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool);
+
+	for (auto& [key, val] : m_ShaderEffects)
+	{
+		m_LogicalDevice.destroyDescriptorSetLayout(val.setsLayout[0]);
+		m_LogicalDevice.destroyDescriptorSetLayout(val.setsLayout[1]);
+		m_LogicalDevice.destroyPipelineLayout(val.pipelineLayout);
+
+		static_assert(ShaderEffect().setsLayout.size() == 2, "Sets layout has been resized");
+	}
+
+	for (auto& [key, val] : m_Shaders)
+	{
+		m_LogicalDevice.destroyShaderModule(val.module);
+	}
+
+
+	m_ShaderEffects.clear();
+	m_Shaders.clear();
+}
+
+void MaterialSystem::DestroyAllMaterials()
+{
+	for (auto& [key, val] : m_ShaderPasses)
+	{
+		m_LogicalDevice.destroyPipeline(val.pipeline);
+	}
+
+    m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
+
+	m_ShaderPasses.clear();
+	m_MasterMaterials.clear();
+	m_Materials.clear();
 }
 
 void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
@@ -175,7 +215,6 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		info.effect,
 		info.renderPass,
 		pipeline.value,
-		info.effect->pipelineLayout,
 	};
 }
 

@@ -14,9 +14,6 @@ AutoCVar ACV_CameraFOV(CVarType::Float, "CameraFOV", "Camera's field of view", 4
 
 Renderer::Renderer(const RendererCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.deviceContext.logicalDevice)
-    , m_SurfaceInfo(createInfo.deviceContext.surfaceInfo)
-    , m_QueueInfo(createInfo.deviceContext.queueInfo)
-    , m_SampleCount(createInfo.deviceContext.maxSupportedSampleCount)
     , m_Allocator(createInfo.deviceContext.allocator)
 {
 	/////////////////////////////////////////////////////////////////////////////////
@@ -38,18 +35,104 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
 	}
 
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create descriptor pool
+	{
+		std::vector<vk::DescriptorPoolSize> poolSizes = {
+			{ vk::DescriptorType::eSampler, 1000 },
+			{ vk::DescriptorType::eCombinedImageSampler, 1000 },
+			{ vk::DescriptorType::eSampledImage, 1000 },
+			{ vk::DescriptorType::eStorageImage, 1000 },
+			{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
+			{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
+			{ vk::DescriptorType::eUniformBuffer, 1000 },
+			{ vk::DescriptorType::eStorageBuffer, 1000 },
+			{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
+			{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
+			{ vk::DescriptorType::eInputAttachment, 1000 }
+		};
+		// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
+
+		vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
+			{},                                      // flags
+			100,                                     // maxSets
+			static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
+			poolSizes.data(),                        // pPoolSizes
+		};
+
+		m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Initialize MaterialSystem
+	{
+		m_MaterialSystem.Init({ m_LogicalDevice });
+
+		// load shaders
+		for (auto& shader : std::filesystem::directory_iterator("Shaders/"))
+		{
+			if (shader.path().extension() == ".spv_vs")
+			{
+				std::string name(shader.path().filename().replace_extension().c_str());
+
+				Shader::CreateInfo shaderCreateInfo {
+					name.c_str(),
+					shader.path().c_str(),
+					vk::ShaderStageFlagBits::eVertex,
+				};
+				m_MaterialSystem.LoadShader(shaderCreateInfo);
+			}
+			else if (shader.path().extension() == ".spv_fs")
+			{
+				std::string name(shader.path().filename().replace_extension().c_str());
+
+				Shader::CreateInfo shaderCreateInfo {
+					name.c_str(),
+					shader.path().c_str(),
+					vk::ShaderStageFlagBits::eFragment,
+				};
+				m_MaterialSystem.LoadShader(shaderCreateInfo);
+			}
+		}
+
+		// create shader efffects
+		ShaderEffect::CreateInfo shaderEffectCreateInfo {
+			"default",
+			{
+			    m_MaterialSystem.GetShader("defaultVertex"),
+			    m_MaterialSystem.GetShader("defaultFragment"),
+			},
+		};
+
+		m_MaterialSystem.CreateShaderEffect(shaderEffectCreateInfo);
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Create swapchain
+	{
+		RecreateSwapchain(createInfo.window, createInfo.deviceContext);
+	}
+}
+
+void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
+{
+	DestroySwapchain();
+
+	m_SurfaceInfo = deviceContext.surfaceInfo;
+	m_QueueInfo   = deviceContext.queueInfo;
+	m_SampleCount = deviceContext.maxSupportedSampleCount;
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the swap chain.
 	{
-		// Select extent
+		const uint32_t minImage = m_SurfaceInfo.capabilities.minImageCount;
+		const uint32_t maxImage = m_SurfaceInfo.capabilities.maxImageCount;
 
-		// Select image count ; one more than minImageCount, if minImageCount +1 is
-		// not higher than maxImageCount (maxImageCount of 0 means no limit)
-		uint32_t imageCount = m_SurfaceInfo.capabilities.maxImageCount > 0 && m_SurfaceInfo.capabilities.minImageCount + 1 > m_SurfaceInfo.capabilities.maxImageCount ?
-		                          m_SurfaceInfo.capabilities.maxImageCount :    // TRUE
-		                          m_SurfaceInfo.capabilities.minImageCount + 1; // FALSE
-
+		uint32_t imageCount = maxImage >= DESIRED_SWAPCHAIN_IMAGES && minImage <= DESIRED_SWAPCHAIN_IMAGES ? DESIRED_SWAPCHAIN_IMAGES :
+		                      maxImage == 0ul && minImage <= DESIRED_SWAPCHAIN_IMAGES                      ? DESIRED_SWAPCHAIN_IMAGES :
+		                      minImage <= 2ul && maxImage >= 2ul                                           ? 2ul :
+		                      minImage == 0ul && maxImage >= 2ul                                           ? 2ul :
+		                                                                                                     minImage;
 		// Create swapchain
 		bool sameQueueIndex = m_QueueInfo.graphicsQueueIndex == m_QueueInfo.presentQueueIndex;
 		vk::SwapchainCreateInfoKHR swapchainCreateInfo {
@@ -186,7 +269,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 		       vk::Format::eD24UnormS8Uint })
 		{
 			formatProperties =
-			    createInfo.deviceContext.physicalDevice.getFormatProperties(format);
+			    deviceContext.physicalDevice.getFormatProperties(format);
 			if ((formatProperties.optimalTilingFeatures &
 			     vk::FormatFeatureFlagBits::eDepthStencilAttachment) ==
 			    vk::FormatFeatureFlagBits::eDepthStencilAttachment)
@@ -235,7 +318,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			/* components */
 			vk::ComponentMapping {
 			    // Don't swizzle the colors around...
-			    vk::ComponentSwizzle::eIdentity, // r
+			    vk::ComponentSwizzle::eIdentity, // t
 			    vk::ComponentSwizzle::eIdentity, // g
 			    vk::ComponentSwizzle::eIdentity, // b
 			    vk::ComponentSwizzle::eIdentity, // a
@@ -416,46 +499,18 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	/// Create texture - @todo wtf is this doing here?
 	{
 		TextureCreateInfo textureCreateInfo {
-			m_LogicalDevice,                         // logicalDevice
-			createInfo.deviceContext.physicalDevice, // physicalDevice
-			m_QueueInfo.graphicsQueue,               // graphicsQueue
-			m_Allocator,                             // allocator
-			m_CommandPool,                           // commandPool
-			"Assets/viking_room.asset_texture",      // imagePath
-			VK_TRUE,                                 // anisotropyEnabled
-			createInfo.deviceContext.physicalDeviceProperties.limits
+			m_LogicalDevice,                    // logicalDevice
+			deviceContext.physicalDevice,       // physicalDevice
+			m_QueueInfo.graphicsQueue,          // graphicsQueue
+			m_Allocator,                        // allocator
+			m_CommandPool,                      // commandPool
+			"Assets/viking_room.asset_texture", // imagePath
+			VK_TRUE,                            // anisotropyEnabled
+			deviceContext.physicalDeviceProperties.limits
 			    .maxSamplerAnisotropy, // maxAnisotropy
 		};
 
 		m_TempTexture = std::make_shared<Texture>(textureCreateInfo);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create descriptor pool
-	{
-		std::vector<vk::DescriptorPoolSize> poolSizes = {
-			{ vk::DescriptorType::eSampler, 1000 },
-			{ vk::DescriptorType::eCombinedImageSampler, 1000 },
-			{ vk::DescriptorType::eSampledImage, 1000 },
-			{ vk::DescriptorType::eStorageImage, 1000 },
-			{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
-			{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
-			{ vk::DescriptorType::eUniformBuffer, 1000 },
-			{ vk::DescriptorType::eStorageBuffer, 1000 },
-			{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
-			{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
-			{ vk::DescriptorType::eInputAttachment, 1000 }
-		};
-		// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
-
-		vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-			{},                                      // flags
-			100,                                     // maxSets
-			static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
-			poolSizes.data(),                        // pPoolSizes
-		};
-
-		m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -466,7 +521,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			BufferCreateInfo createInfo {
 
 				m_LogicalDevice,                         // logicalDevice
-				createInfo.physicalDevice,               // physicalDevice
+				deviceContext.physicalDevice,            // physicalDevice
 				m_Allocator,                             // vmaallocator
 				m_CommandPool,                           // commandPool
 				m_QueueInfo.graphicsQueue,               // graphicsQueue
@@ -498,7 +553,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			static_cast<uint32_t>(descriptorSetLayoutBindings.size()),
 			descriptorSetLayoutBindings.data(),
 		};
-		LOG(warn, "Creating frame descriptor set layout");
 		m_FramesDescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(
 		    descriptorSetLayoutCreateInfo, nullptr);
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -562,7 +616,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			descriptorSetLayoutBindings.data(),                        // pBindings
 		};
 
-		LOG(warn, "Creating forward pass descriptor set layout");
 		m_ForwardPass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -618,7 +671,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	{
 		BufferCreateInfo createInfo {
 			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = createInfo.physicalDevice,
+			.physicalDevice = deviceContext.physicalDevice,
 			.allocator      = m_Allocator,
 			.commandPool    = m_CommandPool,
 			.graphicsQueue  = m_QueueInfo.graphicsQueue,
@@ -635,11 +688,11 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	{
 		ImGui::CreateContext();
 
-		ImGui_ImplGlfw_InitForVulkan(createInfo.window->GetGlfwHandle(), true);
+		ImGui_ImplGlfw_InitForVulkan(window->GetGlfwHandle(), true);
 
 		ImGui_ImplVulkan_InitInfo initInfo {
-			.Instance       = createInfo.deviceContext.instance,
-			.PhysicalDevice = createInfo.deviceContext.physicalDevice,
+			.Instance       = deviceContext.instance,
+			.PhysicalDevice = deviceContext.physicalDevice,
 			.Device         = m_LogicalDevice,
 			.Queue          = m_QueueInfo.graphicsQueue,
 			.DescriptorPool = m_DescriptorPool,
@@ -648,9 +701,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			.MSAASamples    = static_cast<VkSampleCountFlagBits>(m_SampleCount),
 		};
 
-		std::pair userData =
-		    std::make_pair(createInfo.deviceContext.vkGetInstanceProcAddr,
-		                   createInfo.deviceContext.instance);
+		std::pair userData = std::make_pair(deviceContext.vkGetInstanceProcAddr, deviceContext.instance);
 
 		ASSERT(ImGui_ImplVulkan_LoadFunctions(
 		           [](const char* func, void* data) {
@@ -671,50 +722,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Initialize material system
 	{
-		LOG(warn, "Creating MaterialSystem");
-		m_MaterialSystem = MaterialSystem({ m_LogicalDevice });
-
-		// load shaders
-		for (auto& shader : std::filesystem::directory_iterator("Shaders/"))
-		{
-			LOG(warn, "Processing {}", shader.path().filename().c_str());
-			if (shader.path().extension() == ".spv_vs")
-			{
-				std::string name(shader.path().filename().replace_extension().c_str());
-
-				Shader::CreateInfo shaderCreateInfo {
-					name.c_str(),
-					shader.path().c_str(),
-					vk::ShaderStageFlagBits::eVertex,
-				};
-				m_MaterialSystem.LoadShader(shaderCreateInfo);
-			}
-			else if (shader.path().extension() == ".spv_fs")
-			{
-				std::string name(shader.path().filename().replace_extension().c_str());
-
-				Shader::CreateInfo shaderCreateInfo {
-					name.c_str(),
-					shader.path().c_str(),
-					vk::ShaderStageFlagBits::eFragment,
-				};
-				m_MaterialSystem.LoadShader(shaderCreateInfo);
-			}
-		}
-
-		// create shader efffects
-		ShaderEffect::CreateInfo shaderEffectCreateInfo {
-			"default",
-			{
-			    m_MaterialSystem.GetShader("defaultVertex"),
-			    m_MaterialSystem.GetShader("defaultFragment"),
-			},
-		};
-
-		LOG(warn, "Creating ShaderEffect");
-		m_MaterialSystem.CreateShaderEffect(shaderEffectCreateInfo);
-		LOG(warn, "CREATED! ShaderEffect");
-
 		std::vector<vk::VertexInputBindingDescription> inputBindings {
 			vk::VertexInputBindingDescription {
 			    0u,                                    // binding
@@ -751,12 +758,12 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 
 		// Viewport state
 		vk::Viewport viewport {
-			0.0f,                                                               // x
-			0.0f,                                                               // y
-			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.width), // width
-			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.width), // height
-			0.0f,                                                               // minDepth
-			1.0f,                                                               // maxDepth
+			0.0f,                                                                // x
+			0.0f,                                                                // y
+			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.width),  // width
+			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.height), // height
+			0.0f,                                                                // minDepth
+			1.0f,                                                                // maxDepth
 		};
 
 		vk::Rect2D scissors {
@@ -801,7 +808,7 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			    {},
 			    VK_FALSE,
 			    VK_FALSE,
-			    vk::PolygonMode::eFill,
+			    vk::PolygonMode::eLine,
 			    vk::CullModeFlagBits::eBack,
 			    vk::FrontFace::eClockwise,
 			    VK_FALSE,
@@ -850,28 +857,89 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 			0ull,
 		};
 
-		LOG(warn, "Creating ShaderPass");
 		m_MaterialSystem.CreateShaderPass(shaderPassCreateInfo);
 
 
-		LOG(warn, "Creating MasterMaterial");
 		m_MaterialSystem.CreateMasterMaterial({
 		    "default",
 		    m_MaterialSystem.GetShaderPass("default"),
 		    {},
 		});
 
-		LOG(warn, "Creating Material");
 		m_MaterialSystem.CreateMaterial({
 		    "default",
 		    m_MaterialSystem.GetMasterMaterial("default"),
 		    {},
 		    {},
 		});
-		LOG(warn, "CREATED! MATERIAL");
 	}
+
+	m_SwapchainInvalidated = false;
 }
 
+
+void Renderer::DestroySwapchain()
+{
+	if (!m_Swapchain)
+	{
+		return;
+	}
+
+	m_LogicalDevice.waitIdle();
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
+	m_MaterialSystem.DestroyAllMaterials();
+	m_LogicalDevice.resetCommandPool(m_CommandPool);
+	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool);
+	m_LogicalDevice.destroyCommandPool(m_ForwardPass.cmdPool);
+	m_LogicalDevice.destroyCommandPool(m_UploadContext.cmdPool);
+	m_LogicalDevice.destroyCommandPool(m_CommandPool);
+
+	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
+	for (const auto& framebuffer : m_ForwardPass.framebuffers)
+	{
+		m_LogicalDevice.destroyFramebuffer(framebuffer);
+	}
+
+	for (const auto& imageView : m_ImageViews)
+	{
+		m_LogicalDevice.destroyImageView(imageView);
+	}
+
+	m_LogicalDevice.destroyRenderPass(m_ForwardPass.renderpass);
+
+	m_LogicalDevice.destroyImageView(m_DepthImageView);
+	m_LogicalDevice.destroyImageView(m_ColorImageView);
+
+	m_Allocator.destroyImage(m_DepthImage, m_DepthImage);
+	m_Allocator.destroyImage(m_ColorImage, m_ColorImage);
+
+	m_LogicalDevice.destroyDescriptorSetLayout(m_FramesDescriptorSetLayout);
+	m_LogicalDevice.destroyDescriptorSetLayout(m_ForwardPass.descriptorSetLayout);
+
+	m_LogicalDevice.destroyPipelineLayout(m_FramePipelineLayout);
+	m_LogicalDevice.destroyPipelineLayout(m_ForwardPass.pipelineLayout);
+
+	m_LogicalDevice.destroySwapchainKHR(m_Swapchain);
+};
+
+Renderer::~Renderer()
+{
+	DestroySwapchain();
+
+	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
+
+	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		m_LogicalDevice.destroyFence(m_Frames[i].renderFence, nullptr);
+		m_LogicalDevice.destroySemaphore(m_Frames[i].renderSemaphore, nullptr);
+		m_LogicalDevice.destroySemaphore(m_Frames[i].presentSemaphore, nullptr);
+	}
+
+	m_LogicalDevice.destroyFence(m_UploadContext.fence);
+}
 void Renderer::BeginFrame()
 {
 	ImGui_ImplVulkan_NewFrame();
@@ -1003,8 +1071,7 @@ void Renderer::DrawScene(Scene* scene)
 		scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
 			secondaryCmds.bindVertexBuffers(0, 1, renderComp.mesh->vertexBuffer.GetBuffer(), &offset);
 			secondaryCmds.bindIndexBuffer(*(renderComp.mesh->indexBufer.GetBuffer()), 0u, vk::IndexType::eUint32);
-			secondaryCmds.drawIndexed(renderComp.mesh->indices.size(),1u, 0u, 0u, 0u);
-			// LOG(trace, "{} - {}", renderComp.mesh->indices.size(), renderComp.mesh->vertices.size());
+			secondaryCmds.drawIndexed(renderComp.mesh->indices.size(), 1u, 0u, 0u, 0u);
 		});
 
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), secondaryCmds);
@@ -1096,44 +1163,4 @@ void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function
 	m_LogicalDevice.resetFences(m_UploadContext.fence);
 
 	m_LogicalDevice.resetCommandPool(m_CommandPool, {});
-}
-
-Renderer::~Renderer()
-{
-	m_LogicalDevice.waitIdle();
-
-	m_LogicalDevice.destroyCommandPool(m_UploadContext.cmdPool);
-	m_LogicalDevice.destroyFence(m_UploadContext.fence);
-
-	m_LogicalDevice.destroyDescriptorPool(m_ImguiPool, nullptr);
-	ImGui_ImplVulkan_Shutdown();
-	ImGui::DestroyContext();
-
-	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
-	m_LogicalDevice.destroyCommandPool(m_CommandPool, nullptr);
-
-	for (uint32_t i = 0; i < m_ForwardPass.framebuffers.size(); i++)
-	{
-		m_LogicalDevice.destroyFramebuffer(m_ForwardPass.framebuffers[i], nullptr);
-	}
-
-	m_LogicalDevice.destroyRenderPass(m_ForwardPass.renderpass, nullptr);
-	m_LogicalDevice.destroyImageView(m_DepthImageView, nullptr);
-	m_Allocator.destroyImage(m_DepthImage, m_DepthImage);
-	m_LogicalDevice.destroyImageView(m_ColorImageView, nullptr);
-	m_Allocator.destroyImage(m_ColorImage, m_ColorImage);
-
-	for (uint32_t i = 0; i < m_ImageViews.size(); i++)
-	{
-		m_LogicalDevice.destroyImageView(m_ImageViews[i], nullptr);
-	}
-
-	m_LogicalDevice.destroySwapchainKHR(m_Swapchain, nullptr);
-
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		m_LogicalDevice.destroyFence(m_Frames[i].renderFence, nullptr);
-		m_LogicalDevice.destroySemaphore(m_Frames[i].renderSemaphore, nullptr);
-		m_LogicalDevice.destroySemaphore(m_Frames[i].presentSemaphore, nullptr);
-	}
 }
