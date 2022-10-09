@@ -26,6 +26,11 @@ public:
 		return m_Registry.create();
 	}
 
+	void Reset()
+	{
+		m_Registry.clear<StaticMeshRendererComponent, TransformComponent>();
+	}
+
 	void SortComponents()
 	{
 		m_Registry.sort<StaticMeshRendererComponent>([](const StaticMeshRendererComponent& lhs, const StaticMeshRendererComponent& rhs) {

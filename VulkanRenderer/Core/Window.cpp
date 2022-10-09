@@ -2,7 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
-Window::Window(WindowCreateInfo& createInfo)
+Window::Window(const WindowCreateInfo& createInfo)
     : m_Specs(createInfo.specs)
 {
 	// Initialzie glfw

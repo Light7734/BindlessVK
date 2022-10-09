@@ -12,9 +12,18 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-Device::Device(DeviceCreateInfo& createInfo)
+
+template<typename T>
+std::vector<T>& AppendList(std::vector<T>& vec, std::vector<T> values)
+{
+	for (auto& val : values)
+		vec.push_back(val);
+	return vec;
+}
+
+
+Device::Device(const DeviceCreateInfo& createInfo)
     : m_Layers(createInfo.layers)
-    , m_Extensions(createInfo.instanceExtensions)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Initialize volk
@@ -74,15 +83,17 @@ Device::Device(DeviceCreateInfo& createInfo)
 		// If debugging is not enabled, remove validation layer from instance layers
 		if (!createInfo.enableDebugging)
 		{
-			auto validationLayerIt = std::find(createInfo.layers.begin(), createInfo.layers.end(), "VK_LAYER_KHRONOS_validation");
-			if (validationLayerIt != createInfo.layers.end())
+			auto validationLayerIt = std::find(m_Layers.begin(), m_Layers.end(), "VK_LAYER_KHRONOS_validation");
+			if (validationLayerIt != m_Layers.end())
 			{
-				createInfo.layers.erase(validationLayerIt);
+				m_Layers.erase(validationLayerIt);
 			}
 		}
 
 		// Create the vulkan instance
+		std::vector<const char*> requiredWindowExtensions = createInfo.window->GetRequiredExtensions();
 
+		m_Extensions = AppendList(requiredWindowExtensions, m_Extensions);
 		vk::InstanceCreateInfo instanceCreateInfo {
 			{},                                                               // flags
 			&applicationInfo,                                                 // pApplicationInfo

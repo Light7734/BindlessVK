@@ -64,50 +64,6 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Initialize MaterialSystem
-	{
-		m_MaterialSystem.Init({ m_LogicalDevice });
-
-		// load shaders
-		for (auto& shader : std::filesystem::directory_iterator("Shaders/"))
-		{
-			if (shader.path().extension() == ".spv_vs")
-			{
-				std::string name(shader.path().filename().replace_extension().c_str());
-
-				Shader::CreateInfo shaderCreateInfo {
-					name.c_str(),
-					shader.path().c_str(),
-					vk::ShaderStageFlagBits::eVertex,
-				};
-				m_MaterialSystem.LoadShader(shaderCreateInfo);
-			}
-			else if (shader.path().extension() == ".spv_fs")
-			{
-				std::string name(shader.path().filename().replace_extension().c_str());
-
-				Shader::CreateInfo shaderCreateInfo {
-					name.c_str(),
-					shader.path().c_str(),
-					vk::ShaderStageFlagBits::eFragment,
-				};
-				m_MaterialSystem.LoadShader(shaderCreateInfo);
-			}
-		}
-
-		// create shader efffects
-		ShaderEffect::CreateInfo shaderEffectCreateInfo {
-			"default",
-			{
-			    m_MaterialSystem.GetShader("defaultVertex"),
-			    m_MaterialSystem.GetShader("defaultFragment"),
-			},
-		};
-
-		m_MaterialSystem.CreateShaderEffect(shaderEffectCreateInfo);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
 	/// Create swapchain
 	{
 		RecreateSwapchain(createInfo.window, createInfo.deviceContext);
@@ -719,162 +675,10 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////
-	/// Initialize material system
-	{
-		std::vector<vk::VertexInputBindingDescription> inputBindings {
-			vk::VertexInputBindingDescription {
-			    0u,                                    // binding
-			    static_cast<uint32_t>(sizeof(Vertex)), // stride
-			    vk::VertexInputRate::eVertex,          // inputRate
-			},
-		};
-		std::vector<vk::VertexInputAttributeDescription> inputAttributes {
-			vk::VertexInputAttributeDescription {
-			    0u,                           // location
-			    0u,                           // binding
-			    vk::Format::eR32G32B32Sfloat, // format
-			    0u,                           // offset
-			},
-			vk::VertexInputAttributeDescription {
-			    1u,                           // location
-			    0u,                           // binding
-			    vk::Format::eR32G32B32Sfloat, // format
-			    sizeof(glm::vec3),            // offset
-			},
-			vk::VertexInputAttributeDescription {
-			    2u,                                    // location
-			    0u,                                    // binding
-			    vk::Format::eR32G32Sfloat,             // format
-			    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-			},
-			vk::VertexInputAttributeDescription {
-			    3u,                                                        // location
-			    0u,                                                        // binding
-			    vk::Format::eR32Uint,                                      // format
-			    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2), // offset
-			},
-		};
-
-		// Viewport state
-		vk::Viewport viewport {
-			0.0f,                                                                // x
-			0.0f,                                                                // y
-			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.width),  // width
-			static_cast<float>(m_SurfaceInfo.capabilities.currentExtent.height), // height
-			0.0f,                                                                // minDepth
-			1.0f,                                                                // maxDepth
-		};
-
-		vk::Rect2D scissors {
-			{ 0, 0 },                                // offset
-			m_SurfaceInfo.capabilities.currentExtent // extent
-		};
-
-		vk::PipelineColorBlendAttachmentState colorBlendAttachment {
-			VK_FALSE,                           // blendEnable
-			vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
-			vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-			vk::BlendOp::eAdd,                  // colorBlendOp
-			vk::BlendFactor::eOne,              // srcAlphaBlendFactor
-			vk::BlendFactor::eZero,             // dstAlphaBlendFactor
-			vk::BlendOp::eAdd,                  // alphaBlendOp
-
-			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA, // colorWriteMask
-		};
-
-		PipelineConfiguration defaultPassPipelineConfigurations {
-			vk::PipelineVertexInputStateCreateInfo {
-			    {},
-			    static_cast<uint32_t>(inputBindings.size()),
-			    inputBindings.data(),
-			    static_cast<uint32_t>(inputAttributes.size()),
-			    inputAttributes.data(),
-			},
-			vk::PipelineInputAssemblyStateCreateInfo {
-			    {},
-			    vk::PrimitiveTopology::eTriangleList,
-			    VK_FALSE,
-			},
-			vk::PipelineTessellationStateCreateInfo {},
-			vk::PipelineViewportStateCreateInfo {
-			    {},
-			    1u,
-			    &viewport,
-			    1u,
-			    &scissors,
-			},
-			vk::PipelineRasterizationStateCreateInfo {
-			    {},
-			    VK_FALSE,
-			    VK_FALSE,
-			    vk::PolygonMode::eLine,
-			    vk::CullModeFlagBits::eBack,
-			    vk::FrontFace::eClockwise,
-			    VK_FALSE,
-			    0.0f,
-			    0.0f,
-			    0.0f,
-			    1.0f,
-			},
-			vk::PipelineMultisampleStateCreateInfo {
-			    {},
-			    m_SampleCount,
-			    VK_FALSE,
-			    {},
-			    VK_FALSE,
-			    VK_FALSE,
-			},
-			vk::PipelineDepthStencilStateCreateInfo {
-			    {},
-			    VK_TRUE,              // depthTestEnable
-			    VK_TRUE,              // depthWriteEnable
-			    vk::CompareOp::eLess, // depthCompareOp
-			    VK_FALSE,             // depthBoundsTestEnable
-			    VK_FALSE,             // stencilTestEnable
-			    {},                   // front
-			    {},                   // back
-			    0.0f,                 // minDepthBounds
-			    1.0,                  // maxDepthBounds
-			},
-			vk::PipelineColorBlendStateCreateInfo {
-			    {},                         // flags
-			    VK_FALSE,                   // logicOpEnable
-			    vk::LogicOp::eCopy,         // logicOp
-			    1u,                         // attachmentCount
-			    &colorBlendAttachment,      // pAttachments
-			    { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
-			},
-			vk::PipelineDynamicStateCreateInfo {},
-		};
-
-		// create shader passes
-		ShaderPass::CreateInfo shaderPassCreateInfo {
-			"default",
-			defaultPassPipelineConfigurations,
-			m_MaterialSystem.GetShaderEffect("default"),
-			m_ForwardPass.renderpass,
-			0ull,
-		};
-
-		m_MaterialSystem.CreateShaderPass(shaderPassCreateInfo);
-
-
-		m_MaterialSystem.CreateMasterMaterial({
-		    "default",
-		    m_MaterialSystem.GetShaderPass("default"),
-		    {},
-		});
-
-		m_MaterialSystem.CreateMaterial({
-		    "default",
-		    m_MaterialSystem.GetMasterMaterial("default"),
-		    {},
-		    {},
-		});
-	}
 
 	m_SwapchainInvalidated = false;
+
+    m_LogicalDevice.waitIdle();
 }
 
 
@@ -890,7 +694,6 @@ void Renderer::DestroySwapchain()
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
-	m_MaterialSystem.DestroyAllMaterials();
 	m_LogicalDevice.resetCommandPool(m_CommandPool);
 	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool);
 	m_LogicalDevice.destroyCommandPool(m_ForwardPass.cmdPool);
@@ -1065,10 +868,15 @@ void Renderer::DrawScene(Scene* scene)
 
 		VkDeviceSize offset { 0 };
 
-		secondaryCmds.bindPipeline(vk::PipelineBindPoint::eGraphics,
-		                           m_MaterialSystem.GetMaterial("default")->base->shader->pipeline);
-
+		vk::Pipeline currentPipeline = VK_NULL_HANDLE;
 		scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+			vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
+			if (currentPipeline != newPipeline)
+			{
+				secondaryCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
+				currentPipeline = newPipeline;
+			}
+
 			secondaryCmds.bindVertexBuffers(0, 1, renderComp.mesh->vertexBuffer.GetBuffer(), &offset);
 			secondaryCmds.bindIndexBuffer(*(renderComp.mesh->indexBufer.GetBuffer()), 0u, vk::IndexType::eUint32);
 			secondaryCmds.drawIndexed(renderComp.mesh->indices.size(), 1u, 0u, 0u, 0u);

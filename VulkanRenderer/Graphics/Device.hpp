@@ -67,7 +67,7 @@ struct DeviceContext
 class Device
 {
 public:
-	Device(DeviceCreateInfo& createInfo);
+	Device(const DeviceCreateInfo& createInfo);
 	~Device();
 
 	void LogDebugInfo();

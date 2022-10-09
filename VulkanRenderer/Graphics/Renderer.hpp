@@ -1,5 +1,4 @@
 #pragma once
-#include "Graphics/MaterialSystem.hpp"
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
@@ -104,7 +103,7 @@ public:
 
 	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
 
-	Material* GetMaterial(const char* name) { return m_MaterialSystem.GetMaterial(name); }
+	inline vk::RenderPass GetForwardPass() const { return m_ForwardPass.renderpass; }
 
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
 	inline uint32_t GetImageCount() const { return m_Images.size(); }
@@ -117,8 +116,6 @@ private:
 	SurfaceInfo m_SurfaceInfo  = {};
 
 	vma::Allocator m_Allocator;
-
-	MaterialSystem m_MaterialSystem;
 
 	std::array<FrameData, MAX_FRAMES_IN_FLIGHT> m_Frames = {};
 	vk::DescriptorSetLayout m_FramesDescriptorSetLayout;

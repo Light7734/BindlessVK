@@ -6,6 +6,11 @@
 
 static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't");
 
+MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
+{
+	Init(info);
+}
+
 void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 {
 	m_LogicalDevice = info.logicalDevice;
@@ -68,7 +73,7 @@ void MaterialSystem::DestroyAllMaterials()
 		m_LogicalDevice.destroyPipeline(val.pipeline);
 	}
 
-    m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
+	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
 
 	m_ShaderPasses.clear();
 	m_MasterMaterials.clear();
@@ -78,10 +83,8 @@ void MaterialSystem::DestroyAllMaterials()
 void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
 {
 	std::string test(info.name);
-	LOG(trace, "Shader loaded -> {}", test);
 	std::ifstream stream(info.path, std::ios::ate);
 	test = std::string(info.name);
-	LOG(trace, "Shader loaded -> {}", test);
 
 	const size_t fileSize = stream.tellg();
 	std::vector<uint32_t> code(fileSize / sizeof(uint32_t));
@@ -97,7 +100,6 @@ void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
 	};
 
 	test = std::string(info.name);
-	LOG(trace, "Shader loaded -> {}", test);
 	m_Shaders[HashStr(info.name)] = {
 		m_LogicalDevice.createShaderModule(createInfo), // module
 		info.stage,                                     // stage
