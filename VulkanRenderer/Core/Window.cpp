@@ -22,6 +22,8 @@ Window::Window(const WindowCreateInfo& createInfo)
 	// Setup callbacks & userpointer
 	glfwSetWindowUserPointer(m_GlfwWindowHandle, &m_Specs);
 	BindCallbacks();
+
+    glfwSetInputMode(m_GlfwWindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 Window::~Window()

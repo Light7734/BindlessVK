@@ -10,8 +10,6 @@
 #include <filesystem>
 #include <imgui.h>
 
-AutoCVar ACV_CameraFOV(CVarType::Float, "CameraFOV", "Camera's field of view", 45.0f, 45.0f);
-
 Renderer::Renderer(const RendererCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.deviceContext.logicalDevice)
     , m_Allocator(createInfo.deviceContext.allocator)
@@ -678,7 +676,7 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 
 	m_SwapchainInvalidated = false;
 
-    m_LogicalDevice.waitIdle();
+	m_LogicalDevice.waitIdle();
 }
 
 
@@ -753,7 +751,7 @@ void Renderer::BeginFrame()
 	CVar::DrawImguiEditor();
 }
 
-void Renderer::DrawScene(Scene* scene)
+void Renderer::DrawScene(Scene* scene, const Camera& camera)
 {
 	if (m_SwapchainInvalidated)
 		return;
@@ -785,8 +783,8 @@ void Renderer::DrawScene(Scene* scene)
 	/// Update frame descriptor set
 	{
 		glm::mat4* map = (glm::mat4*)frame.cameraData.buffer->Map();
-		map[0]         = glm::perspective(glm::radians((float)CVar::Get("CameraFOV")), m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
-		map[1]         = glm::lookAt({ 4.0f, 4.0f, 2.0f }, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+		map[0]         = camera.GetProjection();
+		map[1]         = camera.GetView();
 		frame.cameraData.buffer->Unmap();
 	}
 

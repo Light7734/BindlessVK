@@ -3,6 +3,7 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
+#include "Scene/Camera.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderer.hpp"
 // #include "Graphics/Shader.hpp"
@@ -237,9 +238,9 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, MeshSystem& mesh
 	Entity entity = scene.CreateEntity();
 
 	scene.AddComponent<TransformComponent>(entity,
-	                                       glm::vec3(0.0f), // Translation
-	                                       glm::vec3(1.0f), // Scale
-	                                       glm::vec3(0.0f)  // Rotation
+	                                       glm::vec3(0.0f),          // Translation
+	                                       glm::vec3(1.0f),          // Scale
+	                                       glm::vec3(0.0f, 0.0, 0.0) // Rotation
 	);
 
 	scene.AddComponent<StaticMeshRendererComponent>(entity,
@@ -304,6 +305,15 @@ int main()
 		// Scene
 		Scene scene;
 
+		Camera camera({
+		    .position  = { 2.0f, 2.0f, 0.5f },
+		    .speed     = 1.0f,
+		    .nearPlane = 0.001f,
+		    .farPlane  = 100.0f,
+		    .width     = 5.0f,
+		    .height    = 5.0f,
+		});
+
 		/////////////////////////////////////////////////////////////////////////////////
 		/// Load assets
 		LoadShaders(materialSystem);
@@ -321,12 +331,38 @@ int main()
 		/// Main application loop
 		uint32_t frames = 0u;
 		Timer fpsTimer;
+		Timer deltaTimer;
+		double lastXPos, lastYPos;
+		glfwGetCursorPos(window.GetGlfwHandle(), &lastXPos, &lastYPos);
+
 		while (!window.ShouldClose())
 		{
 			window.PollEvents();
 
+			float yDelta = glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_W) ? +1 :
+			               glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_S) ? -1 :
+			                                                                0;
+
+			float xDelta = glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_D) ? +1 :
+			               glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_A) ? -1 :
+			                                                                0;
+
+			double xpos, ypos;
+			glfwGetCursorPos(window.GetGlfwHandle(), &xpos, &ypos);
+			double cursorDeltaX = xpos - lastXPos;
+			double cursorDeltaY = ypos - lastYPos;
+			lastXPos            = xpos;
+			lastYPos            = ypos;
+
+			float timeDelta = deltaTimer.ElapsedTime();
+			deltaTimer.Reset();
+
+			camera.Move(timeDelta, xDelta, yDelta);
+			camera.Look(cursorDeltaX, cursorDeltaY);
+
+
 			renderer.BeginFrame();
-			renderer.DrawScene(&scene);
+			renderer.DrawScene(&scene, camera);
 
 			if (renderer.IsSwapchainInvalidated())
 			{

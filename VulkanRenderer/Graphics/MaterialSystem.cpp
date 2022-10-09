@@ -77,6 +77,7 @@ void MaterialSystem::DestroyAllMaterials()
 
 	m_ShaderPasses.clear();
 	m_MasterMaterials.clear();
+	LOG(trace, "Loading shaders......");
 	m_Materials.clear();
 }
 
@@ -99,7 +100,7 @@ void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
 		code.data(),                    // code
 	};
 
-	test = std::string(info.name);
+	test                          = std::string(info.name);
 	m_Shaders[HashStr(info.name)] = {
 		m_LogicalDevice.createShaderModule(createInfo), // module
 		info.stage,                                     // stage

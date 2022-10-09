@@ -6,6 +6,7 @@
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Mesh.hpp"
+#include "Scene/Camera.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Texture.hpp"
 #include "Graphics/Types.hpp"
@@ -97,7 +98,7 @@ public:
 
 	void BeginFrame();
 	void Draw();
-	void DrawScene(class Scene* scene);
+	void DrawScene(class Scene* scene, const Camera& camera);
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
 
