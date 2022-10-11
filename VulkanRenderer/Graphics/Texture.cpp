@@ -3,21 +3,31 @@
 #include <AssetParser.hpp>
 #include <TextureAsset.hpp>
 
-Texture::Texture(TextureCreateInfo& createInfo)
-    : m_LogicalDevice(createInfo.logicalDevice)
-    , m_Allocator(createInfo.allocator)
+TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
+    : m_LogicalDevice(info.deviceContext.logicalDevice)
+    , m_PhysicalDevice(info.deviceContext.physicalDevice)
+    , m_Allocator(info.deviceContext.allocator)
+    , m_PhysicalDeviceProps(info.deviceContext.physicalDeviceProperties)
 {
-	/////////////////////////////////////////////////////////////////////////////////
-	// Load the image
-	Assets::AssetFile file;
-	ASSERT(Assets::LoadBinaryFile(createInfo.imagePath.c_str(), file), "Failed to load image at: {}", createInfo.imagePath);
+	vk::CommandPoolCreateInfo commandPoolCreateInfo {
+		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
+		info.deviceContext.queueInfo.graphicsQueueIndex,    // queueFamilyIndex
+	};
+	m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
 
-	Assets::TextureInfo textureInfo = Assets::ReadTextureInfo(&file);
+	vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
+		m_UploadContext.cmdPool,
+		vk::CommandBufferLevel::ePrimary,
+		1u,
+	};
+	m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
+}
 
-	m_Width     = textureInfo.pixelsSize[0];
-	m_Height    = textureInfo.pixelsSize[1];
-	m_MipLevels = std::floor(std::log2(std::max(m_Width, m_Height))) + 1;
-	m_ImageSize = textureInfo.size;
+void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
+{
+	Texture* texture = &m_Textures[HashStr(info.name.c_str())];
+
+	const uint32_t mipLevels = std::floor(std::log2(std::max(info.width, info.height))) + 1;
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the image and staging buffer
@@ -30,11 +40,11 @@ Texture::Texture(TextureCreateInfo& createInfo)
 
 			/* extent */
 			vk::Extent3D {
-			    static_cast<uint32_t>(m_Width),  // width
-			    static_cast<uint32_t>(m_Height), // height
-			    1u,                              // depth
+			    info.width,  // width
+			    info.height, // height
+			    1u,          // depth
 			},
-			m_MipLevels,                                                                                                    // mipLevels
+			info.width,                                                                                                     // mipLevels
 			1u,                                                                                                             // arrayLayers
 			vk::SampleCountFlagBits::e1,                                                                                    // samples
 			vk::ImageTiling::eOptimal,                                                                                      // tiling
@@ -48,53 +58,48 @@ Texture::Texture(TextureCreateInfo& createInfo)
 		vma::AllocationCreateInfo imageAllocInfo({},
 		                                         vma::MemoryUsage::eGpuOnly,
 		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
-		m_Image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+		texture->image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		// Staging buffer
 		vk::BufferCreateInfo stagingBufferCrateInfo {
 			{},                                    // flags
-			m_ImageSize,                           // size
+			info.size,                             // size
 			vk::BufferUsageFlagBits::eTransferSrc, // usage
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
+		AllocatedBuffer stagingBuffer;
 		vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, { vk::MemoryPropertyFlagBits::eHostCached });
-		m_StagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
-	}
+		stagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 
-	/////////////////////////////////////////////////////////////////////////////////
-	// Write the image data
-	{
 		// Copy data to staging buffer
-		void* stagingMap = m_Allocator.mapMemory(m_StagingBuffer);
-		Assets::UnpackTexture(&textureInfo, file.blob.data(), file.blob.size(), stagingMap);
-		m_Allocator.unmapMemory(m_StagingBuffer);
+		// Assets::UnpackTexture(&textureInfo, file.blob.data(), file.blob.size(), stagingMap);
+		memcpy(m_Allocator.mapMemory(stagingBuffer), info.pixels, info.size);
+		m_Allocator.unmapMemory(stagingBuffer);
 
-		// Allocate cmd buffer
-		vk::CommandBufferAllocateInfo allocInfo {
-			createInfo.commandPool,           // commandPool
-			vk::CommandBufferLevel::ePrimary, // level
-			1u,                               // commandBufferCount
-		};
-		vk::CommandBuffer cmdBuffer;
-		cmdBuffer = m_LogicalDevice.allocateCommandBuffers(allocInfo)[0];
+		ImmediateSubmit([&](vk::CommandBuffer cmd) {
+			TransitionLayout(texture, cmd, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
-		// Begin cmd buffer
-		vk::CommandBufferBeginInfo beginInfo {
-			vk::CommandBufferUsageFlagBits::eOneTimeSubmit, // flags
-		};
+			vk::BufferImageCopy bufferImageCopy {
+				0u, // bufferOffset
+				0u, // bufferRowLength
+				0u, // bufferImageHeight
 
-		cmdBuffer.begin(beginInfo);
+				/* imageSubresource */
+				vk::ImageSubresourceLayers {
+				    vk::ImageAspectFlagBits::eColor, // aspectMask
+				    0u,                              // mipLevel
+				    0u,                              // baseArrayLayer
+				    1u,                              // layerCount
+				},
+				vk::Offset3D { 0, 0, 0 },                     // imageOffset
+				vk::Extent3D { info.width, info.height, 1u }, // imageExtent
+			};
 
-		// Move data from staging buffer to image
-		TransitionLayout(cmdBuffer, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
-		CopyBufferToImage(cmdBuffer);
+			cmd.copyBufferToImage(stagingBuffer, texture->image, vk::ImageLayout::eTransferDstOptimal, 1u, &bufferImageCopy);
 
-		/////////////////////////////////////////////////////////////////////////////////
-		// Generate mipmaps
-		{
 			// Check if image format supports linear blitting
-			vk::FormatProperties formatProperties = createInfo.physicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Srgb);
+			vk::FormatProperties formatProperties = m_PhysicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Srgb);
 
 			if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
 			{
@@ -108,7 +113,7 @@ Texture::Texture(TextureCreateInfo& createInfo)
 				vk::ImageLayout::eUndefined, // newLayout
 				VK_QUEUE_FAMILY_IGNORED,     // srcQueueFamilyIndex
 				VK_QUEUE_FAMILY_IGNORED,     // dstQueueFamilyIndex
-				m_Image,                     // image
+				texture->image,              // image
 
 				vk::ImageSubresourceRange {
 				    vk::ImageAspectFlagBits::eColor, // aspectMask
@@ -119,10 +124,10 @@ Texture::Texture(TextureCreateInfo& createInfo)
 				},
 			};
 
-			int32_t mipWidth  = m_Width;
-			int32_t mipHeight = m_Height;
+			int32_t mipWidth  = info.width;
+			int32_t mipHeight = info.height;
 
-			for (uint32_t i = 1; i < m_MipLevels; i++)
+			for (uint32_t i = 1; i < texture->mipLevels; i++)
 			{
 				barrier.subresourceRange.baseMipLevel = i - 1;
 				barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
@@ -130,7 +135,7 @@ Texture::Texture(TextureCreateInfo& createInfo)
 				barrier.dstAccessMask                 = vk::AccessFlagBits::eTransferRead;
 				barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferWrite;
 
-				cmdBuffer.pipelineBarrier(
+				cmd.pipelineBarrier(
 				    vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
 				    {},
 				    0u, nullptr,
@@ -168,20 +173,20 @@ Texture::Texture(TextureCreateInfo& createInfo)
 					},
 				};
 
-				cmdBuffer.blitImage(m_Image, vk::ImageLayout::eTransferSrcOptimal,
-				                    m_Image, vk::ImageLayout::eTransferDstOptimal,
-				                    1u, &blit, vk::Filter::eLinear);
+				cmd.blitImage(texture->image, vk::ImageLayout::eTransferSrcOptimal,
+				              texture->image, vk::ImageLayout::eTransferDstOptimal,
+				              1u, &blit, vk::Filter::eLinear);
 
 				barrier.oldLayout     = vk::ImageLayout::eTransferSrcOptimal;
 				barrier.newLayout     = vk::ImageLayout::eShaderReadOnlyOptimal;
 				barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
 				barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
-				cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
-				                          {},
-				                          0u, nullptr,
-				                          0u, nullptr,
-				                          1u, &barrier);
+				cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
+				                    {},
+				                    0u, nullptr,
+				                    0u, nullptr,
+				                    1u, &barrier);
 
 				if (mipWidth > 1)
 					mipWidth /= 2;
@@ -190,103 +195,98 @@ Texture::Texture(TextureCreateInfo& createInfo)
 					mipHeight /= 2;
 			}
 
-			barrier.subresourceRange.baseMipLevel = m_MipLevels - 1;
+			barrier.subresourceRange.baseMipLevel = texture->mipLevels - 1;
 			barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
 			barrier.newLayout                     = vk::ImageLayout::eShaderReadOnlyOptimal;
 			barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferRead;
 			barrier.dstAccessMask                 = vk::AccessFlagBits::eShaderRead;
-			cmdBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
-			                          {},
-			                          0u, nullptr,
-			                          0u, nullptr,
-			                          1u, &barrier);
+			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
+			                    {},
+			                    0u, nullptr,
+			                    0u, nullptr,
+			                    1u, &barrier);
+		});
+		m_Allocator.destroyBuffer(stagingBuffer, stagingBuffer);
+
+		/////////////////////////////////////////////////////////////////////////////////
+		// Create image views
+		{
+			vk::ImageViewCreateInfo imageViewCreateInfo {
+				{},                        // flags
+				texture->image,            // image
+				vk::ImageViewType::e2D,    // viewType
+				vk::Format::eR8G8B8A8Srgb, // format
+
+				/* components */
+				vk::ComponentMapping {
+				    // Don't swizzle the colors around...
+				    vk::ComponentSwizzle::eIdentity, // r
+				    vk::ComponentSwizzle::eIdentity, // g
+				    vk::ComponentSwizzle::eIdentity, // b
+				    vk::ComponentSwizzle::eIdentity, // a
+				},
+
+				/* subresourceRange */
+				vk::ImageSubresourceRange {
+				    vk::ImageAspectFlagBits::eColor, // aspectMask
+				    0u,                              // baseMipLevel
+				    texture->mipLevels,              // levelCount
+				    0u,                              // baseArrayLayer
+				    1u,                              // layerCount
+				},
+			};
+
+			texture->imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		}
+		/////////////////////////////////////////////////////////////////////////////////
+		// Create image samplers
+		{
+			vk::SamplerCreateInfo samplerCreateInfo {
+				{},
+				vk::Filter::eLinear,             // magFilter
+				vk::Filter::eLinear,             //minFilter
+				vk::SamplerMipmapMode::eLinear,  // mipmapMode
+				vk::SamplerAddressMode::eRepeat, // addressModeU
+				vk::SamplerAddressMode::eRepeat, // addressModeV
+				vk::SamplerAddressMode::eRepeat, // addressModeW
+				0.0f,                            // mipLodBias
+
+				// #TODO ANISOTROPY
+				false, // anisotropyEnable
+				{},    // maxAnisotropy
+
+				VK_FALSE,                               // compareEnable
+				vk::CompareOp::eAlways,                 // compareOp
+				0.0f,                                   // minLod
+				static_cast<float>(texture->mipLevels), // maxLod
+				vk::BorderColor::eIntOpaqueBlack,       // borderColor
+				VK_FALSE,                               // unnormalizedCoordinates
+			};
+
+			texture->sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
 		}
 
-		// End & Submit cmd buffer
-		cmdBuffer.end();
-		vk::SubmitInfo submitInfo {
-			0u,      // waitSemaphoreCount
-			nullptr, // pWaitSemaphores
-			nullptr, // pWaitDstStageMask
-
-			1u,         // commandBufferCount
-			&cmdBuffer, // pCommandBuffers
-
-			0u,      // signalSemaphoreCount
-			nullptr, // pSignalSemaphores
+		texture->descriptorInfo = {
+			texture->sampler,                        // sampler
+			texture->imageView,                      // imageView
+			vk::ImageLayout::eShaderReadOnlyOptimal, // imageLayout
 		};
-		VKC(createInfo.graphicsQueue.submit(1u, &submitInfo, VK_NULL_HANDLE));
-
-		// Wait for and free cmd buffer
-		createInfo.graphicsQueue.waitIdle();
-		m_LogicalDevice.freeCommandBuffers(createInfo.commandPool, 1u, &cmdBuffer);
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create image views
-	{
-		vk::ImageViewCreateInfo imageViewCreateInfo {
-			{},                        // flags
-			m_Image,                   // image
-			vk::ImageViewType::e2D,    // viewType
-			vk::Format::eR8G8B8A8Srgb, // format
-
-			/* components */
-			vk::ComponentMapping {
-			    // Don't swizzle the colors around...
-			    vk::ComponentSwizzle::eIdentity, // r
-			    vk::ComponentSwizzle::eIdentity, // g
-			    vk::ComponentSwizzle::eIdentity, // b
-			    vk::ComponentSwizzle::eIdentity, // a
-			},
-
-			/* subresourceRange */
-			vk::ImageSubresourceRange {
-			    vk::ImageAspectFlagBits::eColor, // aspectMask
-			    0u,                              // baseMipLevel
-			    m_MipLevels,                     // levelCount
-			    0u,                              // baseArrayLayer
-			    1u,                              // layerCount
-			},
-		};
-
-		m_ImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
-	}
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create image samplers
-	{
-		vk::SamplerCreateInfo samplerCreateInfo {
-			{},
-			vk::Filter::eLinear,              // magFilter
-			vk::Filter::eLinear,              //minFilter
-			vk::SamplerMipmapMode::eLinear,   // mipmapMode
-			vk::SamplerAddressMode::eRepeat,  // addressModeU
-			vk::SamplerAddressMode::eRepeat,  // addressModeV
-			vk::SamplerAddressMode::eRepeat,  // addressModeW
-			0.0f,                             // mipLodBias
-			createInfo.anisotropyEnabled,     // anisotropyEnable
-			createInfo.maxAnisotropy,         // maxAnisotropy
-			VK_FALSE,                         // compareEnable
-			vk::CompareOp::eAlways,           // compareOp
-			0.0f,                             // minLod
-			static_cast<float>(m_MipLevels),  // maxLod
-			vk::BorderColor::eIntOpaqueBlack, // borderColor
-			VK_FALSE,                         // unnormalizedCoordinates
-		};
-
-		m_Sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
-	}
+	return texture;
 }
 
-Texture::~Texture()
+TextureSystem::~TextureSystem()
 {
-	m_LogicalDevice.destroySampler(m_Sampler, nullptr);
-	m_LogicalDevice.destroyImageView(m_ImageView, nullptr);
-	m_Allocator.destroyBuffer(m_StagingBuffer, m_StagingBuffer);
-	m_Allocator.destroyImage(m_Image, m_Image);
+	for (auto& [key, value] : m_Textures)
+	{
+		m_LogicalDevice.destroySampler(value.sampler, nullptr);
+		m_LogicalDevice.destroyImageView(value.imageView, nullptr);
+		m_Allocator.destroyImage(value.image, value.image);
+	}
 }
 
-void Texture::TransitionLayout(vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+void TextureSystem::TransitionLayout(Texture* texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
 {
 	// Memory barrier
 	vk::ImageMemoryBarrier imageMemBarrier {
@@ -296,13 +296,13 @@ void Texture::TransitionLayout(vk::CommandBuffer cmdBuffer, vk::ImageLayout oldL
 		newLayout,               // newLayout
 		VK_QUEUE_FAMILY_IGNORED, // srcQueueFamilyIndex
 		VK_QUEUE_FAMILY_IGNORED, // dstQueueFamilyIndex
-		m_Image,                 // image
+		texture->image,          // image
 
 		/* subresourceRange */
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eColor, // aspectMask
 		    0u,                              // baseMipLevel
-		    m_MipLevels,                     // levelCount
+		    texture->mipLevels,              // levelCount
 		    0u,                              // baseArrayLayer
 		    1u,                              // layerCount
 		},
@@ -340,23 +340,25 @@ void Texture::TransitionLayout(vk::CommandBuffer cmdBuffer, vk::ImageLayout oldL
 	    1, &imageMemBarrier);
 }
 
-void Texture::CopyBufferToImage(vk::CommandBuffer cmdBuffer)
+void TextureSystem::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
 {
-	vk::BufferImageCopy bufferImageCopy {
-		0u, // bufferOffset
-		0u, // bufferRowLength
-		0u, // bufferImageHeight
+	vk::CommandBuffer cmd = m_UploadContext.cmdBuffer;
 
-		/* imageSubresource */
-		vk::ImageSubresourceLayers {
-		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    0u,                              // mipLevel
-		    0u,                              // baseArrayLayer
-		    1u,                              // layerCount
-		},
-		vk::Offset3D { 0, 0, 0 },                                                             // imageOffset
-		vk::Extent3D { static_cast<uint32_t>(m_Width), static_cast<uint32_t>(m_Height), 1u }, // imageExtent
+	vk::CommandBufferBeginInfo beginInfo {
+		vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
 	};
 
-	cmdBuffer.copyBufferToImage(m_StagingBuffer, m_Image, vk::ImageLayout::eTransferDstOptimal, 1u, &bufferImageCopy);
+	cmd.begin(beginInfo);
+
+	function(cmd);
+
+	cmd.end();
+
+	vk::SubmitInfo submitInfo { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
+
+	m_GraphicsQueue.submit(submitInfo, m_UploadContext.fence);
+	VKC(m_LogicalDevice.waitForFences(m_UploadContext.fence, true, UINT_MAX));
+
+	m_LogicalDevice.resetFences(m_UploadContext.fence);
+	m_LogicalDevice.resetCommandPool(m_CommandPool, {});
 }
