@@ -13,3 +13,6 @@
 [submodule "Vendor/spirv-reflect"]
 	path = Vendor/spirv-reflect
 	url = git@github.com:KhronosGroup/SPIRV-Reflect
+[submodule "Vendor/tinygltf"]
+	path = Vendor/tinygltf
+	url = git@github.com:syoyo/tinygltf.git
