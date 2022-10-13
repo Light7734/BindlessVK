@@ -1,3 +1,17 @@
+# Dependencies
+add_subdirectory(./entt)
+add_subdirectory(./glfw)
+add_subdirectory(./glm)
+add_subdirectory(./lz4/build/cmake/)
+add_subdirectory(./nlohmann/)
+add_subdirectory(./spirv-reflect/)
+add_subdirectory(./spdlog)
+add_subdirectory(./tinygltf)
+
+# Configuration files
+configure_file(${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h ${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h)
+
+# Imgui does not provide a CMakeLists.txt so we do it ourselves here
 cmake_minimum_required(VERSION 3.14)
 
 add_library(
@@ -25,9 +39,3 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui
 )
 
-target_link_libraries(
-    imgui
-    PRIVATE volk
-)
-
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/imconfig.h ${CMAKE_SOURCE_DIR}/Vendor/imgui/imconfig.h)
