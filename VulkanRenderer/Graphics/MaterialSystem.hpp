@@ -122,8 +122,6 @@ public:
 	MaterialSystem() = default;
 	~MaterialSystem();
 
-	void Init(const MaterialSystem::CreateInfo& info);
-
 	void DestroyAllMaterials();
 
 	inline Shader* GetShader(const char* name) { return &m_Shaders[HashStr(name)]; }
@@ -141,7 +139,6 @@ public:
 	void CreateMasterMaterial(const MasterMaterial::CreateInfo& info);
 
 	void CreateMaterial(const Material::CreateInfo& info);
-
 
 private:
 	vk::Device m_LogicalDevice          = {};
