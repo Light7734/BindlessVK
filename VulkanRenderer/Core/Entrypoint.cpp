@@ -64,9 +64,9 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass
 	// @TODO: Load from files instead of hard-coding
 	std::vector<vk::VertexInputBindingDescription> inputBindings {
 		vk::VertexInputBindingDescription {
-		    0u,                                    // binding
-		    static_cast<uint32_t>(sizeof(Vertex)), // stride
-		    vk::VertexInputRate::eVertex,          // inputRate
+		    0u,                                           // binding
+		    static_cast<uint32_t>(sizeof(Model::Vertex)), // stride
+		    vk::VertexInputRate::eVertex,                 // inputRate
 		},
 	};
 	std::vector<vk::VertexInputAttributeDescription> inputAttributes {
@@ -85,14 +85,20 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass
 		vk::VertexInputAttributeDescription {
 		    2u,                                    // location
 		    0u,                                    // binding
-		    vk::Format::eR32G32Sfloat,             // format
+		    vk::Format::eR32G32B32Sfloat,          // format
 		    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
 		},
 		vk::VertexInputAttributeDescription {
 		    3u,                                                        // location
 		    0u,                                                        // binding
-		    vk::Format::eR32Uint,                                      // format
-		    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2), // offset
+		    vk::Format::eR32G32Sfloat,                                 // format
+		    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec3), // offset
+		},
+		vk::VertexInputAttributeDescription {
+		    4u,                                                                            // location
+		    0u,                                                                            // binding
+		    vk::Format::eR32G32B32Sfloat,                                                  // format
+		    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(glm::vec3), // offset
 		},
 	};
 
@@ -219,21 +225,19 @@ void LoadMaterials(MaterialSystem& materialSystem)
 	});
 }
 
-void LoadMeshes(MeshSystem& meshSystem)
+void LoadModels(ModelSystem& modelSystem, TextureSystem& textureSystem)
 {
 	// @TODO: Load from files instead of hard-coding
-	Mesh::CreateInfo defaultMeshInfo {
-		"default",
-		"Assets/viking_room.obj",
-		{}
-	};
-	meshSystem.LoadMesh(defaultMeshInfo);
+	modelSystem.LoadModel({
+	    textureSystem,
+	    "default",
+	    "Assets/FlightHelmet/FlightHelmet.gltf",
+	});
 }
 
-void LoadEntities(Scene& scene, MaterialSystem& materialSystem, MeshSystem& meshSystem)
+void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& modelSystem)
 {
 	// @TODO: Load from files instead of hard-coding
-	scene.Reset();
 
 	Entity entity = scene.CreateEntity();
 
@@ -245,7 +249,7 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, MeshSystem& mesh
 
 	scene.AddComponent<StaticMeshRendererComponent>(entity,
 	                                                materialSystem.GetMaterial("default"), // Material
-	                                                meshSystem.GetMesh("default")          // Mesh
+	                                                modelSystem.GetModel("default")        // Mesh
 	);
 }
 
@@ -255,7 +259,10 @@ int main()
 
 	int exitCode = 0;
 	try
-	{ ///////////////////////////////////////////////////////////////////////////////// Initialize application Window
+	{
+		/////////////////////////////////////////////////////////////////////////////////
+		/// Initialize application
+		// Window
 		Window window({
 		    .specs = {
 		        .title  = "BindlessVk",
@@ -294,17 +301,20 @@ int main()
 		    device.GetContext().logicalDevice,
 		});
 
-
-		// MeshSystem
-		MeshSystem meshSystem({
+		// modelSystem
+		ModelSystem modelSystem({
 		    device.GetContext(),
 		    renderer.GetCommandPool(),
 		    renderer.GetQueueInfo().graphicsQueue,
 		});
 
+		// textureSystem
+		TextureSystem textureSystem({
+		    .deviceContext = device.GetContext(),
+		});
+
 		// Scene
 		Scene scene;
-
 		Camera camera({
 		    .position  = { 2.0f, 2.0f, 0.5f },
 		    .speed     = 1.0f,
@@ -323,10 +333,9 @@ int main()
 		LoadMasterMaterials(materialSystem);
 		LoadMaterials(materialSystem);
 
-		LoadMeshes(meshSystem);
+		LoadModels(modelSystem, textureSystem);
 
-
-		LoadEntities(scene, materialSystem, meshSystem);
+		LoadEntities(scene, materialSystem, modelSystem);
 
 		/////////////////////////////////////////////////////////////////////////////////
 		/// Main application loop

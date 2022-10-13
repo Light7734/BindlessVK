@@ -40,17 +40,8 @@ private:
 class StagingBuffer
 {
 public:
-	StagingBuffer(BufferCreateInfo& createInfo);
-	StagingBuffer()                          = default;
-	StagingBuffer(StagingBuffer&& buffer)
-	    : m_Buffer(buffer.m_Buffer)
-	    , m_StagingBuffer(buffer.m_StagingBuffer)
-	    , m_Allocator(buffer.m_Allocator)
-	    , m_LogicalDevice(buffer.m_LogicalDevice)
-	{
-		buffer.m_Buffer        = {};
-		buffer.m_StagingBuffer = {};
-	}
+	StagingBuffer() = default;
+	StagingBuffer(const BufferCreateInfo& createInfo);
 	~StagingBuffer();
 
 	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }

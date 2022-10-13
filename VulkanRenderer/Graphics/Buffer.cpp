@@ -40,7 +40,7 @@ void Buffer::Unmap()
 	m_Allocator.unmapMemory(m_Buffer);
 }
 
-StagingBuffer::StagingBuffer(BufferCreateInfo& createInfo)
+StagingBuffer::StagingBuffer(const BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
     , m_Allocator(createInfo.allocator)
 {
