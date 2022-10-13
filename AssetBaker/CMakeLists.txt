@@ -11,7 +11,8 @@ set_target_properties(
 
 target_include_directories(
     AssetBaker
-    PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser
+    PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/stb/
 )
 
 target_link_libraries(
