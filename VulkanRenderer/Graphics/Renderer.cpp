@@ -427,8 +427,7 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 			vk::CommandBufferLevel::ePrimary,
 			1u,
 		};
-		m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(
-		    uploadContextCmdBufferAllocInfo)[0];
+		m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
 
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
@@ -450,38 +449,20 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Create texture - @todo wtf is this doing here?
-	{
-		TextureCreateInfo textureCreateInfo {
-			m_LogicalDevice,                    // logicalDevice
-			deviceContext.physicalDevice,       // physicalDevice
-			m_QueueInfo.graphicsQueue,          // graphicsQueue
-			m_Allocator,                        // allocator
-			m_CommandPool,                      // commandPool
-			"Assets/viking_room.asset_texture", // imagePath
-			VK_TRUE,                            // anisotropyEnabled
-			deviceContext.physicalDeviceProperties.limits
-			    .maxSamplerAnisotropy, // maxAnisotropy
-		};
-
-		m_TempTexture = std::make_shared<Texture>(textureCreateInfo);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
 	/// Create camera data buffer
 	{
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			BufferCreateInfo createInfo {
 
-				m_LogicalDevice,                         // logicalDevice
-				deviceContext.physicalDevice,            // physicalDevice
-				m_Allocator,                             // vmaallocator
-				m_CommandPool,                           // commandPool
-				m_QueueInfo.graphicsQueue,               // graphicsQueue
-				vk::BufferUsageFlagBits::eUniformBuffer, // usage
-				sizeof(glm::mat4) * 2ul,                 // size
-				{}                                       // inital data
+				m_LogicalDevice,                                       // logicalDevice
+				deviceContext.physicalDevice,                          // physicalDevice
+				m_Allocator,                                           // vmaallocator
+				m_CommandPool,                                         // commandPool
+				m_QueueInfo.graphicsQueue,                             // graphicsQueue
+				vk::BufferUsageFlagBits::eUniformBuffer,               // usage
+				(sizeof(glm::mat4) * 2ul) + (sizeof(glm::vec4) * 2ul), // size
+				{}                                                     // inital data
 			};
 
 			m_Frames[i].cameraData.buffer = std::make_unique<Buffer>(createInfo);
@@ -545,20 +526,11 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 	/// Create forward pass descriptor sets
 	{
 		std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-			// [0] StorageBuffer - Object Data
-			vk::DescriptorSetLayoutBinding {
-			    0ul,                                // binding
-			    vk::DescriptorType::eStorageBuffer, // descriptorType
-			    1ul,                                // descriptorCount
-			    vk::ShaderStageFlagBits::eVertex,   // stageFlags
-			    nullptr,                            // pImmutableSamplers
-			},
-
 			// [1] Sampler - Texture
 			vk::DescriptorSetLayoutBinding {
-			    1u,                                        // binding
+			    0u,                                        // binding
 			    vk::DescriptorType::eCombinedImageSampler, // descriptorType
-			    1u,                                        // descriptorCount
+			    32u,                                       // descriptorCount
 			    vk::ShaderStageFlagBits::eFragment,        // stageFlags
 			    nullptr,                                   // pImmutableSamplers
 			},
@@ -756,6 +728,7 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 	if (m_SwapchainInvalidated)
 		return;
 
+
 	ImGui::Render();
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -779,12 +752,108 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		ASSERT(result == vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
+	scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+		for (const auto* node : renderComp.model->nodes)
+		{
+			for (const auto& primitive : node->mesh)
+			{
+				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].baseColorTextureIndex;
+				uint32_t imageIndex   = renderComp.model->textures[textureIndex].imageIndex;
+
+				Texture* texture = renderComp.model->images[imageIndex].texture;
+
+				std::vector<vk::WriteDescriptorSet> descriptorWrites;
+				for (uint32_t i = 0; i < 32; i++)
+				{
+					descriptorWrites.push_back(vk::WriteDescriptorSet {
+					    m_ForwardPass.descriptorSets[m_CurrentFrame],
+					    0ul,
+					    i,
+					    1ul,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    &texture->descriptorInfo,
+					    nullptr,
+					    nullptr,
+					});
+				}
+
+
+				m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
+				m_LogicalDevice.waitIdle();
+				break;
+			}
+		}
+	});
+
+	scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+		for (const auto* node : renderComp.model->nodes)
+		{
+			for (const auto& primitive : node->mesh)
+			{
+				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].baseColorTextureIndex;
+				uint32_t imageIndex   = renderComp.model->textures[textureIndex].imageIndex;
+
+				Texture* texture  = renderComp.model->images[imageIndex].texture;
+				Texture* texture2 = renderComp.model->images[imageIndex - 1].texture;
+				Texture* texture3 = renderComp.model->images[imageIndex - 2].texture;
+
+				std::vector<vk::WriteDescriptorSet> descriptorWrites = {
+					vk::WriteDescriptorSet {
+					    m_ForwardPass.descriptorSets[m_CurrentFrame],
+					    0ul,
+					    imageIndex,
+					    1ul,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    &texture->descriptorInfo,
+					    nullptr,
+					    nullptr,
+					},
+					vk::WriteDescriptorSet {
+					    m_ForwardPass.descriptorSets[m_CurrentFrame],
+					    0ul,
+					    imageIndex - 1,
+					    1ul,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    &texture2->descriptorInfo,
+					    nullptr,
+					    nullptr,
+					},
+					vk::WriteDescriptorSet {
+					    m_ForwardPass.descriptorSets[m_CurrentFrame],
+					    0ul,
+					    imageIndex - 2,
+					    1ul,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    &texture3->descriptorInfo,
+					    nullptr,
+					    nullptr,
+					}
+				};
+
+				m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
+				m_LogicalDevice.waitIdle();
+			}
+		}
+	});
+
 	////////////////////////////////////////////////////////////////
 	/// Update frame descriptor set
 	{
-		glm::mat4* map = (glm::mat4*)frame.cameraData.buffer->Map();
-		map[0]         = camera.GetProjection();
-		map[1]         = camera.GetView();
+		struct PerFrameData
+		{
+			glm::mat4 projection;
+			glm::mat4 view;
+			glm::vec4 lightPos;
+			glm::vec4 viewPos;
+		};
+
+		PerFrameData* map = (PerFrameData*)frame.cameraData.buffer->Map();
+		// map[0]         = glm::perspective(45.0f, m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
+		// map[1]         = glm::lookAt({ 0.5f, 0.5f, 0.5f }, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+		map->projection = camera.GetProjection();
+		map->view       = camera.GetView();
+		map->lightPos   = glm::vec4(2.0f, 2.0f, 1.0f, 1.0f);
+		map->viewPos    = camera.GetPosition();
 		frame.cameraData.buffer->Unmap();
 	}
 
@@ -838,46 +907,42 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		// Update descriptor sets
 		const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
 
-		vk::DescriptorImageInfo descriptorImageInfo {
-			m_TempTexture->GetSampler(),             // sampler
-			m_TempTexture->GetImageView(),           // imageView
-			vk::ImageLayout::eShaderReadOnlyOptimal, // imageLayout
-		};
 
-		std::vector<vk::WriteDescriptorSet> writeDescriptorSets {
-			vk::WriteDescriptorSet {
-			    descriptorSet,
-			    1u,
-			    0u,
-			    1u,
-			    vk::DescriptorType::eCombinedImageSampler,
-			    &descriptorImageInfo,
-			    nullptr,
-			    nullptr,
-			},
-		};
 		secondaryCmds.reset();
 
 		// #TODO WTF??
 		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
-		m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0u, nullptr);
 
 		VkDeviceSize offset { 0 };
 
 		vk::Pipeline currentPipeline = VK_NULL_HANDLE;
+		uint32_t primitives          = 0;
 		scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
 			vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
+			// bind pipeline
 			if (currentPipeline != newPipeline)
 			{
 				secondaryCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
 				currentPipeline = newPipeline;
 			}
 
-			secondaryCmds.bindVertexBuffers(0, 1, renderComp.mesh->vertexBuffer.GetBuffer(), &offset);
-			secondaryCmds.bindIndexBuffer(*(renderComp.mesh->indexBufer.GetBuffer()), 0u, vk::IndexType::eUint32);
-			secondaryCmds.drawIndexed(renderComp.mesh->indices.size(), 1u, 0u, 0u, 0u);
+			secondaryCmds.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
+			secondaryCmds.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
+
+
+			for (const auto* node : renderComp.model->nodes)
+			{
+				for (const auto& primitive : node->mesh)
+				{
+					primitives++;
+
+					uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].baseColorTextureIndex;
+					uint32_t imageIndex   = renderComp.model->textures[textureIndex].imageIndex;
+					secondaryCmds.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, imageIndex);
+				}
+			}
 		});
 
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), secondaryCmds);

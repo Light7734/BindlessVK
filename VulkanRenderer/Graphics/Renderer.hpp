@@ -5,7 +5,7 @@
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
-#include "Graphics/Mesh.hpp"
+#include "Graphics/Model.hpp"
 #include "Scene/Camera.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Texture.hpp"
@@ -45,14 +45,10 @@ struct CameraData
 	std::unique_ptr<Buffer> buffer;
 	glm::mat4 projection;
 	glm::mat4 view;
+	glm::vec4 lightPos;
+	glm::vec4 viewPos;
 };
 
-struct UploadContext
-{
-	vk::CommandBuffer cmdBuffer;
-	vk::CommandPool cmdPool;
-	vk::Fence fence;
-};
 
 struct FrameData
 {
@@ -112,6 +108,14 @@ public:
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
 
 private:
+	struct UploadContext
+	{
+		vk::CommandBuffer cmdBuffer;
+		vk::CommandPool cmdPool;
+		vk::Fence fence;
+	} m_UploadContext = {};
+
+private:
 	vk::Device m_LogicalDevice = {};
 	QueueInfo m_QueueInfo      = {};
 	SurfaceInfo m_SurfaceInfo  = {};
@@ -153,8 +157,6 @@ private:
 	AllocatedImage m_DepthImage = {};
 
 	vk::ImageView m_DepthImageView = {};
-
-	UploadContext m_UploadContext = {};
 
 	// Pipelines
 	vk::PipelineLayout m_FramePipelineLayout = {};
