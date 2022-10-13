@@ -259,8 +259,8 @@ int main()
 		Window window({
 		    .specs = {
 		        .title  = "BindlessVk",
-		        .width  = 800u,
-		        .height = 600u,
+		        .width  = 1920u,
+		        .height = 1080u,
 		    },
 		    .hints = {
 		        { GLFW_CLIENT_API, GLFW_NO_API },
@@ -312,6 +312,7 @@ int main()
 		    .farPlane  = 100.0f,
 		    .width     = 5.0f,
 		    .height    = 5.0f,
+		    .window    = &window,
 		});
 
 		/////////////////////////////////////////////////////////////////////////////////
@@ -331,35 +332,12 @@ int main()
 		/// Main application loop
 		uint32_t frames = 0u;
 		Timer fpsTimer;
-		Timer deltaTimer;
-		double lastXPos, lastYPos;
-		glfwGetCursorPos(window.GetGlfwHandle(), &lastXPos, &lastYPos);
 
 		while (!window.ShouldClose())
 		{
 			window.PollEvents();
 
-			float yDelta = glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_W) ? +1 :
-			               glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_S) ? -1 :
-			                                                                0;
-
-			float xDelta = glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_D) ? +1 :
-			               glfwGetKey(window.GetGlfwHandle(), GLFW_KEY_A) ? -1 :
-			                                                                0;
-
-			double xpos, ypos;
-			glfwGetCursorPos(window.GetGlfwHandle(), &xpos, &ypos);
-			double cursorDeltaX = xpos - lastXPos;
-			double cursorDeltaY = ypos - lastYPos;
-			lastXPos            = xpos;
-			lastYPos            = ypos;
-
-			float timeDelta = deltaTimer.ElapsedTime();
-			deltaTimer.Reset();
-
-			camera.Move(timeDelta, xDelta, yDelta);
-			camera.Look(cursorDeltaX, cursorDeltaY);
-
+			camera.Update();
 
 			renderer.BeginFrame();
 			renderer.DrawScene(&scene, camera);
@@ -367,12 +345,14 @@ int main()
 			if (renderer.IsSwapchainInvalidated())
 			{
 				renderer.RecreateSwapchain(&window, device.GetContext());
+
 				materialSystem.DestroyAllMaterials();
 				LoadShaderPasses(materialSystem, renderer.GetForwardPass(), device.GetContext().surfaceInfo.capabilities.currentExtent, device.GetContext().maxSupportedSampleCount);
 				LoadMasterMaterials(materialSystem);
 				LoadMaterials(materialSystem);
-				LoadEntities(scene, materialSystem, meshSystem);
-				continue;
+
+				scene.Reset();
+				LoadEntities(scene, materialSystem, modelSystem);
 			}
 
 			// FPS Counter
