@@ -55,8 +55,8 @@ public:
 
 private:
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
-	void TransitionLayout(Texture* texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
-	void CopyBufferToImage(Texture* texture, vk::CommandBuffer cmdBuffer);
+	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
+	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
 	struct UploadContext

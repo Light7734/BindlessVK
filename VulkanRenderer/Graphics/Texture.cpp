@@ -8,6 +8,8 @@ TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
     , m_PhysicalDevice(info.deviceContext.physicalDevice)
     , m_Allocator(info.deviceContext.allocator)
     , m_PhysicalDeviceProps(info.deviceContext.physicalDeviceProperties)
+    , m_GraphicsQueue(info.deviceContext.queueInfo.graphicsQueue)
+
 {
 	vk::CommandPoolCreateInfo commandPoolCreateInfo {
 		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
@@ -21,13 +23,26 @@ TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
 		1u,
 	};
 	m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
+
+	m_UploadContext.fence = m_LogicalDevice.createFence({});
 }
 
-void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
+Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 {
-	Texture* texture = &m_Textures[HashStr(info.name.c_str())];
+	m_Textures[HashStr(info.name.c_str())] = {
+		.descriptorInfo = {},
+		.width          = static_cast<uint32_t>(info.width),
+		.height         = static_cast<uint32_t>(info.height),
+		.channels       = 4ul,
+		.mipLevels      = static_cast<uint32_t>(std::floor(std::log2(std::max(info.width, info.height))) + 1),
+		.size           = info.size,
+		.image          = {},
+		.imageView      = {},
+		.sampler        = {},
+		.buffer         = {},
+	};
 
-	const uint32_t mipLevels = std::floor(std::log2(std::max(info.width, info.height))) + 1;
+	Texture& texture = m_Textures[HashStr(info.name.c_str())];
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the image and staging buffer
@@ -40,11 +55,11 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 
 			/* extent */
 			vk::Extent3D {
-			    info.width,  // width
-			    info.height, // height
-			    1u,          // depth
+			    texture.width,  // width
+			    texture.height, // height
+			    1u,             // depth
 			},
-			info.width,                                                                                                     // mipLevels
+			texture.mipLevels,                                                                                              // mipLevels
 			1u,                                                                                                             // arrayLayers
 			vk::SampleCountFlagBits::e1,                                                                                    // samples
 			vk::ImageTiling::eOptimal,                                                                                      // tiling
@@ -58,7 +73,7 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 		vma::AllocationCreateInfo imageAllocInfo({},
 		                                         vma::MemoryUsage::eGpuOnly,
 		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
-		texture->image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+		texture.image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		// Staging buffer
 		vk::BufferCreateInfo stagingBufferCrateInfo {
@@ -92,11 +107,11 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 				    0u,                              // baseArrayLayer
 				    1u,                              // layerCount
 				},
-				vk::Offset3D { 0, 0, 0 },                     // imageOffset
-				vk::Extent3D { info.width, info.height, 1u }, // imageExtent
+				vk::Offset3D { 0, 0, 0 },                           // imageOffset
+				vk::Extent3D { texture.width, texture.height, 1u }, // imageExtent
 			};
 
-			cmd.copyBufferToImage(stagingBuffer, texture->image, vk::ImageLayout::eTransferDstOptimal, 1u, &bufferImageCopy);
+			cmd.copyBufferToImage(stagingBuffer, texture.image, vk::ImageLayout::eTransferDstOptimal, 1u, &bufferImageCopy);
 
 			// Check if image format supports linear blitting
 			vk::FormatProperties formatProperties = m_PhysicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Srgb);
@@ -113,7 +128,7 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 				vk::ImageLayout::eUndefined, // newLayout
 				VK_QUEUE_FAMILY_IGNORED,     // srcQueueFamilyIndex
 				VK_QUEUE_FAMILY_IGNORED,     // dstQueueFamilyIndex
-				texture->image,              // image
+				texture.image,               // image
 
 				vk::ImageSubresourceRange {
 				    vk::ImageAspectFlagBits::eColor, // aspectMask
@@ -127,7 +142,7 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 			int32_t mipWidth  = info.width;
 			int32_t mipHeight = info.height;
 
-			for (uint32_t i = 1; i < texture->mipLevels; i++)
+			for (uint32_t i = 1; i < texture.mipLevels; i++)
 			{
 				barrier.subresourceRange.baseMipLevel = i - 1;
 				barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
@@ -173,8 +188,8 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 					},
 				};
 
-				cmd.blitImage(texture->image, vk::ImageLayout::eTransferSrcOptimal,
-				              texture->image, vk::ImageLayout::eTransferDstOptimal,
+				cmd.blitImage(texture.image, vk::ImageLayout::eTransferSrcOptimal,
+				              texture.image, vk::ImageLayout::eTransferDstOptimal,
 				              1u, &blit, vk::Filter::eLinear);
 
 				barrier.oldLayout     = vk::ImageLayout::eTransferSrcOptimal;
@@ -195,7 +210,7 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 					mipHeight /= 2;
 			}
 
-			barrier.subresourceRange.baseMipLevel = texture->mipLevels - 1;
+			barrier.subresourceRange.baseMipLevel = texture.mipLevels - 1;
 			barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
 			barrier.newLayout                     = vk::ImageLayout::eShaderReadOnlyOptimal;
 			barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferRead;
@@ -213,7 +228,7 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 		{
 			vk::ImageViewCreateInfo imageViewCreateInfo {
 				{},                        // flags
-				texture->image,            // image
+				texture.image,             // image
 				vk::ImageViewType::e2D,    // viewType
 				vk::Format::eR8G8B8A8Srgb, // format
 
@@ -230,13 +245,13 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 				vk::ImageSubresourceRange {
 				    vk::ImageAspectFlagBits::eColor, // aspectMask
 				    0u,                              // baseMipLevel
-				    texture->mipLevels,              // levelCount
+				    texture.mipLevels,               // levelCount
 				    0u,                              // baseArrayLayer
 				    1u,                              // layerCount
 				},
 			};
 
-			texture->imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+			texture.imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 		}
 		/////////////////////////////////////////////////////////////////////////////////
 		// Create image samplers
@@ -255,25 +270,25 @@ void TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 				false, // anisotropyEnable
 				{},    // maxAnisotropy
 
-				VK_FALSE,                               // compareEnable
-				vk::CompareOp::eAlways,                 // compareOp
-				0.0f,                                   // minLod
-				static_cast<float>(texture->mipLevels), // maxLod
-				vk::BorderColor::eIntOpaqueBlack,       // borderColor
-				VK_FALSE,                               // unnormalizedCoordinates
+				VK_FALSE,                              // compareEnable
+				vk::CompareOp::eAlways,                // compareOp
+				0.0f,                                  // minLod
+				static_cast<float>(texture.mipLevels), // maxLod
+				vk::BorderColor::eIntOpaqueBlack,      // borderColor
+				VK_FALSE,                              // unnormalizedCoordinates
 			};
 
-			texture->sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
+			texture.sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
 		}
 
-		texture->descriptorInfo = {
-			texture->sampler,                        // sampler
-			texture->imageView,                      // imageView
+		texture.descriptorInfo = {
+			texture.sampler,                         // sampler
+			texture.imageView,                       // imageView
 			vk::ImageLayout::eShaderReadOnlyOptimal, // imageLayout
 		};
 	}
 
-	return texture;
+	return &m_Textures[HashStr(info.name.c_str())];
 }
 
 TextureSystem::~TextureSystem()
@@ -286,7 +301,7 @@ TextureSystem::~TextureSystem()
 	}
 }
 
-void TextureSystem::TransitionLayout(Texture* texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
 {
 	// Memory barrier
 	vk::ImageMemoryBarrier imageMemBarrier {
@@ -296,13 +311,13 @@ void TextureSystem::TransitionLayout(Texture* texture, vk::CommandBuffer cmdBuff
 		newLayout,               // newLayout
 		VK_QUEUE_FAMILY_IGNORED, // srcQueueFamilyIndex
 		VK_QUEUE_FAMILY_IGNORED, // dstQueueFamilyIndex
-		texture->image,          // image
+		texture.image,           // image
 
 		/* subresourceRange */
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eColor, // aspectMask
 		    0u,                              // baseMipLevel
-		    texture->mipLevels,              // levelCount
+		    texture.mipLevels,               // levelCount
 		    0u,                              // baseArrayLayer
 		    1u,                              // layerCount
 		},
@@ -360,5 +375,5 @@ void TextureSystem::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& fun
 	VKC(m_LogicalDevice.waitForFences(m_UploadContext.fence, true, UINT_MAX));
 
 	m_LogicalDevice.resetFences(m_UploadContext.fence);
-	m_LogicalDevice.resetCommandPool(m_CommandPool, {});
+	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool, {});
 }
