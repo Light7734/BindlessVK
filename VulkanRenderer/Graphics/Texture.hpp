@@ -48,9 +48,10 @@ public:
 	TextureSystem() = default;
 	~TextureSystem();
 
-	void Init();
+	void SetDefaultTexture(const Texture* texture);
 
 	Texture* CreateTexture(const Texture::CreateInfo& info);
+
 	inline Texture* GetTexture(const char* name) { return &m_Textures[HashStr(name)]; }
 
 private:

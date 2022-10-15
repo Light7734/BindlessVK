@@ -38,6 +38,7 @@ struct RendererCreateInfo
 {
 	Window* window;
 	DeviceContext deviceContext;
+	Texture* defaultTexture;
 };
 
 struct CameraData
@@ -148,6 +149,8 @@ private:
 	std::vector<vk::CommandBuffer> m_CommandBuffers = {};
 
 	uint32_t m_CurrentFrame = 0ul;
+
+    Texture* m_DefaultTexture = {};
 
 	// Descriptor sets
 	vk::DescriptorPool m_DescriptorPool = {};

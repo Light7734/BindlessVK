@@ -290,10 +290,26 @@ int main()
 		    .debugMessageTypes    = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
 		});
 
+		// textureSystem
+		TextureSystem textureSystem({
+		    .deviceContext = device.GetContext(),
+		});
+
+		uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
+		textureSystem.CreateTexture({
+		    "default",
+		    "none",
+		    defaultTexturePixelData,
+		    1,
+		    1,
+		    sizeof(defaultTexturePixelData),
+		});
+
 		// Renderer
 		Renderer renderer = Renderer({
-		    .window        = &window,
-		    .deviceContext = device.GetContext(),
+		    .window         = &window,
+		    .deviceContext  = device.GetContext(),
+		    .defaultTexture = textureSystem.GetTexture("default"),
 		});
 
 		// MaterialSystem
@@ -308,10 +324,6 @@ int main()
 		    renderer.GetQueueInfo().graphicsQueue,
 		});
 
-		// textureSystem
-		TextureSystem textureSystem({
-		    .deviceContext = device.GetContext(),
-		});
 
 		// Scene
 		Scene scene;

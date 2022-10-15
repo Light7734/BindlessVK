@@ -13,6 +13,7 @@
 Renderer::Renderer(const RendererCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.deviceContext.logicalDevice)
     , m_Allocator(createInfo.deviceContext.allocator)
+    , m_DefaultTexture(createInfo.defaultTexture)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Create sync objects
@@ -645,9 +646,29 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		ImGui_ImplVulkan_DestroyFontUploadObjects();
 	}
 
+	ASSERT(m_DefaultTexture, "Renderer's default texture is not set");
+	std::vector<vk::WriteDescriptorSet> descriptorWrites;
+	for (uint32_t i = 0; i < 32; i++)
+	{
+		for (uint32_t j = 0; j < MAX_FRAMES_IN_FLIGHT; j++)
+		{
+			descriptorWrites.push_back(vk::WriteDescriptorSet {
+			    m_ForwardPass.descriptorSets[j],
+			    0ul,
+			    i,
+			    1ul,
+			    vk::DescriptorType::eCombinedImageSampler,
+			    &m_DefaultTexture->descriptorInfo,
+			    nullptr,
+			    nullptr,
+			});
+		}
+	}
+
+
+	m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
 
 	m_SwapchainInvalidated = false;
-
 	m_LogicalDevice.waitIdle();
 }
 
@@ -752,38 +773,6 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		ASSERT(result == vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
-	scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		for (const auto* node : renderComp.model->nodes)
-		{
-			for (const auto& primitive : node->mesh)
-			{
-				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].baseColorTextureIndex;
-				uint32_t imageIndex   = renderComp.model->textures[textureIndex].imageIndex;
-
-				Texture* texture = renderComp.model->images[imageIndex].texture;
-
-				std::vector<vk::WriteDescriptorSet> descriptorWrites;
-				for (uint32_t i = 0; i < 32; i++)
-				{
-					descriptorWrites.push_back(vk::WriteDescriptorSet {
-					    m_ForwardPass.descriptorSets[m_CurrentFrame],
-					    0ul,
-					    i,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &texture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					});
-				}
-
-
-				m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
-				m_LogicalDevice.waitIdle();
-				break;
-			}
-		}
-	});
 
 	scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
 		for (const auto* node : renderComp.model->nodes)
@@ -831,7 +820,6 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 				};
 
 				m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
-				m_LogicalDevice.waitIdle();
 			}
 		}
 	});
@@ -848,12 +836,10 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		};
 
 		PerFrameData* map = (PerFrameData*)frame.cameraData.buffer->Map();
-		// map[0]         = glm::perspective(45.0f, m_SurfaceInfo.capabilities.currentExtent.width / (float)m_SurfaceInfo.capabilities.currentExtent.height, 0.1f, 10.0f);
-		// map[1]         = glm::lookAt({ 0.5f, 0.5f, 0.5f }, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
-		map->projection = camera.GetProjection();
-		map->view       = camera.GetView();
-		map->lightPos   = glm::vec4(2.0f, 2.0f, 1.0f, 1.0f);
-		map->viewPos    = camera.GetPosition();
+		map->projection   = camera.GetProjection();
+		map->view         = camera.GetView();
+		map->lightPos     = glm::vec4(2.0f, 2.0f, 1.0f, 1.0f);
+		map->viewPos      = camera.GetPosition();
 		frame.cameraData.buffer->Unmap();
 	}
 
@@ -907,10 +893,8 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		// Update descriptor sets
 		const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
 
-
 		secondaryCmds.reset();
 
-		// #TODO WTF??
 		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
