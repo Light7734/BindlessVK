@@ -7,12 +7,30 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
+namespace tinygltf {
+struct Image;
+}
+
 struct Texture
 {
-	struct CreateInfo
+	struct CreateInfoGLTF
+	{
+		struct tinygltf::Image* image;
+	};
+
+	/// @todo: Implement loading textures from glb files
+	struct CreateInfoGLB
+	{
+	};
+
+	/// @todo: Implement loading textures from ktx files
+	struct CreateInfoKTX
+	{
+	};
+
+	struct CreateInfoData
 	{
 		const std::string& name;
-		const std::string& uri;
 		uint8_t* pixels;
 		int width;
 		int height;
@@ -30,8 +48,6 @@ struct Texture
 	AllocatedImage image;
 	vk::ImageView imageView;
 	vk::Sampler sampler;
-
-	AllocatedBuffer buffer;
 };
 
 
@@ -48,15 +64,33 @@ public:
 	TextureSystem() = default;
 	~TextureSystem();
 
-	void SetDefaultTexture(const Texture* texture);
+	Texture* CreateFromGLTF(const Texture::CreateInfoGLTF& info);
 
-	Texture* CreateTexture(const Texture::CreateInfo& info);
+	Texture* CreateFromKTX(const Texture::CreateInfoKTX& info)
+	{
+		LOG(err, "NO IMPLEMENT!");
+		return {};
+	}
 
-	inline Texture* GetTexture(const char* name) { return &m_Textures[HashStr(name)]; }
+	Texture* CreateFromGLB(const Texture::CreateInfoGLB& info)
+	{
+		LOG(err, "NO IMPLEMENT!");
+		return {};
+	}
+
+	Texture* CreateFromData(const Texture::CreateInfoData& info);
+
+	inline Texture* GetTexture(const char* name)
+	{
+		return &m_Textures[HashStr(name)];
+	}
+
+private:
+	void BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight);
 
 private:
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
-	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
+	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
 	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:

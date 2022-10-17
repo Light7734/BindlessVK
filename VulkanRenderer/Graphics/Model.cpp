@@ -33,39 +33,22 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Load Images
+	/// Load textures
 	{
 		for (tinygltf::Image& image : input.images)
 		{
 			// @TODO: Convert 3 component images to 4 components
 			LOG(warn, "Detected image {}", image.uri);
 
-			model.images.push_back({
-			    .texture = info.textureSystem.CreateTexture({
-			        .name   = image.uri,
-			        .uri    = image.uri,
-			        .pixels = &image.image[0],
-			        .width  = image.width,
-			        .height = image.height,
-			        .size   = image.image.size(),
-			    }),
-			});
+			model.textures.push_back(
+			    info.textureSystem.CreateFromGLTF({
+			        .image = &image,
+			    }));
 		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Load Textures
-	{
-		for (tinygltf::Texture& texture : input.textures)
-		{
-			model.textures.push_back({
-			    .imageIndex = texture.source,
-			});
-		}
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	/// Load Material Parameters
+	/// Load material parameters
 	{
 		for (tinygltf::Material& material : input.materials)
 		{
@@ -73,15 +56,14 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 			       "Material doesn't have required values");
 
 			model.materialParameters.push_back({
-			    .baseColor             = glm::vec4(1.0),
-			    .baseColorTextureIndex = material.values["baseColorTexture"].TextureIndex(),
+			    .albedoFactor = glm::vec4(1.0),
+			    .albedoTextureIndex = material.values["baseColorTexture"].TextureIndex(),
 			});
 		}
 	}
 
-
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Load Nodes
+	/// Load nodes
 	{
 		std::function<void(const tinygltf::Node&, Model::Node*)> loadNode =
 		    [&](const tinygltf::Node& inputNode, Model::Node* parent) {
@@ -177,7 +159,7 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 							    vertices.push_back({
 							        .position = glm::vec4(glm::make_vec3(&positionBuffer[v * 3]), 1.0f),
 							        .normal   = glm::normalize(glm::vec3(normalBuffer ? glm::make_vec3(&normalBuffer[v * 3]) : glm::vec3(0.0f))),
-                                    .tangent = glm::normalize(glm::vec3(tangentBuffer ? glm::make_vec3(&tangentBuffer[v * 3]) : glm::vec3(0.0f))),
+							        .tangent  = glm::normalize(glm::vec3(tangentBuffer ? glm::make_vec3(&tangentBuffer[v * 3]) : glm::vec3(0.0f))),
 							        .uv       = texCoordBuffer ? glm::make_vec2(&texCoordBuffer[v * 2]) : glm::vec3(0.0f),
 							        .color    = glm::vec3(1.0),
 							    });

@@ -2,6 +2,7 @@
 
 #include <AssetParser.hpp>
 #include <TextureAsset.hpp>
+#include <tiny_gltf.h>
 
 TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
     : m_LogicalDevice(info.deviceContext.logicalDevice)
@@ -11,6 +12,10 @@ TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
     , m_GraphicsQueue(info.deviceContext.queueInfo.graphicsQueue)
 
 {
+	ASSERT(m_PhysicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
+	           vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
+	       "Texture image format(eR8G8B8A8Srgb) does not support linear blitting");
+
 	vk::CommandPoolCreateInfo commandPoolCreateInfo {
 		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
 		info.deviceContext.queueInfo.graphicsQueueIndex,    // queueFamilyIndex
@@ -27,7 +32,7 @@ TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
 	m_UploadContext.fence = m_LogicalDevice.createFence({});
 }
 
-Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
+Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
 {
 	m_Textures[HashStr(info.name.c_str())] = {
 		.descriptorInfo = {},
@@ -39,7 +44,6 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 		.image          = {},
 		.imageView      = {},
 		.sampler        = {},
-		.buffer         = {},
 	};
 
 	Texture& texture = m_Textures[HashStr(info.name.c_str())];
@@ -47,7 +51,7 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the image and staging buffer
 	{
-		// Image
+		// Create vulkan image
 		vk::ImageCreateInfo imageCreateInfo {
 			{},                        // flags
 			vk::ImageType::e2D,        // imageType
@@ -75,7 +79,7 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
 		texture.image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
-		// Staging buffer
+		// Create staging buffer
 		vk::BufferCreateInfo stagingBufferCrateInfo {
 			{},                                    // flags
 			info.size,                             // size
@@ -88,12 +92,11 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 		stagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 
 		// Copy data to staging buffer
-		// Assets::UnpackTexture(&textureInfo, file.blob.data(), file.blob.size(), stagingMap);
 		memcpy(m_Allocator.mapMemory(stagingBuffer), info.pixels, info.size);
 		m_Allocator.unmapMemory(stagingBuffer);
 
 		ImmediateSubmit([&](vk::CommandBuffer cmd) {
-			TransitionLayout(texture, cmd, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+			TransitionLayout(texture, cmd, 0u, texture.mipLevels, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
 			vk::BufferImageCopy bufferImageCopy {
 				0u, // bufferOffset
@@ -113,14 +116,8 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 
 			cmd.copyBufferToImage(stagingBuffer, texture.image, vk::ImageLayout::eTransferDstOptimal, 1u, &bufferImageCopy);
 
-			// Check if image format supports linear blitting
-			vk::FormatProperties formatProperties = m_PhysicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Srgb);
-
-			if (!(formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eSampledImageFilterLinear))
-			{
-				throw std::runtime_error("Texture image format does not support linear blitting");
-			}
-
+			/////////////////////////////////////////////////////////////////////////////////
+			/// Create texture mipmaps
 			vk::ImageMemoryBarrier barrier {
 				{},                          // srcAccessmask
 				{},                          // dstAccessMask
@@ -144,83 +141,15 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 
 			for (uint32_t i = 1; i < texture.mipLevels; i++)
 			{
-				barrier.subresourceRange.baseMipLevel = i - 1;
-				barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
-				barrier.newLayout                     = vk::ImageLayout::eTransferSrcOptimal;
-				barrier.dstAccessMask                 = vk::AccessFlagBits::eTransferRead;
-				barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferWrite;
-
-				cmd.pipelineBarrier(
-				    vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,
-				    {},
-				    0u, nullptr,
-				    0u, nullptr,
-				    1u, &barrier);
-
-
-				vk::ImageBlit blit {
-					/* srcSubresource */
-					vk::ImageSubresourceLayers {
-					    vk::ImageAspectFlagBits::eColor, // aspectMask
-					    i - 1u,                          // mipLevel
-					    0u,                              // baseArrayLayer
-					    1u,                              // layerCount
-					},
-
-					/* srcOffsets */
-					{
-					    vk::Offset3D { 0, 0, 0 },
-					    vk::Offset3D { mipWidth, mipHeight, 1 },
-					},
-
-					/* dstSubresource */
-					vk::ImageSubresourceLayers {
-					    vk::ImageAspectFlagBits::eColor, // aspectMask
-					    i,                               // mipLevel
-					    0u,                              // baseArrayLayer
-					    1u,                              // layerCount
-					},
-
-					/* dstOffsets */
-					{
-					    vk::Offset3D { 0, 0, 0 },
-					    vk::Offset3D { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 },
-					},
-				};
-
-				cmd.blitImage(texture.image, vk::ImageLayout::eTransferSrcOptimal,
-				              texture.image, vk::ImageLayout::eTransferDstOptimal,
-				              1u, &blit, vk::Filter::eLinear);
-
-				barrier.oldLayout     = vk::ImageLayout::eTransferSrcOptimal;
-				barrier.newLayout     = vk::ImageLayout::eShaderReadOnlyOptimal;
-				barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
-				barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
-
-				cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
-				                    {},
-				                    0u, nullptr,
-				                    0u, nullptr,
-				                    1u, &barrier);
-
-				if (mipWidth > 1)
-					mipWidth /= 2;
-
-				if (mipHeight > 1)
-					mipHeight /= 2;
+				TransitionLayout(texture, cmd, i - 1u, 1u, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal);
+				BlitImage(cmd, texture.image, i, mipWidth, mipHeight);
+				TransitionLayout(texture, cmd, i - 1u, 1u, vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 			}
 
-			barrier.subresourceRange.baseMipLevel = texture.mipLevels - 1;
-			barrier.oldLayout                     = vk::ImageLayout::eTransferDstOptimal;
-			barrier.newLayout                     = vk::ImageLayout::eShaderReadOnlyOptimal;
-			barrier.srcAccessMask                 = vk::AccessFlagBits::eTransferRead;
-			barrier.dstAccessMask                 = vk::AccessFlagBits::eShaderRead;
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader,
-			                    {},
-			                    0u, nullptr,
-			                    0u, nullptr,
-			                    1u, &barrier);
+			TransitionLayout(texture, cmd, texture.mipLevels - 1ul, 1u, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 		});
+
+		// Copy buffer to image is executed, delete the staging buffer
 		m_Allocator.destroyBuffer(stagingBuffer, stagingBuffer);
 
 		/////////////////////////////////////////////////////////////////////////////////
@@ -278,6 +207,7 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 				VK_FALSE,                              // unnormalizedCoordinates
 			};
 
+			/// @todo Should we separate samplers and textures?
 			texture.sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
 		}
 
@@ -291,6 +221,58 @@ Texture* TextureSystem::CreateTexture(const Texture::CreateInfo& info)
 	return &m_Textures[HashStr(info.name.c_str())];
 }
 
+Texture* TextureSystem::CreateFromGLTF(const Texture::CreateInfoGLTF& info)
+{
+	return CreateFromData({
+	    .name   = info.image->uri,
+	    .pixels = &info.image->image[0],
+	    .width  = info.image->width,
+	    .height = info.image->height,
+	    .size   = info.image->image.size(),
+	});
+}
+
+void TextureSystem::BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight)
+{
+	vk::ImageBlit blit {
+		/* srcSubresource */
+		vk::ImageSubresourceLayers {
+		    vk::ImageAspectFlagBits::eColor, // aspectMask
+		    mipIndex - 1u,                   // mipLevel
+		    0u,                              // baseArrayLayer
+		    1u,                              // layerCount
+		},
+
+		/* srcOffsets */
+		{
+		    vk::Offset3D { 0, 0, 0 },
+		    vk::Offset3D { mipWidth, mipHeight, 1 },
+		},
+
+		/* dstSubresource */
+		vk::ImageSubresourceLayers {
+		    vk::ImageAspectFlagBits::eColor, // aspectMask
+		    mipIndex,                        // mipLevel
+		    0u,                              // baseArrayLayer
+		    1u,                              // layerCount
+		},
+
+		/* dstOffsets */
+		{
+		    vk::Offset3D { 0, 0, 0 },
+		    vk::Offset3D { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 },
+		},
+	};
+	cmd.blitImage(image, vk::ImageLayout::eTransferSrcOptimal,
+	              image, vk::ImageLayout::eTransferDstOptimal,
+	              1u, &blit, vk::Filter::eLinear);
+	if (mipWidth > 1)
+		mipWidth /= 2;
+
+	if (mipHeight > 1)
+		mipHeight /= 2;
+}
+
 TextureSystem::~TextureSystem()
 {
 	for (auto& [key, value] : m_Textures)
@@ -301,7 +283,7 @@ TextureSystem::~TextureSystem()
 	}
 }
 
-void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
 {
 	// Memory barrier
 	vk::ImageMemoryBarrier imageMemBarrier {
@@ -316,8 +298,8 @@ void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuff
 		/* subresourceRange */
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    0u,                              // baseMipLevel
-		    texture.mipLevels,               // levelCount
+		    baseMipLevel,                              // baseMipLevel
+		    levelCount,               // levelCount
 		    0u,                              // baseArrayLayer
 		    1u,                              // layerCount
 		},
@@ -326,7 +308,7 @@ void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuff
 	vk::PipelineStageFlags srcStage;
 	vk::PipelineStageFlags dstStage;
 
-	// Undefined -> Transfer
+	// Undefined -> TRANSFER DST
 	if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal)
 	{
 		imageMemBarrier.srcAccessMask = {};
@@ -336,14 +318,40 @@ void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuff
 		dstStage = vk::PipelineStageFlagBits::eTransfer;
 	}
 
-	// Transfer -> Shader read only
-	if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
+	// TRANSFER DST -> TRANSFER SRC
+	else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eTransferSrcOptimal)
+	{
+		imageMemBarrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+		imageMemBarrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+		srcStage = vk::PipelineStageFlagBits::eTransfer;
+		dstStage = vk::PipelineStageFlagBits::eTransfer;
+	}
+
+	// TRANSFER SRC -> SHADER READ
+	else if (oldLayout == vk::ImageLayout::eTransferSrcOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
+	{
+		imageMemBarrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+		imageMemBarrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+		srcStage = vk::PipelineStageFlagBits::eTransfer;
+		dstStage = vk::PipelineStageFlagBits::eFragmentShader;
+	}
+	//
+	// TRANSFER DST -> SHADER READ
+	else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal)
 	{
 		imageMemBarrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
 		imageMemBarrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
 		srcStage = vk::PipelineStageFlagBits::eTransfer;
 		dstStage = vk::PipelineStageFlagBits::eFragmentShader;
+	}
+
+	else
+	{
+		/// @todo: Stringifier
+		LOG(err, "Texture transition layout to/from unexpected layout(s) \n {} -> {}", (int32_t)oldLayout, (int32_t)newLayout);
 	}
 
 	// Execute pipeline barrier

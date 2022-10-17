@@ -296,9 +296,8 @@ int main()
 		});
 
 		uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
-		textureSystem.CreateTexture({
+		textureSystem.CreateFromData({
 		    "default",
-		    "none",
 		    defaultTexturePixelData,
 		    1,
 		    1,

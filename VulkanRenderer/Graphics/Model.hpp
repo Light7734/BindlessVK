@@ -56,13 +56,13 @@ public:
 
 	struct MaterialParameters
 	{
-		glm::vec4 baseColor = glm::vec4(1.0f);
-		int32_t baseColorTextureIndex;
-	};
+		glm::vec3 albedoFactor   = glm::vec4(1.0f);
+		glm::vec3 diffuseFactor  = glm::vec4(1.0f);
+		glm::vec3 specularFactor = glm::vec4(1.0f);
 
-	struct Image
-	{
-		::Texture* texture;
+		int32_t albedoTextureIndex;
+		int32_t normalTextureIndex;
+		int32_t metallicRoughnessTextureIndex;
 	};
 
 	struct Texture
@@ -70,8 +70,8 @@ public:
 		int32_t imageIndex;
 	};
 
-	std::vector<Image> images;
-	std::vector<Model::Texture> textures;
+	/// @todo: Support textures with different samplers
+	std::vector<::Texture*> textures;
 	std::vector<MaterialParameters> materialParameters;
 	std::vector<Node*> nodes;
 	StagingBuffer* vertexBuffer;

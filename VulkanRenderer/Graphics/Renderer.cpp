@@ -779,41 +779,45 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		{
 			for (const auto& primitive : node->mesh)
 			{
-				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].baseColorTextureIndex;
-				uint32_t imageIndex   = renderComp.model->textures[textureIndex].imageIndex;
+				const auto& model    = renderComp.model;
+				const auto& material = model->materialParameters[primitive.materialIndex];
 
-				Texture* texture  = renderComp.model->images[imageIndex].texture;
-				Texture* texture2 = renderComp.model->images[imageIndex - 1].texture;
-				Texture* texture3 = renderComp.model->images[imageIndex - 2].texture;
+				uint32_t albedoTextureIndex            = material.albedoTextureIndex;
+				uint32_t normalTextureIndex            = material.normalTextureIndex;
+				uint32_t metallicRoughnessTextureIndex = material.metallicRoughnessTextureIndex;
+
+				Texture* albedoTexture            = model->textures[albedoTextureIndex];
+				Texture* normalTexture            = model->textures[normalTextureIndex];
+				Texture* metallicRoughnessTexture = model->textures[metallicRoughnessTextureIndex];
 
 				std::vector<vk::WriteDescriptorSet> descriptorWrites = {
 					vk::WriteDescriptorSet {
 					    m_ForwardPass.descriptorSets[m_CurrentFrame],
 					    0ul,
-					    imageIndex,
+					    albedoTextureIndex,
 					    1ul,
 					    vk::DescriptorType::eCombinedImageSampler,
-					    &texture->descriptorInfo,
+					    &albedoTexture->descriptorInfo,
 					    nullptr,
 					    nullptr,
 					},
 					vk::WriteDescriptorSet {
 					    m_ForwardPass.descriptorSets[m_CurrentFrame],
 					    0ul,
-					    imageIndex - 1,
+					    metallicRoughnessTextureIndex,
 					    1ul,
 					    vk::DescriptorType::eCombinedImageSampler,
-					    &texture2->descriptorInfo,
+					    &metallicRoughnessTexture->descriptorInfo,
 					    nullptr,
 					    nullptr,
 					},
 					vk::WriteDescriptorSet {
 					    m_ForwardPass.descriptorSets[m_CurrentFrame],
 					    0ul,
-					    imageIndex - 2,
+					    normalTextureIndex,
 					    1ul,
 					    vk::DescriptorType::eCombinedImageSampler,
-					    &texture3->descriptorInfo,
+					    &normalTexture->descriptorInfo,
 					    nullptr,
 					    nullptr,
 					}
@@ -890,14 +894,13 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		primaryCmd.begin(primaryCmdBufferBeginInfo);
 		primaryCmd.beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
 
-		// Update descriptor sets
 		const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
 
 		secondaryCmds.reset();
 
 		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
 		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
-		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &descriptorSet, 0ul, nullptr);
+		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &m_ForwardPass.descriptorSets[m_CurrentFrame], 0ul, nullptr);
 
 		VkDeviceSize offset { 0 };
 
@@ -922,9 +925,8 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 				{
 					primitives++;
 
-					uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].baseColorTextureIndex;
-					uint32_t imageIndex   = renderComp.model->textures[textureIndex].imageIndex;
-					secondaryCmds.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, imageIndex);
+					uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
+					secondaryCmds.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
 				}
 			}
 		});
