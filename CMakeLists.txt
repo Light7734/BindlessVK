@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
-project(VulkanRenderer LANGUAGES CXX)
+project(VulkanRenderer LANGUAGES C CXX)
+
+include_directories(
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/include
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/other_include
+)
 
 set(SPIRV_REFLECT_STATIC_LIB ON)
 set(SPIRV_REFLECT_EXECUTABLE OFF)
@@ -15,3 +20,4 @@ add_subdirectory(AssetParser/)
 add_subdirectory(VulkanRenderer/)
 
 set(CMAKE_BUILD_TYPE DEBUG)
+

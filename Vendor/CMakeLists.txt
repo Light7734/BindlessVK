@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.14)
+
 # Dependencies
 add_subdirectory(./entt)
 add_subdirectory(./glfw)
@@ -11,8 +13,19 @@ add_subdirectory(./tinygltf)
 # Configuration files
 configure_file(${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h ${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h)
 
+# KTX (Khronos texture)
+add_library(
+    ktx SHARED
+
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/lib/texture.c
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/lib/hashlist.c
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/lib/checkheader.c
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/lib/swap.c
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/lib/memstream.c
+    ${CMAKE_SOURCE_DIR}/Vendor/ktx/lib/filestream.c
+)
+
 # Imgui does not provide a CMakeLists.txt so we do it ourselves here
-cmake_minimum_required(VERSION 3.14)
 
 add_library(
     imgui SHARED 
