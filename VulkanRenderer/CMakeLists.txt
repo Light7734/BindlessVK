@@ -56,6 +56,7 @@ target_link_libraries(
     PRIVATE spirv-reflect-static
     PRIVATE spdlog
     PRIVATE tinygltf
+    PRIVATE ktx
 )
 
 target_precompile_headers(
