@@ -14,6 +14,8 @@ Renderer::Renderer(const RendererCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.deviceContext.logicalDevice)
     , m_Allocator(createInfo.deviceContext.allocator)
     , m_DefaultTexture(createInfo.defaultTexture)
+    , m_SkyboxTexture(createInfo.skyboxTexture)
+
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Create sync objects
@@ -527,11 +529,20 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 	/// Create forward pass descriptor sets
 	{
 		std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-			// [1] Sampler - Texture
+			// [0] Sampler - Texture
 			vk::DescriptorSetLayoutBinding {
 			    0u,                                        // binding
 			    vk::DescriptorType::eCombinedImageSampler, // descriptorType
 			    32u,                                       // descriptorCount
+			    vk::ShaderStageFlagBits::eFragment,        // stageFlags
+			    nullptr,                                   // pImmutableSamplers
+			},
+
+			// [1] Sampler - Texture
+			vk::DescriptorSetLayoutBinding {
+			    1u,                                        // binding
+			    vk::DescriptorType::eCombinedImageSampler, // descriptorType
+			    8u,                                        // descriptorCount
 			    vk::ShaderStageFlagBits::eFragment,        // stageFlags
 			    nullptr,                                   // pImmutableSamplers
 			},
@@ -647,6 +658,7 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 	}
 
 	ASSERT(m_DefaultTexture, "Renderer's default texture is not set");
+	ASSERT(m_SkyboxTexture, "Renderer's skybox texture is not set");
 	std::vector<vk::WriteDescriptorSet> descriptorWrites;
 	for (uint32_t i = 0; i < 32; i++)
 	{
@@ -665,7 +677,22 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		}
 	}
 
-
+	for (uint32_t i = 0; i < 8; i++)
+	{
+		for (uint32_t j = 0; j < MAX_FRAMES_IN_FLIGHT; j++)
+		{
+			descriptorWrites.push_back(vk::WriteDescriptorSet {
+			    m_ForwardPass.descriptorSets[j],
+			    1ul,
+			    i,
+			    1ul,
+			    vk::DescriptorType::eCombinedImageSampler,
+			    &m_SkyboxTexture->descriptorInfo,
+			    nullptr,
+			    nullptr,
+			});
+		}
+	}
 	m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
 
 	m_SwapchainInvalidated = false;
@@ -907,25 +934,29 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		vk::Pipeline currentPipeline = VK_NULL_HANDLE;
 		uint32_t primitives          = 0;
 		scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-			vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
 			// bind pipeline
+			LOG(trace, "Pipeline...");
+			vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
 			if (currentPipeline != newPipeline)
 			{
 				secondaryCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
 				currentPipeline = newPipeline;
 			}
 
+			// bind buffers
+			LOG(trace, "Buffers");
 			secondaryCmds.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
 			secondaryCmds.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
 
-
+			// draw primitves
+			LOG(trace, "Primitives");
 			for (const auto* node : renderComp.model->nodes)
 			{
 				for (const auto& primitive : node->mesh)
 				{
-					primitives++;
-
+					LOG(trace, "Primitive {}", primitives++);
 					uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
+					LOG(trace, "Tex index: {}", textureIndex);
 					secondaryCmds.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
 				}
 			}

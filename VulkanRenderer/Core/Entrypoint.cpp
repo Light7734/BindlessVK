@@ -33,175 +33,326 @@ void LoadShaders(MaterialSystem& materialSystem)
 			continue;
 		}
 
-		Shader::CreateInfo shaderCreateInfo {
-			name.c_str(),
-			path.c_str(),
-			!strcmp(extension.c_str(), VERTEX_EXTENSION) ? vk::ShaderStageFlagBits::eVertex :
-			                                               vk::ShaderStageFlagBits::eFragment,
-		};
-		LOG(trace, "Loaded shader: {} -> {}", name, path);
-
-		materialSystem.LoadShader(shaderCreateInfo);
+		materialSystem.LoadShader({
+		    name.c_str(),
+		    path.c_str(),
+		    !strcmp(extension.c_str(), VERTEX_EXTENSION) ? vk::ShaderStageFlagBits::eVertex :
+		                                                   vk::ShaderStageFlagBits::eFragment,
+		});
 	}
 }
 
 void LoadShaderEffects(MaterialSystem& materialSystem)
 {
 	// @TODO: Load from files instead of hard-coding
-	ShaderEffect::CreateInfo shaderEffectCreateInfo {
-		"default",
-		{
-		    materialSystem.GetShader("defaultVertex"),
-		    materialSystem.GetShader("defaultFragment"),
-		},
-	};
+	materialSystem.CreateShaderEffect({
+	    "default",
+	    {
+	        materialSystem.GetShader("defaultVertex"),
+	        materialSystem.GetShader("defaultFragment"),
+	    },
+	});
 
-	materialSystem.CreateShaderEffect(shaderEffectCreateInfo);
+	materialSystem.CreateShaderEffect({
+	    "skybox",
+	    {
+	        materialSystem.GetShader("skybox_vertex"),
+	        materialSystem.GetShader("skybox_fragment"),
+	    },
+	});
 }
 
 void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass, vk::Extent2D extent, vk::SampleCountFlagBits sampleCount)
 {
-	// @TODO: Load from files instead of hard-coding
-	std::vector<vk::VertexInputBindingDescription> inputBindings {
-		vk::VertexInputBindingDescription {
-		    0u,                                           // binding
-		    static_cast<uint32_t>(sizeof(Model::Vertex)), // stride
-		    vk::VertexInputRate::eVertex,                 // inputRate
-		},
-	};
-	std::vector<vk::VertexInputAttributeDescription> inputAttributes {
-		vk::VertexInputAttributeDescription {
-		    0u,                           // location
-		    0u,                           // binding
-		    vk::Format::eR32G32B32Sfloat, // format
-		    0u,                           // offset
-		},
-		vk::VertexInputAttributeDescription {
-		    1u,                           // location
-		    0u,                           // binding
-		    vk::Format::eR32G32B32Sfloat, // format
-		    sizeof(glm::vec3),            // offset
-		},
-		vk::VertexInputAttributeDescription {
-		    2u,                                    // location
-		    0u,                                    // binding
-		    vk::Format::eR32G32B32Sfloat,          // format
-		    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-		},
-		vk::VertexInputAttributeDescription {
-		    3u,                                                        // location
-		    0u,                                                        // binding
-		    vk::Format::eR32G32Sfloat,                                 // format
-		    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-		},
-		vk::VertexInputAttributeDescription {
-		    4u,                                                                            // location
-		    0u,                                                                            // binding
-		    vk::Format::eR32G32B32Sfloat,                                                  // format
-		    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(glm::vec3), // offset
-		},
-	};
+	{
+		// @TODO: Load from files instead of hard-coding
+		std::vector<vk::VertexInputBindingDescription> inputBindings {
+			vk::VertexInputBindingDescription {
+			    0u,                                           // binding
+			    static_cast<uint32_t>(sizeof(Model::Vertex)), // stride
+			    vk::VertexInputRate::eVertex,                 // inputRate
+			},
+		};
+		std::vector<vk::VertexInputAttributeDescription> inputAttributes {
+			vk::VertexInputAttributeDescription {
+			    0u,                           // location
+			    0u,                           // binding
+			    vk::Format::eR32G32B32Sfloat, // format
+			    0u,                           // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    1u,                           // location
+			    0u,                           // binding
+			    vk::Format::eR32G32B32Sfloat, // format
+			    sizeof(glm::vec3),            // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    2u,                                    // location
+			    0u,                                    // binding
+			    vk::Format::eR32G32B32Sfloat,          // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    3u,                                                        // location
+			    0u,                                                        // binding
+			    vk::Format::eR32G32Sfloat,                                 // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec3), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    4u,                                                                            // location
+			    0u,                                                                            // binding
+			    vk::Format::eR32G32B32Sfloat,                                                  // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(glm::vec3), // offset
+			},
+		};
 
-	// Viewport state
-	vk::Viewport viewport {
-		0.0f,                              // x
-		0.0f,                              // y
-		static_cast<float>(extent.width),  // width
-		static_cast<float>(extent.height), // height
-		0.0f,                              // minDepth
-		1.0f,                              // maxDepth
-	};
+		// Viewport state
+		vk::Viewport viewport {
+			0.0f,                              // x
+			0.0f,                              // y
+			static_cast<float>(extent.width),  // width
+			static_cast<float>(extent.height), // height
+			0.0f,                              // minDepth
+			1.0f,                              // maxDepth
+		};
 
-	vk::Rect2D scissors {
-		{ 0, 0 }, // offset
-		extent    // extent
-	};
+		vk::Rect2D scissors {
+			{ 0, 0 }, // offset
+			extent    // extent
+		};
 
-	vk::PipelineColorBlendAttachmentState colorBlendAttachment {
-		VK_FALSE,                           // blendEnable
-		vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
-		vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-		vk::BlendOp::eAdd,                  // colorBlendOp
-		vk::BlendFactor::eOne,              // srcAlphaBlendFactor
-		vk::BlendFactor::eZero,             // dstAlphaBlendFactor
-		vk::BlendOp::eAdd,                  // alphaBlendOp
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment {
+			VK_FALSE,                           // blendEnable
+			vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
+			vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
+			vk::BlendOp::eAdd,                  // colorBlendOp
+			vk::BlendFactor::eOne,              // srcAlphaBlendFactor
+			vk::BlendFactor::eZero,             // dstAlphaBlendFactor
+			vk::BlendOp::eAdd,                  // alphaBlendOp
 
-		vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA, // colorWriteMask
-	};
+			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA, // colorWriteMask
+		};
 
-	PipelineConfiguration defaultPassPipelineConfigurations {
-		vk::PipelineVertexInputStateCreateInfo {
-		    {},
-		    static_cast<uint32_t>(inputBindings.size()),
-		    inputBindings.data(),
-		    static_cast<uint32_t>(inputAttributes.size()),
-		    inputAttributes.data(),
-		},
-		vk::PipelineInputAssemblyStateCreateInfo {
-		    {},
-		    vk::PrimitiveTopology::eTriangleList,
-		    VK_FALSE,
-		},
-		vk::PipelineTessellationStateCreateInfo {},
-		vk::PipelineViewportStateCreateInfo {
-		    {},
-		    1u,
-		    &viewport,
-		    1u,
-		    &scissors,
-		},
-		vk::PipelineRasterizationStateCreateInfo {
-		    {},
-		    VK_FALSE,
-		    VK_FALSE,
-		    vk::PolygonMode::eFill,
-		    vk::CullModeFlagBits::eBack,
-		    vk::FrontFace::eClockwise,
-		    VK_FALSE,
-		    0.0f,
-		    0.0f,
-		    0.0f,
-		    1.0f,
-		},
-		vk::PipelineMultisampleStateCreateInfo {
-		    {},
-		    sampleCount,
-		    VK_FALSE,
-		    {},
-		    VK_FALSE,
-		    VK_FALSE,
-		},
-		vk::PipelineDepthStencilStateCreateInfo {
-		    {},
-		    VK_TRUE,              // depthTestEnable
-		    VK_TRUE,              // depthWriteEnable
-		    vk::CompareOp::eLess, // depthCompareOp
-		    VK_FALSE,             // depthBoundsTestEnable
-		    VK_FALSE,             // stencilTestEnable
-		    {},                   // front
-		    {},                   // back
-		    0.0f,                 // minDepthBounds
-		    1.0,                  // maxDepthBounds
-		},
-		vk::PipelineColorBlendStateCreateInfo {
-		    {},                         // flags
-		    VK_FALSE,                   // logicOpEnable
-		    vk::LogicOp::eCopy,         // logicOp
-		    1u,                         // attachmentCount
-		    &colorBlendAttachment,      // pAttachments
-		    { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
-		},
-		vk::PipelineDynamicStateCreateInfo {},
-	};
+		// create shader passes
+		materialSystem.CreateShaderPass({
+		    "default",
+		    {
+		        vk::PipelineVertexInputStateCreateInfo {
+		            {},
+		            static_cast<uint32_t>(inputBindings.size()),
+		            inputBindings.data(),
+		            static_cast<uint32_t>(inputAttributes.size()),
+		            inputAttributes.data(),
+		        },
+		        vk::PipelineInputAssemblyStateCreateInfo {
+		            {},
+		            vk::PrimitiveTopology::eTriangleList,
+		            VK_FALSE,
+		        },
+		        vk::PipelineTessellationStateCreateInfo {},
+		        vk::PipelineViewportStateCreateInfo {
+		            {},
+		            1u,
+		            &viewport,
+		            1u,
+		            &scissors,
+		        },
+		        vk::PipelineRasterizationStateCreateInfo {
+		            {},
+		            VK_FALSE,
+		            VK_FALSE,
+		            vk::PolygonMode::eFill,
+		            vk::CullModeFlagBits::eBack,
+		            vk::FrontFace::eClockwise,
+		            VK_FALSE,
+		            0.0f,
+		            0.0f,
+		            0.0f,
+		            1.0f,
+		        },
+		        vk::PipelineMultisampleStateCreateInfo {
+		            {},
+		            sampleCount,
+		            VK_FALSE,
+		            {},
+		            VK_FALSE,
+		            VK_FALSE,
+		        },
+		        vk::PipelineDepthStencilStateCreateInfo {
+		            {},
+		            VK_TRUE,              // depthTestEnable
+		            VK_TRUE,              // depthWriteEnable
+		            vk::CompareOp::eLess, // depthCompareOp
+		            VK_FALSE,             // depthBoundsTestEnable
+		            VK_FALSE,             // stencilTestEnable
+		            {},                   // front
+		            {},                   // back
+		            0.0f,                 // minDepthBounds
+		            1.0,                  // maxDepthBounds
+		        },
+		        vk::PipelineColorBlendStateCreateInfo {
+		            {},                         // flags
+		            VK_FALSE,                   // logicOpEnable
+		            vk::LogicOp::eCopy,         // logicOp
+		            1u,                         // attachmentCount
+		            &colorBlendAttachment,      // pAttachments
+		            { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
+		        },
+		        vk::PipelineDynamicStateCreateInfo {},
+		    },
+		    materialSystem.GetShaderEffect("default"),
+		    forwardPass,
+		    0ull,
+		});
+	}
 
-	// create shader passes
-	materialSystem.CreateShaderPass({
-	    "default",
-	    defaultPassPipelineConfigurations,
-	    materialSystem.GetShaderEffect("default"),
-	    forwardPass,
-	    0ull,
-	});
+	{
+		std::vector<vk::VertexInputBindingDescription> inputBindings {
+			vk::VertexInputBindingDescription {
+			    0u,                                           // binding
+			    static_cast<uint32_t>(sizeof(Model::Vertex)), // stride
+			    vk::VertexInputRate::eVertex,                 // inputRate
+			},
+		};
+		std::vector<vk::VertexInputAttributeDescription> inputAttributes {
+			vk::VertexInputAttributeDescription {
+			    0u,                           // location
+			    0u,                           // binding
+			    vk::Format::eR32G32B32Sfloat, // format
+			    0u,                           // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    1u,                           // location
+			    0u,                           // binding
+			    vk::Format::eR32G32B32Sfloat, // format
+			    sizeof(glm::vec3),            // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    2u,                                    // location
+			    0u,                                    // binding
+			    vk::Format::eR32G32B32Sfloat,          // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    3u,                                                        // location
+			    0u,                                                        // binding
+			    vk::Format::eR32G32Sfloat,                                 // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec3), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    4u,                                                                            // location
+			    0u,                                                                            // binding
+			    vk::Format::eR32G32B32Sfloat,                                                  // format
+			    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(glm::vec3), // offset
+			},
+		};
+		// Viewport state
+		vk::Viewport viewport {
+			0.0f,                              // x
+			0.0f,                              // y
+			static_cast<float>(extent.width),  // width
+			static_cast<float>(extent.height), // height
+			0.0f,                              // minDepth
+			1.0f,                              // maxDepth
+		};
+
+		vk::Rect2D scissors {
+			{ 0, 0 }, // offset
+			extent    // extent
+		};
+
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment {
+			VK_FALSE,                           // blendEnable
+			vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
+			vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
+			vk::BlendOp::eAdd,                  // colorBlendOp
+			vk::BlendFactor::eOne,              // srcAlphaBlendFactor
+			vk::BlendFactor::eZero,             // dstAlphaBlendFactor
+			vk::BlendOp::eAdd,                  // alphaBlendOp
+
+			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA, // colorWriteMask
+		};
+
+		// create shader passes
+		materialSystem.CreateShaderPass({
+		    "skybox",
+		    {
+
+		        vk::PipelineVertexInputStateCreateInfo {
+		            {},
+		            static_cast<uint32_t>(inputBindings.size()),
+		            inputBindings.data(),
+		            static_cast<uint32_t>(inputAttributes.size()),
+		            inputAttributes.data(),
+		        },
+
+		        vk::PipelineInputAssemblyStateCreateInfo {
+		            {},
+		            vk::PrimitiveTopology::eTriangleList,
+		            VK_FALSE,
+		        },
+
+		        vk::PipelineTessellationStateCreateInfo {},
+
+		        vk::PipelineViewportStateCreateInfo {
+		            {},
+		            1u,
+		            &viewport,
+		            1u,
+		            &scissors,
+		        },
+
+		        vk::PipelineRasterizationStateCreateInfo {
+		            {},
+		            VK_FALSE,
+		            VK_FALSE,
+		            vk::PolygonMode::eFill,
+		            vk::CullModeFlagBits::eBack,
+		            vk::FrontFace::eCounterClockwise,
+		            VK_FALSE,
+		            0.0f,
+		            0.0f,
+		            0.0f,
+		            1.0f,
+		        },
+		        vk::PipelineMultisampleStateCreateInfo {
+		            {},
+		            sampleCount,
+		            VK_FALSE,
+		            {},
+		            VK_FALSE,
+		            VK_FALSE,
+		        },
+
+		        vk::PipelineDepthStencilStateCreateInfo {
+		            {},
+		            VK_TRUE,                    // depthTestEnable
+		            VK_TRUE,                    // depthWriteEnable
+		            vk::CompareOp::eLessOrEqual, // depthCompareOp
+		            VK_FALSE,                    // depthBoundsTestEnable
+		            VK_FALSE,                    // stencilTestEnable
+		            {},                          // front
+		            {},                          // back
+		            0.0f,                        // minDepthBounds
+		            1.0,                         // maxDepthBounds
+		        },
+
+		        vk::PipelineColorBlendStateCreateInfo {
+		            {},                         // flags
+		            VK_FALSE,                   // logicOpEnable
+		            vk::LogicOp::eCopy,         // logicOp
+		            1u,                         // attachmentCount
+		            &colorBlendAttachment,      // pAttachments
+		            { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
+		        },
+		        vk::PipelineDynamicStateCreateInfo {},
+		    },
+
+		    materialSystem.GetShaderEffect("skybox"),
+		    forwardPass,
+		    0ull,
+		});
+	}
 }
 
 void LoadMasterMaterials(MaterialSystem& materialSystem)
@@ -210,6 +361,12 @@ void LoadMasterMaterials(MaterialSystem& materialSystem)
 	materialSystem.CreateMasterMaterial({
 	    "default",
 	    materialSystem.GetShaderPass("default"),
+	    {},
+	});
+
+	materialSystem.CreateMasterMaterial({
+	    "skybox",
+	    materialSystem.GetShaderPass("skybox"),
 	    {},
 	});
 }
@@ -223,6 +380,13 @@ void LoadMaterials(MaterialSystem& materialSystem)
 	    {},
 	    {},
 	});
+
+	materialSystem.CreateMaterial({
+	    "skybox",
+	    materialSystem.GetMasterMaterial("skybox"),
+	    {},
+	    {},
+	});
 }
 
 void LoadModels(ModelSystem& modelSystem, TextureSystem& textureSystem)
@@ -233,23 +397,41 @@ void LoadModels(ModelSystem& modelSystem, TextureSystem& textureSystem)
 	    "default",
 	    "Assets/FlightHelmet/FlightHelmet.gltf",
 	});
+
+	modelSystem.LoadModel({
+	    textureSystem,
+	    "skybox",
+	    "Assets/Cube/Cube.gltf",
+	});
 }
 
 void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& modelSystem)
 {
 	// @TODO: Load from files instead of hard-coding
 
-	Entity entity = scene.CreateEntity();
+	Entity testModel = scene.CreateEntity();
 
-	scene.AddComponent<TransformComponent>(entity,
+	scene.AddComponent<TransformComponent>(testModel,
 	                                       glm::vec3(0.0f),          // Translation
 	                                       glm::vec3(1.0f),          // Scale
 	                                       glm::vec3(0.0f, 0.0, 0.0) // Rotation
 	);
 
-	scene.AddComponent<StaticMeshRendererComponent>(entity,
+	scene.AddComponent<StaticMeshRendererComponent>(testModel,
 	                                                materialSystem.GetMaterial("default"), // Material
 	                                                modelSystem.GetModel("default")        // Mesh
+	);
+
+	Entity skybox = scene.CreateEntity();
+	scene.AddComponent<TransformComponent>(skybox,
+	                                       glm::vec3(0.0f),          // Translation
+	                                       glm::vec3(1.0f),          // Scale
+	                                       glm::vec3(0.0f, 0.0, 0.0) // Rotation
+	);
+
+	scene.AddComponent<StaticMeshRendererComponent>(skybox,
+	                                                materialSystem.GetMaterial("skybox"), // Material
+	                                                modelSystem.GetModel("skybox")        // Mesh
 	);
 }
 
@@ -296,12 +478,20 @@ int main()
 		});
 
 		uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
-		textureSystem.CreateFromData({
-		    "default",
-		    defaultTexturePixelData,
-		    1,
-		    1,
-		    sizeof(defaultTexturePixelData),
+		textureSystem.CreateFromBuffer({
+		    .name   = "default",
+		    .pixels = defaultTexturePixelData,
+		    .width  = 1,
+		    .height = 1,
+		    .size   = sizeof(defaultTexturePixelData),
+		    .type   = Texture::Type::e2D,
+		});
+
+
+		textureSystem.CreateFromKTX({
+		    "skybox",
+		    "Assets/cubemap_yokohama_rgba.ktx",
+		    Texture::Type::eCubeMap,
 		});
 
 		// Renderer
@@ -309,6 +499,7 @@ int main()
 		    .window         = &window,
 		    .deviceContext  = device.GetContext(),
 		    .defaultTexture = textureSystem.GetTexture("default"),
+		    .skyboxTexture  = textureSystem.GetTexture("skybox"),
 		});
 
 		// MaterialSystem
@@ -321,6 +512,8 @@ int main()
 		    device.GetContext(),
 		    renderer.GetCommandPool(),
 		    renderer.GetQueueInfo().graphicsQueue,
+
+
 		});
 
 
@@ -345,7 +538,6 @@ int main()
 		LoadMaterials(materialSystem);
 
 		LoadModels(modelSystem, textureSystem);
-
 		LoadEntities(scene, materialSystem, modelSystem);
 
 		/////////////////////////////////////////////////////////////////////////////////

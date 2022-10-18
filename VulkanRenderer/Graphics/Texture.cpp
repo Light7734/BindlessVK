@@ -2,7 +2,10 @@
 
 #include <AssetParser.hpp>
 #include <TextureAsset.hpp>
+#include <ktx.h>
+#include <ktxvulkan.h>
 #include <tiny_gltf.h>
+
 
 TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
     : m_LogicalDevice(info.deviceContext.logicalDevice)
@@ -32,18 +35,19 @@ TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
 	m_UploadContext.fence = m_LogicalDevice.createFence({});
 }
 
-Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
+Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 {
 	m_Textures[HashStr(info.name.c_str())] = {
 		.descriptorInfo = {},
 		.width          = static_cast<uint32_t>(info.width),
 		.height         = static_cast<uint32_t>(info.height),
-		.channels       = 4ul,
+		.format         = vk::Format::eR8G8B8A8Srgb,
 		.mipLevels      = static_cast<uint32_t>(std::floor(std::log2(std::max(info.width, info.height))) + 1),
 		.size           = info.size,
-		.image          = {},
-		.imageView      = {},
 		.sampler        = {},
+		.imageView      = {},
+		.layout         = info.layout,
+		.image          = {},
 	};
 
 	Texture& texture = m_Textures[HashStr(info.name.c_str())];
@@ -87,8 +91,9 @@ Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
 
-		AllocatedBuffer stagingBuffer;
 		vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, { vk::MemoryPropertyFlagBits::eHostCached });
+
+		AllocatedBuffer stagingBuffer;
 		stagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 
 		// Copy data to staging buffer
@@ -96,7 +101,7 @@ Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
 		m_Allocator.unmapMemory(stagingBuffer);
 
 		ImmediateSubmit([&](vk::CommandBuffer cmd) {
-			TransitionLayout(texture, cmd, 0u, texture.mipLevels, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+			TransitionLayout(texture, cmd, 0u, texture.mipLevels, 1u, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
 			vk::BufferImageCopy bufferImageCopy {
 				0u, // bufferOffset
@@ -141,12 +146,12 @@ Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
 
 			for (uint32_t i = 1; i < texture.mipLevels; i++)
 			{
-				TransitionLayout(texture, cmd, i - 1u, 1u, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal);
+				TransitionLayout(texture, cmd, i - 1u, 1u, 1u, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eTransferSrcOptimal);
 				BlitImage(cmd, texture.image, i, mipWidth, mipHeight);
-				TransitionLayout(texture, cmd, i - 1u, 1u, vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+				TransitionLayout(texture, cmd, i - 1u, 1u, 1u, vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 			}
 
-			TransitionLayout(texture, cmd, texture.mipLevels - 1ul, 1u, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+			TransitionLayout(texture, cmd, texture.mipLevels - 1ul, 1u, 1u, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
 		});
 
 		// Copy buffer to image is executed, delete the staging buffer
@@ -196,8 +201,8 @@ Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
 				0.0f,                            // mipLodBias
 
 				// #TODO ANISOTROPY
-				false, // anisotropyEnable
-				{},    // maxAnisotropy
+				VK_FALSE, // anisotropyEnable
+				{},       // maxAnisotropy
 
 				VK_FALSE,                              // compareEnable
 				vk::CompareOp::eAlways,                // compareOp
@@ -223,14 +228,198 @@ Texture* TextureSystem::CreateFromData(const Texture::CreateInfoData& info)
 
 Texture* TextureSystem::CreateFromGLTF(const Texture::CreateInfoGLTF& info)
 {
-	return CreateFromData({
+	return CreateFromBuffer({
 	    .name   = info.image->uri,
 	    .pixels = &info.image->image[0],
 	    .width  = info.image->width,
 	    .height = info.image->height,
 	    .size   = info.image->image.size(),
+	    .layout = info.layout,
 	});
 }
+
+Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
+{
+	ktxTexture* textureKtx;
+	KTXASSERT(ktxTexture_CreateFromNamedFile(info.uri.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &textureKtx), "Failed to load ktx file");
+
+	m_Textures[HashStr(info.name.c_str())] = {
+		.descriptorInfo = {},
+		.width          = textureKtx->baseWidth,
+		.height         = textureKtx->baseHeight,
+		.format         = vk::Format::eB8G8R8A8Srgb,
+		.mipLevels      = textureKtx->numLevels,
+		.size           = ktxTexture_GetSize(textureKtx),
+		.sampler        = {},
+		.imageView      = {},
+		.layout         = info.layout,
+		.image          = {},
+	};
+	uint8_t* data    = ktxTexture_GetData(textureKtx);
+	Texture& texture = m_Textures[HashStr(info.name.c_str())];
+
+
+	// Create staging buffer
+	vk::BufferCreateInfo stagingBufferCrateInfo {
+		{},                                    // flags
+		texture.size,                          // size
+		vk::BufferUsageFlagBits::eTransferSrc, // usage
+		vk::SharingMode::eExclusive,           // sharingMode
+	};
+
+	AllocatedBuffer stagingBuffer;
+	vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, { vk::MemoryPropertyFlagBits::eHostCached });
+	stagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
+
+	// Copy data to staging buffer
+	memcpy(m_Allocator.mapMemory(stagingBuffer), data, texture.size);
+	m_Allocator.unmapMemory(stagingBuffer);
+
+	std::vector<vk::BufferImageCopy> bufferCopies;
+
+	ASSERT(info.type == Texture::Type::eCubeMap, "Create From KTX Only supports cubemaps for the time being...")
+
+	for (uint32_t face = 0; face < 6; face++)
+	{
+		for (uint32_t level = 0u; level < texture.mipLevels; level++)
+		{
+			size_t offset;
+			KTXASSERT(ktxTexture_GetImageOffset(textureKtx, level, 0u, face, &offset), "Failed to get ktx image offset");
+
+			bufferCopies.push_back({
+			    offset, // bufferOffset
+			    {},     // bufferRowLength
+			    {},     // bufferImageHeight
+
+			    /* imageSubresource */
+			    {
+			        vk::ImageAspectFlagBits::eColor, // aspectMask
+			        level,                           // mipLevel
+			        face,                            // baseArrayLayer
+			        1u,                              // layerCount
+			    },
+
+			    /* imageOffset */
+			    {},
+
+			    /* imageExtent */
+			    {
+			        texture.width >> level,  // width
+			        texture.height >> level, // height
+			        1u,                      // depth
+			    },
+			});
+		}
+	}
+
+	// Create vulkan image
+	vk::ImageCreateInfo imageCreateInfo {
+		vk::ImageCreateFlagBits::eCubeCompatible, // flags
+		vk::ImageType::e2D,                       // imageType
+		texture.format,                           // format
+
+		/* extent */
+		vk::Extent3D {
+		    texture.width,  // width
+		    texture.height, // height
+		    1u,             // depth
+		},
+		texture.mipLevels,                                                       // mipLevels
+		6u,                                                                      // arrayLayers
+		vk::SampleCountFlagBits::e1,                                             // samples
+		vk::ImageTiling::eOptimal,                                               // tiling
+		vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, // usage
+		vk::SharingMode::eExclusive,                                             // sharingMode
+		0u,                                                                      // queueFamilyIndexCount
+		nullptr,                                                                 // queueFamilyIndices
+		vk::ImageLayout::eUndefined,                                             // initialLayout
+	};
+
+	vma::AllocationCreateInfo imageAllocInfo({},
+	                                         vma::MemoryUsage::eGpuOnly,
+	                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
+	texture.image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+
+	ImmediateSubmit([&](vk::CommandBuffer&& cmd) {
+		TransitionLayout(texture, cmd, 0u, texture.mipLevels, 6u, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+		cmd.copyBufferToImage(stagingBuffer, texture.image, vk::ImageLayout::eTransferDstOptimal, static_cast<uint32_t>(bufferCopies.size()), bufferCopies.data());
+		TransitionLayout(texture, cmd, 0u, texture.mipLevels, 6u, vk::ImageLayout::eTransferDstOptimal, texture.layout);
+	});
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create image views
+	{
+		vk::ImageViewCreateInfo imageViewCreateInfo {
+			{},                       // flags
+			texture.image,            // image
+			vk::ImageViewType::eCube, // viewType
+			texture.format,           // format
+
+			/* components */
+			vk::ComponentMapping {
+			    // Don't swizzle the colors around...
+			    vk::ComponentSwizzle::eIdentity, // r
+			    vk::ComponentSwizzle::eIdentity, // g
+			    vk::ComponentSwizzle::eIdentity, // b
+			    vk::ComponentSwizzle::eIdentity, // a
+			},
+
+			/* subresourceRange */
+			vk::ImageSubresourceRange {
+			    vk::ImageAspectFlagBits::eColor, // aspectMask
+			    0u,                              // baseMipLevel
+			    texture.mipLevels,               // levelCount
+			    0u,                              // baseArrayLayer
+			    6u,                              // layerCount
+			},
+		};
+
+		texture.imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+	}
+	/////////////////////////////////////////////////////////////////////////////////
+	// Create image samplers
+	{
+		vk::SamplerCreateInfo samplerCreateInfo {
+			{},
+			vk::Filter::eLinear,                  // magFilter
+			vk::Filter::eLinear,                  //minFilter
+			vk::SamplerMipmapMode::eLinear,       // mipmapMode
+			vk::SamplerAddressMode::eClampToEdge, // addressModeU
+			vk::SamplerAddressMode::eClampToEdge, // addressModeV
+			vk::SamplerAddressMode::eClampToEdge, // addressModeW
+			0.0f,                                 // mipLodBias
+
+			// #TODO ANISOTROPY
+			VK_FALSE, // anisotropyEnable
+			{},       // maxAnisotropy
+
+			VK_FALSE,                              // compareEnable
+			vk::CompareOp::eNever,                 // compareOp
+			0.0f,                                  // minLod
+			static_cast<float>(texture.mipLevels), // maxLod
+			vk::BorderColor::eFloatOpaqueWhite,    // borderColor
+			VK_FALSE,                              // unnormalizedCoordinates
+		};
+
+		/// @todo Should we separate samplers and textures?
+		texture.sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
+	}
+
+	texture.descriptorInfo = {
+		texture.sampler,   // sampler
+		texture.imageView, // imageView
+		texture.layout,    // imageLayout
+	};
+
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Cleanup
+	m_Allocator.destroyBuffer(stagingBuffer, stagingBuffer);
+	ktxTexture_Destroy(textureKtx);
+
+	return &m_Textures[HashStr(info.name.c_str())];
+}
+
 
 void TextureSystem::BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight)
 {
@@ -283,7 +472,7 @@ TextureSystem::~TextureSystem()
 	}
 }
 
-void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
+void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
 {
 	// Memory barrier
 	vk::ImageMemoryBarrier imageMemBarrier {
@@ -298,10 +487,10 @@ void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuff
 		/* subresourceRange */
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    baseMipLevel,                              // baseMipLevel
-		    levelCount,               // levelCount
+		    baseMipLevel,                    // baseMipLevel
+		    levelCount,                      // levelCount
 		    0u,                              // baseArrayLayer
-		    1u,                              // layerCount
+		    layerCount,                      // layerCount
 		},
 	};
 	/* Specify the source & destination stages and access masks... */

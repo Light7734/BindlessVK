@@ -24,6 +24,12 @@ struct PipelineConfiguration
 /// @todo
 struct MaterialParameters
 {
+	glm::vec4 baseColorFactor;
+	glm::vec4 emissiveFactor;
+	glm::vec4 diffuseFactor;
+	glm::vec4 specularFactor;
+	float metallicFactor;
+	float roughnessFactor;
 };
 
 /// @brief A vulkan shader module & it's code, for building ShaderEffects

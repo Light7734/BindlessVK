@@ -39,6 +39,7 @@ struct RendererCreateInfo
 	Window* window;
 	DeviceContext deviceContext;
 	Texture* defaultTexture;
+	Texture* skyboxTexture;
 };
 
 struct CameraData
@@ -150,7 +151,8 @@ private:
 
 	uint32_t m_CurrentFrame = 0ul;
 
-    Texture* m_DefaultTexture = {};
+	Texture* m_DefaultTexture = {};
+    Texture* m_SkyboxTexture = {};
 
 	// Descriptor sets
 	vk::DescriptorPool m_DescriptorPool = {};

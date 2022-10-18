@@ -23,7 +23,7 @@ Window::Window(const WindowCreateInfo& createInfo)
 	glfwSetWindowUserPointer(m_GlfwWindowHandle, &m_Specs);
 	BindCallbacks();
 
-    glfwSetInputMode(m_GlfwWindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetInputMode(m_GlfwWindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 Window::~Window()
@@ -56,9 +56,7 @@ vk::SurfaceKHR Window::CreateSurface(vk::Instance instance)
 {
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 	VkResult result      = glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface);
-	if (result != VK_SUCCESS)
-		throw vkException("glfwCreateWindowSurface(instance, m_GlfwWindowHandle, nullptr, &surface)", result, __FILE__, __LINE__);
-	ASSERT(surface, "Failed to create window surface");
+	ASSERT(result == VK_SUCCESS && surface, "Failed to create window surface");
 	return surface;
 }
 
@@ -71,7 +69,7 @@ vk::Extent2D Window::GetFramebufferSize()
 
 void Window::BindCallbacks()
 {
-	// #todo: callbacks
+	// @todo: callbacks
 	glfwSetKeyCallback(m_GlfwWindowHandle, [](GLFWwindow* window, int key, int scanCode, int action, int mods) {
 		if (key == GLFW_KEY_ESCAPE)
 			glfwSetWindowShouldClose(window, true);
