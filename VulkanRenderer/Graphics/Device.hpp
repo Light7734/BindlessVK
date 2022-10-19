@@ -46,7 +46,7 @@ struct DeviceCreateInfo
 	std::vector<const char*> logicalDeviceExtensions;
 
 	bool enableDebugging;
-	vk::DebugUtilsMessageSeverityFlagBitsEXT debugMessageSeverity;
+	vk::DebugUtilsMessageSeverityFlagsEXT debugMessageSeverity;
 	vk::DebugUtilsMessageTypeFlagsEXT debugMessageTypes;
 };
 
@@ -100,8 +100,12 @@ private:
 	vk::Instance m_Instance = {};
 
 	// Layers & Extensions
-	std::vector<const char*> m_Layers     = {};
-	std::vector<const char*> m_Extensions = {};
+	std::vector<const char*> m_Layers                  = {};
+	std::vector<const char*> m_InstanceExtensions      = {};
+	std::vector<const char*> m_LogicalDeviceExtensions = {};
+
+
+	vk::DebugUtilsMessengerEXT m_DebugUtilMessenger = {};
 
 	// Device
 	vk::Device m_LogicalDevice                              = {};

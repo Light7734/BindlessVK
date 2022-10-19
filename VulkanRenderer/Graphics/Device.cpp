@@ -12,18 +12,10 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-
-template<typename T>
-std::vector<T>& AppendList(std::vector<T>& vec, std::vector<T> values)
-{
-	for (auto& val : values)
-		vec.push_back(val);
-	return vec;
-}
-
-
 Device::Device(const DeviceCreateInfo& createInfo)
     : m_Layers(createInfo.layers)
+    , m_InstanceExtensions(createInfo.instanceExtensions)
+    , m_LogicalDeviceExtensions(createInfo.logicalDeviceExtensions)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Initialize volk
@@ -57,9 +49,9 @@ Device::Device(const DeviceCreateInfo& createInfo)
 	// Create vulkan instance, window surface, debug messenger, and load the instace with volk.
 	{
 		vk::ApplicationInfo applicationInfo {
-			"Vulkan Renderer",        // pApplicationName
+			"BindlessVK",             // pApplicationName
 			VK_MAKE_VERSION(1, 0, 0), // applicationVersion
-			"None",                   // pEngineName
+			"BindlessVK",             // pEngineName
 			VK_MAKE_VERSION(1, 0, 0), // engineVersion
 			VK_API_VERSION_1_2,       // apiVersion
 		};
@@ -68,7 +60,6 @@ Device::Device(const DeviceCreateInfo& createInfo)
 			{},                              // flags
 			createInfo.debugMessageSeverity, // messageSeverity
 			createInfo.debugMessageTypes,    // messageType
-			nullptr,                         // pUserData
 		};
 
 		// Setup validation layer message callback
@@ -76,7 +67,89 @@ Device::Device(const DeviceCreateInfo& createInfo)
 		                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 		                                              const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		                                              void* pUserData) {
-			LOGVk(trace, "{}", pCallbackData->pMessage); // #TODO: Format this!
+			std::string type = messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT                                                                       ? "GENERAL" :
+			                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT && messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ? "VALIDATION | PERFORMANCE" :
+			                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT                                                                    ? "VALIDATION" :
+			                                                                                                                                                       "PERFORMANCE";
+
+			std::string message = (pCallbackData->pMessage);
+
+			auto pos = message.find_last_of("|");
+			if (pos != std::string::npos)
+			{
+				message = message.substr(pos + 1);
+			}
+			pos = message.find_last_of("(");
+			if (pos != std::string::npos)
+			{
+				message = message.substr(0, pos);
+			}
+
+			if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+			{
+				LOGVk(err, ">>VULKAN MESSAGE CALLBACK<<");
+				LOGVk(err, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
+				LOGVk(err, "    Type: {}", type);
+				LOGVk(err, "    Message: {}", message);
+				LOGVk(err, "");
+
+
+				if (pCallbackData->objectCount)
+				{
+					LOGVk(err, "     OBJECTS - {}:", pCallbackData->objectCount);
+					for (uint32_t object = 0; object < pCallbackData->objectCount; object++)
+					{
+						LOGVk(err, "            Object[{}] -> Type: {}, Value: {}, Name: {}",
+						      object,
+						      pCallbackData->pObjects[object].objectType,
+						      fmt::ptr((void*)pCallbackData->pObjects[object].objectHandle),
+						      pCallbackData->pObjects[object].pObjectName ? pCallbackData->pObjects[object].pObjectName : "Undefined");
+					}
+				}
+
+				if (pCallbackData->cmdBufLabelCount)
+				{
+					LOGVk(err, "     COMMAND BUFFER LABELS - {}", pCallbackData->cmdBufLabelCount);
+					for (uint32_t label = 0; label < pCallbackData->cmdBufLabelCount; label++)
+					{
+						LOGVk(err, "            Label[{}] -> {} ({}, {}, {}, {})",
+						      label,
+						      pCallbackData->pCmdBufLabels[label].pLabelName,
+						      pCallbackData->pCmdBufLabels[label].color[0],
+						      pCallbackData->pCmdBufLabels[label].color[1],
+						      pCallbackData->pCmdBufLabels[label].color[2],
+						      pCallbackData->pCmdBufLabels[label].color[3]);
+					}
+				}
+
+				DEBUG_TRAP();
+			}
+			else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+			{
+				LOGVk(warn, ">>VULKAN MESSAGE CALLBACK<<");
+				LOGVk(warn, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
+				LOGVk(warn, "    Type: {}", type);
+				LOGVk(warn, "    Message: {}", pCallbackData->pMessage);
+				LOGVk(warn, "");
+			}
+			else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+			{
+				LOGVk(info, ">>VULKAN MESSAGE CALLBACK<<");
+				LOGVk(info, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
+				LOGVk(info, "    Type: {}", type);
+				LOGVk(info, "    Message: {}", pCallbackData->pMessage);
+				LOGVk(info, "");
+			}
+			else
+			{
+				LOGVk(trace, "[ >> VULKAN MESSAGE CALLBACK << ]");
+				LOGVk(trace, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
+				LOGVk(trace, "    Type: {}", type);
+				LOGVk(trace, "    Message: {}", pCallbackData->pMessage);
+				LOGVk(trace, "");
+			}
+
+
 			return static_cast<VkBool32>(VK_FALSE);
 		};
 
@@ -91,22 +164,24 @@ Device::Device(const DeviceCreateInfo& createInfo)
 		}
 
 		// Create the vulkan instance
-		std::vector<const char*> requiredWindowExtensions = createInfo.window->GetRequiredExtensions();
+		std::vector<const char*> windowExtensions = createInfo.window->GetRequiredExtensions();
+		m_InstanceExtensions.insert(m_InstanceExtensions.end(), windowExtensions.begin(), windowExtensions.end());
 
-		m_Extensions = AppendList(requiredWindowExtensions, m_Extensions);
 		vk::InstanceCreateInfo instanceCreateInfo {
-			{},                                                               // flags
-			&applicationInfo,                                                 // pApplicationInfo
-			static_cast<uint32_t>(m_Layers.size()),                           // enabledLayerCount
-			m_Layers.data(),                                                  // ppEnabledLayerNames
-			static_cast<uint32_t>(m_Extensions.size()),                       // enabledExtensionCount
-			m_Extensions.data(),                                              // ppEnabledExtensionNames
-			createInfo.enableDebugging ? &debugMessengerCreateInfo : nullptr, // pNext
+			{},                                                 // flags
+			&applicationInfo,                                   // pApplicationInfo
+			static_cast<uint32_t>(m_Layers.size()),             // enabledLayerCount
+			m_Layers.data(),                                    // ppEnabledLayerNames
+			static_cast<uint32_t>(m_InstanceExtensions.size()), // enabledExtensionCount
+			m_InstanceExtensions.data(),                        // ppEnabledExtensionNames
 		};
 
 		VKC(vk::createInstance(&instanceCreateInfo, nullptr, &m_Instance));
 		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Instance);
 		m_SurfaceInfo.surface = createInfo.window->CreateSurface(m_Instance);
+
+
+		m_DebugUtilMessenger = m_Instance.createDebugUtilsMessengerEXT(debugMessengerCreateInfo);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -178,7 +253,7 @@ Device::Device(const DeviceCreateInfo& createInfo)
 					continue;
 
 				bool failed = false;
-				for (const auto& requiredExtensionName : createInfo.logicalDeviceExtensions)
+				for (const auto& requiredExtensionName : m_LogicalDeviceExtensions)
 				{
 					bool found = false;
 					for (const auto& extension : deviceExtensionsProperties)
@@ -323,14 +398,14 @@ Device::Device(const DeviceCreateInfo& createInfo)
 		};
 
 		vk::DeviceCreateInfo logicalDeviceCreateInfo {
-			{},                                                               // flags
-			static_cast<uint32_t>(queuesCreateInfo.size()),                   // queueCreateInfoCount
-			queuesCreateInfo.data(),                                          // pQueueCreateInfos
-			0u,                                                               // enabledLayerCount
-			nullptr,                                                          // ppEnabledLayerNames
-			static_cast<uint32_t>(createInfo.logicalDeviceExtensions.size()), // enabledExtensionCount
-			createInfo.logicalDeviceExtensions.data(),                        // ppEnabledExtensionNames
-			&physicalDeviceFeatures,                                          // pEnabledFeatures
+			{},                                                      // flags
+			static_cast<uint32_t>(queuesCreateInfo.size()),          // queueCreateInfoCount
+			queuesCreateInfo.data(),                                 // pQueueCreateInfos
+			0u,                                                      // enabledLayerCount
+			nullptr,                                                 // ppEnabledLayerNames
+			static_cast<uint32_t>(m_LogicalDeviceExtensions.size()), // enabledExtensionCount
+			m_LogicalDeviceExtensions.data(),                        // ppEnabledExtensionNames
+			&physicalDeviceFeatures,                                 // pEnabledFeatures
 		};
 
 		m_LogicalDevice = m_PhysicalDevice.createDevice(logicalDeviceCreateInfo);
@@ -430,6 +505,8 @@ Device::~Device()
 	m_LogicalDevice.destroy(nullptr);
 
 	m_Instance.destroySurfaceKHR(m_SurfaceInfo.surface, nullptr);
+
+	m_Instance.destroyDebugUtilsMessengerEXT(m_DebugUtilMessenger);
 	m_Instance.destroy();
 }
 
@@ -454,7 +531,7 @@ void Device::LogDebugInfo()
 			LOG(info, "        {}", layer);
 
 		LOG(info, "    Extensions:");
-		for (auto extension : m_Extensions)
+		for (auto extension : m_InstanceExtensions)
 			LOG(info, "        {}", extension);
 
 		LOG(info, "    Queues:");

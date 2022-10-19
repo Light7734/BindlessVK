@@ -935,7 +935,6 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		uint32_t primitives          = 0;
 		scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
 			// bind pipeline
-			LOG(trace, "Pipeline...");
 			vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
 			if (currentPipeline != newPipeline)
 			{
@@ -944,19 +943,15 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 			}
 
 			// bind buffers
-			LOG(trace, "Buffers");
 			secondaryCmds.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
 			secondaryCmds.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
 
 			// draw primitves
-			LOG(trace, "Primitives");
 			for (const auto* node : renderComp.model->nodes)
 			{
 				for (const auto& primitive : node->mesh)
 				{
-					LOG(trace, "Primitive {}", primitives++);
 					uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
-					LOG(trace, "Tex index: {}", textureIndex);
 					secondaryCmds.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
 				}
 			}
