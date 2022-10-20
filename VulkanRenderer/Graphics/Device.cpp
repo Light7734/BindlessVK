@@ -148,7 +148,7 @@ Device::Device(const DeviceCreateInfo& createInfo)
 			VK_MAKE_VERSION(1, 0, 0), // applicationVersion
 			"BindlessVK",             // pEngineName
 			VK_MAKE_VERSION(1, 0, 0), // engineVersion
-			VK_API_VERSION_1_2,       // apiVersion
+			VK_API_VERSION_1_3,       // apiVersion
 		};
 
 		vk::DebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
@@ -404,6 +404,10 @@ Device::Device(const DeviceCreateInfo& createInfo)
 			VK_FALSE, // inheritedQueries
 		};
 
+		vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures {
+			true, // dynamicRendering
+		};
+
 		vk::DeviceCreateInfo logicalDeviceCreateInfo {
 			{},                                                      // flags
 			static_cast<uint32_t>(queuesCreateInfo.size()),          // queueCreateInfoCount
@@ -413,6 +417,7 @@ Device::Device(const DeviceCreateInfo& createInfo)
 			static_cast<uint32_t>(m_LogicalDeviceExtensions.size()), // enabledExtensionCount
 			m_LogicalDeviceExtensions.data(),                        // ppEnabledExtensionNames
 			&physicalDeviceFeatures,                                 // pEnabledFeatures
+			&dynamicRenderingFeatures,
 		};
 
 		m_LogicalDevice = m_PhysicalDevice.createDevice(logicalDeviceCreateInfo);
@@ -502,6 +507,26 @@ SurfaceInfo Device::FetchSurfaceInfo()
 	m_SurfaceInfo.supportedPresentModes = m_PhysicalDevice.getSurfacePresentModesKHR(m_SurfaceInfo.surface);
 
 	return m_SurfaceInfo;
+}
+
+vk::Format Device::FetchDepthFormat()
+{
+	vk::Format result        = {};
+	bool hasStencilComponent = false;
+	vk::FormatProperties formatProperties;
+	for (vk::Format format : { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint })
+	{
+		formatProperties = m_PhysicalDevice.getFormatProperties(format);
+		if ((formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) == vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+		{
+			result              = format;
+			hasStencilComponent = format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
+		}
+	}
+
+	LOG(trace, "Detph format: {}",  string_VkFormat(static_cast<VkFormat>(result)));
+
+	return result;
 }
 
 Device::~Device()

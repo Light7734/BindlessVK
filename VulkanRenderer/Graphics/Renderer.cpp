@@ -162,7 +162,6 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 			m_SurfaceInfo.format.format, // format
 
 			/* extent */
-
 			vk::Extent3D {
 			    m_SurfaceInfo.capabilities.currentExtent.width,  // width
 			    m_SurfaceInfo.capabilities.currentExtent.height, // height
@@ -217,31 +216,11 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create depth buffer
 	{
-		// Find depth format
-		m_DepthFormat            = vk::Format::eUndefined;
-		bool hasStencilComponent = false;
-		vk::FormatProperties formatProperties;
-		for (vk::Format format :
-		     { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint,
-		       vk::Format::eD24UnormS8Uint })
-		{
-			formatProperties =
-			    deviceContext.physicalDevice.getFormatProperties(format);
-			if ((formatProperties.optimalTilingFeatures &
-			     vk::FormatFeatureFlagBits::eDepthStencilAttachment) ==
-			    vk::FormatFeatureFlagBits::eDepthStencilAttachment)
-			{
-				m_DepthFormat       = format;
-				hasStencilComponent = format == vk::Format::eD32SfloatS8Uint ||
-				                      format == vk::Format::eD24UnormS8Uint;
-			}
-		}
-
 		// Create depth image
 		vk::ImageCreateInfo imageCreateInfo {
-			{},                 // flags
-			vk::ImageType::e2D, // imageType
-			m_DepthFormat,      // format
+			{},                        // flags
+			vk::ImageType::e2D,        // imageType
+			deviceContext.depthFormat, // format
 
 			/* extent */
 			vk::Extent3D {
@@ -260,18 +239,17 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 			vk::ImageLayout::eUndefined,                     // initialLayout
 		};
 
-		vma::AllocationCreateInfo imageAllocInfo(
-		    {}, vma::MemoryUsage::eGpuOnly,
-		    vk::MemoryPropertyFlagBits::eDeviceLocal);
+		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
 		m_DepthImage = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		// Create depth image-view
 		vk::ImageViewCreateInfo imageViewCreateInfo {
-			{},                     // flags
-			m_DepthImage,           // image
-			vk::ImageViewType::e2D, // viewType
-			m_DepthFormat,          // format
+			{},                        // flags
+			m_DepthImage,              // image
+			vk::ImageViewType::e2D,    // viewType
+			deviceContext.depthFormat, // format
+
 			/* components */
 			vk::ComponentMapping {
 			    // Don't swizzle the colors around...
@@ -292,124 +270,6 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		};
 
 		m_DepthImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Specify the attachments and subpasses and create the forward pass
-	{
-		// Attachments
-		std::vector<vk::AttachmentDescription> attachments;
-		attachments.push_back({
-		    {},                                       // flags
-		    m_SurfaceInfo.format.format,              // format
-		    m_SampleCount,                            // samples
-		    vk::AttachmentLoadOp::eClear,             // loadOp
-		    vk::AttachmentStoreOp::eStore,            // storeOp
-		    vk::AttachmentLoadOp::eDontCare,          // stencilLoadOp
-		    vk::AttachmentStoreOp::eDontCare,         // stencilStoreOp
-		    vk::ImageLayout::eUndefined,              // initialLayout
-		    vk::ImageLayout::eColorAttachmentOptimal, // finalLayout
-		});
-
-		attachments.push_back({
-		    {},                                              // flags
-		    m_DepthFormat,                                   // format
-		    m_SampleCount,                                   // samples
-		    vk::AttachmentLoadOp::eClear,                    // loadOp
-		    vk::AttachmentStoreOp::eStore,                   // storeOp
-		    vk::AttachmentLoadOp::eDontCare,                 // stencilLoadOp
-		    vk::AttachmentStoreOp::eDontCare,                // stencilStoreOp
-		    vk::ImageLayout::eUndefined,                     // initialLayout
-		    vk::ImageLayout::eDepthStencilAttachmentOptimal, // finalLayout
-		});
-
-		attachments.push_back({
-		    {},                               // flags
-		    m_SurfaceInfo.format.format,      // format
-		    vk::SampleCountFlagBits::e1,      // samples
-		    vk::AttachmentLoadOp::eDontCare,  // loadOp
-		    vk::AttachmentStoreOp::eStore,    // storeOp
-		    vk::AttachmentLoadOp::eDontCare,  // stencilLoadOp
-		    vk::AttachmentStoreOp::eDontCare, // stencilStoreOp
-		    vk::ImageLayout::eUndefined,      // initialLayout
-		    vk::ImageLayout::ePresentSrcKHR,  // finalLayout
-		});
-
-		// Subpass
-		vk::AttachmentReference colorAttachmentRef {
-			0u,                                       // attachment
-			vk::ImageLayout::eColorAttachmentOptimal, // layout
-		};
-
-		vk::AttachmentReference depthAttachmentRef {
-			1u,                                              // attachment
-			vk::ImageLayout::eDepthStencilAttachmentOptimal, // layout
-		};
-
-		vk::AttachmentReference colorAttachmentResolveRef {
-			2u,                                       // attachment
-			vk::ImageLayout::eColorAttachmentOptimal, // layout
-		};
-
-		vk::SubpassDescription subpassDesc {
-			{},                               // flags
-			vk::PipelineBindPoint::eGraphics, // pipelineBindPoint
-			0u,                               // ipnutAttachmentCount
-			nullptr,                          // pInputAttachments
-			1u,                               // colorAttachmentCount
-			&colorAttachmentRef,              // pColorAttachments
-			&colorAttachmentResolveRef,       // pResolveAttachments
-			&depthAttachmentRef,              // pDepthStencilAttachment
-		};
-
-		// Subpass dependency
-		vk::SubpassDependency subpassDependency {
-			VK_SUBPASS_EXTERNAL,                                                                                // srcSubpass
-			0u,                                                                                                 // dstSubpass
-			vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests, // srcStageMask
-			vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests, // dstStageMask
-			{},                                                                                                 // srcAccessMask
-			vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,       // dstAccessMask
-			{},                                                                                                 // dependencytFlags
-		};
-
-		// Renderpass
-		vk::RenderPassCreateInfo renderPassCreateInfo {
-			{},                                        // flags
-			static_cast<uint32_t>(attachments.size()), // attachmentCount
-			attachments.data(),                        // pAttachments
-			1u,                                        // subpassCount
-			&subpassDesc,                              // pSubpasses
-			1u,                                        // dependencyCount
-			&subpassDependency,                        // pDependencies
-		};
-
-		m_ForwardPass.renderpass =
-		    m_LogicalDevice.createRenderPass(renderPassCreateInfo, nullptr);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create the framebuffers
-	{
-		m_ForwardPass.framebuffers.resize(m_Images.size());
-		for (uint32_t i = 0; i < m_ForwardPass.framebuffers.size(); i++)
-		{
-			std::vector<vk::ImageView> imageViews = {
-				m_ColorImageView, m_DepthImageView, m_ImageViews[i]
-			};
-			vk::FramebufferCreateInfo framebufferCreateInfo {
-				{},                                              // flags
-				m_ForwardPass.renderpass,                        // renderPass
-				static_cast<uint32_t>(imageViews.size()),        // attachmentCount
-				imageViews.data(),                               // pAttachments
-				m_SurfaceInfo.capabilities.currentExtent.width,  // width
-				m_SurfaceInfo.capabilities.currentExtent.height, // height
-				1u,                                              // layers
-			};
-
-			m_ForwardPass.framebuffers[i] =
-			    m_LogicalDevice.createFramebuffer(framebufferCreateInfo, nullptr);
-		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -567,11 +427,6 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		}
 	}
 
-
-	/////////////////////////////////////////////////////////////////////////////////
-	/// Write descriptor sets
-
-
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Create frame pipeline layout
 	{
@@ -629,14 +484,16 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		ImGui_ImplGlfw_InitForVulkan(window->GetGlfwHandle(), true);
 
 		ImGui_ImplVulkan_InitInfo initInfo {
-			.Instance       = deviceContext.instance,
-			.PhysicalDevice = deviceContext.physicalDevice,
-			.Device         = m_LogicalDevice,
-			.Queue          = m_QueueInfo.graphicsQueue,
-			.DescriptorPool = m_DescriptorPool,
-			.MinImageCount  = MAX_FRAMES_IN_FLIGHT,
-			.ImageCount     = MAX_FRAMES_IN_FLIGHT,
-			.MSAASamples    = static_cast<VkSampleCountFlagBits>(m_SampleCount),
+			.Instance              = deviceContext.instance,
+			.PhysicalDevice        = deviceContext.physicalDevice,
+			.Device                = m_LogicalDevice,
+			.Queue                 = m_QueueInfo.graphicsQueue,
+			.DescriptorPool        = m_DescriptorPool,
+			.UseDynamicRendering   = true,
+			.ColorAttachmentFormat = static_cast<VkFormat>(m_SurfaceInfo.format.format),
+			.MinImageCount         = MAX_FRAMES_IN_FLIGHT,
+			.ImageCount            = MAX_FRAMES_IN_FLIGHT,
+			.MSAASamples           = static_cast<VkSampleCountFlagBits>(m_SampleCount),
 		};
 
 		std::pair userData = std::make_pair(deviceContext.vkGetInstanceProcAddr, deviceContext.instance);
@@ -649,7 +506,7 @@ void Renderer::RecreateSwapchain(Window* window, DeviceContext deviceContext)
 		           (void*)&userData),
 		       "ImGui failed to load vulkan functions");
 
-		ImGui_ImplVulkan_Init(&initInfo, m_ForwardPass.renderpass);
+		ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
 
 		ImmediateSubmit([](vk::CommandBuffer cmd) {
 			ImGui_ImplVulkan_CreateFontsTexture(cmd);
@@ -719,17 +576,11 @@ void Renderer::DestroySwapchain()
 	m_LogicalDevice.destroyCommandPool(m_CommandPool);
 
 	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
-	for (const auto& framebuffer : m_ForwardPass.framebuffers)
-	{
-		m_LogicalDevice.destroyFramebuffer(framebuffer);
-	}
 
 	for (const auto& imageView : m_ImageViews)
 	{
 		m_LogicalDevice.destroyImageView(imageView);
 	}
-
-	m_LogicalDevice.destroyRenderPass(m_ForwardPass.renderpass);
 
 	m_LogicalDevice.destroyImageView(m_DepthImageView);
 	m_LogicalDevice.destroyImageView(m_ColorImageView);
@@ -875,19 +726,65 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	/// Forward Render Pass
+	/// Rendering
 	{
-		const std::array<vk::ClearValue, 2> clearValues {
-			vk::ClearValue { vk::ClearColorValue { std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f } } },
-			vk::ClearValue { vk::ClearDepthStencilValue { 1.0f, 0 } },
+		vk::RenderingAttachmentInfo colorAttachmentInfo {
+			m_ColorImageView,                         // imageView
+			vk::ImageLayout::eColorAttachmentOptimal, // imageLayout
+
+			vk::ResolveModeFlagBits::eAverage,        // resolveMode
+			m_ImageViews[imageIndex],                 // resolveImageView
+			vk::ImageLayout::eColorAttachmentOptimal, // resolveImageLayout
+
+			vk::AttachmentLoadOp::eClear,  // loadOp
+			vk::AttachmentStoreOp::eStore, // storeOp
+
+			/* clearValue */
+			vk::ClearColorValue {
+			    std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f },
+			},
 		};
 
-		const vk::Framebuffer framebuffer = m_ForwardPass.framebuffers[imageIndex];
+		vk::RenderingAttachmentInfo depthAttachmentInfo {
+			m_DepthImageView,                                // imageView
+			vk::ImageLayout::eDepthStencilAttachmentOptimal, // imageLayout
+
+			{}, // resolveMode
+			{}, // resolveImageView
+			{}, // resolveImageLayout
+
+			vk::AttachmentLoadOp::eClear,  // loadOp
+			vk::AttachmentStoreOp::eStore, // storeOp
+
+			/* clearValue */
+			vk::ClearDepthStencilValue {
+			    { 1.0, 0 },
+			},
+		};
+
+
+		vk::RenderingInfo renderingInfo {
+			{}, // flags
+
+			/* renderArea */
+			vk::Rect2D {
+			    { 0, 0 },                                 // offset
+			    m_SurfaceInfo.capabilities.currentExtent, // extent
+			},
+
+			1u,                   // layerCount
+			{},                   // viewMask
+			1u,                   // colorAttachmentCount
+			&colorAttachmentInfo, // pColorAttachments
+			&depthAttachmentInfo, // pDepthAttachment
+			{},                   // pStencilAttachment
+		};
 
 		const vk::CommandBufferInheritanceInfo inheritanceInfo {
 			m_ForwardPass.renderpass, // renderpass
 			0u,                       // subpass
-			framebuffer,              // framebuffer
+
+			// framebuffer,              // framebuffer
 		};
 
 		const vk::CommandBufferBeginInfo primaryCmdBufferBeginInfo {
@@ -895,39 +792,55 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 			nullptr // pInheritanceInfo
 		};
 
-		const vk::CommandBufferBeginInfo secondaryCmdBufferBeginInfo {
-			vk::CommandBufferUsageFlagBits::eRenderPassContinue, // flags
-			&inheritanceInfo                                     // pInheritanceInfo
-		};
-
-		const vk::RenderPassBeginInfo renderpassBeginInfo {
-			m_ForwardPass.renderpass, // renderPass
-			framebuffer,              // framebuffer
-
-			/* renderArea */
-			vk::Rect2D {
-			    { 0, 0 },                                 // offset
-			    m_SurfaceInfo.capabilities.currentExtent, // extent
-			},
-			static_cast<uint32_t>(clearValues.size()), // clearValueCount
-			clearValues.data(),                        // pClearValues
-		};
+		// const vk::CommandBufferBeginInfo secondaryCmdBufferBeginInfo {
+		// 	vk::CommandBufferUsageFlagBits::eRenderPassContinue, // flags
+		// 	&inheritanceInfo                                     // pInheritanceInfo
+		// };
 
 		// Record commnads @todo multi-thread secondary commands
-		const auto primaryCmd    = m_ForwardPass.cmdBuffers[m_CurrentFrame].primary;
-		const auto secondaryCmds = m_ForwardPass.cmdBuffers[m_CurrentFrame].secondaries[m_CurrentFrame];
+		const auto primaryCmd = m_ForwardPass.cmdBuffers[m_CurrentFrame].primary;
+		// const auto secondaryCmds = m_ForwardPass.cmdBuffers[m_CurrentFrame].secondaries[m_CurrentFrame];
 
 		primaryCmd.reset();
 		primaryCmd.begin(primaryCmdBufferBeginInfo);
-		primaryCmd.beginRenderPass(renderpassBeginInfo, vk::SubpassContents::eSecondaryCommandBuffers);
+
+		// Transition image to color write
+		vk::ImageMemoryBarrier imageMemoryBarrier {
+			{},                                        // srcAccessMask
+			vk::AccessFlagBits::eColorAttachmentWrite, // dstAccessMask
+			vk::ImageLayout::eUndefined,               // oldLayout
+			vk::ImageLayout::eColorAttachmentOptimal,  // newLayout
+			{},
+			{},
+			m_Images[imageIndex], // image
+
+			/* subresourceRange */
+			vk::ImageSubresourceRange {
+			    vk::ImageAspectFlagBits::eColor,
+			    0u,
+			    1u,
+			    0u,
+			    1u,
+			},
+		};
+
+		primaryCmd.pipelineBarrier(
+		    vk::PipelineStageFlagBits::eTopOfPipe,
+		    vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		    {},
+		    {},
+		    {},
+		    imageMemoryBarrier);
+
+		primaryCmd.beginRendering(renderingInfo);
 
 		const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
 
-		secondaryCmds.reset();
+		// secondaryCmds.reset();
 
-		secondaryCmds.begin(secondaryCmdBufferBeginInfo);
-		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
-		secondaryCmds.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &m_ForwardPass.descriptorSets[m_CurrentFrame], 0ul, nullptr);
+		// secondaryCmds.begin(secondaryCmdBufferBeginInfo);
+		primaryCmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
+		primaryCmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &m_ForwardPass.descriptorSets[m_CurrentFrame], 0ul, nullptr);
 
 		VkDeviceSize offset { 0 };
 
@@ -938,13 +851,13 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 			vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
 			if (currentPipeline != newPipeline)
 			{
-				secondaryCmds.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
+				primaryCmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
 				currentPipeline = newPipeline;
 			}
 
 			// bind buffers
-			secondaryCmds.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
-			secondaryCmds.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
+			primaryCmd.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
+			primaryCmd.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
 
 			// draw primitves
 			for (const auto* node : renderComp.model->nodes)
@@ -952,16 +865,75 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 				for (const auto& primitive : node->mesh)
 				{
 					uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
-					secondaryCmds.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
+					primaryCmd.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
 				}
 			}
 		});
 
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), secondaryCmds);
-		secondaryCmds.end();
+		// primaryCmd.executeCommands(1ul, &primaryCmd);
+		primaryCmd.endRendering();
 
-		primaryCmd.executeCommands(1ul, &secondaryCmds);
-		primaryCmd.endRenderPass();
+		colorAttachmentInfo = {
+			m_ColorImageView,                         // imageView
+			vk::ImageLayout::eColorAttachmentOptimal, // imageLayout
+
+			vk::ResolveModeFlagBits::eAverage,        // resolveMode
+			m_ImageViews[imageIndex],                 // resolveImageView
+			vk::ImageLayout::eColorAttachmentOptimal, // resolveImageLayout
+
+			vk::AttachmentLoadOp::eLoad,   // loadOp
+			vk::AttachmentStoreOp::eStore, // storeOp
+		};
+		renderingInfo = {
+			{}, // flags
+
+			/* renderArea */
+			vk::Rect2D {
+			    { 0, 0 },                                 // offset
+			    m_SurfaceInfo.capabilities.currentExtent, // extent
+			},
+
+			1u,                   // layerCount
+			{},                   // viewMask
+			1u,                   // colorAttachmentCount
+			&colorAttachmentInfo, // pColorAttachments
+			{},                   // pDepthAttachment
+			{},                   // pStencilAttachment
+		};
+
+		primaryCmd.beginRendering(renderingInfo);
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), primaryCmd);
+		primaryCmd.endRendering();
+
+		// Transition color image to present optimal
+		imageMemoryBarrier = {
+			vk::AccessFlagBits::eColorAttachmentWrite, // srcAccessMask
+			{},                                        // dstAccessMask
+			vk::ImageLayout::eColorAttachmentOptimal,  // oldLayout
+			vk::ImageLayout::ePresentSrcKHR,           // newLayout
+			{},
+			{},
+			m_Images[imageIndex], // image
+
+			/* subresourceRange */
+			vk::ImageSubresourceRange {
+			    vk::ImageAspectFlagBits::eColor,
+			    0u,
+			    1u,
+			    0u,
+			    1u,
+			},
+		};
+
+		primaryCmd.pipelineBarrier(
+		    vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		    vk::PipelineStageFlagBits::eBottomOfPipe,
+		    {},
+		    {},
+		    {},
+		    imageMemoryBarrier);
+
+
 		primaryCmd.end();
 	}
 

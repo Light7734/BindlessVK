@@ -59,6 +59,7 @@ struct DeviceContext
 	vk::PhysicalDeviceProperties physicalDeviceProperties;
 	vk::SampleCountFlagBits maxSupportedSampleCount;
 	vma::Allocator allocator;
+	vk::Format depthFormat;
 
 	QueueInfo queueInfo;
 	SurfaceInfo surfaceInfo;
@@ -84,6 +85,7 @@ public:
 			m_PhysicalDeviceProperties,
 			m_MaxSupportedSampleCount,
 			m_Allocator,
+			FetchDepthFormat(),
 			m_QueueInfo,
 			FetchSurfaceInfo(),
 		};
@@ -91,9 +93,8 @@ public:
 
 private:
 	SurfaceInfo FetchSurfaceInfo();
+    vk::Format FetchDepthFormat();
 
-
-    
 
 private:
 	vk::DynamicLoader m_DynamicLoader;

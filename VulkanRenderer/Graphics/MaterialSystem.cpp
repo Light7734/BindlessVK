@@ -1,4 +1,5 @@
 #include "Graphics/MaterialSystem.hpp"
+#include <vulkan/vk_enum_string_helper.h>
 
 #include <fstream>
 #include <istream>
@@ -179,6 +180,15 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		};
 	}
 
+	LOG(trace, "Depth attachment format: {}", string_VkFormat(static_cast<VkFormat>(info.depthAttachmentFormat)));
+	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
+		{},                          //  viewMask
+		1u,                          // colorAttachmentCount
+		&info.colorAttachmentFormat, // pColorAttachmentFormats
+		info.depthAttachmentFormat,  // depthAttachmentFormat
+		{},                          // stencilAttachmentFormat
+	};
+
 	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
 		{}, // flags
 		static_cast<uint32_t>(stages.size()),
@@ -193,10 +203,11 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		&info.pipelineConfiguration.colorBlendState,
 		&info.pipelineConfiguration.dynamicState,
 		info.effect->pipelineLayout,
-		info.renderPass,
-		info.subpass,
-		{},
-		{},
+		{}, // renderPass
+		{}, // subpass
+		{}, // basePipelineHandle
+		{}, // basePipelineIndex
+		&pipelineRenderingCreateInfo,
 	};
 
 	auto pipeline = m_LogicalDevice.createGraphicsPipeline({}, graphicsPipelineCreateInfo);
@@ -204,7 +215,6 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 
 	m_ShaderPasses[HashStr(info.name)] = {
 		info.effect,
-		info.renderPass,
 		pipeline.value,
 	};
 }

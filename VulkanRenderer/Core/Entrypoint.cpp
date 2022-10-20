@@ -62,7 +62,7 @@ void LoadShaderEffects(MaterialSystem& materialSystem)
 	});
 }
 
-void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass, vk::Extent2D extent, vk::SampleCountFlagBits sampleCount)
+void LoadShaderPasses(MaterialSystem& materialSystem, vk::Format colorAttachmentFormat, vk::Format depthAttachmentFormat, vk::Extent2D extent, vk::SampleCountFlagBits sampleCount)
 {
 	{
 		// @TODO: Load from files instead of hard-coding
@@ -201,8 +201,8 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass
 		        vk::PipelineDynamicStateCreateInfo {},
 		    },
 		    materialSystem.GetShaderEffect("default"),
-		    forwardPass,
-		    0ull,
+		    colorAttachmentFormat,
+            depthAttachmentFormat,
 		});
 	}
 
@@ -326,8 +326,8 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass
 
 		        vk::PipelineDepthStencilStateCreateInfo {
 		            {},
-		            VK_TRUE,                    // depthTestEnable
-		            VK_TRUE,                    // depthWriteEnable
+		            VK_TRUE,                     // depthTestEnable
+		            VK_TRUE,                     // depthWriteEnable
 		            vk::CompareOp::eLessOrEqual, // depthCompareOp
 		            VK_FALSE,                    // depthBoundsTestEnable
 		            VK_FALSE,                    // stencilTestEnable
@@ -349,8 +349,8 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::RenderPass forwardPass
 		    },
 
 		    materialSystem.GetShaderEffect("skybox"),
-		    forwardPass,
-		    0ull,
+		    colorAttachmentFormat,
+            depthAttachmentFormat,
 		});
 	}
 }
@@ -466,15 +466,18 @@ int main()
 		    },
 		    .logicalDeviceExtensions = {
 		        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 		    },
 		    .enableDebugging      = true,
 		    .debugMessageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
 		    .debugMessageTypes    = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
 		});
+		DeviceContext deviceContext = device.GetContext();
+
 
 		// textureSystem
 		TextureSystem textureSystem({
-		    .deviceContext = device.GetContext(),
+		    .deviceContext = deviceContext,
 		});
 
 		uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
@@ -497,7 +500,7 @@ int main()
 		// Renderer
 		Renderer renderer = Renderer({
 		    .window         = &window,
-		    .deviceContext  = device.GetContext(),
+		    .deviceContext  = deviceContext,
 		    .defaultTexture = textureSystem.GetTexture("default"),
 		    .skyboxTexture  = textureSystem.GetTexture("skybox"),
 		});
@@ -512,8 +515,6 @@ int main()
 		    device.GetContext(),
 		    renderer.GetCommandPool(),
 		    renderer.GetQueueInfo().graphicsQueue,
-
-
 		});
 
 
@@ -533,7 +534,7 @@ int main()
 		/// Load assets
 		LoadShaders(materialSystem);
 		LoadShaderEffects(materialSystem);
-		LoadShaderPasses(materialSystem, renderer.GetForwardPass(), device.GetContext().surfaceInfo.capabilities.currentExtent, device.GetContext().maxSupportedSampleCount);
+		LoadShaderPasses(materialSystem, deviceContext.surfaceInfo.format.format, deviceContext.depthFormat, deviceContext.surfaceInfo.capabilities.currentExtent, deviceContext.maxSupportedSampleCount);
 		LoadMasterMaterials(materialSystem);
 		LoadMaterials(materialSystem);
 
@@ -559,7 +560,7 @@ int main()
 				renderer.RecreateSwapchain(&window, device.GetContext());
 
 				materialSystem.DestroyAllMaterials();
-				LoadShaderPasses(materialSystem, renderer.GetForwardPass(), device.GetContext().surfaceInfo.capabilities.currentExtent, device.GetContext().maxSupportedSampleCount);
+				LoadShaderPasses(materialSystem, deviceContext.surfaceInfo.format.format, deviceContext.depthFormat, deviceContext.surfaceInfo.capabilities.currentExtent, deviceContext.maxSupportedSampleCount);
 				LoadMasterMaterials(materialSystem);
 				LoadMaterials(materialSystem);
 

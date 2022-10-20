@@ -70,13 +70,11 @@ struct ShaderPass
 		const char* name;
 		PipelineConfiguration pipelineConfiguration;
 		ShaderEffect* effect;
-		vk::RenderPass renderPass;
-		uint32_t subpass;
+		vk::Format colorAttachmentFormat;
+        vk::Format depthAttachmentFormat;
 	};
 
 	ShaderEffect* effect;
-
-	vk::RenderPass renderPass;
 	vk::Pipeline pipeline;
 };
 
