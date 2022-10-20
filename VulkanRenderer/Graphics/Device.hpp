@@ -92,6 +92,9 @@ public:
 private:
 	SurfaceInfo FetchSurfaceInfo();
 
+
+    
+
 private:
 	vk::DynamicLoader m_DynamicLoader;
 	PFN_vkGetInstanceProcAddr m_VkGetInstanceProcAddr;

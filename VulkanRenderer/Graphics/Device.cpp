@@ -8,9 +8,104 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vk_mem_alloc.hpp>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan_core.h>
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+
+VkBool32 VulkanDebugMessageCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData)
+{
+	std::string type = messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT                                                                       ? "GENERAL" :
+	                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT && messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ? "VALIDATION | PERFORMANCE" :
+	                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT                                                                    ? "VALIDATION" :
+	                                                                                                                                                       "PERFORMANCE";
+
+	std::string message             = (pCallbackData->pMessage);
+	std::string url                 = {};
+	std::string vulkanSpecStatement = {};
+
+	// Remove beginning sections ( we'll log them ourselves )
+	auto pos = message.find_last_of("|");
+	if (pos != std::string::npos)
+	{
+		message = message.substr(pos + 2);
+	}
+
+	// Separate url section of message
+	pos = message.find_last_of("(");
+	if (pos != std::string::npos)
+	{
+		url     = message.substr(pos + 1, message.length() - (pos + 2));
+		message = message.substr(0, pos);
+	}
+
+	// Separate the "Vulkan spec states:" section of the message
+	pos = message.find("The Vulkan spec states:");
+	if (pos != std::string::npos)
+	{
+		size_t len          = std::strlen("The Vulkan spec states: ");
+		vulkanSpecStatement = message.substr(pos + len, message.length() - pos - len);
+		message             = message.substr(0, pos);
+	}
+
+	if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+	{
+		LOGVk(err, "[ __VULKAN_MESSAGE_CALLBACK__ ]");
+		LOGVk(err, "    Type -> {} - {}", type, pCallbackData->pMessageIdName);
+		LOGVk(err, "    Url  -> {}", url);
+		LOGVk(err, "    Msg  -> {}", message);
+		LOGVk(err, "    Spec -> {}", vulkanSpecStatement);
+
+		if (pCallbackData->objectCount)
+		{
+			LOGVk(err, "    {} OBJECTS:", pCallbackData->objectCount);
+			for (uint32_t object = 0; object < pCallbackData->objectCount; object++)
+			{
+				LOGVk(err, "            [{}] {} -> Addr: {}, Name: {}",
+				      object,
+				      string_VkObjectType(pCallbackData->pObjects[object].objectType) + std::strlen("VK_OBJECT_TYPE_"),
+				      fmt::ptr((void*)pCallbackData->pObjects[object].objectHandle),
+				      pCallbackData->pObjects[object].pObjectName ? pCallbackData->pObjects[object].pObjectName : "(Undefined)");
+			}
+		}
+
+		if (pCallbackData->cmdBufLabelCount)
+		{
+			LOGVk(err, "    {} COMMAND BUFFER LABELS:", pCallbackData->cmdBufLabelCount);
+			for (uint32_t label = 0; label < pCallbackData->cmdBufLabelCount; label++)
+			{
+				LOGVk(err, "            [{}]-> {} ({}, {}, {}, {})",
+				      label,
+				      pCallbackData->pCmdBufLabels[label].pLabelName,
+				      pCallbackData->pCmdBufLabels[label].color[0],
+				      pCallbackData->pCmdBufLabels[label].color[1],
+				      pCallbackData->pCmdBufLabels[label].color[2],
+				      pCallbackData->pCmdBufLabels[label].color[3]);
+			}
+		}
+
+		LOGVk(err, "");
+	}
+	else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
+	{
+		LOGVk(warn, "{} - {}-> {}", type, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+	}
+	else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
+	{
+		LOGVk(info, "{} - {}-> {}", type, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+	}
+	else
+	{
+		LOGVk(trace, "{} - {}-> {}", type, pCallbackData->pMessageIdName, pCallbackData->pMessage);
+	}
+
+
+	return static_cast<VkBool32>(VK_FALSE);
+}
 
 Device::Device(const DeviceCreateInfo& createInfo)
     : m_Layers(createInfo.layers)
@@ -63,95 +158,7 @@ Device::Device(const DeviceCreateInfo& createInfo)
 		};
 
 		// Setup validation layer message callback
-		debugMessengerCreateInfo.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-		                                              VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-		                                              const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-		                                              void* pUserData) {
-			std::string type = messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT                                                                       ? "GENERAL" :
-			                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT && messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ? "VALIDATION | PERFORMANCE" :
-			                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT                                                                    ? "VALIDATION" :
-			                                                                                                                                                       "PERFORMANCE";
-
-			std::string message = (pCallbackData->pMessage);
-
-			auto pos = message.find_last_of("|");
-			if (pos != std::string::npos)
-			{
-				message = message.substr(pos + 1);
-			}
-			pos = message.find_last_of("(");
-			if (pos != std::string::npos)
-			{
-				message = message.substr(0, pos);
-			}
-
-			if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-			{
-				LOGVk(err, ">>VULKAN MESSAGE CALLBACK<<");
-				LOGVk(err, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
-				LOGVk(err, "    Type: {}", type);
-				LOGVk(err, "    Message: {}", message);
-				LOGVk(err, "");
-
-
-				if (pCallbackData->objectCount)
-				{
-					LOGVk(err, "     OBJECTS - {}:", pCallbackData->objectCount);
-					for (uint32_t object = 0; object < pCallbackData->objectCount; object++)
-					{
-						LOGVk(err, "            Object[{}] -> Type: {}, Value: {}, Name: {}",
-						      object,
-						      pCallbackData->pObjects[object].objectType,
-						      fmt::ptr((void*)pCallbackData->pObjects[object].objectHandle),
-						      pCallbackData->pObjects[object].pObjectName ? pCallbackData->pObjects[object].pObjectName : "Undefined");
-					}
-				}
-
-				if (pCallbackData->cmdBufLabelCount)
-				{
-					LOGVk(err, "     COMMAND BUFFER LABELS - {}", pCallbackData->cmdBufLabelCount);
-					for (uint32_t label = 0; label < pCallbackData->cmdBufLabelCount; label++)
-					{
-						LOGVk(err, "            Label[{}] -> {} ({}, {}, {}, {})",
-						      label,
-						      pCallbackData->pCmdBufLabels[label].pLabelName,
-						      pCallbackData->pCmdBufLabels[label].color[0],
-						      pCallbackData->pCmdBufLabels[label].color[1],
-						      pCallbackData->pCmdBufLabels[label].color[2],
-						      pCallbackData->pCmdBufLabels[label].color[3]);
-					}
-				}
-
-				DEBUG_TRAP();
-			}
-			else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-			{
-				LOGVk(warn, ">>VULKAN MESSAGE CALLBACK<<");
-				LOGVk(warn, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
-				LOGVk(warn, "    Type: {}", type);
-				LOGVk(warn, "    Message: {}", pCallbackData->pMessage);
-				LOGVk(warn, "");
-			}
-			else if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
-			{
-				LOGVk(info, ">>VULKAN MESSAGE CALLBACK<<");
-				LOGVk(info, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
-				LOGVk(info, "    Type: {}", type);
-				LOGVk(info, "    Message: {}", pCallbackData->pMessage);
-				LOGVk(info, "");
-			}
-			else
-			{
-				LOGVk(trace, "[ >> VULKAN MESSAGE CALLBACK << ]");
-				LOGVk(trace, "    IdNumber: {} IdName: {}", pCallbackData->messageIdNumber, pCallbackData->pMessageIdName);
-				LOGVk(trace, "    Type: {}", type);
-				LOGVk(trace, "    Message: {}", pCallbackData->pMessage);
-				LOGVk(trace, "");
-			}
-
-
-			return static_cast<VkBool32>(VK_FALSE);
-		};
+		debugMessengerCreateInfo.pfnUserCallback = &VulkanDebugMessageCallback;
 
 		// If debugging is not enabled, remove validation layer from instance layers
 		if (!createInfo.enableDebugging)

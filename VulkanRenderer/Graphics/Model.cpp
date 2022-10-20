@@ -37,9 +37,6 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	{
 		for (tinygltf::Image& image : input.images)
 		{
-			// @TODO: Convert 3 component images to 4 components
-			LOG(warn, "Detected image {}", image.uri);
-
 			model.textures.push_back(
 			    info.textureSystem.CreateFromGLTF({
 			        .image = &image,

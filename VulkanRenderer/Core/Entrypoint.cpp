@@ -468,7 +468,7 @@ int main()
 		        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		    },
 		    .enableDebugging      = true,
-		    .debugMessageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose,
+		    .debugMessageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
 		    .debugMessageTypes    = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
 		});
 

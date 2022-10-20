@@ -32,7 +32,6 @@ MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
 	};
 
 	m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
-	LOG(warn, "Created Descriptor Pool");
 }
 
 MaterialSystem::~MaterialSystem()
@@ -71,7 +70,6 @@ void MaterialSystem::DestroyAllMaterials()
 
 	m_ShaderPasses.clear();
 	m_MasterMaterials.clear();
-	LOG(trace, "Loading shaders......");
 	m_Materials.clear();
 }
 
@@ -108,7 +106,6 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 
 	for (const auto& shaderStage : info.shaders)
 	{
-		LOG(trace, shaderStage->code.size());
 		SpvReflectShaderModule spvModule;
 
 		SPVASSERT(spvReflectCreateShaderModule(shaderStage->code.size() * sizeof(uint32_t), shaderStage->code.data(), &spvModule), "spvReflectCreateShaderModule failed");
