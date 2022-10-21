@@ -105,22 +105,23 @@ public:
 	}
 
 private:
-	void BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight);
-
-private:
-	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
-	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
-	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
-
-private:
 	struct UploadContext
 	{
 		vk::CommandBuffer cmdBuffer;
 		vk::CommandPool cmdPool;
 		vk::Fence fence;
-	} m_UploadContext = {};
+	};
 
 private:
+	void BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight);
+
+	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
+	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
+	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
+
+private:
+	UploadContext m_UploadContext                      = {};
+
 	vk::Device m_LogicalDevice                         = {};
 	vk::PhysicalDevice m_PhysicalDevice                = {};
 	vk::PhysicalDeviceProperties m_PhysicalDeviceProps = {};

@@ -99,6 +99,14 @@ public:
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
 
 private:
+	struct UploadContext
+	{
+		vk::CommandBuffer cmdBuffer;
+		vk::CommandPool cmdPool;
+		vk::Fence fence;
+	};
+
+private:
 	void CreateSyncObjects();
 	void CreateDescriptorPools();
 
@@ -111,7 +119,6 @@ private:
 	void CreateFramePass();
 	void CreateForwardPass(const DeviceContext& deviceContext);
 	void CreateUIPass(Window* window, const DeviceContext& deviceContext);
-
 
 	void UpdateFrameDescriptorSet(const FrameData& frame, const Camera& camera);
 	void UpdateForwardPassDescriptorSet(Scene* scene, uint32_t frameIndex);
@@ -126,18 +133,12 @@ private:
 
 	void WriteDescriptorSetsDefaultValues();
 
-	struct UploadContext
-	{
-		vk::CommandBuffer cmdBuffer;
-		vk::CommandPool cmdPool;
-		vk::Fence fence;
-	} m_UploadContext = {};
-
 private:
-	vk::Device m_LogicalDevice = {};
-	QueueInfo m_QueueInfo      = {};
-	SurfaceInfo m_SurfaceInfo  = {};
-	vk::Format m_DepthFormat   = {};
+	UploadContext m_UploadContext = {};
+	vk::Device m_LogicalDevice    = {};
+	QueueInfo m_QueueInfo         = {};
+	SurfaceInfo m_SurfaceInfo     = {};
+	vk::Format m_DepthFormat      = {};
 
 	vma::Allocator m_Allocator = {};
 
