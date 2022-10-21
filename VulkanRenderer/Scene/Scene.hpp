@@ -30,14 +30,7 @@ public:
 	{
 		m_Registry.clear<StaticMeshRendererComponent, TransformComponent>();
 	}
-
-	void SortComponents()
-	{
-		m_Registry.sort<StaticMeshRendererComponent>([](const StaticMeshRendererComponent& lhs, const StaticMeshRendererComponent& rhs) {
-			return ((uint64_t)lhs.mesh->hash << 32 | (uint32_t)lhs.material->sortKey) > ((uint64_t)rhs.mesh->hash << 32 | (uint32_t)rhs.material->sortKey);
-		});
-	}
-
+     
 	template<typename T, typename... Args>
 	inline T& AddComponent(Entity entity, Args&&... args)
 	{

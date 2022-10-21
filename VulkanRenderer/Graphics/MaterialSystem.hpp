@@ -24,6 +24,12 @@ struct PipelineConfiguration
 /// @todo
 struct MaterialParameters
 {
+	glm::vec4 baseColorFactor;
+	glm::vec4 emissiveFactor;
+	glm::vec4 diffuseFactor;
+	glm::vec4 specularFactor;
+	float metallicFactor;
+	float roughnessFactor;
 };
 
 /// @brief A vulkan shader module & it's code, for building ShaderEffects
@@ -64,13 +70,11 @@ struct ShaderPass
 		const char* name;
 		PipelineConfiguration pipelineConfiguration;
 		ShaderEffect* effect;
-		vk::RenderPass renderPass;
-		uint32_t subpass;
+		vk::Format colorAttachmentFormat;
+		vk::Format depthAttachmentFormat;
 	};
 
 	ShaderEffect* effect;
-
-	vk::RenderPass renderPass;
 	vk::Pipeline pipeline;
 };
 
@@ -122,8 +126,6 @@ public:
 	MaterialSystem() = default;
 	~MaterialSystem();
 
-	void Init(const MaterialSystem::CreateInfo& info);
-
 	void DestroyAllMaterials();
 
 	inline Shader* GetShader(const char* name) { return &m_Shaders[HashStr(name)]; }
@@ -141,7 +143,6 @@ public:
 	void CreateMasterMaterial(const MasterMaterial::CreateInfo& info);
 
 	void CreateMaterial(const Material::CreateInfo& info);
-
 
 private:
 	vk::Device m_LogicalDevice          = {};

@@ -3,18 +3,13 @@
 #include <fstream>
 #include <istream>
 #include <spirv_reflect.h>
+#include <vulkan/vk_enum_string_helper.h>
 
 static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't");
 
 MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
+    : m_LogicalDevice(info.logicalDevice)
 {
-	Init(info);
-}
-
-void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
-{
-	m_LogicalDevice = info.logicalDevice;
-
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{ vk::DescriptorType::eSampler, 1000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 1000 },
@@ -38,7 +33,6 @@ void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 	};
 
 	m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
-	LOG(warn, "Created Descriptor Pool");
 }
 
 MaterialSystem::~MaterialSystem()
@@ -77,7 +71,6 @@ void MaterialSystem::DestroyAllMaterials()
 
 	m_ShaderPasses.clear();
 	m_MasterMaterials.clear();
-	LOG(trace, "Loading shaders......");
 	m_Materials.clear();
 }
 
@@ -114,7 +107,6 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 
 	for (const auto& shaderStage : info.shaders)
 	{
-		LOG(trace, shaderStage->code.size());
 		SpvReflectShaderModule spvModule;
 
 		SPVASSERT(spvReflectCreateShaderModule(shaderStage->code.size() * sizeof(uint32_t), shaderStage->code.data(), &spvModule), "spvReflectCreateShaderModule failed");
@@ -125,7 +117,6 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 		std::vector<SpvReflectDescriptorSet*> descriptorSets(descriptorSetsCount);
 		SPVASSERT(spvReflectEnumerateDescriptorSets(&spvModule, &descriptorSetsCount, descriptorSets.data()), "spvReflectEnumerateDescriptorSets failed");
 
-		uint32_t i_set = 0ul;
 		for (const auto& spvSet : descriptorSets)
 		{
 			for (uint32_t i_binding = 0ull; i_binding < spvSet->binding_count; i_binding++)
@@ -143,7 +134,7 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 				setBindings[spvBinding.set][spvBinding.binding].descriptorCount = 1u;
 				for (uint32_t i_dim = 0; i_dim < spvBinding.array.dims_count; i_dim++)
 				{
-					setBindings[i_binding][spvBinding.binding].descriptorCount *= spvBinding.array.dims[i_dim];
+					setBindings[spvBinding.set][spvBinding.binding].descriptorCount *= spvBinding.array.dims[i_dim];
 				}
 			}
 		}
@@ -158,7 +149,6 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 			static_cast<uint32_t>(set.size()), // bindingCount
 			set.data(),                        // pBindings
 		};
-		LOG(trace, "Creating {}", index);
 		setsLayout[index++] = m_LogicalDevice.createDescriptorSetLayout(setLayoutCreateInfo);
 	}
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
@@ -168,7 +158,6 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 	};
 
 
-	LOG(trace, "Creating pipeline");
 	m_ShaderEffects[HashStr(info.name)] = {
 		info.shaders,                                                   // shaders
 		m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo), // piplineLayout
@@ -191,6 +180,14 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		};
 	}
 
+	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
+		{},                          //  viewMask
+		1u,                          // colorAttachmentCount
+		&info.colorAttachmentFormat, // pColorAttachmentFormats
+		info.depthAttachmentFormat,  // depthAttachmentFormat
+		{},                          // stencilAttachmentFormat
+	};
+
 	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
 		{}, // flags
 		static_cast<uint32_t>(stages.size()),
@@ -205,10 +202,11 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		&info.pipelineConfiguration.colorBlendState,
 		&info.pipelineConfiguration.dynamicState,
 		info.effect->pipelineLayout,
-		info.renderPass,
-		info.subpass,
-		{},
-		{},
+		{}, // renderPass
+		{}, // subpass
+		{}, // basePipelineHandle
+		{}, // basePipelineIndex
+		&pipelineRenderingCreateInfo,
 	};
 
 	auto pipeline = m_LogicalDevice.createGraphicsPipeline({}, graphicsPipelineCreateInfo);
@@ -216,7 +214,6 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 
 	m_ShaderPasses[HashStr(info.name)] = {
 		info.effect,
-		info.renderPass,
 		pipeline.value,
 	};
 }

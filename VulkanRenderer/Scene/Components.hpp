@@ -2,7 +2,7 @@
 
 #include "Core/Base.hpp"
 #include "Graphics/MaterialSystem.hpp"
-#include "Graphics/Mesh.hpp"
+#include "Graphics/Model.hpp"
 
 #include <entt/entt.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -42,12 +42,12 @@ struct StaticMeshRendererComponent
 {
 	StaticMeshRendererComponent(const StaticMeshRendererComponent&) = default;
 
-	StaticMeshRendererComponent(Material* _material, Mesh* _mesh)
+	StaticMeshRendererComponent(Material* _material, Model* _model)
 	    : material(_material)
-	    , mesh(_mesh)
+	    , model(_model)
 	{
 	}
 
 	Material* material;
-	Mesh* mesh;
+	Model* model;
 };

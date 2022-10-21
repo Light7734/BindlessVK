@@ -32,45 +32,52 @@ struct FailedAsssertionException: std::exception
 	}
 };
 
-struct vkException: std::exception
-{
-	vkException(const char* statement, int errorCode, const char* file, int line)
-	{
-		// #todo: Stringify vkException
-		LOG(critical, "Vulkan check failed: {}", statement);
-		LOG(critical, "vkException thrown with code {} at {}:{}", errorCode, file, line);
-		DEBUG_TRAP();
-	}
-};
+// Concatinate tokens
+#define CAT_INDIRECTION(a, b) a##b
 
+// Token indirection
+#define TOKEN_INDIRECTION(token) token
+#define TKNIND(token)            TOKEN_INDIRECTION(token)
+
+#define CAT_TOKEN(a, b) CAT_INDIRECTION(a, b)
 
 // Assertions
-#define ASSERT(x, ...)                                           \
-	if (!(x))                                                    \
-	{                                                            \
-		LOG(critical, __VA_ARGS__);                              \
-		throw FailedAsssertionException(#x, __FILE__, __LINE__); \
+#define ASSERT(x, ...)                                                           \
+	if (!(x))                                                                    \
+	{                                                                            \
+		LOG(critical, __VA_ARGS__);                                              \
+		throw FailedAsssertionException(#x, TKNIND(__FILE__), TKNIND(__LINE__)); \
 	}
 
-#define SPVASSERT(x, ...)                                            \
-	{                                                                \
-		SpvReflectResult res = x;                                    \
-		if (res)                                                     \
-		{                                                            \
-			LOG(critical, "{}", (int)res);                           \
-			LOG(critical, __VA_ARGS__);                              \
-			throw FailedAsssertionException(#x, __FILE__, __LINE__); \
-		}                                                            \
+#define SPVASSERT(x, ...)                                                                                \
+	{                                                                                                    \
+		SpvReflectResult CAT_TOKEN(spvresult, __LINE__) = x;                                             \
+		if (CAT_TOKEN(spvresult, __LINE__))                                                              \
+		{                                                                                                \
+			LOG(critical, "SPV assertion failed: {}", static_cast<int>(CAT_TOKEN(spvresult, __LINE__))); \
+			LOG(critical, __VA_ARGS__);                                                                  \
+			throw FailedAsssertionException(#x, TKNIND(__FILE__), TKNIND(__LINE__));                     \
+		}                                                                                                \
 	}
 
-// ye wtf C++
-#define VKC(x)                       VKC_NO_REDIFINITION(x, __LINE__)
-#define VKC_NO_REDIFINITION(x, line) VKC_NO_REDIFINITION2(x, line)
-#define VKC_NO_REDIFINITION2(x, line)                                       \
-	vk::Result vkr##line;                                                   \
-	if ((vkr##line = x) != vk::Result::eSuccess)                            \
-	{                                                                       \
-		throw vkException(#x, static_cast<int>(vkr##line), __FILE__, line); \
+
+#define KTXASSERT(x, ...)                                                                                \
+	{                                                                                                    \
+		ktxResult CAT_TOKEN(ktxresult, __LINE__) = x;                                                    \
+		if (CAT_TOKEN(ktxresult, __LINE__) != KTX_SUCCESS)                                               \
+		{                                                                                                \
+			LOG(critical, "KTX assertion failed: {}", static_cast<int>(CAT_TOKEN(ktxresult, __LINE__))); \
+			LOG(critical, __VA_ARGS__);                                                                  \
+			throw FailedAsssertionException(#x, TKNIND(__FILE__), TKNIND(__LINE__));                     \
+		}                                                                                                \
+	}
+
+#define VKC(x)                                                                                     \
+	vk::Result CAT_TOKEN(vkresult, __LINE__);                                                      \
+	if ((CAT_TOKEN(vkresult, __LINE__) = x) != vk::Result::eSuccess)                               \
+	{                                                                                              \
+		LOG(critical, "VK assertion failed: {}", static_cast<int>(CAT_TOKEN(vkresult, __LINE__))); \
+		throw FailedAsssertionException(#x, TKNIND(__FILE__), TKNIND(__LINE__));                   \
 	}
 
 

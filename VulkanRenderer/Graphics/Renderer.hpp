@@ -5,7 +5,7 @@
 #include "Core/Base.hpp"
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
-#include "Graphics/Mesh.hpp"
+#include "Graphics/Model.hpp"
 #include "Scene/Camera.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Texture.hpp"
@@ -26,32 +26,13 @@
 
 class Window;
 
-struct DrawIndirectData
-{
-	class Mesh* mesh;
-	class Material* material;
-	uint32_t first;
-	uint32_t count;
-};
-
-struct RendererCreateInfo
-{
-	Window* window;
-	DeviceContext deviceContext;
-};
-
 struct CameraData
 {
 	std::unique_ptr<Buffer> buffer;
 	glm::mat4 projection;
 	glm::mat4 view;
-};
-
-struct UploadContext
-{
-	vk::CommandBuffer cmdBuffer;
-	vk::CommandPool cmdPool;
-	vk::Fence fence;
+	glm::vec4 lightPos;
+	glm::vec4 viewPos;
 };
 
 struct FrameData
@@ -74,26 +55,34 @@ struct RenderPassData
 		std::vector<vk::CommandBuffer> secondaries; // secondary command buffers for each thread
 	};
 
-	vk::RenderPass renderpass;
-	std::vector<vk::Framebuffer> framebuffers;
-
-	vk::CommandPool cmdPool;                                 // Pools for threads @todo Multi-threading
 	std::array<CmdBuffers, MAX_FRAMES_IN_FLIGHT> cmdBuffers; // Command buffers for each frame
 
-	std::unique_ptr<Buffer> storageBuffer;
-
 	std::array<vk::DescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // Binding 1
+
+	vk::CommandPool cmdPool; // Pools for threads @todo Multi-threading
+
 	vk::DescriptorSetLayout descriptorSetLayout;
 	vk::PipelineLayout pipelineLayout;
+
+	std::unique_ptr<Buffer> storageBuffer;
 };
 
 class Renderer
 {
 public:
-	Renderer(const RendererCreateInfo& createInfo);
+	struct CreateInfo
+	{
+		DeviceContext deviceContext;
+		Window* window;
+		Texture* defaultTexture;
+		Texture* skyboxTexture;
+	};
+
+public:
+	Renderer(const Renderer::CreateInfo& createInfo);
 	~Renderer();
 
-	void RecreateSwapchain(Window* window, DeviceContext context);
+	void RecreateSwapchainResources(Window* window, DeviceContext context);
 	void DestroySwapchain();
 
 	void BeginFrame();
@@ -104,26 +93,59 @@ public:
 
 	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
 
-	inline vk::RenderPass GetForwardPass() const { return m_ForwardPass.renderpass; }
-
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
 	inline uint32_t GetImageCount() const { return m_Images.size(); }
 
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
 
 private:
+	void CreateSyncObjects();
+	void CreateDescriptorPools();
+
+	void CreateSwapchain();
+	void CreateImageViews();
+	void CreateResolveColorImage();
+	void CreateDepthImage();
+	void CreateCommandPool();
+	void CreateDescriptorResources(vk::PhysicalDevice physicalDevice);
+	void CreateFramePass();
+	void CreateForwardPass(const DeviceContext& deviceContext);
+	void CreateUIPass(Window* window, const DeviceContext& deviceContext);
+
+
+	void UpdateFrameDescriptorSet(const FrameData& frame, const Camera& camera);
+	void UpdateForwardPassDescriptorSet(Scene* scene, uint32_t frameIndex);
+
+	void SetupRenderBarriers(vk::CommandBuffer cmd, uint32_t imageIndex);
+	void SetupPresentBarriers(vk::CommandBuffer cmd, uint32_t imageIndex);
+	void RenderForwardPass(Scene* scene, vk::CommandBuffer cmd, uint32_t imageIndex);
+	void RenderUIPass(vk::CommandBuffer cmd, uint32_t imageIndex);
+
+	void SubmitQueue(const FrameData& frame, vk::CommandBuffer cmd);
+	void PresentFrame(const FrameData& frame, uint32_t imageIndex);
+
+	void WriteDescriptorSetsDefaultValues();
+
+	struct UploadContext
+	{
+		vk::CommandBuffer cmdBuffer;
+		vk::CommandPool cmdPool;
+		vk::Fence fence;
+	} m_UploadContext = {};
+
+private:
 	vk::Device m_LogicalDevice = {};
 	QueueInfo m_QueueInfo      = {};
 	SurfaceInfo m_SurfaceInfo  = {};
+	vk::Format m_DepthFormat   = {};
 
-	vma::Allocator m_Allocator;
+	vma::Allocator m_Allocator = {};
 
 	std::array<FrameData, MAX_FRAMES_IN_FLIGHT> m_Frames = {};
-	vk::DescriptorSetLayout m_FramesDescriptorSetLayout;
+	vk::DescriptorSetLayout m_FramesDescriptorSetLayout  = {};
 
 	// Render Passes
 	RenderPassData m_ForwardPass = {};
-	// RenderPassData m_UIPass;
 
 	bool m_SwapchainInvalidated = false;
 
@@ -145,19 +167,17 @@ private:
 
 	uint32_t m_CurrentFrame = 0ul;
 
+	Texture* m_DefaultTexture = {};
+	Texture* m_SkyboxTexture  = {};
+
 	// Descriptor sets
 	vk::DescriptorPool m_DescriptorPool = {};
 
 	// Depth buffer
-	vk::Format m_DepthFormat    = {};
 	AllocatedImage m_DepthImage = {};
 
 	vk::ImageView m_DepthImageView = {};
 
-	UploadContext m_UploadContext = {};
-
 	// Pipelines
 	vk::PipelineLayout m_FramePipelineLayout = {};
-	std::shared_ptr<Texture> m_TempTexture   = {}; // #TEMP
-	                                               //
 };

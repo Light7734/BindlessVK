@@ -9,7 +9,8 @@ struct AllocatedImage
 	AllocatedImage() = default;
 
 	AllocatedImage(std::pair<vk::Image, vma::Allocation> pair)
-	    : image(pair.first), allocation(pair.second)
+	    : image(pair.first)
+	    , allocation(pair.second)
 	{
 	}
 
@@ -25,7 +26,8 @@ struct AllocatedBuffer
 	AllocatedBuffer() = default;
 
 	AllocatedBuffer(std::pair<vk::Buffer, vma::Allocation> pair)
-	    : buffer(pair.first), allocation(pair.second)
+	    : buffer(pair.first)
+	    , allocation(pair.second)
 	{
 	}
 

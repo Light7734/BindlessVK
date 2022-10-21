@@ -16,3 +16,18 @@
 [submodule "Vendor/tinygltf"]
 	path = Vendor/tinygltf
 	url = git@github.com:syoyo/tinygltf.git
+[submodule "Vendor/glfw"]
+	path = Vendor/glfw
+	url = git@github.com:glfw/glfw.git
+[submodule "Vendor/glm"]
+	path = Vendor/glm
+	url = git@github.com:g-truc/glm.git
+[submodule "Vendor/spdlog"]
+	path = Vendor/spdlog
+	url = git@github.com:gabime/spdlog.git
+[submodule "Vendor/entt"]
+	path = Vendor/entt
+	url = git@github.com:skypjack/entt.git
+[submodule "Vendor/stb"]
+	path = Vendor/stb
+	url = git@github.com:nothings/stb

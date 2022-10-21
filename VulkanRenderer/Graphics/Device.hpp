@@ -37,19 +37,6 @@ struct QueueInfo
 	vk::Queue graphicsQueue = VK_NULL_HANDLE;
 	vk::Queue presentQueue  = VK_NULL_HANDLE;
 };
-
-struct DeviceCreateInfo
-{
-	Window* window;
-	std::vector<const char*> layers;
-	std::vector<const char*> instanceExtensions;
-	std::vector<const char*> logicalDeviceExtensions;
-
-	bool enableDebugging;
-	vk::DebugUtilsMessageSeverityFlagBitsEXT debugMessageSeverity;
-	vk::DebugUtilsMessageTypeFlagsEXT debugMessageTypes;
-};
-
 struct DeviceContext
 {
 	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
@@ -59,7 +46,7 @@ struct DeviceContext
 	vk::PhysicalDeviceProperties physicalDeviceProperties;
 	vk::SampleCountFlagBits maxSupportedSampleCount;
 	vma::Allocator allocator;
-
+	vk::Format depthFormat;
 	QueueInfo queueInfo;
 	SurfaceInfo surfaceInfo;
 };
@@ -67,7 +54,21 @@ struct DeviceContext
 class Device
 {
 public:
-	Device(const DeviceCreateInfo& createInfo);
+	struct CreateInfo
+	{
+		Window* window;
+
+		std::vector<const char*> layers;
+		std::vector<const char*> instanceExtensions;
+		std::vector<const char*> logicalDeviceExtensions;
+
+		bool enableDebugging;
+		vk::DebugUtilsMessageSeverityFlagsEXT debugMessageSeverity;
+		vk::DebugUtilsMessageTypeFlagsEXT debugMessageTypes;
+	};
+
+public:
+	Device(const Device::CreateInfo& info);
 	~Device();
 
 	void LogDebugInfo();
@@ -84,13 +85,22 @@ public:
 			m_PhysicalDeviceProperties,
 			m_MaxSupportedSampleCount,
 			m_Allocator,
+			m_DepthFormat,
 			m_QueueInfo,
 			FetchSurfaceInfo(),
 		};
 	}
 
 private:
+	void CheckLayerSupport();
+	void CreateVulkanInstance(const Device::CreateInfo& info);
+	void PickPhysicalDevice();
+	void CreateLogicalDevice();
+	void CreateAllocator();
+
 	SurfaceInfo FetchSurfaceInfo();
+	vk::Format FetchDepthFormat();
+
 
 private:
 	vk::DynamicLoader m_DynamicLoader;
@@ -100,14 +110,19 @@ private:
 	vk::Instance m_Instance = {};
 
 	// Layers & Extensions
-	std::vector<const char*> m_Layers     = {};
-	std::vector<const char*> m_Extensions = {};
+	std::vector<const char*> m_Layers                  = {};
+	std::vector<const char*> m_InstanceExtensions      = {};
+	std::vector<const char*> m_LogicalDeviceExtensions = {};
+
+	vk::DebugUtilsMessengerEXT m_DebugUtilMessenger = {};
 
 	// Device
 	vk::Device m_LogicalDevice                              = {};
 	vk::PhysicalDevice m_PhysicalDevice                     = {};
 	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 	vk::SampleCountFlagBits m_MaxSupportedSampleCount       = vk::SampleCountFlagBits::e1;
+	vk::Format m_DepthFormat                                = {};
+
 
 	// Queue & Surface
 	QueueInfo m_QueueInfo     = {};
