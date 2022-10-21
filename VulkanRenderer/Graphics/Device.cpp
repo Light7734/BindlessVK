@@ -13,11 +13,10 @@
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
-VkBool32 VulkanDebugMessageCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
-    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-    void* pUserData)
+VkBool32 VulkanDebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                    VkDebugUtilsMessageTypeFlagsEXT messageTypes,
+                                    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                    void* pUserData)
 {
 	std::string type = messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT                                                                       ? "GENERAL" :
 	                   messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT && messageTypes == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ? "VALIDATION | PERFORMANCE" :
@@ -107,375 +106,402 @@ VkBool32 VulkanDebugMessageCallback(
 	return static_cast<VkBool32>(VK_FALSE);
 }
 
-Device::Device(const DeviceCreateInfo& createInfo)
-    : m_Layers(createInfo.layers)
-    , m_InstanceExtensions(createInfo.instanceExtensions)
-    , m_LogicalDeviceExtensions(createInfo.logicalDeviceExtensions)
+Device::Device(const Device::CreateInfo& info)
+    : m_Layers(info.layers)
+    , m_InstanceExtensions(info.instanceExtensions)
+    , m_LogicalDeviceExtensions(info.logicalDeviceExtensions)
 {
-	/////////////////////////////////////////////////////////////////////////////////
-	// Initialize volk
+	// Initialize default dispatcher
 	m_VkGetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_VkGetInstanceProcAddr);
-	/////////////////////////////////////////////////////////////////////////////////
-	// Check if the required layers exist.
+
+	CheckLayerSupport();
+	CreateVulkanInstance(info);
+	PickPhysicalDevice();
+	CreateLogicalDevice();
+	CreateAllocator();
+}
+
+Device::~Device()
+{
+	m_LogicalDevice.waitIdle();
+	m_Allocator.destroy();
+
+	m_LogicalDevice.destroy(nullptr);
+
+	m_Instance.destroySurfaceKHR(m_SurfaceInfo.surface, nullptr);
+
+	m_Instance.destroyDebugUtilsMessengerEXT(m_DebugUtilMessenger);
+	m_Instance.destroy();
+}
+
+void Device::CheckLayerSupport()
+{
+	std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
+	ASSERT(!availableLayers.empty(), "No instance layer found");
+
+	// Check if we support all the required layers
+	for (const char* requiredLayerName : m_Layers)
 	{
-		std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
-		ASSERT(!availableLayers.empty(), "No instance layer found");
+		bool layerFound = false;
 
-		// Check if we support all the required layers
-		for (const char* requiredLayerName : m_Layers)
+		for (const auto& layerProperties : availableLayers)
 		{
-			bool layerFound = false;
-
-			for (const auto& layerProperties : availableLayers)
+			if (strcmp(requiredLayerName, layerProperties.layerName))
 			{
-				if (strcmp(requiredLayerName, layerProperties.layerName))
+				layerFound = true;
+				break;
+			}
+		}
+
+		ASSERT(layerFound, "Required layer not found");
+	}
+}
+
+void Device::CreateVulkanInstance(const Device::CreateInfo& info)
+{
+	vk::ApplicationInfo applicationInfo {
+		"BindlessVK",             // pApplicationName
+		VK_MAKE_VERSION(1, 0, 0), // applicationVersion
+		"BindlessVK",             // pEngineName
+		VK_MAKE_VERSION(1, 0, 0), // engineVersion
+		VK_API_VERSION_1_3,       // apiVersion
+	};
+
+	vk::DebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
+		{},                        // flags
+		info.debugMessageSeverity, // messageSeverity
+		info.debugMessageTypes,    // messageType
+	};
+
+	// Setup validation layer message callback
+	debugMessengerCreateInfo.pfnUserCallback = &VulkanDebugMessageCallback;
+
+	// If debugging is not enabled, remove validation layer from instance layers
+	if (!info.enableDebugging)
+	{
+		auto validationLayerIt = std::find(m_Layers.begin(), m_Layers.end(), "VK_LAYER_KHRONOS_validation");
+		if (validationLayerIt != m_Layers.end())
+		{
+			m_Layers.erase(validationLayerIt);
+		}
+	}
+
+	// Create the vulkan instance
+	std::vector<const char*> windowExtensions = info.window->GetRequiredExtensions();
+	m_InstanceExtensions.insert(m_InstanceExtensions.end(), windowExtensions.begin(), windowExtensions.end());
+
+	vk::InstanceCreateInfo instanceCreateInfo {
+		{},                                                 // flags
+		&applicationInfo,                                   // pApplicationInfo
+		static_cast<uint32_t>(m_Layers.size()),             // enabledLayerCount
+		m_Layers.data(),                                    // ppEnabledLayerNames
+		static_cast<uint32_t>(m_InstanceExtensions.size()), // enabledExtensionCount
+		m_InstanceExtensions.data(),                        // ppEnabledExtensionNames
+	};
+
+	VKC(vk::createInstance(&instanceCreateInfo, nullptr, &m_Instance));
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Instance);
+	m_SurfaceInfo.surface = info.window->CreateSurface(m_Instance);
+
+
+	m_DebugUtilMessenger = m_Instance.createDebugUtilsMessengerEXT(debugMessengerCreateInfo);
+}
+
+void Device::PickPhysicalDevice()
+{
+	// Fetch physical devices with vulkan support
+	std::vector<vk::PhysicalDevice> devices = m_Instance.enumeratePhysicalDevices();
+	ASSERT(devices.size(), "No physical device with vulkan support found");
+
+	// Select the most suitable physical device
+	uint32_t highScore = 0u;
+	for (const auto& device : devices)
+	{
+		uint32_t score = 0u;
+
+		// Fetch properties & features
+		vk::PhysicalDeviceProperties properties = device.getProperties();
+		vk::PhysicalDeviceFeatures features     = device.getFeatures();
+
+		// Check if device supports required features
+		if (!features.geometryShader || !features.samplerAnisotropy)
+			continue;
+
+		/** Check if the device supports the required queues **/
+		{
+			// Fetch queue families
+			std::vector<vk::QueueFamilyProperties> queueFamiliesProperties = device.getQueueFamilyProperties();
+			if (queueFamiliesProperties.empty())
+				continue;
+
+			uint32_t index = 0u;
+			for (const auto& queueFamilyProperties : queueFamiliesProperties)
+			{
+				// Check if current queue index supports any or all desired queues
+				if (queueFamilyProperties.queueFlags & vk::QueueFlagBits::eGraphics)
 				{
-					layerFound = true;
+					m_QueueInfo.graphicsQueueIndex = index;
+				}
+
+				if (device.getSurfaceSupportKHR(index, m_SurfaceInfo.surface))
+				{
+					m_QueueInfo.presentQueueIndex = index;
+				}
+
+				index++;
+
+				// Device does supports all the required queues!
+				if (m_QueueInfo.graphicsQueueIndex != UINT32_MAX && m_QueueInfo.presentQueueIndex != UINT32_MAX)
+				{
 					break;
 				}
 			}
 
-			ASSERT(layerFound, "Required layer not found");
-		}
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create vulkan instance, window surface, debug messenger, and load the instace with volk.
-	{
-		vk::ApplicationInfo applicationInfo {
-			"BindlessVK",             // pApplicationName
-			VK_MAKE_VERSION(1, 0, 0), // applicationVersion
-			"BindlessVK",             // pEngineName
-			VK_MAKE_VERSION(1, 0, 0), // engineVersion
-			VK_API_VERSION_1_3,       // apiVersion
-		};
-
-		vk::DebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
-			{},                              // flags
-			createInfo.debugMessageSeverity, // messageSeverity
-			createInfo.debugMessageTypes,    // messageType
-		};
-
-		// Setup validation layer message callback
-		debugMessengerCreateInfo.pfnUserCallback = &VulkanDebugMessageCallback;
-
-		// If debugging is not enabled, remove validation layer from instance layers
-		if (!createInfo.enableDebugging)
-		{
-			auto validationLayerIt = std::find(m_Layers.begin(), m_Layers.end(), "VK_LAYER_KHRONOS_validation");
-			if (validationLayerIt != m_Layers.end())
+			// Device doesn't support all the required queues!
+			if (m_QueueInfo.graphicsQueueIndex == UINT32_MAX || m_QueueInfo.presentQueueIndex == UINT32_MAX)
 			{
-				m_Layers.erase(validationLayerIt);
+				m_QueueInfo.graphicsQueueIndex = UINT32_MAX;
+				m_QueueInfo.presentQueueIndex  = UINT32_MAX;
+				continue;
 			}
 		}
 
-		// Create the vulkan instance
-		std::vector<const char*> windowExtensions = createInfo.window->GetRequiredExtensions();
-		m_InstanceExtensions.insert(m_InstanceExtensions.end(), windowExtensions.begin(), windowExtensions.end());
-
-		vk::InstanceCreateInfo instanceCreateInfo {
-			{},                                                 // flags
-			&applicationInfo,                                   // pApplicationInfo
-			static_cast<uint32_t>(m_Layers.size()),             // enabledLayerCount
-			m_Layers.data(),                                    // ppEnabledLayerNames
-			static_cast<uint32_t>(m_InstanceExtensions.size()), // enabledExtensionCount
-			m_InstanceExtensions.data(),                        // ppEnabledExtensionNames
-		};
-
-		VKC(vk::createInstance(&instanceCreateInfo, nullptr, &m_Instance));
-		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Instance);
-		m_SurfaceInfo.surface = createInfo.window->CreateSurface(m_Instance);
-
-
-		m_DebugUtilMessenger = m_Instance.createDebugUtilsMessengerEXT(debugMessengerCreateInfo);
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Iterate through physical devices that supports vulkan, and pick the most suitable one
-	{
-		// Fetch physical devices with vulkan support
-		std::vector<vk::PhysicalDevice> devices = m_Instance.enumeratePhysicalDevices();
-		ASSERT(devices.size(), "No physical device with vulkan support found");
-
-		// Select the most suitable physical device
-		uint32_t highScore = 0u;
-		for (const auto& device : devices)
+		/** Check if device supports required extensions **/
 		{
-			uint32_t score = 0u;
+			// Fetch extensions
 
-			// Fetch properties & features
-			vk::PhysicalDeviceProperties properties = device.getProperties();
-			vk::PhysicalDeviceFeatures features     = device.getFeatures();
-
-			// Check if device supports required features
-			if (!features.geometryShader || !features.samplerAnisotropy)
+			std::vector<vk::ExtensionProperties> deviceExtensionsProperties = device.enumerateDeviceExtensionProperties();
+			if (deviceExtensionsProperties.empty())
 				continue;
 
-			/** Check if the device supports the required queues **/
+			bool failed = false;
+			for (const auto& requiredExtensionName : m_LogicalDeviceExtensions)
 			{
-				// Fetch queue families
-				std::vector<vk::QueueFamilyProperties> queueFamiliesProperties = device.getQueueFamilyProperties();
-				if (queueFamiliesProperties.empty())
-					continue;
-
-				uint32_t index = 0u;
-				for (const auto& queueFamilyProperties : queueFamiliesProperties)
+				bool found = false;
+				for (const auto& extension : deviceExtensionsProperties)
 				{
-					// Check if current queue index supports any or all desired queues
-					if (queueFamilyProperties.queueFlags & vk::QueueFlagBits::eGraphics)
+					if (!strcmp(requiredExtensionName, extension.extensionName))
 					{
-						m_QueueInfo.graphicsQueueIndex = index;
-					}
-
-					if (device.getSurfaceSupportKHR(index, m_SurfaceInfo.surface))
-					{
-						m_QueueInfo.presentQueueIndex = index;
-					}
-
-					index++;
-
-					// Device does supports all the required queues!
-					if (m_QueueInfo.graphicsQueueIndex != UINT32_MAX && m_QueueInfo.presentQueueIndex != UINT32_MAX)
-					{
+						found = true;
 						break;
 					}
 				}
 
-				// Device doesn't support all the required queues!
-				if (m_QueueInfo.graphicsQueueIndex == UINT32_MAX || m_QueueInfo.presentQueueIndex == UINT32_MAX)
+				if (!found)
 				{
-					m_QueueInfo.graphicsQueueIndex = UINT32_MAX;
-					m_QueueInfo.presentQueueIndex  = UINT32_MAX;
-					continue;
+					failed = true;
+					break;
 				}
 			}
 
-			/** Check if device supports required extensions **/
-			{
-				// Fetch extensions
-
-				std::vector<vk::ExtensionProperties> deviceExtensionsProperties = device.enumerateDeviceExtensionProperties();
-				if (deviceExtensionsProperties.empty())
-					continue;
-
-				bool failed = false;
-				for (const auto& requiredExtensionName : m_LogicalDeviceExtensions)
-				{
-					bool found = false;
-					for (const auto& extension : deviceExtensionsProperties)
-					{
-						if (!strcmp(requiredExtensionName, extension.extensionName))
-						{
-							found = true;
-							break;
-						}
-					}
-
-					if (!found)
-					{
-						failed = true;
-						break;
-					}
-				}
-
-				if (failed)
-					continue;
-			}
-
-			/** Check if swap chain is adequate **/
-			{
-				// Fetch swap chain capabilities
-				m_SurfaceInfo.capabilities = device.getSurfaceCapabilitiesKHR(m_SurfaceInfo.surface);
-
-				// Fetch swap chain formats
-				m_SurfaceInfo.supportedFormats = device.getSurfaceFormatsKHR(m_SurfaceInfo.surface);
-				if (m_SurfaceInfo.supportedFormats.empty())
-					continue;
-
-				// Fetch swap chain present modes
-				m_SurfaceInfo.supportedPresentModes = device.getSurfacePresentModesKHR(m_SurfaceInfo.surface);
-				if (m_SurfaceInfo.supportedPresentModes.empty())
-					continue;
-			}
-
-			if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				score += 69420; // nice
-
-			score += properties.limits.maxImageDimension2D;
-
-			m_PhysicalDevice = score > highScore ? device : m_PhysicalDevice;
+			if (failed)
+				continue;
 		}
-		ASSERT(m_PhysicalDevice, "No suitable physical device found");
 
-		// Cache the selected physical device's properties
-		m_PhysicalDeviceProperties = m_PhysicalDevice.getProperties();
-
-		// Determine max sample counts
-		vk::Flags<vk::SampleCountFlagBits> counts = m_PhysicalDeviceProperties.limits.framebufferColorSampleCounts & m_PhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
-		// m_MaxSupportedSampleCount = VK_SAMPLE_COUNT_1_BIT;
-		m_MaxSupportedSampleCount = counts & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
-		                            counts & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
-		                            counts & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
-		                            counts & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
-		                            counts & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
-		                            counts & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
-		                                                                    vk::SampleCountFlagBits::e1;
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create the logical device.
-	{
-		std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
-
-		float queuePriority = 1.0f; // Always 1.0
-		queuesCreateInfo.push_back({
-		    {},                             // flags
-		    m_QueueInfo.graphicsQueueIndex, // queueFamilyIndex
-		    1u,                             // queueCount
-		    &queuePriority,                 // pQueuePriorities
-		});
-
-		if (m_QueueInfo.presentQueueIndex != m_QueueInfo.graphicsQueueIndex)
+		/** Check if swap chain is adequate **/
 		{
-			queuesCreateInfo.push_back({
-			    {},                            // flags
-			    m_QueueInfo.presentQueueIndex, // queueFamilyIndex
-			    1u,                            // queueCount
-			    &queuePriority,                // pQueuePriorities
-			});
+			// Fetch swap chain capabilities
+			m_SurfaceInfo.capabilities = device.getSurfaceCapabilitiesKHR(m_SurfaceInfo.surface);
+
+			// Fetch swap chain formats
+			m_SurfaceInfo.supportedFormats = device.getSurfaceFormatsKHR(m_SurfaceInfo.surface);
+			if (m_SurfaceInfo.supportedFormats.empty())
+				continue;
+
+			// Fetch swap chain present modes
+			m_SurfaceInfo.supportedPresentModes = device.getSurfacePresentModesKHR(m_SurfaceInfo.surface);
+			if (m_SurfaceInfo.supportedPresentModes.empty())
+				continue;
 		}
 
-		vk::PhysicalDeviceFeatures physicalDeviceFeatures {
-			VK_FALSE, // robustBufferAccess
-			VK_FALSE, // fullDrawIndexUint32
-			VK_FALSE, // imageCubeArray
-			VK_FALSE, // independentBlend
-			VK_FALSE, // geometryShader
-			VK_FALSE, // tessellationShader
-			VK_FALSE, // sampleRateShading
-			VK_FALSE, // dualSrcBlend
-			VK_FALSE, // logicOp
-			VK_FALSE, // multiDrawIndirect
-			VK_FALSE, // drawIndirectFirstInstance
-			VK_FALSE, // depthClamp
-			VK_FALSE, // depthBiasClamp
-			VK_FALSE, // fillModeNonSolid
-			VK_FALSE, // depthBounds
-			VK_FALSE, // wideLines
-			VK_FALSE, // largePoints
-			VK_FALSE, // alphaToOne
-			VK_FALSE, // multiViewport
-			VK_TRUE,  // samplerAnisotropy
-			VK_FALSE, // textureCompressionETC2
-			VK_FALSE, // textureCompressionASTC
-			VK_FALSE, // textureCompressionBC
-			VK_FALSE, // occlusionQueryPrecise
-			VK_FALSE, // pipelineStatisticsQuery
-			VK_FALSE, // vertexPipelineStoresAndAtomics
-			VK_FALSE, // fragmentStoresAndAtomics
-			VK_FALSE, // shaderTessellationAndGeometryPointSize
-			VK_FALSE, // shaderImageGatherExtended
-			VK_FALSE, // shaderStorageImageExtendedFormats
-			VK_FALSE, // shaderStorageImageMultisample
-			VK_FALSE, // shaderStorageImageReadWithoutFormat
-			VK_FALSE, // shaderStorageImageWriteWithoutFormat
-			VK_FALSE, // shaderUniformBufferArrayDynamicIndexing
-			VK_FALSE, // shaderSampledImageArrayDynamicIndexing
-			VK_FALSE, // shaderStorageBufferArrayDynamicIndexing
-			VK_FALSE, // shaderStorageImageArrayDynamicIndexing
-			VK_FALSE, // shaderClipDistance
-			VK_FALSE, // shaderCullDistance
-			VK_FALSE, // shaderFloat64
-			VK_FALSE, // shaderInt64
-			VK_FALSE, // shaderInt16
-			VK_FALSE, // shaderResourceResidency
-			VK_FALSE, // shaderResourceMinLod
-			VK_FALSE, // sparseBinding
-			VK_FALSE, // sparseResidencyBuffer
-			VK_FALSE, // sparseResidencyImage2D
-			VK_FALSE, // sparseResidencyImage3D
-			VK_FALSE, // sparseResidency2Samples
-			VK_FALSE, // sparseResidency4Samples
-			VK_FALSE, // sparseResidency8Samples
-			VK_FALSE, // sparseResidency16Samples
-			VK_FALSE, // sparseResidencyAliased
-			VK_FALSE, // variableMultisampleRate
-			VK_FALSE, // inheritedQueries
-		};
+		if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+			score += 69420; // nice
 
-		vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures {
-			true, // dynamicRendering
-		};
+		score += properties.limits.maxImageDimension2D;
 
-		vk::DeviceCreateInfo logicalDeviceCreateInfo {
-			{},                                                      // flags
-			static_cast<uint32_t>(queuesCreateInfo.size()),          // queueCreateInfoCount
-			queuesCreateInfo.data(),                                 // pQueueCreateInfos
-			0u,                                                      // enabledLayerCount
-			nullptr,                                                 // ppEnabledLayerNames
-			static_cast<uint32_t>(m_LogicalDeviceExtensions.size()), // enabledExtensionCount
-			m_LogicalDeviceExtensions.data(),                        // ppEnabledExtensionNames
-			&physicalDeviceFeatures,                                 // pEnabledFeatures
-			&dynamicRenderingFeatures,
-		};
-
-		m_LogicalDevice = m_PhysicalDevice.createDevice(logicalDeviceCreateInfo);
-		VULKAN_HPP_DEFAULT_DISPATCHER.init(m_LogicalDevice);
-
-		m_QueueInfo.graphicsQueue = m_LogicalDevice.getQueue(m_QueueInfo.graphicsQueueIndex, 0u);
-		m_QueueInfo.presentQueue  = m_LogicalDevice.getQueue(m_QueueInfo.presentQueueIndex, 0u);
-
-		ASSERT(m_QueueInfo.graphicsQueue, "Failed to fetch graphics queue");
-		ASSERT(m_QueueInfo.presentQueue, "Failed to fetch present queue");
+		m_PhysicalDevice = score > highScore ? device : m_PhysicalDevice;
 	}
+	ASSERT(m_PhysicalDevice, "No suitable physical device found");
+
+	// Cache the selected physical device's properties
+	m_PhysicalDeviceProperties = m_PhysicalDevice.getProperties();
+
+	// Determine max sample counts
+	vk::Flags<vk::SampleCountFlagBits> counts = m_PhysicalDeviceProperties.limits.framebufferColorSampleCounts & m_PhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
+
+	m_MaxSupportedSampleCount = counts & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
+	                            counts & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
+	                            counts & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
+	                            counts & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
+	                            counts & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
+	                            counts & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
+	                                                                    vk::SampleCountFlagBits::e1;
 
 
-	////////////////////////////////////////////////////////////////
-	/// Initializes VMA
+	// Select depth format
+	// bool hasStencilComponent = false;
+	vk::FormatProperties formatProperties;
+	for (vk::Format format : { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint })
 	{
-		vma::VulkanFunctions vulkanFunctions(
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceProperties,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkAllocateMemory,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkFreeMemory,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkMapMemory,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkUnmapMemory,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkFlushMappedMemoryRanges,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkInvalidateMappedMemoryRanges,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateBuffer,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyBuffer,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateImage,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyImage,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdCopyBuffer,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements2KHR,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements2KHR,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory2KHR,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory2KHR,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties2KHR,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceBufferMemoryRequirements,
-		    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceImageMemoryRequirements);
-
-		vma::AllocatorCreateInfo allocCreateInfo({},               // flags
-		                                         m_PhysicalDevice, // physicalDevice
-		                                         m_LogicalDevice,  // device
-		                                         {},               // preferredLargeHeapBlockSize
-		                                         {},               // pAllocationCallbacks
-		                                         {},               // pDeviceMemoryCallbacks
-		                                         {},               // pHeapSizeLimit
-		                                         &vulkanFunctions, // pVulkanFunctions
-		                                         m_Instance,       // instance
-		                                         {});              // vulkanApiVersion
-
-
-		m_Allocator = vma::createAllocator(allocCreateInfo);
+		formatProperties = m_PhysicalDevice.getFormatProperties(format);
+		if ((formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) == vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+		{
+			m_DepthFormat = format;
+			// hasStencilComponent = format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
+		}
 	}
+}
+
+void Device::CreateLogicalDevice()
+{
+	std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
+
+	float queuePriority = 1.0f; // Always 1.0
+	queuesCreateInfo.push_back({
+	    {},                             // flags
+	    m_QueueInfo.graphicsQueueIndex, // queueFamilyIndex
+	    1u,                             // queueCount
+	    &queuePriority,                 // pQueuePriorities
+	});
+
+	if (m_QueueInfo.presentQueueIndex != m_QueueInfo.graphicsQueueIndex)
+	{
+		queuesCreateInfo.push_back({
+		    {},                            // flags
+		    m_QueueInfo.presentQueueIndex, // queueFamilyIndex
+		    1u,                            // queueCount
+		    &queuePriority,                // pQueuePriorities
+		});
+	}
+
+	vk::PhysicalDeviceFeatures physicalDeviceFeatures {
+		VK_FALSE, // robustBufferAccess
+		VK_FALSE, // fullDrawIndexUint32
+		VK_FALSE, // imageCubeArray
+		VK_FALSE, // independentBlend
+		VK_FALSE, // geometryShader
+		VK_FALSE, // tessellationShader
+		VK_FALSE, // sampleRateShading
+		VK_FALSE, // dualSrcBlend
+		VK_FALSE, // logicOp
+		VK_FALSE, // multiDrawIndirect
+		VK_FALSE, // drawIndirectFirstInstance
+		VK_FALSE, // depthClamp
+		VK_FALSE, // depthBiasClamp
+		VK_FALSE, // fillModeNonSolid
+		VK_FALSE, // depthBounds
+		VK_FALSE, // wideLines
+		VK_FALSE, // largePoints
+		VK_FALSE, // alphaToOne
+		VK_FALSE, // multiViewport
+		VK_TRUE,  // samplerAnisotropy
+		VK_FALSE, // textureCompressionETC2
+		VK_FALSE, // textureCompressionASTC
+		VK_FALSE, // textureCompressionBC
+		VK_FALSE, // occlusionQueryPrecise
+		VK_FALSE, // pipelineStatisticsQuery
+		VK_FALSE, // vertexPipelineStoresAndAtomics
+		VK_FALSE, // fragmentStoresAndAtomics
+		VK_FALSE, // shaderTessellationAndGeometryPointSize
+		VK_FALSE, // shaderImageGatherExtended
+		VK_FALSE, // shaderStorageImageExtendedFormats
+		VK_FALSE, // shaderStorageImageMultisample
+		VK_FALSE, // shaderStorageImageReadWithoutFormat
+		VK_FALSE, // shaderStorageImageWriteWithoutFormat
+		VK_FALSE, // shaderUniformBufferArrayDynamicIndexing
+		VK_FALSE, // shaderSampledImageArrayDynamicIndexing
+		VK_FALSE, // shaderStorageBufferArrayDynamicIndexing
+		VK_FALSE, // shaderStorageImageArrayDynamicIndexing
+		VK_FALSE, // shaderClipDistance
+		VK_FALSE, // shaderCullDistance
+		VK_FALSE, // shaderFloat64
+		VK_FALSE, // shaderInt64
+		VK_FALSE, // shaderInt16
+		VK_FALSE, // shaderResourceResidency
+		VK_FALSE, // shaderResourceMinLod
+		VK_FALSE, // sparseBinding
+		VK_FALSE, // sparseResidencyBuffer
+		VK_FALSE, // sparseResidencyImage2D
+		VK_FALSE, // sparseResidencyImage3D
+		VK_FALSE, // sparseResidency2Samples
+		VK_FALSE, // sparseResidency4Samples
+		VK_FALSE, // sparseResidency8Samples
+		VK_FALSE, // sparseResidency16Samples
+		VK_FALSE, // sparseResidencyAliased
+		VK_FALSE, // variableMultisampleRate
+		VK_FALSE, // inheritedQueries
+	};
+
+	vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures {
+		true, // dynamicRendering
+	};
+
+	vk::DeviceCreateInfo logicalDeviceCreateInfo {
+		{},                                                      // flags
+		static_cast<uint32_t>(queuesCreateInfo.size()),          // queueCreateInfoCount
+		queuesCreateInfo.data(),                                 // pQueueCreateInfos
+		0u,                                                      // enabledLayerCount
+		nullptr,                                                 // ppEnabledLayerNames
+		static_cast<uint32_t>(m_LogicalDeviceExtensions.size()), // enabledExtensionCount
+		m_LogicalDeviceExtensions.data(),                        // ppEnabledExtensionNames
+		&physicalDeviceFeatures,                                 // pEnabledFeatures
+		&dynamicRenderingFeatures,
+	};
+
+	m_LogicalDevice = m_PhysicalDevice.createDevice(logicalDeviceCreateInfo);
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_LogicalDevice);
+
+	m_QueueInfo.graphicsQueue = m_LogicalDevice.getQueue(m_QueueInfo.graphicsQueueIndex, 0u);
+	m_QueueInfo.presentQueue  = m_LogicalDevice.getQueue(m_QueueInfo.presentQueueIndex, 0u);
+
+	ASSERT(m_QueueInfo.graphicsQueue, "Failed to fetch graphics queue");
+	ASSERT(m_QueueInfo.presentQueue, "Failed to fetch present queue");
+}
+
+void Device::CreateAllocator()
+{
+	vma::VulkanFunctions vulkanFunctions(
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceProperties,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkAllocateMemory,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkFreeMemory,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkMapMemory,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkUnmapMemory,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkFlushMappedMemoryRanges,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkInvalidateMappedMemoryRanges,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateBuffer,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyBuffer,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateImage,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkDestroyImage,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdCopyBuffer,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetBufferMemoryRequirements2KHR,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetImageMemoryRequirements2KHR,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindBufferMemory2KHR,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkBindImageMemory2KHR,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetPhysicalDeviceMemoryProperties2KHR,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceBufferMemoryRequirements,
+	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceImageMemoryRequirements);
+
+	vma::AllocatorCreateInfo allocCreateInfo({},               // flags
+	                                         m_PhysicalDevice, // physicalDevice
+	                                         m_LogicalDevice,  // device
+	                                         {},               // preferredLargeHeapBlockSize
+	                                         {},               // pAllocationCallbacks
+	                                         {},               // pDeviceMemoryCallbacks
+	                                         {},               // pHeapSizeLimit
+	                                         &vulkanFunctions, // pVulkanFunctions
+	                                         m_Instance,       // instance
+	                                         {});              // vulkanApiVersion
+
+
+	m_Allocator = vma::createAllocator(allocCreateInfo);
 }
 
 SurfaceInfo Device::FetchSurfaceInfo()
@@ -511,35 +537,7 @@ SurfaceInfo Device::FetchSurfaceInfo()
 
 vk::Format Device::FetchDepthFormat()
 {
-	vk::Format result        = {};
-	bool hasStencilComponent = false;
-	vk::FormatProperties formatProperties;
-	for (vk::Format format : { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint })
-	{
-		formatProperties = m_PhysicalDevice.getFormatProperties(format);
-		if ((formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) == vk::FormatFeatureFlagBits::eDepthStencilAttachment)
-		{
-			result              = format;
-			hasStencilComponent = format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
-		}
-	}
-
-	LOG(trace, "Detph format: {}",  string_VkFormat(static_cast<VkFormat>(result)));
-
-	return result;
-}
-
-Device::~Device()
-{
-	m_LogicalDevice.waitIdle();
-	m_Allocator.destroy();
-
-	m_LogicalDevice.destroy(nullptr);
-
-	m_Instance.destroySurfaceKHR(m_SurfaceInfo.surface, nullptr);
-
-	m_Instance.destroyDebugUtilsMessengerEXT(m_DebugUtilMessenger);
-	m_Instance.destroy();
+	vk::Format result = {};
 }
 
 void Device::LogDebugInfo()

@@ -71,7 +71,7 @@ struct ShaderPass
 		PipelineConfiguration pipelineConfiguration;
 		ShaderEffect* effect;
 		vk::Format colorAttachmentFormat;
-        vk::Format depthAttachmentFormat;
+		vk::Format depthAttachmentFormat;
 	};
 
 	ShaderEffect* effect;

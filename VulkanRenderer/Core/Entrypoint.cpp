@@ -202,7 +202,7 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::Format colorAttachment
 		    },
 		    materialSystem.GetShaderEffect("default"),
 		    colorAttachmentFormat,
-            depthAttachmentFormat,
+		    depthAttachmentFormat,
 		});
 	}
 
@@ -350,7 +350,7 @@ void LoadShaderPasses(MaterialSystem& materialSystem, vk::Format colorAttachment
 
 		    materialSystem.GetShaderEffect("skybox"),
 		    colorAttachmentFormat,
-            depthAttachmentFormat,
+		    depthAttachmentFormat,
 		});
 	}
 }
@@ -458,7 +458,7 @@ int main()
 		});
 
 		// Device
-		Device device(DeviceCreateInfo {
+		Device device({
 		    .window             = &window,
 		    .layers             = { "VK_LAYER_KHRONOS_validation" },
 		    .instanceExtensions = {
@@ -498,21 +498,21 @@ int main()
 		});
 
 		// Renderer
-		Renderer renderer = Renderer({
-		    .window         = &window,
+		Renderer renderer({
 		    .deviceContext  = deviceContext,
+		    .window         = &window,
 		    .defaultTexture = textureSystem.GetTexture("default"),
 		    .skyboxTexture  = textureSystem.GetTexture("skybox"),
 		});
 
 		// MaterialSystem
 		MaterialSystem materialSystem({
-		    device.GetContext().logicalDevice,
+		    deviceContext.logicalDevice,
 		});
 
 		// modelSystem
 		ModelSystem modelSystem({
-		    device.GetContext(),
+		    deviceContext,
 		    renderer.GetCommandPool(),
 		    renderer.GetQueueInfo().graphicsQueue,
 		});
@@ -557,7 +557,7 @@ int main()
 
 			if (renderer.IsSwapchainInvalidated())
 			{
-				renderer.RecreateSwapchain(&window, device.GetContext());
+				renderer.RecreateSwapchainResources(&window, device.GetContext());
 
 				materialSystem.DestroyAllMaterials();
 				LoadShaderPasses(materialSystem, deviceContext.surfaceInfo.format.format, deviceContext.depthFormat, deviceContext.surfaceInfo.capabilities.currentExtent, deviceContext.maxSupportedSampleCount);

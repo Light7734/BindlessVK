@@ -431,3 +431,5 @@ build/
 compile_commands.json
 
 .ccls-cache/
+
+imgui.ini

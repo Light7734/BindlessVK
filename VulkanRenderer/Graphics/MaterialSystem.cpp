@@ -1,9 +1,9 @@
 #include "Graphics/MaterialSystem.hpp"
-#include <vulkan/vk_enum_string_helper.h>
 
 #include <fstream>
 #include <istream>
 #include <spirv_reflect.h>
+#include <vulkan/vk_enum_string_helper.h>
 
 static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't");
 
@@ -180,7 +180,6 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		};
 	}
 
-	LOG(trace, "Depth attachment format: {}", string_VkFormat(static_cast<VkFormat>(info.depthAttachmentFormat)));
 	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
 		{},                          //  viewMask
 		1u,                          // colorAttachmentCount
