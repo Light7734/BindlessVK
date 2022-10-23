@@ -8,6 +8,8 @@
 #include "Graphics/Model.hpp"
 #include "Scene/Camera.hpp"
 // #include "Graphics/Pipeline.hpp"
+#include "Graphics/RenderGraph.hpp"
+#include "Graphics/RenderPass.hpp"
 #include "Graphics/Texture.hpp"
 #include "Graphics/Types.hpp"
 
@@ -25,47 +27,6 @@
 #endif
 
 class Window;
-
-struct CameraData
-{
-	std::unique_ptr<Buffer> buffer;
-	glm::mat4 projection;
-	glm::mat4 view;
-	glm::vec4 lightPos;
-	glm::vec4 viewPos;
-};
-
-struct FrameData
-{
-	vk::Semaphore renderSemaphore;
-	vk::Semaphore presentSemaphore;
-	vk::Fence renderFence;
-
-	CameraData cameraData;
-
-	vk::DescriptorSet descriptorSet; // Binding 0
-};
-
-// @todo Multi-threading
-struct RenderPassData
-{
-	struct CmdBuffers
-	{
-		vk::CommandBuffer primary;
-		std::vector<vk::CommandBuffer> secondaries; // secondary command buffers for each thread
-	};
-
-	std::array<CmdBuffers, MAX_FRAMES_IN_FLIGHT> cmdBuffers; // Command buffers for each frame
-
-	std::array<vk::DescriptorSet, MAX_FRAMES_IN_FLIGHT> descriptorSets; // Binding 1
-
-	vk::CommandPool cmdPool; // Pools for threads @todo Multi-threading
-
-	vk::DescriptorSetLayout descriptorSetLayout;
-	vk::PipelineLayout pipelineLayout;
-
-	std::unique_ptr<Buffer> storageBuffer;
-};
 
 class Renderer
 {
@@ -94,7 +55,7 @@ public:
 	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
 
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
-	inline uint32_t GetImageCount() const { return m_Images.size(); }
+	inline uint32_t GetImageCount() const { return m_SwapchainImages.size(); }
 
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
 
@@ -115,21 +76,14 @@ private:
 	void CreateResolveColorImage();
 	void CreateDepthImage();
 	void CreateCommandPool();
-	void CreateDescriptorResources(vk::PhysicalDevice physicalDevice);
-	void CreateFramePass();
-	void CreateForwardPass(const DeviceContext& deviceContext);
-	void CreateUIPass(Window* window, const DeviceContext& deviceContext);
-
-	void UpdateFrameDescriptorSet(const FrameData& frame, const Camera& camera);
-	void UpdateForwardPassDescriptorSet(Scene* scene, uint32_t frameIndex);
 
 	void SetupRenderBarriers(vk::CommandBuffer cmd, uint32_t imageIndex);
 	void SetupPresentBarriers(vk::CommandBuffer cmd, uint32_t imageIndex);
 	void RenderForwardPass(Scene* scene, vk::CommandBuffer cmd, uint32_t imageIndex);
 	void RenderUIPass(vk::CommandBuffer cmd, uint32_t imageIndex);
 
-	void SubmitQueue(const FrameData& frame, vk::CommandBuffer cmd);
-	void PresentFrame(const FrameData& frame, uint32_t imageIndex);
+	void SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd);
+	void PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex);
 
 	void WriteDescriptorSetsDefaultValues();
 
@@ -142,28 +96,34 @@ private:
 
 	vma::Allocator m_Allocator = {};
 
-	std::array<FrameData, MAX_FRAMES_IN_FLIGHT> m_Frames = {};
-	vk::DescriptorSetLayout m_FramesDescriptorSetLayout  = {};
+	RenderGraph m_RenderGraph;
 
-	// Render Passes
-	RenderPassData m_ForwardPass = {};
+	// Sync objects
+	std::array<vk::Fence, MAX_FRAMES_IN_FLIGHT> m_RenderFences          = {};
+	std::array<vk::Semaphore, MAX_FRAMES_IN_FLIGHT> m_RenderSemaphores  = {};
+	std::array<vk::Semaphore, MAX_FRAMES_IN_FLIGHT> m_PresentSemaphores = {};
 
 	bool m_SwapchainInvalidated = false;
 
 	// Swapchain
 	vk::SwapchainKHR m_Swapchain = {};
 
-	std::vector<vk::Image> m_Images         = {};
-	std::vector<vk::ImageView> m_ImageViews = {};
+	std::vector<vk::Image> m_SwapchainImages         = {};
+	std::vector<vk::ImageView> m_SwapchainImageViews = {};
 
-	// Multisampling
-	AllocatedImage m_ColorImage    = {};
-	vk::ImageView m_ColorImageView = {};
+	// Render Targets
+	AllocatedImage m_ColorTarget    = {};
+	vk::ImageView m_ColorTargetView = {};
+
+	AllocatedImage m_DepthTarget    = {};
+	vk::ImageView m_DepthTargetView = {};
 
 	vk::SampleCountFlagBits m_SampleCount = vk::SampleCountFlagBits::e1;
 
-	// Commands
-	vk::CommandPool m_CommandPool                   = {};
+	// Pools
+	vk::CommandPool m_CommandPool       = {};
+	vk::DescriptorPool m_DescriptorPool = {};
+
 	std::vector<vk::CommandBuffer> m_CommandBuffers = {};
 
 	uint32_t m_CurrentFrame = 0ul;
@@ -172,13 +132,4 @@ private:
 	Texture* m_SkyboxTexture  = {};
 
 	// Descriptor sets
-	vk::DescriptorPool m_DescriptorPool = {};
-
-	// Depth buffer
-	AllocatedImage m_DepthImage = {};
-
-	vk::ImageView m_DepthImageView = {};
-
-	// Pipelines
-	vk::PipelineLayout m_FramePipelineLayout = {};
 };

@@ -10,6 +10,153 @@
 #include <filesystem>
 #include <imgui.h>
 
+struct CameraData
+{
+	glm::mat4 projection;
+	glm::mat4 view;
+	glm::vec3 viewPos;
+};
+
+// @todo:
+struct SceneData
+{
+	glm::vec3 lightPos;
+};
+
+void GraphUpdate(const RenderGraph::UpdateData& data)
+{
+	LOG(trace, "Updating graph - camera - {}", data.frameIndex);
+	data.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
+		*(CameraData*)data.graph.GetDescriptorBuffer("Camera", data.frameIndex)->Map() = {
+			.projection = cameraComp.GetProjection(),
+			.view       = cameraComp.GetView(transformComp.translation),
+			.viewPos    = transformComp.translation,
+		};
+	});
+
+	LOG(trace, "Updating graph - scene - {}", data.frameIndex);
+	data.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
+		LOG(err, "1");
+		Buffer* sceneDataBuffer = data.graph.GetDescriptorBuffer("Scene", data.frameIndex);
+
+		LOG(err, "2");
+		SceneData* sceneData = (SceneData*)sceneDataBuffer->Map();
+
+		LOG(err, "3");
+		sceneData[0] = {
+			.lightPos = trasnformComp.translation,
+		};
+		LOG(err, "4");
+	});
+}
+
+void ForwardPassUpdate(const RenderPass::UpdateData& data)
+{
+	LOG(trace, "Updating pass - get - {}", data.frameIndex);
+	const RenderPass& renderPass = data.renderPass;
+	const uint32_t frameIndex    = data.frameIndex;
+	vk::Device logicalDevice     = data.logicalDevice;
+	Scene* scene                 = data.scene;
+
+	LOG(trace, "Updating pass - getset - {}", data.frameIndex);
+
+	vk::DescriptorSet descriptorSet = renderPass.GetDescriptorSet(frameIndex);
+
+	LOG(trace, "Updating pass - entt - {}", data.frameIndex);
+	// @todo: don't update every frame
+	data.scene->GetRegistry()
+	    ->group(entt::get<TransformComponent, StaticMeshRendererComponent>)
+	    .each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+		    for (const auto* node : renderComp.model->nodes)
+		    {
+			    for (const auto& primitive : node->mesh)
+			    {
+				    const auto& model    = renderComp.model;
+				    const auto& material = model->materialParameters[primitive.materialIndex];
+
+				    uint32_t albedoTextureIndex            = material.albedoTextureIndex;
+				    uint32_t normalTextureIndex            = material.normalTextureIndex;
+				    uint32_t metallicRoughnessTextureIndex = material.metallicRoughnessTextureIndex;
+
+				    Texture* albedoTexture            = model->textures[albedoTextureIndex];
+				    Texture* normalTexture            = model->textures[normalTextureIndex];
+				    Texture* metallicRoughnessTexture = model->textures[metallicRoughnessTextureIndex];
+
+				    std::vector<vk::WriteDescriptorSet> descriptorWrites = {
+
+					    vk::WriteDescriptorSet {
+					        descriptorSet,
+					        0ul,
+					        albedoTextureIndex,
+					        1ul,
+					        vk::DescriptorType::eCombinedImageSampler,
+					        &albedoTexture->descriptorInfo,
+					        nullptr,
+					        nullptr,
+					    },
+
+					    vk::WriteDescriptorSet {
+					        descriptorSet,
+					        0ul,
+					        metallicRoughnessTextureIndex,
+					        1ul,
+					        vk::DescriptorType::eCombinedImageSampler,
+					        &metallicRoughnessTexture->descriptorInfo,
+					        nullptr,
+					        nullptr,
+					    },
+
+					    vk::WriteDescriptorSet {
+					        descriptorSet,
+					        0ul,
+					        normalTextureIndex,
+					        1ul,
+					        vk::DescriptorType::eCombinedImageSampler,
+					        &normalTexture->descriptorInfo,
+					        nullptr,
+					        nullptr,
+					    }
+				    };
+
+				    logicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
+			    }
+		    }
+	    });
+}
+
+void ForwardPassRender(const RenderPass::RenderData& data)
+{
+	VkDeviceSize offset { 0 };
+	vk::Pipeline currentPipeline = VK_NULL_HANDLE;
+
+	data.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+		const auto cmd = data.cmd;
+
+		// bind pipeline
+		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
+		if (currentPipeline != newPipeline)
+		{
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
+			currentPipeline = newPipeline;
+		}
+
+		// bind buffers
+		cmd.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
+		cmd.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
+
+		// draw primitves
+		for (const auto* node : renderComp.model->nodes)
+		{
+			for (const auto& primitive : node->mesh)
+			{
+				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
+				cmd.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
+			}
+		}
+	});
+}
+
+
 Renderer::Renderer(const Renderer::CreateInfo& info)
     : m_LogicalDevice(info.deviceContext.logicalDevice)
     , m_Allocator(info.deviceContext.allocator)
@@ -35,9 +182,9 @@ Renderer::~Renderer()
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		m_LogicalDevice.destroyFence(m_Frames[i].renderFence, nullptr);
-		m_LogicalDevice.destroySemaphore(m_Frames[i].renderSemaphore, nullptr);
-		m_LogicalDevice.destroySemaphore(m_Frames[i].presentSemaphore, nullptr);
+		m_LogicalDevice.destroyFence(m_RenderFences[i], nullptr);
+		m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
+		m_LogicalDevice.destroySemaphore(m_PresentSemaphores[i], nullptr);
 	}
 
 	m_LogicalDevice.destroyFence(m_UploadContext.fence);
@@ -53,19 +200,193 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 
 	CreateSwapchain();
 	CreateImageViews();
-
 	CreateResolveColorImage();
 	CreateDepthImage();
-
 	CreateCommandPool();
 
-	CreateDescriptorResources(deviceContext.physicalDevice);
-	CreateFramePass();
-	CreateForwardPass(deviceContext);
-	CreateUIPass(window, deviceContext);
+	m_RenderGraph.Init({
+	    .swapchainImageCount = static_cast<uint32_t>(m_SwapchainImages.size()),
+	    .swapchainExtent     = m_SurfaceInfo.capabilities.maxImageExtent,
+	    .descriptorPool      = m_DescriptorPool,
+	    .logicalDevice       = deviceContext.logicalDevice,
+	    .physicalDevice      = deviceContext.physicalDevice,
+	    .allocator           = m_Allocator,
+	    .commandPool         = m_CommandPool,
+	    .queueInfo           = m_QueueInfo,
+	});
 
-	WriteDescriptorSetsDefaultValues();
+
+	ImGui::CreateContext();
+
+	ImGui_ImplGlfw_InitForVulkan(window->GetGlfwHandle(), true);
+
+	ImGui_ImplVulkan_InitInfo initInfo {
+		.Instance              = deviceContext.instance,
+		.PhysicalDevice        = deviceContext.physicalDevice,
+		.Device                = m_LogicalDevice,
+		.Queue                 = m_QueueInfo.graphicsQueue,
+		.DescriptorPool        = m_DescriptorPool,
+		.UseDynamicRendering   = true,
+		.ColorAttachmentFormat = static_cast<VkFormat>(m_SurfaceInfo.format.format),
+		.MinImageCount         = MAX_FRAMES_IN_FLIGHT,
+		.ImageCount            = MAX_FRAMES_IN_FLIGHT,
+		.MSAASamples           = static_cast<VkSampleCountFlagBits>(m_SampleCount),
+	};
+
+	std::pair userData = std::make_pair(deviceContext.vkGetInstanceProcAddr, deviceContext.instance);
+
+	ASSERT(ImGui_ImplVulkan_LoadFunctions(
+	           [](const char* func, void* data) {
+		           auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
+		           return vkGetProcAddr(instance, func);
+	           },
+	           (void*)&userData),
+	       "ImGui failed to load vulkan functions");
+
+	ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
+
+	ImmediateSubmit([](vk::CommandBuffer cmd) {
+		ImGui_ImplVulkan_CreateFontsTexture(cmd);
+	});
+	ImGui_ImplVulkan_DestroyFontUploadObjects();
+
+
+	RenderPass forwardPass;
+	forwardPass
+	    .SetName("ForwardPass")
+	    .AddDescriptor({
+	        .name        = "Textures",
+	        .count       = 32u,
+	        .type        = vk::DescriptorType::eCombinedImageSampler,
+	        .stageMask   = vk::ShaderStageFlagBits::eFragment,
+	        .initialData = nullptr,
+
+	    })
+	    .AddDescriptor({
+	        .name        = "TextureCubes",
+	        .count       = 8u,
+	        .type        = vk::DescriptorType::eCombinedImageSampler,
+	        .stageMask   = vk::ShaderStageFlagBits::eFragment,
+	        .initialData = nullptr,
+	    })
+	    .AddColorAttachment({
+	        .name   = "ColorTarget",
+	        .images = { m_ColorTarget },
+	        .views  = { m_ColorTargetView },
+	        .layout = vk::ImageLayout::eColorAttachmentOptimal,
+
+	        .resolveMode   = vk::ResolveModeFlagBits::eAverage,
+	        .resolveLayout = vk::ImageLayout::eColorAttachmentOptimal,
+	        .resolveView   = m_SwapchainImageViews,
+
+	        .loadOp  = vk::AttachmentLoadOp::eClear,
+	        .storeOp = vk::AttachmentStoreOp::eStore,
+
+	        .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+	        .accessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+	    })
+	    .SetDepthAttachment({
+	        .name   = "DepthTarget",
+	        .images = { m_DepthTarget },
+	        .views  = { m_DepthTargetView },
+	        .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+
+	        .loadOp  = vk::AttachmentLoadOp::eClear,
+	        .storeOp = vk::AttachmentStoreOp::eDontCare,
+
+	        .stageMask  = vk::PipelineStageFlagBits::eEarlyFragmentTests,
+	        .accessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+	    })
+	    .SetUpdateAction(&ForwardPassUpdate)
+	    .SetRenderAction(&ForwardPassRender);
+	// forwardPass
+
+	RenderPass uiPass;
+	uiPass
+	    .SetName("UserInterfacePass")
+	    .AddColorAttachment({
+	        .name   = "ColorTarget",
+	        .images = { m_ColorTarget },
+	        .views  = { m_ColorTargetView },
+	        .layout = vk::ImageLayout::eColorAttachmentOptimal,
+
+	        .resolveMode   = vk::ResolveModeFlagBits::eAverage,
+	        .resolveLayout = vk::ImageLayout::eColorAttachmentOptimal,
+	        .resolveView   = m_SwapchainImageViews,
+
+	        .loadOp  = vk::AttachmentLoadOp::eClear,
+	        .storeOp = vk::AttachmentStoreOp::eStore,
+
+	        .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+	        .accessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+	    })
+	    .SetUpdateAction([](const RenderPass::UpdateData& data) {
+        })
+	    .SetRenderAction([](const RenderPass::RenderData& data) {
+		    ImGui::Render();
+		    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), data.cmd);
+	    });
+	// uiPass
+
+
+	m_RenderGraph
+	    .SetName("SimpleGraph")
+	    .AddDescriptor({
+	        .name       = "Camera",
+	        .count      = 1u,
+	        .type       = vk::DescriptorType::eUniformBuffer,
+	        .stageMask  = vk::ShaderStageFlagBits::eVertex,
+	        .bufferSize = sizeof(CameraData),
+	    })
+	    .AddDescriptor({
+	        .name       = "Scene",
+	        .count      = 1u,
+	        .type       = vk::DescriptorType::eUniformBuffer,
+	        .stageMask  = vk::ShaderStageFlagBits::eVertex,
+	        .bufferSize = sizeof(SceneData),
+	    })
+	    .AddRenderPass(&forwardPass)
+	    .AddRenderPass(&uiPass)
+	    .SetUpdateAction(&GraphUpdate)
+	    .ResolveGraph();
+	// m_RenderGraph
+
+	m_SwapchainInvalidated = false;
+	m_LogicalDevice.waitIdle();
 }
+
+void Renderer::DestroySwapchain()
+{
+	if (!m_Swapchain)
+	{
+		return;
+	}
+
+	m_LogicalDevice.waitIdle();
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
+	m_LogicalDevice.resetCommandPool(m_CommandPool);
+	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool);
+	m_LogicalDevice.destroyCommandPool(m_UploadContext.cmdPool);
+	m_LogicalDevice.destroyCommandPool(m_CommandPool);
+
+	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
+
+	for (const auto& imageView : m_SwapchainImageViews)
+	{
+		m_LogicalDevice.destroyImageView(imageView);
+	}
+
+	m_LogicalDevice.destroyImageView(m_DepthTargetView);
+	m_LogicalDevice.destroyImageView(m_ColorTargetView);
+
+	m_Allocator.destroyImage(m_DepthTarget, m_DepthTarget);
+	m_Allocator.destroyImage(m_ColorTarget, m_ColorTarget);
+
+	m_LogicalDevice.destroySwapchainKHR(m_Swapchain);
+};
 
 void Renderer::CreateSyncObjects()
 {
@@ -77,9 +398,9 @@ void Renderer::CreateSyncObjects()
 			vk::FenceCreateFlagBits::eSignaled, // flags
 		};
 
-		m_Frames[i].renderFence      = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
-		m_Frames[i].renderSemaphore  = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-		m_Frames[i].presentSemaphore = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+		m_RenderFences[i]      = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
+		m_RenderSemaphores[i]  = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+		m_PresentSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
 	}
 
 	m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
@@ -143,17 +464,17 @@ void Renderer::CreateSwapchain()
 		VK_NULL_HANDLE,                                                              // oldSwapchain
 	};
 
-	m_Swapchain = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
-	m_Images    = m_LogicalDevice.getSwapchainImagesKHR(m_Swapchain);
+	m_Swapchain       = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
+	m_SwapchainImages = m_LogicalDevice.getSwapchainImagesKHR(m_Swapchain);
 }
 
 void Renderer::CreateImageViews()
 {
-	for (uint32_t i = 0; i < m_Images.size(); i++)
+	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
 	{
 		vk::ImageViewCreateInfo imageViewCreateInfo {
 			{},                          // flags
-			m_Images[i],                 // image
+			m_SwapchainImages[i],        // image
 			vk::ImageViewType::e2D,      // viewType
 			m_SurfaceInfo.format.format, // format
 
@@ -177,7 +498,7 @@ void Renderer::CreateImageViews()
 			},
 		};
 
-		m_ImageViews.push_back(m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr));
+		m_SwapchainImageViews.push_back(m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr));
 	}
 }
 
@@ -209,12 +530,12 @@ void Renderer::CreateResolveColorImage()
 	vma::AllocationCreateInfo imageAllocInfo(
 	    {}, vma::MemoryUsage::eGpuOnly,
 	    vk::MemoryPropertyFlagBits::eDeviceLocal);
-	m_ColorImage = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+	m_ColorTarget = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 	// Create color image-view
 	vk::ImageViewCreateInfo imageViewCreateInfo {
 		{},                          // flags
-		m_ColorImage,                // image
+		m_ColorTarget,               // image
 		vk::ImageViewType::e2D,      // viewType
 		m_SurfaceInfo.format.format, // format
 
@@ -237,7 +558,7 @@ void Renderer::CreateResolveColorImage()
 		},
 	};
 
-	m_ColorImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+	m_ColorTargetView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 }
 
 void Renderer::CreateDepthImage()
@@ -267,12 +588,12 @@ void Renderer::CreateDepthImage()
 
 	vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
 
-	m_DepthImage = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+	m_DepthTarget = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 	// Create depth image-view
 	vk::ImageViewCreateInfo imageViewCreateInfo {
 		{},                     // flags
-		m_DepthImage,           // image
+		m_DepthTarget,          // image
 		vk::ImageViewType::e2D, // viewType
 		m_DepthFormat,          // format
 
@@ -295,7 +616,7 @@ void Renderer::CreateDepthImage()
 		},
 	};
 
-	m_DepthImageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+	m_DepthTargetView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 }
 
 void Renderer::CreateCommandPool()
@@ -307,8 +628,14 @@ void Renderer::CreateCommandPool()
 	};
 
 	m_CommandPool           = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
-	m_ForwardPass.cmdPool   = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
 	m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+
+	vk::CommandBufferAllocateInfo cmdBufferAllocInfo {
+		m_CommandPool,                    // commandPool
+		vk::CommandBufferLevel::ePrimary, // level
+		MAX_FRAMES_IN_FLIGHT,             // commandBufferCount
+	};
+	m_CommandBuffers = m_LogicalDevice.allocateCommandBuffers(cmdBufferAllocInfo);
 
 	vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
 		m_UploadContext.cmdPool,
@@ -316,305 +643,7 @@ void Renderer::CreateCommandPool()
 		1u,
 	};
 	m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
-
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		vk::CommandBufferAllocateInfo primaryCmdBufferAllocInfo {
-			m_ForwardPass.cmdPool,            // commandPool
-			vk::CommandBufferLevel::ePrimary, // level
-			1ull,                             // commandBufferCount
-		};
-
-		vk::CommandBufferAllocateInfo secondaryCmdBuffersAllocInfo {
-			m_CommandPool,                      // commandPool
-			vk::CommandBufferLevel::eSecondary, // level
-			MAX_FRAMES_IN_FLIGHT,               // commandBufferCount
-		};
-
-		m_ForwardPass.cmdBuffers[i].primary     = m_LogicalDevice.allocateCommandBuffers(primaryCmdBufferAllocInfo)[0];
-		m_ForwardPass.cmdBuffers[i].secondaries = m_LogicalDevice.allocateCommandBuffers(secondaryCmdBuffersAllocInfo);
-	}
 }
-
-void Renderer::CreateDescriptorResources(vk::PhysicalDevice physicalDevice)
-{
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		BufferCreateInfo createInfo {
-
-			m_LogicalDevice,                                       // logicalDevice
-			physicalDevice,                                        // physicalDevice
-			m_Allocator,                                           // vmaallocator
-			m_CommandPool,                                         // commandPool
-			m_QueueInfo.graphicsQueue,                             // graphicsQueue
-			vk::BufferUsageFlagBits::eUniformBuffer,               // usage
-			(sizeof(glm::mat4) * 2ul) + (sizeof(glm::vec4) * 2ul), // size
-			{}                                                     // inital data
-		};
-
-		m_Frames[i].cameraData.buffer = std::make_unique<Buffer>(createInfo);
-	}
-}
-
-void Renderer::CreateFramePass()
-{
-	// Descriptor set layout
-	std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-		// [0] UniformBuffer - View Projection
-		vk::DescriptorSetLayoutBinding {
-		    0ul,
-		    vk::DescriptorType::eUniformBuffer,
-		    1ul,
-		    vk::ShaderStageFlagBits::eVertex,
-		    nullptr,
-		},
-	};
-
-	vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
-		{},
-		static_cast<uint32_t>(descriptorSetLayoutBindings.size()),
-		descriptorSetLayoutBindings.data(),
-	};
-	m_FramesDescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
-
-	// Allocate descriptor sets
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		vk::DescriptorSetAllocateInfo allocInfo {
-			m_DescriptorPool,
-			1ul,
-			&m_FramesDescriptorSetLayout,
-		};
-		m_Frames[i].descriptorSet = m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
-	}
-
-	// Pipeline layout
-	std::array<vk::DescriptorSetLayout, 1> setLayouts = {
-		m_FramesDescriptorSetLayout,
-	};
-
-	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
-		{},                // flags
-		setLayouts.size(), // setLayoutCount
-		setLayouts.data(), //// pSetLayouts
-	};
-
-	m_FramePipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
-}
-
-void Renderer::CreateForwardPass(const DeviceContext& deviceContext)
-{
-	// Descriptor set layout
-	std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {
-		// [0] Sampler - Texture
-		vk::DescriptorSetLayoutBinding {
-		    0u,                                        // binding
-		    vk::DescriptorType::eCombinedImageSampler, // descriptorType
-		    32u,                                       // descriptorCount
-		    vk::ShaderStageFlagBits::eFragment,        // stageFlags
-		    nullptr,                                   // pImmutableSamplers
-		},
-
-		// [1] Sampler - Texture
-		vk::DescriptorSetLayoutBinding {
-		    1u,                                        // binding
-		    vk::DescriptorType::eCombinedImageSampler, // descriptorType
-		    8u,                                        // descriptorCount
-		    vk::ShaderStageFlagBits::eFragment,        // stageFlags
-		    nullptr,                                   // pImmutableSamplers
-		},
-	};
-
-	vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
-		{},                                                        // flags
-		static_cast<uint32_t>(descriptorSetLayoutBindings.size()), // bindingCount
-		descriptorSetLayoutBindings.data(),                        // pBindings
-	};
-	m_ForwardPass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
-
-
-	// Allocate descriptor sets
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		vk::DescriptorSetAllocateInfo allocInfo {
-			m_DescriptorPool,
-			1ul,
-			&m_ForwardPass.descriptorSetLayout,
-		};
-
-		m_ForwardPass.descriptorSets[i] = m_LogicalDevice.allocateDescriptorSets(allocInfo)[0];
-	}
-
-	// Pipeline layout
-	std::array<vk::DescriptorSetLayout, 2> setLayouts = {
-		m_FramesDescriptorSetLayout,
-		m_ForwardPass.descriptorSetLayout,
-	};
-	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
-		{},                // flags
-		setLayouts.size(), // setLayoutCount
-		setLayouts.data(), //// pSetLayouts
-	};
-
-	m_ForwardPass.pipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo, nullptr);
-
-	// Storage buffer
-	BufferCreateInfo createInfo {
-		.logicalDevice  = m_LogicalDevice,
-		.physicalDevice = deviceContext.physicalDevice,
-		.allocator      = m_Allocator,
-		.commandPool    = m_CommandPool,
-		.graphicsQueue  = m_QueueInfo.graphicsQueue,
-		.usage          = vk::BufferUsageFlagBits::eStorageBuffer,
-		.size           = sizeof(glm::mat4) * 100,
-		.initialData    = {},
-	};
-
-	m_ForwardPass.storageBuffer = std::make_unique<Buffer>(createInfo);
-}
-
-void Renderer::CreateUIPass(Window* window, const DeviceContext& deviceContext)
-{
-	ImGui::CreateContext();
-
-	ImGui_ImplGlfw_InitForVulkan(window->GetGlfwHandle(), true);
-
-	ImGui_ImplVulkan_InitInfo initInfo {
-		.Instance              = deviceContext.instance,
-		.PhysicalDevice        = deviceContext.physicalDevice,
-		.Device                = m_LogicalDevice,
-		.Queue                 = m_QueueInfo.graphicsQueue,
-		.DescriptorPool        = m_DescriptorPool,
-		.UseDynamicRendering   = true,
-		.ColorAttachmentFormat = static_cast<VkFormat>(m_SurfaceInfo.format.format),
-		.MinImageCount         = MAX_FRAMES_IN_FLIGHT,
-		.ImageCount            = MAX_FRAMES_IN_FLIGHT,
-		.MSAASamples           = static_cast<VkSampleCountFlagBits>(m_SampleCount),
-	};
-
-	std::pair userData = std::make_pair(deviceContext.vkGetInstanceProcAddr, deviceContext.instance);
-
-	ASSERT(ImGui_ImplVulkan_LoadFunctions(
-	           [](const char* func, void* data) {
-		           auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
-		           return vkGetProcAddr(instance, func);
-	           },
-	           (void*)&userData),
-	       "ImGui failed to load vulkan functions");
-
-	ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
-
-	ImmediateSubmit([](vk::CommandBuffer cmd) {
-		ImGui_ImplVulkan_CreateFontsTexture(cmd);
-	});
-	ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
-
-void Renderer::WriteDescriptorSetsDefaultValues()
-{
-	std::vector<vk::WriteDescriptorSet> descriptorWrites;
-
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		vk::DescriptorBufferInfo viewProjectionBufferInfo {
-			*m_Frames[i].cameraData.buffer->GetBuffer(),
-			0ul,
-			VK_WHOLE_SIZE,
-		};
-
-		descriptorWrites.push_back({
-		    vk::WriteDescriptorSet {
-		        m_Frames[i].descriptorSet,
-		        0ul,
-		        0ul,
-		        1ul,
-		        vk::DescriptorType::eUniformBuffer,
-		        nullptr,
-		        &viewProjectionBufferInfo,
-		        nullptr,
-		    },
-		});
-	}
-
-	for (uint32_t i = 0; i < 32; i++)
-	{
-		for (uint32_t j = 0; j < MAX_FRAMES_IN_FLIGHT; j++)
-		{
-			descriptorWrites.push_back(vk::WriteDescriptorSet {
-			    m_ForwardPass.descriptorSets[j],
-			    0ul,
-			    i,
-			    1ul,
-			    vk::DescriptorType::eCombinedImageSampler,
-			    &m_DefaultTexture->descriptorInfo,
-			    nullptr,
-			    nullptr,
-			});
-		}
-	}
-
-	for (uint32_t i = 0; i < 8; i++)
-	{
-		for (uint32_t j = 0; j < MAX_FRAMES_IN_FLIGHT; j++)
-		{
-			descriptorWrites.push_back(vk::WriteDescriptorSet {
-			    m_ForwardPass.descriptorSets[j],
-			    1ul,
-			    i,
-			    1ul,
-			    vk::DescriptorType::eCombinedImageSampler,
-			    &m_SkyboxTexture->descriptorInfo,
-			    nullptr,
-			    nullptr,
-			});
-		}
-	}
-	m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
-
-	m_SwapchainInvalidated = false;
-	m_LogicalDevice.waitIdle();
-}
-
-
-void Renderer::DestroySwapchain()
-{
-	if (!m_Swapchain)
-	{
-		return;
-	}
-
-	m_LogicalDevice.waitIdle();
-	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
-
-	m_LogicalDevice.resetCommandPool(m_CommandPool);
-	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool);
-	m_LogicalDevice.destroyCommandPool(m_ForwardPass.cmdPool);
-	m_LogicalDevice.destroyCommandPool(m_UploadContext.cmdPool);
-	m_LogicalDevice.destroyCommandPool(m_CommandPool);
-
-	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
-
-	for (const auto& imageView : m_ImageViews)
-	{
-		m_LogicalDevice.destroyImageView(imageView);
-	}
-
-	m_LogicalDevice.destroyImageView(m_DepthImageView);
-	m_LogicalDevice.destroyImageView(m_ColorImageView);
-
-	m_Allocator.destroyImage(m_DepthImage, m_DepthImage);
-	m_Allocator.destroyImage(m_ColorImage, m_ColorImage);
-
-	m_LogicalDevice.destroyDescriptorSetLayout(m_FramesDescriptorSetLayout);
-	m_LogicalDevice.destroyDescriptorSetLayout(m_ForwardPass.descriptorSetLayout);
-
-	m_LogicalDevice.destroyPipelineLayout(m_FramePipelineLayout);
-	m_LogicalDevice.destroyPipelineLayout(m_ForwardPass.pipelineLayout);
-
-	m_LogicalDevice.destroySwapchainKHR(m_Swapchain);
-};
 
 void Renderer::BeginFrame()
 {
@@ -631,12 +660,11 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 	if (m_SwapchainInvalidated)
 		return;
 
-	const FrameData& frame = m_Frames[m_CurrentFrame];
-
-	VKC(m_LogicalDevice.waitForFences(1u, &frame.renderFence, VK_TRUE, UINT64_MAX));
+	VKC(m_LogicalDevice.waitForFences(1u, &m_RenderFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+	VKC(m_LogicalDevice.resetFences(1u, &m_RenderFences[m_CurrentFrame]));
 
 	uint32_t imageIndex;
-	vk::Result result = m_LogicalDevice.acquireNextImageKHR(m_Swapchain, UINT64_MAX, frame.renderSemaphore, VK_NULL_HANDLE, &imageIndex);
+	vk::Result result = m_LogicalDevice.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_RenderSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
 	{
 		m_LogicalDevice.waitIdle();
@@ -648,132 +676,25 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 		ASSERT(result == vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
-	UpdateFrameDescriptorSet(frame, camera);
-	UpdateForwardPassDescriptorSet(scene, m_CurrentFrame);
-
-	const auto cmd = m_ForwardPass.cmdBuffers[m_CurrentFrame].primary;
+	auto cmd = m_CommandBuffers[m_CurrentFrame];
 	cmd.reset();
-
 	cmd.begin(vk::CommandBufferBeginInfo {});
-	cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_FramePipelineLayout, 0ul, 1ul, &frame.descriptorSet, 0ul, nullptr);
-	SetupRenderBarriers(cmd, imageIndex);
 
-	RenderForwardPass(scene, cmd, imageIndex);
-	RenderUIPass(cmd, imageIndex);
+
+	m_RenderGraph.Update(scene, m_CurrentFrame);
+	m_RenderGraph.Render({
+	    scene,
+	    cmd,
+	    m_CurrentFrame,
+	});
 
 	SetupPresentBarriers(cmd, imageIndex);
 	cmd.end();
 
-	SubmitQueue(frame, cmd);
-	PresentFrame(frame, imageIndex);
+	SubmitQueue(m_PresentSemaphores[m_CurrentFrame], m_RenderSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
+	PresentFrame(m_RenderSemaphores[m_CurrentFrame], imageIndex);
 
 	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
-}
-
-void Renderer::UpdateFrameDescriptorSet(const FrameData& frame, const Camera& camera)
-{
-	struct PerFrameData
-	{
-		glm::mat4 projection;
-		glm::mat4 view;
-		glm::vec4 lightPos;
-		glm::vec4 viewPos;
-	};
-
-	PerFrameData* map = (PerFrameData*)frame.cameraData.buffer->Map();
-	map->projection   = camera.GetProjection();
-	map->view         = camera.GetView();
-	map->lightPos     = glm::vec4(2.0f, 2.0f, 1.0f, 1.0f);
-	map->viewPos      = camera.GetPosition();
-	frame.cameraData.buffer->Unmap();
-}
-
-void Renderer::UpdateForwardPassDescriptorSet(Scene* scene, uint32_t frameIndex)
-{
-	scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		for (const auto* node : renderComp.model->nodes)
-		{
-			for (const auto& primitive : node->mesh)
-			{
-				const auto& model    = renderComp.model;
-				const auto& material = model->materialParameters[primitive.materialIndex];
-
-				uint32_t albedoTextureIndex            = material.albedoTextureIndex;
-				uint32_t normalTextureIndex            = material.normalTextureIndex;
-				uint32_t metallicRoughnessTextureIndex = material.metallicRoughnessTextureIndex;
-
-				Texture* albedoTexture            = model->textures[albedoTextureIndex];
-				Texture* normalTexture            = model->textures[normalTextureIndex];
-				Texture* metallicRoughnessTexture = model->textures[metallicRoughnessTextureIndex];
-
-				std::vector<vk::WriteDescriptorSet> descriptorWrites = {
-					vk::WriteDescriptorSet {
-					    m_ForwardPass.descriptorSets[frameIndex],
-					    0ul,
-					    albedoTextureIndex,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &albedoTexture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					},
-					vk::WriteDescriptorSet {
-					    m_ForwardPass.descriptorSets[frameIndex],
-					    0ul,
-					    metallicRoughnessTextureIndex,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &metallicRoughnessTexture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					},
-					vk::WriteDescriptorSet {
-					    m_ForwardPass.descriptorSets[frameIndex],
-					    0ul,
-					    normalTextureIndex,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &normalTexture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					}
-				};
-
-				m_LogicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
-			}
-		}
-	});
-}
-
-void Renderer::SetupRenderBarriers(vk::CommandBuffer cmd, uint32_t imageIndex)
-{
-	// Transition image to color write
-	vk::ImageMemoryBarrier imageMemoryBarrier {
-		{},                                        // srcAccessMask
-		vk::AccessFlagBits::eColorAttachmentWrite, // dstAccessMask
-		vk::ImageLayout::eUndefined,               // oldLayout
-		vk::ImageLayout::eColorAttachmentOptimal,  // newLayout
-		{},
-		{},
-		m_Images[imageIndex], // image
-
-		/* subresourceRange */
-		vk::ImageSubresourceRange {
-		    vk::ImageAspectFlagBits::eColor,
-		    0u,
-		    1u,
-		    0u,
-		    1u,
-		},
-	};
-
-	cmd.pipelineBarrier(
-	    vk::PipelineStageFlagBits::eTopOfPipe,
-	    vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	    {},
-	    {},
-	    {},
-	    imageMemoryBarrier);
 }
 
 void Renderer::SetupPresentBarriers(vk::CommandBuffer cmd, uint32_t imageIndex)
@@ -786,7 +707,7 @@ void Renderer::SetupPresentBarriers(vk::CommandBuffer cmd, uint32_t imageIndex)
 		vk::ImageLayout::ePresentSrcKHR,           // newLayout
 		{},
 		{},
-		m_Images[imageIndex], // image
+		m_SwapchainImages[imageIndex], // image
 
 		/* subresourceRange */
 		vk::ImageSubresourceRange {
@@ -807,163 +728,31 @@ void Renderer::SetupPresentBarriers(vk::CommandBuffer cmd, uint32_t imageIndex)
 	    imageMemoryBarrier);
 }
 
-void Renderer::RenderForwardPass(Scene* scene, vk::CommandBuffer cmd, uint32_t imageIndex)
-{
-	vk::RenderingAttachmentInfo colorAttachmentInfo {
-		m_ColorImageView,                         // imageView
-		vk::ImageLayout::eColorAttachmentOptimal, // imageLayout
-
-		vk::ResolveModeFlagBits::eAverage,        // resolveMode
-		m_ImageViews[imageIndex],                 // resolveImageView
-		vk::ImageLayout::eColorAttachmentOptimal, // resolveImageLayout
-
-		vk::AttachmentLoadOp::eClear,  // loadOp
-		vk::AttachmentStoreOp::eStore, // storeOp
-
-		/* clearValue */
-		vk::ClearColorValue {
-		    std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f },
-		},
-	};
-
-	vk::RenderingAttachmentInfo depthAttachmentInfo {
-		m_DepthImageView,                                // imageView
-		vk::ImageLayout::eDepthStencilAttachmentOptimal, // imageLayout
-
-		{}, // resolveMode
-		{}, // resolveImageView
-		{}, // resolveImageLayout
-
-		vk::AttachmentLoadOp::eClear,  // loadOp
-		vk::AttachmentStoreOp::eStore, // storeOp
-
-		/* clearValue */
-		vk::ClearDepthStencilValue {
-		    { 1.0, 0 },
-		},
-	};
-
-	vk::RenderingInfo renderingInfo {
-		{}, // flags
-
-		/* renderArea */
-		vk::Rect2D {
-		    { 0, 0 },                                 // offset
-		    m_SurfaceInfo.capabilities.currentExtent, // extent
-		},
-
-		1u,                   // layerCount
-		{},                   // viewMask
-		1u,                   // colorAttachmentCount
-		&colorAttachmentInfo, // pColorAttachments
-		&depthAttachmentInfo, // pDepthAttachment
-		{},                   // pStencilAttachment
-	};
-
-	cmd.beginRendering(renderingInfo);
-
-	const vk::DescriptorSet descriptorSet = m_ForwardPass.descriptorSets[m_CurrentFrame];
-
-	cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_ForwardPass.pipelineLayout, 1ul, 1ul, &m_ForwardPass.descriptorSets[m_CurrentFrame], 0ul, nullptr);
-
-	VkDeviceSize offset { 0 };
-
-	vk::Pipeline currentPipeline = VK_NULL_HANDLE;
-	uint32_t primitives          = 0;
-	scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		// bind pipeline
-		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
-		if (currentPipeline != newPipeline)
-		{
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
-			currentPipeline = newPipeline;
-		}
-
-		// bind buffers
-		cmd.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
-		cmd.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
-
-		// draw primitves
-		for (const auto* node : renderComp.model->nodes)
-		{
-			for (const auto& primitive : node->mesh)
-			{
-				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
-				cmd.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
-			}
-		}
-	});
-
-
-	cmd.endRendering();
-}
-
-void Renderer::RenderUIPass(vk::CommandBuffer cmd, uint32_t imageIndex)
-{
-	ImGui::Render();
-
-	vk::RenderingAttachmentInfo colorAttachmentInfo = {
-		m_ColorImageView,                         // imageView
-		vk::ImageLayout::eColorAttachmentOptimal, // imageLayout
-
-		vk::ResolveModeFlagBits::eAverage,        // resolveMode
-		m_ImageViews[imageIndex],                 // resolveImageView
-		vk::ImageLayout::eColorAttachmentOptimal, // resolveImageLayout
-
-		vk::AttachmentLoadOp::eLoad,   // loadOp
-		vk::AttachmentStoreOp::eStore, // storeOp
-	};
-	vk::RenderingInfo renderingInfo = {
-		{}, // flags
-
-		/* renderArea */
-		vk::Rect2D {
-		    { 0, 0 },                                 // offset
-		    m_SurfaceInfo.capabilities.currentExtent, // extent
-		},
-
-		1u,                   // layerCount
-		{},                   // viewMask
-		1u,                   // colorAttachmentCount
-		&colorAttachmentInfo, // pColorAttachments
-		{},                   // pDepthAttachment
-		{},                   // pStencilAttachment
-	};
-
-	cmd.beginRendering(renderingInfo);
-
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-
-	cmd.endRendering();
-}
-
-
-void Renderer::SubmitQueue(const FrameData& frame, vk::CommandBuffer cmd)
+void Renderer::SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd)
 {
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submitInfo {
-		1u,                      // waitSemaphoreCount
-		&frame.renderSemaphore,  // pWaitSemaphores
-		&waitStage,              // pWaitDstStageMask
-		1u,                      // commandBufferCount
-		&cmd,                    // pCommandBuffers
-		1u,                      // signalSemaphoreCount
-		&frame.presentSemaphore, // pSignalSemaphores
+		1u,               // waitSemaphoreCount
+		&waitSemaphore,   // pWaitSemaphores
+		&waitStage,       // pWaitDstStageMask
+		1u,               // commandBufferCount
+		&cmd,             // pCommandBuffers
+		1u,               // signalSemaphoreCount
+		&signalSemaphore, // pSignalSemaphores
 	};
 
-	VKC(m_LogicalDevice.resetFences(1u, &frame.renderFence));
-	VKC(m_QueueInfo.graphicsQueue.submit(1u, &submitInfo, frame.renderFence));
+	VKC(m_QueueInfo.graphicsQueue.submit(1u, &submitInfo, signalFence));
 }
 
-void Renderer::PresentFrame(const FrameData& frame, uint32_t imageIndex)
+void Renderer::PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex)
 {
 	vk::PresentInfoKHR presentInfo {
-		1u,                      // waitSemaphoreCount
-		&frame.presentSemaphore, // pWaitSemaphores
-		1u,                      // swapchainCount
-		&m_Swapchain,            // pSwapchains
-		&imageIndex,             // pImageIndices
-		nullptr                  // pResults
+		1u,             // waitSemaphoreCount
+		&waitSemaphore, // pWaitSemaphores
+		1u,             // swapchainCount
+		&m_Swapchain,   // pSwapchains
+		&imageIndex,    // pImageIndices
+		nullptr         // pResults
 	};
 
 	try
@@ -983,7 +772,6 @@ void Renderer::PresentFrame(const FrameData& frame, uint32_t imageIndex)
 		return;
 	}
 }
-
 
 void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
 {

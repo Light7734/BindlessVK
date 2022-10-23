@@ -3,6 +3,8 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
+#include "Graphics/RenderGraph.hpp"
+#include "Graphics/RenderPass.hpp"
 #include "Scene/Camera.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderer.hpp"
@@ -433,6 +435,18 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	                                                materialSystem.GetMaterial("skybox"), // Material
 	                                                modelSystem.GetModel("skybox")        // Mesh
 	);
+
+	Entity light = scene.CreateEntity();
+	LOG(trace, "FUCK");
+	scene.AddComponent<TransformComponent>(light,
+	                                       glm::vec3(2.0f, 2.0f, 1.0f), // Translation
+	                                       glm::vec3(1.0f),             // Scale
+	                                       glm::vec3(0.0f, 0.0, 0.0)    // Rotation
+	);
+
+	LOG(trace, "THIS");
+	scene.AddComponent<LightComponent>(light, 12);
+	LOG(trace, "SHIT");
 }
 
 int main()

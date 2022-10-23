@@ -122,19 +122,18 @@ private:
 		m_Pitch = std::clamp(m_Pitch, -89.0, 89.0);
 
 		m_Front = glm::normalize(glm::vec3(
-		                                   glm::sin(glm::radians(m_Yaw)) * glm::cos(glm::radians(m_Pitch)),
-		                                   glm::sin(glm::radians(m_Pitch)),
-                    glm::cos(glm::radians(m_Yaw)) * glm::cos(glm::radians(m_Pitch))
-                                           ));
+		    glm::sin(glm::radians(m_Yaw)) * glm::cos(glm::radians(m_Pitch)),
+		    glm::sin(glm::radians(m_Pitch)),
+		    glm::cos(glm::radians(m_Yaw)) * glm::cos(glm::radians(m_Pitch))));
 	}
 
 private:
-	// @TODO: Make this variable hook into ACV_CameraFOV's Change
 	Window* m_Window;
 	double m_LastMouseX = std::numeric_limits<double>::max();
 	double m_LastMouseY = std::numeric_limits<double>::max();
 
 	Timer m_DeltaTimer;
+	// @TODO: Make this variable hook into ACV_CameraFOV's Change
 	float m_FieldOfView = {};
 
 	float m_Width  = {};

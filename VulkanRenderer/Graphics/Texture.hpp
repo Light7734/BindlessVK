@@ -120,7 +120,7 @@ private:
 	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
-	UploadContext m_UploadContext                      = {};
+	UploadContext m_UploadContext = {};
 
 	vk::Device m_LogicalDevice                         = {};
 	vk::PhysicalDevice m_PhysicalDevice                = {};

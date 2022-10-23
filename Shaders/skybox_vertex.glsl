@@ -11,9 +11,13 @@ layout(location = 0) out vec3 outUVW;
 layout(std140, set = 0, binding = 0) uniform FrameData {
     mat4 projection;
     mat4 view;
-    vec4 lightPos;
     vec4 viewPos;
 } U_FrameData;
+
+
+layout(std140, set = 0, binding = 1) uniform SceneData {
+    vec4 lightPos;
+} U_SceneData;
 
 
 void main()
