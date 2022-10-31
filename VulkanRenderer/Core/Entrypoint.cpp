@@ -437,7 +437,7 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	);
 
 	Entity light = scene.CreateEntity();
-	LOG(trace, "FUCK");
+	LOG(trace, "MOMENT");
 	scene.AddComponent<TransformComponent>(light,
 	                                       glm::vec3(2.0f, 2.0f, 1.0f), // Translation
 	                                       glm::vec3(1.0f),             // Scale
@@ -446,7 +446,7 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 
 	LOG(trace, "THIS");
 	scene.AddComponent<LightComponent>(light, 12);
-	LOG(trace, "SHIT");
+	LOG(trace, "BRUH");
 }
 
 int main()

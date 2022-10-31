@@ -27,7 +27,7 @@ void GraphUpdate(const RenderGraph::UpdateData& data)
 {
 	LOG(trace, "Updating graph - camera - {}", data.frameIndex);
 	data.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-		*(CameraData*)data.graph.GetDescriptorBuffer("Camera", data.frameIndex)->Map() = {
+		*(CameraData*)data.graph.MapDescriptorBuffer("frame_data", data.frameIndex) = {
 			.projection = cameraComp.GetProjection(),
 			.view       = cameraComp.GetView(transformComp.translation),
 			.viewPos    = transformComp.translation,
@@ -36,11 +36,7 @@ void GraphUpdate(const RenderGraph::UpdateData& data)
 
 	LOG(trace, "Updating graph - scene - {}", data.frameIndex);
 	data.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
-		LOG(err, "1");
-		Buffer* sceneDataBuffer = data.graph.GetDescriptorBuffer("Scene", data.frameIndex);
-
-		LOG(err, "2");
-		SceneData* sceneData = (SceneData*)sceneDataBuffer->Map();
+		SceneData* sceneData = (SceneData*)data.graph.MapDescriptorBuffer("scene_data", data.frameIndex);
 
 		LOG(err, "3");
 		sceneData[0] = {
@@ -52,15 +48,16 @@ void GraphUpdate(const RenderGraph::UpdateData& data)
 
 void ForwardPassUpdate(const RenderPass::UpdateData& data)
 {
+	vk::RenderingAttachmentInfo info;
 	LOG(trace, "Updating pass - get - {}", data.frameIndex);
-	const RenderPass& renderPass = data.renderPass;
-	const uint32_t frameIndex    = data.frameIndex;
-	vk::Device logicalDevice     = data.logicalDevice;
-	Scene* scene                 = data.scene;
+	RenderPass& renderPass    = data.renderPass;
+	const uint32_t frameIndex = data.frameIndex;
+	vk::Device logicalDevice  = data.logicalDevice;
+	Scene* scene              = data.scene;
 
 	LOG(trace, "Updating pass - getset - {}", data.frameIndex);
 
-	vk::DescriptorSet descriptorSet = renderPass.GetDescriptorSet(frameIndex);
+	vk::DescriptorSet* descriptorSet = &renderPass.descriptorSets[frameIndex];
 
 	LOG(trace, "Updating pass - entt - {}", data.frameIndex);
 	// @todo: don't update every frame
@@ -85,7 +82,7 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 				    std::vector<vk::WriteDescriptorSet> descriptorWrites = {
 
 					    vk::WriteDescriptorSet {
-					        descriptorSet,
+					        *descriptorSet,
 					        0ul,
 					        albedoTextureIndex,
 					        1ul,
@@ -96,7 +93,7 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 					    },
 
 					    vk::WriteDescriptorSet {
-					        descriptorSet,
+					        *descriptorSet,
 					        0ul,
 					        metallicRoughnessTextureIndex,
 					        1ul,
@@ -107,7 +104,7 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 					    },
 
 					    vk::WriteDescriptorSet {
-					        descriptorSet,
+					        *descriptorSet,
 					        0ul,
 					        normalTextureIndex,
 					        1ul,
@@ -139,7 +136,6 @@ void ForwardPassRender(const RenderPass::RenderData& data)
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
 			currentPipeline = newPipeline;
 		}
-
 		// bind buffers
 		cmd.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
 		cmd.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
@@ -200,8 +196,6 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 
 	CreateSwapchain();
 	CreateImageViews();
-	CreateResolveColorImage();
-	CreateDepthImage();
 	CreateCommandPool();
 
 	m_RenderGraph.Init({
@@ -212,6 +206,8 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	    .physicalDevice      = deviceContext.physicalDevice,
 	    .allocator           = m_Allocator,
 	    .commandPool         = m_CommandPool,
+	    .colorFormat         = m_SurfaceInfo.format.format,
+	    .depthFormat         = m_DepthFormat,
 	    .queueInfo           = m_QueueInfo,
 	});
 
@@ -232,7 +228,6 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 		.ImageCount            = MAX_FRAMES_IN_FLIGHT,
 		.MSAASamples           = static_cast<VkSampleCountFlagBits>(m_SampleCount),
 	};
-
 	std::pair userData = std::make_pair(deviceContext.vkGetInstanceProcAddr, deviceContext.instance);
 
 	ASSERT(ImGui_ImplVulkan_LoadFunctions(
@@ -250,106 +245,91 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	});
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 
+	RenderPassRecipe uiPassRecipe;
+	RenderPassRecipe forwardPassRecipe;
 
-	RenderPass forwardPass;
-	forwardPass
-	    .SetName("ForwardPass")
-	    .AddDescriptor({
-	        .name        = "Textures",
-	        .count       = 32u,
-	        .type        = vk::DescriptorType::eCombinedImageSampler,
-	        .stageMask   = vk::ShaderStageFlagBits::eFragment,
-	        .initialData = nullptr,
+	RenderPassRecipe::AttachmentInfo colorTarget = {};
 
+	forwardPassRecipe
+	    .SetName("forward")
+	    .AddColorOutput({
+	        .name     = "forwardpass",
+	        .size     = { 1.0, 1.0 },
+	        .sizeType = RenderPassRecipe::SizeType::eSwapchainRelative,
+	        .format   = m_SurfaceInfo.format.format,
+	        .samples  = m_SampleCount,
 	    })
-	    .AddDescriptor({
-	        .name        = "TextureCubes",
-	        .count       = 8u,
-	        .type        = vk::DescriptorType::eCombinedImageSampler,
-	        .stageMask   = vk::ShaderStageFlagBits::eFragment,
-	        .initialData = nullptr,
+	    .SetDepthStencilOutput({
+	        .name     = "forward_depth",
+	        .size     = { 1.0, 1.0 },
+	        .sizeType = RenderPassRecipe::SizeType::eSwapchainRelative,
+	        .format   = m_DepthFormat,
+	        .samples  = m_SampleCount,
 	    })
-	    .AddColorAttachment({
-	        .name   = "ColorTarget",
-	        .images = { m_ColorTarget },
-	        .views  = { m_ColorTargetView },
-	        .layout = vk::ImageLayout::eColorAttachmentOptimal,
-
-	        .resolveMode   = vk::ResolveModeFlagBits::eAverage,
-	        .resolveLayout = vk::ImageLayout::eColorAttachmentOptimal,
-	        .resolveView   = m_SwapchainImageViews,
-
-	        .loadOp  = vk::AttachmentLoadOp::eClear,
-	        .storeOp = vk::AttachmentStoreOp::eStore,
-
-	        .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	        .accessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+	    .AddTextureInput({
+	        .name           = "texture_cubes",
+	        .binding        = 1,
+	        .count          = 8u,
+	        .type           = vk::DescriptorType::eCombinedImageSampler,
+	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+	        .defaultTexture = m_DefaultTexture,
 	    })
-	    .SetDepthAttachment({
-	        .name   = "DepthTarget",
-	        .images = { m_DepthTarget },
-	        .views  = { m_DepthTargetView },
-	        .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
-
-	        .loadOp  = vk::AttachmentLoadOp::eClear,
-	        .storeOp = vk::AttachmentStoreOp::eDontCare,
-
-	        .stageMask  = vk::PipelineStageFlagBits::eEarlyFragmentTests,
-	        .accessMask = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+	    .AddTextureInput({
+	        .name           = "texture_2ds",
+	        .binding        = 0,
+	        .count          = 32,
+	        .type           = vk::DescriptorType::eCombinedImageSampler,
+	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+	        .defaultTexture = m_DefaultTexture,
 	    })
 	    .SetUpdateAction(&ForwardPassUpdate)
 	    .SetRenderAction(&ForwardPassRender);
-	// forwardPass
 
-	RenderPass uiPass;
-	uiPass
-	    .SetName("UserInterfacePass")
-	    .AddColorAttachment({
-	        .name   = "ColorTarget",
-	        .images = { m_ColorTarget },
-	        .views  = { m_ColorTargetView },
-	        .layout = vk::ImageLayout::eColorAttachmentOptimal,
-
-	        .resolveMode   = vk::ResolveModeFlagBits::eAverage,
-	        .resolveLayout = vk::ImageLayout::eColorAttachmentOptimal,
-	        .resolveView   = m_SwapchainImageViews,
-
-	        .loadOp  = vk::AttachmentLoadOp::eClear,
-	        .storeOp = vk::AttachmentStoreOp::eStore,
-
-	        .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-	        .accessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+	uiPassRecipe
+	    .SetName("ui")
+	    .AddColorOutput({
+	        .name     = "backbuffer",
+	        .size     = { 1.0, 1.0 },
+	        .sizeType = RenderPassRecipe::SizeType::eSwapchainRelative,
+	        .format   = m_SurfaceInfo.format.format,
+	        .samples  = m_SampleCount,
+	        .input    = "forwardpass",
 	    })
 	    .SetUpdateAction([](const RenderPass::UpdateData& data) {
-        })
+		    LOG(trace, "no op");
+	    })
 	    .SetRenderAction([](const RenderPass::RenderData& data) {
 		    ImGui::Render();
 		    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), data.cmd);
 	    });
-	// uiPass
-
 
 	m_RenderGraph
 	    .SetName("SimpleGraph")
-	    .AddDescriptor({
-	        .name       = "Camera",
-	        .count      = 1u,
-	        .type       = vk::DescriptorType::eUniformBuffer,
-	        .stageMask  = vk::ShaderStageFlagBits::eVertex,
-	        .bufferSize = sizeof(CameraData),
+	    .SetBackbuffer("backbuffer")
+	    .AddBufferInput({
+	        .name      = "frame_data",
+	        .binding   = 0,
+	        .count     = 1,
+	        .type      = vk::DescriptorType::eUniformBuffer,
+	        .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	        .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+	        .initialData = nullptr,
 	    })
-	    .AddDescriptor({
-	        .name       = "Scene",
-	        .count      = 1u,
-	        .type       = vk::DescriptorType::eUniformBuffer,
-	        .stageMask  = vk::ShaderStageFlagBits::eVertex,
-	        .bufferSize = sizeof(SceneData),
+	    .AddBufferInput({
+	        .name      = "scene_data",
+	        .binding   = 1,
+	        .count     = 1,
+	        .type      = vk::DescriptorType::eUniformBuffer,
+	        .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	        .size        = sizeof(glm::vec4),
+	        .initialData = nullptr,
 	    })
-	    .AddRenderPass(&forwardPass)
-	    .AddRenderPass(&uiPass)
+	    .AddRenderPassRecipe(forwardPassRecipe)
+	    .AddRenderPassRecipe(uiPassRecipe)
 	    .SetUpdateAction(&GraphUpdate)
-	    .ResolveGraph();
-	// m_RenderGraph
+	    .Build();
 
 	m_SwapchainInvalidated = false;
 	m_LogicalDevice.waitIdle();
@@ -409,17 +389,17 @@ void Renderer::CreateSyncObjects()
 void Renderer::CreateDescriptorPools()
 {
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
-		{ vk::DescriptorType::eSampler, 1000 },
-		{ vk::DescriptorType::eCombinedImageSampler, 1000 },
-		{ vk::DescriptorType::eSampledImage, 1000 },
-		{ vk::DescriptorType::eStorageImage, 1000 },
-		{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
-		{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
-		{ vk::DescriptorType::eUniformBuffer, 1000 },
-		{ vk::DescriptorType::eStorageBuffer, 1000 },
-		{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
-		{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
-		{ vk::DescriptorType::eInputAttachment, 1000 }
+		{ vk::DescriptorType::eSampler, 8000 },
+		{ vk::DescriptorType::eCombinedImageSampler, 8000 },
+		{ vk::DescriptorType::eSampledImage, 8000 },
+		{ vk::DescriptorType::eStorageImage, 8000 },
+		{ vk::DescriptorType::eUniformTexelBuffer, 8000 },
+		{ vk::DescriptorType::eStorageTexelBuffer, 8000 },
+		{ vk::DescriptorType::eUniformBuffer, 8000 },
+		{ vk::DescriptorType::eStorageBuffer, 8000 },
+		{ vk::DescriptorType::eUniformBufferDynamic, 8000 },
+		{ vk::DescriptorType::eStorageBufferDynamic, 8000 },
+		{ vk::DescriptorType::eInputAttachment, 8000 }
 	};
 	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
@@ -504,61 +484,6 @@ void Renderer::CreateImageViews()
 
 void Renderer::CreateResolveColorImage()
 {
-	vk::ImageCreateInfo imageCreateInfo {
-		{},                          // flags
-		vk::ImageType::e2D,          // imageType
-		m_SurfaceInfo.format.format, // format
-
-		/* extent */
-		vk::Extent3D {
-		    m_SurfaceInfo.capabilities.currentExtent.width,  // width
-		    m_SurfaceInfo.capabilities.currentExtent.height, // height
-		    1u,                                              // depth
-		},
-		1u,                        // mipLevels
-		1u,                        // arrayLayers
-		m_SampleCount,             // samples
-		vk::ImageTiling::eOptimal, // tiling
-		vk::ImageUsageFlagBits::eTransientAttachment |
-		    vk::ImageUsageFlagBits::eColorAttachment, // usage
-		vk::SharingMode::eExclusive,                  // sharingMode
-		0u,                                           // queueFamilyIndexCount
-		nullptr,                                      // pQueueFamilyIndices
-		vk::ImageLayout::eUndefined,                  // initialLayout
-	};
-
-	vma::AllocationCreateInfo imageAllocInfo(
-	    {}, vma::MemoryUsage::eGpuOnly,
-	    vk::MemoryPropertyFlagBits::eDeviceLocal);
-	m_ColorTarget = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
-
-	// Create color image-view
-	vk::ImageViewCreateInfo imageViewCreateInfo {
-		{},                          // flags
-		m_ColorTarget,               // image
-		vk::ImageViewType::e2D,      // viewType
-		m_SurfaceInfo.format.format, // format
-
-		/* components */
-		vk::ComponentMapping {
-		    // Don't swizzle the colors around...
-		    vk::ComponentSwizzle::eIdentity, // r
-		    vk::ComponentSwizzle::eIdentity, // g
-		    vk::ComponentSwizzle::eIdentity, // b
-		    vk::ComponentSwizzle::eIdentity, // a
-		},
-
-		/* subresourceRange */
-		vk::ImageSubresourceRange {
-		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    0u,                              // baseMipLevel
-		    1u,                              // levelCount
-		    0u,                              // baseArrayLayer
-		    1u,                              // layerCount
-		},
-	};
-
-	m_ColorTargetView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 }
 
 void Renderer::CreateDepthImage()

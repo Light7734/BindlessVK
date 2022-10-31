@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vulkan/vulkan_structs.hpp>
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
 #include "Core/Base.hpp"
@@ -27,7 +26,8 @@
 #ifndef DESIRED_SWAPCHAIN_IMAGES
 	#define DESIRED_SWAPCHAIN_IMAGES 3
 #endif
-// @wip finish this....
+
+
 class RenderGraph
 {
 public:
@@ -40,6 +40,8 @@ public:
 		vk::PhysicalDevice physicalDevice;
 		vma::Allocator allocator;
 		vk::CommandPool commandPool;
+		vk::Format colorFormat;
+		vk::Format depthFormat;
 		QueueInfo queueInfo;
 	};
 
@@ -52,540 +54,214 @@ public:
 	};
 
 public:
-	RenderGraph()
-	{
-	}
+	RenderGraph();
 
-	~RenderGraph()
-	{
-	}
+	~RenderGraph();
 
-	void Init(const CreateInfo& info)
-	{
-		m_SwapchainImageCount = info.swapchainImageCount;
-		m_SwapchainExtent     = info.swapchainExtent;
-		m_LogicalDevice       = info.logicalDevice;
-		m_DescriptorPool      = info.descriptorPool;
-		m_PhysicalDevice      = info.physicalDevice;
-		m_Allocator           = info.allocator;
-		m_CommandPool         = info.commandPool;
-		m_QueueInfo           = info.queueInfo;
-	}
+	void Init(const CreateInfo& info);
 
+	void Build();
 
-	void ResolveGraph()
-	{
-		std::vector<vk::DescriptorSetLayoutBinding> graphDescriptorSetLayoutBindings = {};
-		uint32_t graphDescriptorSetIndex                                             = 0u;
-		for (RenderPass::DescriptorInfo descriptorInfo : m_DescriptorInfos)
-		{
-			graphDescriptorSetLayoutBindings.push_back({
-			    graphDescriptorSetIndex++,
-			    descriptorInfo.type,
-			    descriptorInfo.count,
-			    descriptorInfo.stageMask,
-			    nullptr,
-			});
+	void Update(Scene* scene, uint32_t frameIndex);
 
-			// @todo: Add support for other buffer types
-			if (descriptorInfo.type == vk::DescriptorType::eUniformBuffer || descriptorInfo.type == vk::DescriptorType::eStorageBuffer)
-			{
-				for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-				{
-					BufferCreateInfo createInfo {
-						m_LogicalDevice,           // logicalDevice
-						m_PhysicalDevice,          // physicalDevice
-						m_Allocator,               // vmaallocator
-						m_CommandPool,             // commandPool
-						m_QueueInfo.graphicsQueue, // graphicsQueue
+	void Render(const RenderPass::RenderData& data);
 
-						// usage
-						descriptorInfo.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-						                                                            vk::BufferUsageFlagBits::eStorageBuffer,
-
-						descriptorInfo.bufferSize,  // size
-						descriptorInfo.initialData, // inital data
-					};
-
-					LOG(warn, "Creating descriptor buffer {}-{}", descriptorInfo.name, i);
-					m_DescriptorBuffers[HashStr(descriptorInfo.name.c_str())][i] = new Buffer(createInfo);
-				}
-			}
-		};
-
-		vk::DescriptorSetLayoutCreateInfo graphDescriptorSetLayoutCreateInfo {
-			{},
-			static_cast<uint32_t>(graphDescriptorSetLayoutBindings.size()),
-			graphDescriptorSetLayoutBindings.data(),
-		};
-		m_DescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(graphDescriptorSetLayoutCreateInfo, nullptr);
-
-		vk::PipelineLayoutCreateInfo graphPipelineLayoutCreateInfo {
-			{}, // flags
-			1u,
-			&m_DescriptorSetLayout,
-		};
-		m_PipelineLayout = m_LogicalDevice.createPipelineLayout(graphPipelineLayoutCreateInfo);
-
-
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-		{
-			vk::DescriptorSetAllocateInfo allocInfo {
-				m_DescriptorPool,
-				1ul,
-				&m_DescriptorSetLayout,
-			};
-
-			// SET descriptor SET...
-			m_DescriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
-		}
-
-		/////////////////////////////////////////////////////////////////////////////////
-		/// Descriptors
-		for (RenderPass* renderPass : m_RenderPasses)
-		{
-			std::vector<vk::DescriptorSetLayoutBinding> descriptorSetLayoutBindings = {};
-
-			uint32_t i = 0;
-			for (RenderPass::DescriptorInfo descriptorInfo : renderPass->GetDescriptorInfos())
-			{
-				descriptorSetLayoutBindings.push_back({
-				    i++,
-				    descriptorInfo.type,
-				    descriptorInfo.count,
-				    descriptorInfo.stageMask,
-				    nullptr,
-				});
-
-				// @todo: Add support for other buffer types
-				if (descriptorInfo.type == vk::DescriptorType::eUniformBuffer || descriptorInfo.type == vk::DescriptorType::eStorageBuffer)
-				{
-					for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-					{
-						BufferCreateInfo createInfo {
-							m_LogicalDevice,           // logicalDevice
-							m_PhysicalDevice,          // physicalDevice
-							m_Allocator,               // vmaallocator
-							m_CommandPool,             // commandPool
-							m_QueueInfo.graphicsQueue, // graphicsQueue
-
-							// usage
-							descriptorInfo.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-							                                                            vk::BufferUsageFlagBits::eStorageBuffer,
-
-							descriptorInfo.bufferSize,  // size
-							descriptorInfo.initialData, // inital data
-						};
-
-						renderPass->SetDescriptorResource(descriptorInfo.name.c_str(), i, new Buffer(createInfo));
-					}
-				}
-			}
-
-			vk::DescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo {
-				{},
-				static_cast<uint32_t>(descriptorSetLayoutBindings.size()),
-				descriptorSetLayoutBindings.data(),
-			};
-
-			vk::DescriptorSetLayout descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(descriptorSetLayoutCreateInfo, nullptr);
-			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-			{
-				vk::DescriptorSetAllocateInfo allocInfo {
-					m_DescriptorPool,
-					1ul,
-					&descriptorSetLayout,
-				};
-
-				// SET descriptor SET...
-				renderPass->SetDescriptorSet(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0], i);
-			}
-
-			std::array<vk::DescriptorSetLayout, 2u> pipelineDescriptorSetLayouts {
-				m_DescriptorSetLayout,
-				descriptorSetLayout,
-			};
-
-			vk::PipelineLayoutCreateInfo renderPassPipelineLayoutCreateInfo {
-				{}, // flags
-				static_cast<uint32_t>(pipelineDescriptorSetLayouts.size()),
-				pipelineDescriptorSetLayouts.data(),
-			};
-			renderPass->SetPipelineLayout(m_LogicalDevice.createPipelineLayout(renderPassPipelineLayoutCreateInfo));
-		}
-
-
-		/////////////////////////////////////////////////////////////////////////////////
-		// Barriers
-		// @todo: Create a top level barrier
-		size_t i = 1;
-		std::unordered_map<uint64_t, RenderPass::AttachmentInfo> lastStates;
-
-		m_ImageBarries.resize(m_RenderPasses.size() + 1);
-		for (RenderPass* renderPass : m_RenderPasses)
-		{
-			std::vector<ImageBarrier>& barriers = m_ImageBarries[i++];
-			barriers                            = {};
-
-			for (RenderPass::AttachmentInfo attachment : renderPass->GetAttachments())
-			{
-				uint64_t key = HashStr(attachment.name.c_str());
-
-				// an image barrier is already applied
-				if (lastStates.contains(key))
-				{
-					RenderPass::AttachmentInfo lastState;
-
-					vk::PipelineStageFlags srcStageMask = lastState.stageMask;
-					vk::PipelineStageFlags dstStageMask = attachment.stageMask;
-
-					vk::AccessFlags srcAccessMask = lastState.accessMask;
-					vk::AccessFlags dstAccessMask = attachment.accessMask;
-
-					vk::ImageLayout srcLayout = lastState.layout;
-					vk::ImageLayout dstLayout = attachment.layout;
-
-					if (srcStageMask != dstStageMask ||
-					    srcAccessMask != dstAccessMask ||
-					    srcLayout != dstLayout)
-					{
-						if (attachment.images.size() == 1u)
-						{
-							barriers.push_back({
-							    .srcStageMask  = srcStageMask,
-							    .dstStageMask  = dstStageMask,
-							    .barrierObject = {
-							        srcAccessMask,
-							        dstAccessMask,
-							        srcLayout,
-							        dstLayout,
-							        {},
-							        {},
-							        attachment.images[0],
-
-							        // @todo: don't assumbe color
-							        vk::ImageSubresourceRange {
-							            vk::ImageAspectFlagBits::eColor,
-							            0u,
-							            1u,
-							            0u,
-							            1u,
-							        },
-							    },
-							});
-						}
-						else if (attachment.images.size() == m_SwapchainImageCount)
-						{
-							for (uint32_t j = 0; j < m_SwapchainImageCount; j++)
-							{
-								barriers.push_back({
-								    .srcStageMask  = srcStageMask,
-								    .dstStageMask  = dstStageMask,
-								    .barrierObject = {
-								        srcAccessMask,
-								        dstAccessMask,
-								        srcLayout,
-								        dstLayout,
-								        {},
-								        {},
-								        attachment.images[j],
-
-								        // @todo: don't assumbe color
-								        vk::ImageSubresourceRange {
-								            vk::ImageAspectFlagBits::eColor,
-								            0u,
-								            1u,
-								            0u,
-								            1u,
-								        },
-								    },
-								    .imageIndex = j,
-								});
-							}
-						}
-						else
-						{
-							ASSERT(false, "@TODO");
-						}
-					}
-					else
-					{
-						LOG(info, "Found matching barriers, skippin...");
-					}
-				}
-
-				// image is in default layout with no active barriers
-				else
-				{
-					vk::PipelineStageFlags srcStageMask = vk::PipelineStageFlagBits::eTopOfPipe;
-					vk::PipelineStageFlags dstStageMask = attachment.stageMask;
-
-					vk::AccessFlags srcAccessMask = {};
-					vk::AccessFlags dstAccessMask = attachment.accessMask;
-
-					vk::ImageLayout srcLayout = vk::ImageLayout::eUndefined;
-					vk::ImageLayout dstLayout = attachment.layout;
-
-					if (attachment.images.size() == 1u)
-					{
-						barriers.push_back({
-						    .srcStageMask  = srcStageMask,
-						    .dstStageMask  = dstStageMask,
-						    .barrierObject = {
-						        srcAccessMask,
-						        dstAccessMask,
-						        srcLayout,
-						        dstLayout,
-						        {},
-						        {},
-						        attachment.images[0],
-
-						        // @todo: don't assumbe color
-						        vk::ImageSubresourceRange {
-						            vk::ImageAspectFlagBits::eColor,
-						            0u,
-						            1u,
-						            0u,
-						            1u,
-						        },
-						    },
-						});
-					}
-
-					else if (attachment.images.size() == m_SwapchainImageCount)
-					{
-						for (uint32_t j = 0; j < m_SwapchainImageCount; j++)
-						{
-							barriers.push_back({
-							    .srcStageMask  = srcStageMask,
-							    .dstStageMask  = dstStageMask,
-							    .barrierObject = {
-							        srcAccessMask,
-							        dstAccessMask,
-							        srcLayout,
-							        dstLayout,
-							        {},
-							        {},
-							        attachment.images[j],
-
-							        // @todo: don't assumbe color
-							        vk::ImageSubresourceRange {
-							            vk::ImageAspectFlagBits::eColor,
-							            0u,
-							            1u,
-							            0u,
-							            1u,
-							        },
-							    },
-							    .imageIndex = j,
-							});
-						}
-					}
-				}
-
-				lastStates[key] = attachment;
-			}
-		}
-
-
-		/////////////////////////////////////////////////////////////////////////////////
-		/// RenderingInfos
-		for (RenderPass* renderPass : m_RenderPasses)
-		{
-			m_RenderingInfos.push_back({});
-			std::vector<vk::RenderingInfo>& infos = m_RenderingInfos.back();
-			for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
-			{
-				std::vector<vk::RenderingAttachmentInfo> colorInfos;
-				vk::RenderingAttachmentInfo depthInfo = {};
-
-				for (RenderPass::AttachmentInfo attachment : renderPass->GetAttachments())
-				{
-					if (attachment.layout == vk::ImageLayout::eColorAttachmentOptimal)
-					{
-						vk::RenderingAttachmentInfo abc {
-							attachment.views[0],
-							attachment.layout,
-
-							attachment.resolveMode,
-							attachment.resolveView[i],
-							attachment.resolveLayout,
-
-							attachment.loadOp,
-							attachment.storeOp,
-
-							/* clearValue */
-							vk::ClearColorValue {
-							    std::array<float, 4> { 0.0f, 0.0f, 0.0f, 1.0f },
-							},
-						};
-					}
-					else if (attachment.layout == vk::ImageLayout::eDepthStencilAttachmentOptimal)
-					{
-						depthInfo = {
-							attachment.views[0],
-							attachment.layout,
-							{},
-							{},
-							{},
-							attachment.loadOp,
-							attachment.storeOp,
-
-							/* clearValue */
-							vk::ClearDepthStencilValue {
-							    { 1.0, 0 },
-							},
-						};
-					}
-				}
-
-				infos.push_back({
-				    {},
-
-				    vk::Rect2D {
-				        { 0, 0 },
-				        m_SwapchainExtent,
-				    },
-
-				    1u,
-				    {},
-				    static_cast<uint32_t>(colorInfos.size()),
-				    colorInfos.data(),
-				    &depthInfo,
-				    {},
-				});
-			}
-		}
-	}
-
-	RenderGraph& SetName(const std::string& name)
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Builder functions
+	inline RenderGraph& SetName(const std::string& name)
 	{
 		m_Name = name;
 		return *this;
 	}
 
-	RenderGraph& AddDescriptor(const RenderPass::DescriptorInfo& info)
+	inline RenderGraph& AddRenderPassRecipe(const RenderPassRecipe& recipe)
 	{
-		m_DescriptorInfos.push_back(info);
+		m_Recipes.push_back(recipe);
 		return *this;
 	}
 
-	RenderGraph& AddRenderPass(RenderPass* pass)
+	inline RenderGraph& SetSwapchainContext()
 	{
-		m_RenderPasses.push_back(pass);
+	}
+
+	inline RenderGraph& AddBufferInput(const RenderPassRecipe::BufferInputInfo& info)
+	{
+		ASSERT(info.type == vk::DescriptorType::eUniformBuffer || info.type == vk::DescriptorType::eStorageBuffer,
+		       "Invalid descriptor type for buffer input: {}",
+		       string_VkDescriptorType(static_cast<VkDescriptorType>(info.type)));
+		m_BufferInputInfos.push_back(info);
 		return *this;
 	}
 
-	RenderGraph& SetUpdateAction(std::function<void(const RenderGraph::UpdateData&)> updateAction)
+	inline RenderGraph& AddTextureInput()
 	{
-		m_UpdateAction = updateAction;
+		ASSERT(false, "Not implemented");
 		return *this;
 	}
 
-	void Update(Scene* scene, uint32_t frameIndex)
+	inline RenderGraph& SetUpdateAction(std::function<void(const RenderGraph::UpdateData&)> action)
 	{
-		m_UpdateAction({
-		    .graph         = *this,
-		    .frameIndex    = frameIndex,
-		    .logicalDevice = m_LogicalDevice,
-		    .scene         = scene,
-		});
+		m_UpdateAction = action;
+		return *this;
+	}
 
-		for (auto* renderPass : m_RenderPasses)
+	inline RenderGraph& SetBackbuffer(const std::string& name)
+	{
+		m_BackbufferAttachmentNames.push_back(name);
+		return *this;
+	}
+
+	inline Buffer* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
+	{
+		uint8_t* map = (uint8_t*)(m_BufferInputs[HashStr(name)]->Map());
+
+		// @todo: stop this hacc
+		for (uint32_t i = 0; i < m_BufferInputInfos.size(); i++)
 		{
-			LOG(critical, "{}", renderPass->GetName());
-			renderPass->Update({
-			    .renderPass    = *renderPass,
-			    .frameIndex    = frameIndex,
-			    .logicalDevice = m_LogicalDevice,
-			    .scene         = scene,
-			});
-		}
-	}
-
-	void Render(const RenderPass::RenderData& data)
-	{
-		// @todo: Setup render barriers
-		const auto cmd = data.cmd;
-
-		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                       m_PipelineLayout,
-		                       0u, m_DescriptorSets[data.frameIndex], 0u);
-
-		size_t i = 1;
-		for (auto* renderPass : m_RenderPasses)
-		{
-			for (ImageBarrier& barrier : m_ImageBarries[i])
+			if (m_BufferInputInfos[i].name == name)
 			{
-				if (barrier.imageIndex != UINT32_MAX && barrier.imageIndex != data.imageIndex)
-					continue;
-
-				cmd.pipelineBarrier(
-				    barrier.srcStageMask,
-				    barrier.dstStageMask,
-				    {},
-				    {},
-				    {},
-				    barrier.barrierObject);
+				map += m_BufferInputInfos[i].size * frameIndex;
 			}
-
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			                       renderPass->GetPipelineLayout(),
-			                       1u, renderPass->GetDescriptorSet(data.frameIndex), 0u);
-
-
-			cmd.beginRendering(m_RenderingInfos[i][data.imageIndex]);
-			renderPass->Render(data);
-			cmd.endRendering();
-			i++;
 		}
 
-		// @wip: Setup present barriers
+		return m_BufferInputs[HashStr(name)];
 	}
-
-	Buffer* GetDescriptorBuffer(const char* name, uint32_t frameIndex)
-	{
-		return m_DescriptorBuffers[HashStr(name)][frameIndex];
-	}
-
 
 private:
-	struct ImageBarrier
+	void ValidateGraph();
+	void ReorderPasses();
+
+	void BuildAttachmentResources();
+
+	void BuildTextureInputs();
+	void BuildBufferInputs();
+
+	void BuildDescriptorSets();
+	void WriteDescriptorSets();
+
+private:
+	struct ImageAttachment
 	{
-		vk::PipelineStageFlags srcStageMask;
-		vk::PipelineStageFlags dstStageMask;
-		vk::ImageMemoryBarrier barrierObject;
+		std::vector<AllocatedImage> image;
+		std::vector<vk::ImageView> imageView;
 
-
-		uint32_t imageIndex = UINT32_MAX;
+		// Transinet multi-sampled
+		std::vector<AllocatedImage> transientMSImage;
+		std::vector<vk::ImageView> transientMSImageView;
 	};
+
+	struct AttachmentResource
+	{
+		enum class Type
+		{
+			ePerImage,
+			ePerFrame,
+			eSingle,
+		} type;
+
+		// Required for aliasing Read-Modify-Write attachments
+		std::string lastWriteName;
+
+		vk::AccessFlags accessMask;
+		vk::PipelineStageFlags stageMask;
+		vk::ImageLayout layout;
+		vk::Format format;
+
+		VkExtent3D extent;
+		glm::vec2 size;
+		RenderPassRecipe::SizeType sizeType;
+		std::string relativeSizeName;
+
+		std::vector<vk::Image> images;
+		std::vector<vk::ImageView> imageViews;
+
+		// Transient multi-sampled images
+		vk::SampleCountFlagBits sampleCount;
+		vk::ResolveModeFlagBits transientMSResolveMode;
+		AllocatedImage transientMSImage;
+		vk::ImageView transientMSImageView;
+
+		std::tuple<vk::Image, vk::ImageView, vk::Image, vk::ImageView> GetResource(uint32_t imageIndex, uint32_t frameIndex)
+		{
+			switch (type)
+			{
+			case Type::ePerImage:
+			{
+				return std::make_tuple(
+				    images[imageIndex],
+				    imageViews[imageIndex],
+				    transientMSImage,
+				    transientMSImageView);
+			}
+
+			case Type::ePerFrame:
+			{
+				return std::make_tuple(
+				    images[frameIndex],
+				    imageViews[frameIndex],
+				    transientMSImage,
+				    transientMSImageView);
+			}
+
+			case Type::eSingle:
+			{
+				return std::make_tuple(
+				    images[0],
+				    imageViews[0],
+				    transientMSImage,
+				    transientMSImageView);
+			}
+
+			default:
+				ASSERT(false, "Invalid attachment resource type");
+				return {};
+			}
+		};
+	};
+
+	void CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResource::Type type);
+
 
 	std::string m_Name = {};
 
 	std::function<void(const RenderGraph::UpdateData&)> m_UpdateAction = {};
 
-	std::vector<RenderPass*> m_RenderPasses                      = {};
-	std::vector<std::vector<ImageBarrier>> m_ImageBarries        = {};
-	std::vector<std::vector<vk::RenderingInfo>> m_RenderingInfos = {};
+	std::vector<AttachmentResource> m_AttachmentResources = {};
 
-	std::unordered_map<uint64_t, std::array<Buffer*, MAX_FRAMES_IN_FLIGHT>> m_DescriptorBuffers = {};
+	std::vector<RenderPassRecipe> m_Recipes = {};
+	std::vector<RenderPass> m_RenderPasses  = {};
+	vk::Extent2D m_SwapchainExtent          = {};
+
+	std::string m_BackbufferResourceName = {};
+	std::vector<std::string> m_BackbufferAttachmentNames;
+
+	std::vector<vk::Image> m_SwapchainImages         = {};
+	std::vector<vk::ImageView> m_SwapchainImageViews = {};
+
+	vk::Format m_ColorFormat;
+	vk::Format m_DepthFormat;
+
+	std::vector<RenderPassRecipe::BufferInputInfo> m_BufferInputInfos;
+
+	uint32_t m_MinUniformBufferOffsetAlignment;
+
+	////
+	std::unordered_map<uint64_t, Buffer*> m_BufferInputs = {};
 
 	vma::Allocator m_Allocator = {};
 
-	std::vector<vk::DescriptorSet> m_DescriptorSets;
+	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
 
-	std::vector<RenderPass::DescriptorInfo> m_DescriptorInfos = {};
+	// std::vector<RenderPass::DescriptorInfo> m_DescriptorInfos = {};
 
 	uint32_t m_SwapchainImageCount      = {};
-	vk::Extent2D m_SwapchainExtent      = {};
 	vk::DescriptorPool m_DescriptorPool = {};
 
+	vk::PipelineLayout m_PipelineLayout           = {};
+	vk::DescriptorSetLayout m_DescriptorSetLayout = {};
 
-	vk::PipelineLayout m_PipelineLayout;
-	vk::DescriptorSetLayout m_DescriptorSetLayout;
-
-	vk::Device m_LogicalDevice;
-	vk::PhysicalDevice m_PhysicalDevice;
-	vk::CommandPool m_CommandPool;
-	QueueInfo m_QueueInfo;
+	vk::Device m_LogicalDevice          = {};
+	vk::PhysicalDevice m_PhysicalDevice = {};
+	vk::CommandPool m_CommandPool       = {};
+	QueueInfo m_QueueInfo               = {};
 };

@@ -6,14 +6,14 @@
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Model.hpp"
-#include "Scene/Camera.hpp"
-// #include "Graphics/Pipeline.hpp"
 #include "Graphics/Texture.hpp"
 #include "Graphics/Types.hpp"
+#include "Scene/Camera.hpp"
 
 #include <functional>
 #include <vector>
 #include <vk_mem_alloc.hpp>
+#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.hpp>
 
 #ifndef MAX_FRAMES_IN_FLIGHT
@@ -24,49 +24,8 @@
 	#define DESIRED_SWAPCHAIN_IMAGES 3
 #endif
 
-class RenderPass
+struct RenderPass
 {
-public:
-	struct AttachmentInfo
-	{
-		std::string name;
-
-		std::vector<vk::Image> images;
-		std::vector<vk::ImageView> views;
-		vk::ImageLayout layout;
-
-		vk::ResolveModeFlagBits resolveMode    = vk::ResolveModeFlagBits::eNone;
-		vk::ImageLayout resolveLayout          = vk::ImageLayout::eUndefined;
-		std::vector<vk::ImageView> resolveView = {};
-
-		vk::AttachmentLoadOp loadOp   = vk::AttachmentLoadOp::eLoad;
-		vk::AttachmentStoreOp storeOp = vk::AttachmentStoreOp::eStore;
-
-
-		vk::PipelineStageFlags stageMask;
-		vk::AccessFlags accessMask;
-
-		vk::ImageSubresourceRange subresourceRange = {
-			vk::ImageAspectFlagBits::eColor, // aspectMask
-			0u,                              // baseMipLevel
-			1u,                              // levelCount
-			0u,                              //baseArrayLayer
-			1u,                              // layerCount
-		};
-	};
-
-	struct DescriptorInfo
-	{
-		std::string name;
-		uint32_t count;
-		vk::DescriptorType type;
-		vk::ShaderStageFlags stageMask;
-
-		size_t bufferSize = 0ull;
-		void* initialData = nullptr;
-	};
-
-
 	struct RenderData
 	{
 		class Scene* scene;
@@ -83,101 +42,140 @@ public:
 		class Scene* scene;
 	};
 
-public:
-	RenderPass()
+	struct Attachment
 	{
-	}
+		vk::PipelineStageFlags stageMask;
+		vk::AccessFlags accessMask;
+		vk::ImageLayout layout;
+		vk::ImageSubresourceRange subresourceRange;
 
-	~RenderPass()
-	{
-	}
+		vk::AttachmentLoadOp loadOp;
+		vk::AttachmentStoreOp storeOp;
 
-	inline void Render(const RenderData& data) { m_RenderAction(data); }
-	inline void Update(const UpdateData& data) { m_UpdateAction(data); }
+		uint32_t resourceIndex;
 
-	inline RenderPass& SetName(const std::string& name)
-	{
-		if (name.empty())
-		{
-			LOG(warn, "Render pass set name to empty");
-		}
-
-		m_Name = name;
-		return *this;
-	}
-
-	const std::string& GetName() { return m_Name; }
-
-	inline RenderPass& SetRenderAction(std::function<void(const RenderData&)>&& renderAction)
-	{
-		m_RenderAction = renderAction;
-		return *this;
-	}
-
-	inline RenderPass& SetUpdateAction(std::function<void(const UpdateData&)>&& updateAction)
-	{
-		m_UpdateAction = updateAction;
-		return *this;
-	}
-
-	inline const std::vector<RenderPass::AttachmentInfo>& GetAttachments() const
-	{
-		return m_ColorAttachments;
-	}
-
-	inline const std::vector<RenderPass::DescriptorInfo>& GetDescriptorInfos() const
-	{
-		return m_Descriptors;
-	}
-
-	inline RenderPass& AddDescriptor(const RenderPass::DescriptorInfo& info)
-	{
-		m_Descriptors.push_back(info);
-		return *this;
-	}
-
-	inline RenderPass& AddColorAttachment(const RenderPass::AttachmentInfo& info)
-	{
-		m_ColorAttachments.push_back(info);
-		return *this;
-	}
-
-	inline RenderPass& SetDepthAttachment(const RenderPass::AttachmentInfo& info)
-	{
-		m_DepthAttachment = info;
-		return *this;
-	}
-
-	inline void SetPipelineLayout(vk::PipelineLayout pipelineLayout)
-	{
-		m_PipelineLayout = pipelineLayout;
-	}
-
-	inline void SetDescriptorSet(vk::DescriptorSet set, uint32_t frameIndex)
-	{
-		m_DescriptorSets[frameIndex] = set;
-	}
-
-	inline void SetDescriptorResource(const char* name, uint32_t frameIndex, Buffer* resource)
-	{
-		m_DescriptorResources[HashStr(name)][frameIndex] = resource;
+		vk::ClearValue clearValue;
 	};
 
-	vk::DescriptorSet GetDescriptorSet(uint32_t frameIndex) const { return m_DescriptorSets[frameIndex]; };
-	vk::PipelineLayout GetPipelineLayout() const { return m_PipelineLayout; }
+	std::string name;
 
-private:
-	std::string m_Name = {};
-	std::function<void(const RenderData&)> m_RenderAction;
-	std::function<void(const UpdateData&)> m_UpdateAction;
+	std::vector<Attachment> attachments;
 
-	std::vector<RenderPass::DescriptorInfo> m_Descriptors;
-	std::unordered_map<uint64_t, std::array<Buffer*, MAX_FRAMES_IN_FLIGHT>> m_DescriptorResources;
+	std::unordered_map<uint64_t, Buffer*> bufferInputs;
 
-	std::vector<RenderPass::AttachmentInfo> m_ColorAttachments;
-	RenderPass::AttachmentInfo m_DepthAttachment;
+	std::vector<vk::DescriptorSet> descriptorSets;
+	vk::DescriptorSetLayout descriptorSetLayout;
+	vk::PipelineLayout pipelineLayout;
 
-	std::array<vk::DescriptorSet, MAX_FRAMES_IN_FLIGHT> m_DescriptorSets;
-	vk::DescriptorSetLayout m_DescriptorSetLayout;
-	vk::PipelineLayout m_PipelineLayout;
+	std::function<void(const RenderPass::RenderData&)> renderAction = {};
+	std::function<void(const RenderPass::UpdateData&)> updateAction = {};
+};
+
+struct RenderPassRecipe
+{
+public:
+	enum class SizeType : uint8_t
+	{
+		eSwapchainRelative,
+		eRelative,
+		eAbsolute,
+
+		nCount,
+	};
+
+	struct AttachmentInfo
+	{
+		std::string name;
+		glm::vec2 size;
+		SizeType sizeType;
+		vk::Format format;
+		vk::SampleCountFlagBits samples;
+
+		std::string input;
+		std::string sizeRelativeName;
+	};
+
+	struct TextureInputInfo
+	{
+		std::string name;
+		uint32_t binding;
+		uint32_t count;
+		vk::DescriptorType type;
+		vk::ShaderStageFlagBits stageMask;
+
+		Texture* defaultTexture;
+	};
+
+	struct BufferInputInfo
+	{
+		std::string name;
+		uint32_t binding;
+		uint32_t count;
+		vk::DescriptorType type;
+		vk::ShaderStageFlagBits stageMask;
+
+		size_t size;
+		void* initialData;
+	};
+
+	std::string name = {};
+
+	std::function<void(const RenderPass::RenderData&)> renderAction = {};
+	std::function<void(const RenderPass::UpdateData&)> updateAction = {};
+
+	RenderPassRecipe::AttachmentInfo depthStencilAttachmentInfo        = {};
+	std::vector<RenderPassRecipe::AttachmentInfo> colorAttachmentInfos = {};
+
+	std::vector<RenderPassRecipe::TextureInputInfo> textureInputInfos;
+	std::vector<RenderPassRecipe::BufferInputInfo> bufferInputInfos;
+
+	///
+	/////////////////////////////////////////////////////////////////////////////////
+	/// Builder functions for convenience
+	inline RenderPassRecipe&
+	    SetName(const std::string& name)
+	{
+		this->name = name;
+		return *this;
+	}
+
+	inline RenderPassRecipe& SetRenderAction(std::function<void(const RenderPass::RenderData&)>&& renderAction)
+	{
+		this->renderAction = renderAction;
+		return *this;
+	}
+
+	inline RenderPassRecipe& SetUpdateAction(std::function<void(const RenderPass::UpdateData&)>&& updateAction)
+	{
+		this->updateAction = updateAction;
+		return *this;
+	}
+
+	inline RenderPassRecipe& AddColorOutput(const RenderPassRecipe::AttachmentInfo& info)
+	{
+		this->colorAttachmentInfos.push_back(info);
+		return *this;
+	}
+
+	inline RenderPassRecipe& SetDepthStencilOutput(const RenderPassRecipe::AttachmentInfo& info)
+	{
+		this->depthStencilAttachmentInfo = info;
+		return *this;
+	}
+
+	inline RenderPassRecipe& AddTextureInput(RenderPassRecipe::TextureInputInfo info)
+	{
+		textureInputInfos.push_back(info);
+		return *this;
+	}
+
+	inline RenderPassRecipe& AddBufferInput(RenderPassRecipe::BufferInputInfo info)
+	{
+		ASSERT(info.type == vk::DescriptorType::eUniformBuffer || info.type == vk::DescriptorType::eStorageBuffer,
+		       "Invalid descriptor type for buffer input: {}",
+		       string_VkDescriptorType(static_cast<VkDescriptorType>(info.type)));
+
+		bufferInputInfos.push_back(info);
+		return *this;
+	}
 };

@@ -111,6 +111,10 @@ private:
 	std::vector<vk::Image> m_SwapchainImages         = {};
 	std::vector<vk::ImageView> m_SwapchainImageViews = {};
 
+
+	RenderPass m_ForwardPass;
+	RenderPass m_UIPass;
+
 	// Render Targets
 	AllocatedImage m_ColorTarget    = {};
 	vk::ImageView m_ColorTargetView = {};

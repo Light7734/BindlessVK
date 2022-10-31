@@ -18,10 +18,11 @@ add_executable(
     # Graphics
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Device.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/MaterialSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Model.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Graphics/RenderGraph.cpp
 
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/Utils/CVar.cpp

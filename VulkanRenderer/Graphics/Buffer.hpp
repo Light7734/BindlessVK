@@ -25,10 +25,16 @@ public:
 
 	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
 
+	inline vk::DescriptorBufferInfo* GetDescriptorInfo()
+	{
+		return &m_DescriptorInfo;
+	}
+
 	void* Map();
 	void Unmap();
 
 private:
+	vk::DescriptorBufferInfo m_DescriptorInfo;
 	vk::Device m_LogicalDevice = {};
 
 	vma::Allocator m_Allocator = {};

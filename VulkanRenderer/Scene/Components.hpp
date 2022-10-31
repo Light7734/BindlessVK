@@ -104,7 +104,7 @@ struct CameraComponent
 struct LightComponent
 {
 	LightComponent(const LightComponent&) = default;
-	LightComponent(uint32_t fuck)
-	    : shit(fuck){}
-	uint32_t shit;
+	LightComponent(uint32_t b)
+	    : a(b) {}
+	uint32_t a;
 };

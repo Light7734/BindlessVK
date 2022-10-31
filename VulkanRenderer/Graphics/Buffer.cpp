@@ -23,6 +23,12 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 			m_Allocator.unmapMemory(m_Buffer);
 		}
 	}
+
+	m_DescriptorInfo = {
+		m_Buffer,      // buffer
+		0u,            // offset
+		VK_WHOLE_SIZE, // range
+	};
 }
 
 Buffer::~Buffer()
