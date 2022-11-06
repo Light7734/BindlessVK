@@ -437,16 +437,27 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	);
 
 	Entity light = scene.CreateEntity();
-	LOG(trace, "MOMENT");
 	scene.AddComponent<TransformComponent>(light,
 	                                       glm::vec3(2.0f, 2.0f, 1.0f), // Translation
 	                                       glm::vec3(1.0f),             // Scale
 	                                       glm::vec3(0.0f, 0.0, 0.0)    // Rotation
 	);
 
-	LOG(trace, "THIS");
+	Entity camera = scene.CreateEntity();
+	scene.AddComponent<TransformComponent>(camera,
+	                                       glm::vec3(6.0, 7.0, 2.5),
+	                                       glm::vec3(1.0),
+	                                       glm::vec3(0.0f, 0.0, 0.0));
+	scene.AddComponent<CameraComponent>(camera,
+	                                    45.0f,
+	                                    5.0, 1.0,
+	                                    0.001f, 100.0f,
+	                                    225.0, 0.0,
+	                                    glm::vec3(0.0f, 0.0f, -1.0f),
+	                                    glm::vec3(0.0f, -1.0f, 0.0f));
+
+
 	scene.AddComponent<LightComponent>(light, 12);
-	LOG(trace, "BRUH");
 }
 
 int main()

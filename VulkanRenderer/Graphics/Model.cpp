@@ -53,7 +53,7 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 			       "Material doesn't have required values");
 
 			model.materialParameters.push_back({
-			    .albedoFactor = glm::vec4(1.0),
+			    .albedoFactor       = glm::vec4(1.0),
 			    .albedoTextureIndex = material.values["baseColorTexture"].TextureIndex(),
 			});
 		}
@@ -229,6 +229,14 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .initialData    = vertices.data(),
 	});
 
+	std::string vertexBufferName(std::string(info.name) + " VertexBuffer");
+	m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    vk::ObjectType::eBuffer,
+	    (uint64_t)(VkBuffer)(*model.vertexBuffer->GetBuffer()),
+	    vertexBufferName.c_str(),
+	});
+
+
 	model.indexBuffer = new StagingBuffer({
 	    .logicalDevice  = m_LogicalDevice,
 	    .physicalDevice = m_PhysicalDevice,
@@ -238,6 +246,13 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .usage          = vk::BufferUsageFlagBits::eIndexBuffer,
 	    .size           = indices.size() * sizeof(uint32_t),
 	    .initialData    = indices.data(),
+	});
+
+	std::string indexBufferName(std::string(info.name) + " IndexBuffer");
+	m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    vk::ObjectType::eBuffer,
+	    (uint64_t)(VkBuffer)(*model.indexBuffer->GetBuffer()),
+	    indexBufferName.c_str(),
 	});
 }
 

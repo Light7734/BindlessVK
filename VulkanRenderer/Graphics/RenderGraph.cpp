@@ -22,6 +22,8 @@ void RenderGraph::Init(const CreateInfo& info)
 	m_QueueInfo           = info.queueInfo;
 	m_ColorFormat         = info.colorFormat;
 	m_DepthFormat         = info.depthFormat;
+	m_SwapchainImages     = info.swapchainImages;
+	m_SwapchainImageViews = info.swapchainImageViews;
 
 	m_MinUniformBufferOffsetAlignment = m_PhysicalDevice.getProperties().limits.minUniformBufferOffsetAlignment;
 }
@@ -55,7 +57,10 @@ void RenderGraph::ReorderPasses()
 {
 	for (uint32_t i = m_Recipes.size(); i-- > 0;)
 	{
-		auto& recipe = m_Recipes[i];
+		auto& recipe                   = m_Recipes[i];
+		m_RenderPasses[i].name         = recipe.name;
+		m_RenderPasses[i].updateAction = recipe.updateAction;
+		m_RenderPasses[i].renderAction = recipe.renderAction;
 
 
 		for (const RenderPassRecipe::AttachmentInfo& info : recipe.colorAttachmentInfos)
@@ -106,8 +111,9 @@ void RenderGraph::BuildAttachmentResources()
 				        1u,                              // layerCount
 				    },
 
-				    .loadOp  = vk::AttachmentLoadOp::eClear,
-				    .storeOp = vk::AttachmentStoreOp::eStore,
+				    .loadOp        = vk::AttachmentLoadOp::eClear,
+				    .storeOp       = vk::AttachmentStoreOp::eStore,
+				    .resourceIndex = static_cast<uint32_t>(m_AttachmentResources.size() - 1u),
 				});
 			}
 			// Read-Modify-Write ( alias the image )
@@ -138,8 +144,9 @@ void RenderGraph::BuildAttachmentResources()
 						        1u,                              // layerCount
 						    },
 
-						    .loadOp  = vk::AttachmentLoadOp::eLoad,
-						    .storeOp = vk::AttachmentStoreOp::eStore,
+						    .loadOp        = vk::AttachmentLoadOp::eLoad,
+						    .storeOp       = vk::AttachmentStoreOp::eStore,
+						    .resourceIndex = i,
 						});
 						break;
 					}
@@ -168,15 +175,18 @@ void RenderGraph::BuildAttachmentResources()
 				    .layout     = vk::ImageLayout::eDepthAttachmentOptimal,
 				    /* subresourceRange */
 				    .subresourceRange = vk::ImageSubresourceRange {
-				        vk::ImageAspectFlagBits::eDepth, // aspectMask
-				        0u,                              // baseMipLevel
-				        1u,                              // levelCount
-				        0u,                              // baseArrayLayer
-				        1u,                              // layerCount
+				        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, // aspectMask
+
+				        0u, // baseMipLevel
+				        1u, // levelCount
+				        0u, // baseArrayLayer
+				        1u, // layerCount
 				    },
 
 				    .loadOp  = vk::AttachmentLoadOp::eClear,
 				    .storeOp = vk::AttachmentStoreOp::eStore,
+
+				    .resourceIndex = static_cast<uint32_t>(m_AttachmentResources.size() - 1u),
 				});
 			}
 			// Read-Modify-Write ( alias the image )
@@ -187,7 +197,7 @@ void RenderGraph::BuildAttachmentResources()
 				{
 					if (attachmentResource.size != info.size || attachmentResource.sizeType != info.sizeType)
 					{
-						ASSERT(false, "ReadWrite attachment with different size from input is currently not supported ");
+						ASSERT(false, "ReadWrite attachment with different size from input is currently not supported");
 					}
 
 					if (attachmentResource.lastWriteName == info.input)
@@ -200,15 +210,17 @@ void RenderGraph::BuildAttachmentResources()
 						    .layout     = vk::ImageLayout::eDepthAttachmentOptimal,
 						    /* subresourceRange */
 						    .subresourceRange = vk::ImageSubresourceRange {
-						        vk::ImageAspectFlagBits::eDepth, // aspectMask
-						        0u,                              // baseMipLevel
-						        1u,                              // levelCount
-						        0u,                              // baseArrayLayer
-						        1u,                              // layerCount
+						        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, // aspectMask
+
+						        0u, // baseMipLevel
+						        1u, // levelCount
+						        0u, // baseArrayLayer
+						        1u, // layerCount
 						    },
 
-						    .loadOp  = vk::AttachmentLoadOp::eLoad,
-						    .storeOp = vk::AttachmentStoreOp::eStore,
+						    .loadOp        = vk::AttachmentLoadOp::eLoad,
+						    .storeOp       = vk::AttachmentStoreOp::eStore,
+						    .resourceIndex = 1u,
 						});
 						break;
 					}
@@ -229,7 +241,9 @@ void RenderGraph::BuildBufferInputs()
 {
 	for (RenderPassRecipe::BufferInputInfo& info : m_BufferInputInfos)
 	{
-		info.size = (info.size + m_MinUniformBufferOffsetAlignment - 1) & -m_MinUniformBufferOffsetAlignment;
+		size_t old = info.size;
+		info.size  = (info.size + m_MinUniformBufferOffsetAlignment - 1) & -m_MinUniformBufferOffsetAlignment;
+		LOG(warn, "{} -> {} ({})", old, info.size, m_MinUniformBufferOffsetAlignment);
 
 		BufferCreateInfo bufferCreateInfo {
 			.logicalDevice = m_LogicalDevice,
@@ -241,7 +255,6 @@ void RenderGraph::BuildBufferInputs()
 			.size          = info.size * MAX_FRAMES_IN_FLIGHT,
 		};
 
-        LOG(err, "Creating bfinpt: {}", info.name);
 		m_BufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
 	}
 
@@ -300,6 +313,13 @@ void RenderGraph::BuildDescriptorSets()
 				&m_DescriptorSetLayout,
 			};
 			m_DescriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
+
+			std::string descriptorSetName = "render_graph DescriptorSet #" + std::to_string(i);
+			m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+			    vk::ObjectType::eDescriptorSet,
+			    (uint64_t)(VkDescriptorSet)m_DescriptorSets.back(),
+			    descriptorSetName.c_str(),
+			});
 		}
 
 		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
@@ -351,10 +371,17 @@ void RenderGraph::BuildDescriptorSets()
 		{
 			vk::DescriptorSetAllocateInfo allocInfo {
 				m_DescriptorPool,
-				1,
+				1u,
 				&pass.descriptorSetLayout,
 			};
 			pass.descriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
+
+			std::string descriptorSetName = pass.name + " DescriptorSet #" + std::to_string(i);
+			m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+			    vk::ObjectType::eDescriptorSet,
+			    (uint64_t)(VkDescriptorSet)pass.descriptorSets.back(),
+			    descriptorSetName.c_str(),
+			});
 		}
 
 		// Create pipeline layout
@@ -526,6 +553,8 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 	};
 
 	AttachmentResource resource = {
+		.type = type,
+
 		.lastWriteName = info.name,
 
 		.accessMask = {},
@@ -577,6 +606,13 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 		LOG(trace, "69696969");
 		AllocatedImage image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
+		std::string imageName = info.name + " Image";
+		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImage,
+		    (uint64_t)(VkImage)(vk::Image)image,
+		    imageName.c_str(),
+		});
+
 		vk::ImageViewCreateInfo imageViewCreateInfo {
 			{},                     // flags
 			image,                  // image
@@ -601,7 +637,13 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 			    1u,         // layerCount
 			},
 		};
-		vk::ImageView imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		vk::ImageView imageView   = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		std::string imageViewName = info.name + " ImageView";
+		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImageView,
+		    (uint64_t)(VkImageView)imageView,
+		    imageViewName.c_str(),
+		});
 
 		resource.images     = { image };
 		resource.imageViews = { imageView };
@@ -635,6 +677,14 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 		LOG(trace, "ABABABABAB");
 		AllocatedImage image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
+		std::string imageName = info.name + " TransientMS Image";
+		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImage,
+		    (uint64_t)(VkImage)(vk::Image)image,
+		    imageName.c_str(),
+		});
+
+
 		vk::ImageViewCreateInfo imageViewCreateInfo {
 			{},                     // flags
 			image,                  // image
@@ -659,11 +709,19 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 			    1u,         // layerCount
 			},
 		};
-		vk::ImageView imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		vk::ImageView imageView   = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		std::string imageViewName = info.name + " TransientMS ImageView";
+		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImageView,
+		    (uint64_t)(VkImageView)imageView,
+		    imageViewName.c_str(),
+		});
 
 		resource.transientMSImage     = image;
 		resource.transientMSImageView = imageView;
 	}
+
+	m_AttachmentResources.push_back(resource);
 }
 
 void RenderGraph::Update(Scene* scene, uint32_t frameIndex)
@@ -677,7 +735,6 @@ void RenderGraph::Update(Scene* scene, uint32_t frameIndex)
 
 	for (RenderPass& pass : m_RenderPasses)
 	{
-		LOG(critical, "{}", pass.name);
 		pass.updateAction({
 		    .renderPass    = pass,
 		    .frameIndex    = frameIndex,
@@ -699,6 +756,11 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 	size_t i = 0;
 	for (RenderPass& pass : m_RenderPasses)
 	{
+		cmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
+		    pass.name.c_str(),
+		    { 1.0, 1.0, 0.8, 1.0 },
+		}));
+
 		std::vector<vk::RenderingAttachmentInfo> renderingColorAttachmentInfos;
 		vk::RenderingAttachmentInfo renderingDepthAttachmentInfo;
 
@@ -721,12 +783,21 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 				nullptr,                        // pNext
 			};
 
-			cmd.pipelineBarrier(resource.stageMask,
-			                    attachment.stageMask,
-			                    {},
-			                    {},
-			                    {},
-			                    imageBarrier);
+			if (resource.accessMask != attachment.accessMask ||
+			    resource.layout != attachment.layout ||
+			    resource.stageMask != attachment.stageMask)
+			{
+				cmd.pipelineBarrier(resource.stageMask,
+				                    attachment.stageMask,
+				                    {},
+				                    {},
+				                    {},
+				                    imageBarrier);
+			}
+
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+			                       pass.pipelineLayout,
+			                       1ul, 1u, &pass.descriptorSets[data.frameIndex], 0ul, {});
 
 			vk::RenderingAttachmentInfo renderingAttachmentInfo {};
 			// Multi-sampled image
@@ -793,10 +864,6 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 			}
 		}
 
-		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                       pass.pipelineLayout,
-		                       1ul, 1u, &pass.descriptorSets[data.frameIndex], 0ul, {});
-
 
 		vk::RenderingInfo renderingInfo {
 			{}, // flags
@@ -813,8 +880,17 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 		};
 
 		cmd.beginRendering(renderingInfo);
+
+		cmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
+		    (pass.name + " render action").c_str(),
+		    { 1.0, 1.0, 0.2, 1.0 },
+		}));
+
 		pass.renderAction(data);
+		cmd.endDebugUtilsLabelEXT();
+
 		cmd.endRendering();
+		cmd.endDebugUtilsLabelEXT();
 		i++;
 	}
 }

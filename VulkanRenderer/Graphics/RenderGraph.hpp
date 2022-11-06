@@ -43,6 +43,8 @@ public:
 		vk::Format colorFormat;
 		vk::Format depthFormat;
 		QueueInfo queueInfo;
+		std::vector<vk::Image> swapchainImages;
+		std::vector<vk::ImageView> swapchainImageViews;
 	};
 
 	struct UpdateData
@@ -89,6 +91,7 @@ public:
 		ASSERT(info.type == vk::DescriptorType::eUniformBuffer || info.type == vk::DescriptorType::eStorageBuffer,
 		       "Invalid descriptor type for buffer input: {}",
 		       string_VkDescriptorType(static_cast<VkDescriptorType>(info.type)));
+		LOG(trace, "Adding buffer input info: {}", info.name);
 		m_BufferInputInfos.push_back(info);
 		return *this;
 	}
@@ -111,20 +114,28 @@ public:
 		return *this;
 	}
 
-	inline Buffer* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
+	inline void* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
 	{
 		uint8_t* map = (uint8_t*)(m_BufferInputs[HashStr(name)]->Map());
 
 		// @todo: stop this hacc
+		LOG(warn, "...");
 		for (uint32_t i = 0; i < m_BufferInputInfos.size(); i++)
 		{
+			LOG(warn, "{} =? {}", m_BufferInputInfos[i].name, name);
 			if (m_BufferInputInfos[i].name == name)
 			{
+				LOG(warn, "{} -> {} + {} * {}", name, (size_t)map, m_BufferInputInfos[i].size, frameIndex);
 				map += m_BufferInputInfos[i].size * frameIndex;
 			}
 		}
 
-		return m_BufferInputs[HashStr(name)];
+		return (void*)map;
+	}
+
+	inline void UnMapDescriptorBuffer(const char* name)
+	{
+		m_BufferInputs[HashStr(name)]->Unmap();
 	}
 
 private:

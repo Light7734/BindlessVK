@@ -25,41 +25,38 @@ struct SceneData
 
 void GraphUpdate(const RenderGraph::UpdateData& data)
 {
-	LOG(trace, "Updating graph - camera - {}", data.frameIndex);
+	LOG(warn, "frame_data...");
 	data.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
 		*(CameraData*)data.graph.MapDescriptorBuffer("frame_data", data.frameIndex) = {
 			.projection = cameraComp.GetProjection(),
 			.view       = cameraComp.GetView(transformComp.translation),
 			.viewPos    = transformComp.translation,
 		};
+		data.graph.UnMapDescriptorBuffer("frame_data");
 	});
 
-	LOG(trace, "Updating graph - scene - {}", data.frameIndex);
+	LOG(warn, "scene_data...");
 	data.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
 		SceneData* sceneData = (SceneData*)data.graph.MapDescriptorBuffer("scene_data", data.frameIndex);
 
-		LOG(err, "3");
 		sceneData[0] = {
 			.lightPos = trasnformComp.translation,
 		};
-		LOG(err, "4");
+		data.graph.UnMapDescriptorBuffer("scene_data");
 	});
 }
 
 void ForwardPassUpdate(const RenderPass::UpdateData& data)
 {
 	vk::RenderingAttachmentInfo info;
-	LOG(trace, "Updating pass - get - {}", data.frameIndex);
 	RenderPass& renderPass    = data.renderPass;
 	const uint32_t frameIndex = data.frameIndex;
 	vk::Device logicalDevice  = data.logicalDevice;
 	Scene* scene              = data.scene;
 
-	LOG(trace, "Updating pass - getset - {}", data.frameIndex);
 
 	vk::DescriptorSet* descriptorSet = &renderPass.descriptorSets[frameIndex];
 
-	LOG(trace, "Updating pass - entt - {}", data.frameIndex);
 	// @todo: don't update every frame
 	data.scene->GetRegistry()
 	    ->group(entt::get<TransformComponent, StaticMeshRendererComponent>)
@@ -133,6 +130,7 @@ void ForwardPassRender(const RenderPass::RenderData& data)
 		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
 		if (currentPipeline != newPipeline)
 		{
+			LOG(trace, "Binding pipeline:");
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
 			currentPipeline = newPipeline;
 		}
@@ -209,6 +207,8 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	    .colorFormat         = m_SurfaceInfo.format.format,
 	    .depthFormat         = m_DepthFormat,
 	    .queueInfo           = m_QueueInfo,
+	    .swapchainImages     = m_SwapchainImages,
+	    .swapchainImageViews = m_SwapchainImageViews,
 	});
 
 
@@ -267,20 +267,20 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	        .samples  = m_SampleCount,
 	    })
 	    .AddTextureInput({
-	        .name           = "texture_cubes",
-	        .binding        = 1,
-	        .count          = 8u,
-	        .type           = vk::DescriptorType::eCombinedImageSampler,
-	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-	        .defaultTexture = m_DefaultTexture,
-	    })
-	    .AddTextureInput({
 	        .name           = "texture_2ds",
 	        .binding        = 0,
 	        .count          = 32,
 	        .type           = vk::DescriptorType::eCombinedImageSampler,
 	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
 	        .defaultTexture = m_DefaultTexture,
+	    })
+	    .AddTextureInput({
+	        .name           = "texture_cubes",
+	        .binding        = 1,
+	        .count          = 8u,
+	        .type           = vk::DescriptorType::eCombinedImageSampler,
+	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+	        .defaultTexture = m_SkyboxTexture,
 	    })
 	    .SetUpdateAction(&ForwardPassUpdate)
 	    .SetRenderAction(&ForwardPassRender);
@@ -296,7 +296,6 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	        .input    = "forwardpass",
 	    })
 	    .SetUpdateAction([](const RenderPass::UpdateData& data) {
-		    LOG(trace, "no op");
 	    })
 	    .SetRenderAction([](const RenderPass::RenderData& data) {
 		    ImGui::Render();
@@ -404,10 +403,10 @@ void Renderer::CreateDescriptorPools()
 	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
 	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-		{},                                      // flags
-		100,                                     // maxSets
-		static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
-		poolSizes.data(),                        // pPoolSizes
+		vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind, // flags
+		100,                                                // maxSets
+		static_cast<uint32_t>(poolSizes.size()),            // poolSizeCount
+		poolSizes.data(),                                   // pPoolSizes
 	};
 
 	m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
@@ -479,6 +478,24 @@ void Renderer::CreateImageViews()
 		};
 
 		m_SwapchainImageViews.push_back(m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr));
+	}
+
+
+	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
+	{
+		std::string imageName("swap_chain Image #" + std::to_string(i));
+		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImage,
+		    (uint64_t)(VkImage)m_SwapchainImages[i],
+		    imageName.c_str(),
+		});
+
+		std::string viewName("swap_chain ImageView #" + std::to_string(i));
+		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImageView,
+		    (uint64_t)(VkImageView)m_SwapchainImageViews[i],
+		    viewName.c_str(),
+		});
 	}
 }
 
@@ -603,21 +620,23 @@ void Renderer::DrawScene(Scene* scene, const Camera& camera)
 
 	auto cmd = m_CommandBuffers[m_CurrentFrame];
 	cmd.reset();
-	cmd.begin(vk::CommandBufferBeginInfo {});
-
 
 	m_RenderGraph.Update(scene, m_CurrentFrame);
+
+	cmd.begin(vk::CommandBufferBeginInfo {});
+
 	m_RenderGraph.Render({
-	    scene,
-	    cmd,
-	    m_CurrentFrame,
+	    .scene      = scene,
+	    .cmd        = cmd,
+	    .imageIndex = imageIndex,
+	    .frameIndex = m_CurrentFrame,
 	});
 
 	SetupPresentBarriers(cmd, imageIndex);
 	cmd.end();
 
-	SubmitQueue(m_PresentSemaphores[m_CurrentFrame], m_RenderSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
-	PresentFrame(m_RenderSemaphores[m_CurrentFrame], imageIndex);
+	SubmitQueue(m_RenderSemaphores[m_CurrentFrame], m_PresentSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
+	PresentFrame(m_PresentSemaphores[m_CurrentFrame], imageIndex);
 
 	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
 }
