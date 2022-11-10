@@ -61,7 +61,8 @@ struct CameraComponent
 	                float width, float aspectRatio,
 	                float nearPlane, float farPlane,
 	                double yaw, double pitch,
-	                glm::vec3 front, glm::vec3 up)
+	                glm::vec3 front, glm::vec3 up,
+	                float speed)
 
 	    : fov(fov)
 	    , width(width)
@@ -72,6 +73,8 @@ struct CameraComponent
 	    , pitch(pitch)
 	    , front(front)
 	    , up(up)
+        , speed(speed)
+
 	{
 	}
 
@@ -98,6 +101,8 @@ struct CameraComponent
 
 	glm::vec3 front;
 	glm::vec3 up;
+
+	float speed;
 };
 
 // @todo:

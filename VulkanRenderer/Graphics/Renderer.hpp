@@ -6,7 +6,7 @@
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Model.hpp"
-#include "Scene/Camera.hpp"
+#include "Scene/CameraController.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/RenderGraph.hpp"
 #include "Graphics/RenderPass.hpp"
@@ -48,7 +48,8 @@ public:
 
 	void BeginFrame();
 	void Draw();
-	void DrawScene(class Scene* scene, const Camera& camera);
+	void DrawScene(class Scene* scene);
+
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
 
@@ -77,10 +78,8 @@ private:
 	void CreateDepthImage();
 	void CreateCommandPool();
 
-	void SetupRenderBarriers(vk::CommandBuffer cmd, uint32_t imageIndex);
-	void SetupPresentBarriers(vk::CommandBuffer cmd, uint32_t imageIndex);
-	void RenderForwardPass(Scene* scene, vk::CommandBuffer cmd, uint32_t imageIndex);
-	void RenderUIPass(vk::CommandBuffer cmd, uint32_t imageIndex);
+	void InitializeImGui(const DeviceContext& deviceContext, Window* window);
+	void CreateRenderGraph(const DeviceContext& deviceContex);
 
 	void SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd);
 	void PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex);

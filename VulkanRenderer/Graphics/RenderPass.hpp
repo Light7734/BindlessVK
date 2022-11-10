@@ -8,7 +8,7 @@
 #include "Graphics/Model.hpp"
 #include "Graphics/Texture.hpp"
 #include "Graphics/Types.hpp"
-#include "Scene/Camera.hpp"
+#include "Scene/CameraController.hpp"
 
 #include <functional>
 #include <vector>
@@ -93,6 +93,8 @@ public:
 
 		std::string input;
 		std::string sizeRelativeName;
+
+		vk::ClearValue clearValue;
 	};
 
 	struct TextureInputInfo

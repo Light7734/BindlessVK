@@ -5,7 +5,7 @@
 #include "Graphics/Device.hpp"
 #include "Graphics/RenderGraph.hpp"
 #include "Graphics/RenderPass.hpp"
-#include "Scene/Camera.hpp"
+#include "Scene/CameraController.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderer.hpp"
 // #include "Graphics/Shader.hpp"
@@ -454,7 +454,8 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	                                    0.001f, 100.0f,
 	                                    225.0, 0.0,
 	                                    glm::vec3(0.0f, 0.0f, -1.0f),
-	                                    glm::vec3(0.0f, -1.0f, 0.0f));
+	                                    glm::vec3(0.0f, -1.0f, 0.0f),
+	                                    10.0f);
 
 
 	scene.AddComponent<LightComponent>(light, 12);
@@ -545,16 +546,6 @@ int main()
 
 		// Scene
 		Scene scene;
-		Camera camera({
-		    .position  = { 2.0f, 2.0f, 0.5f },
-		    .speed     = 1.0f,
-		    .nearPlane = 0.001f,
-		    .farPlane  = 100.0f,
-		    .width     = 5.0f,
-		    .height    = 5.0f,
-		    .window    = &window,
-		});
-
 		/////////////////////////////////////////////////////////////////////////////////
 		/// Load assets
 		LoadShaders(materialSystem);
@@ -565,6 +556,12 @@ int main()
 
 		LoadModels(modelSystem, textureSystem);
 		LoadEntities(scene, materialSystem, modelSystem);
+
+		CameraController camera({
+		    .scene  = &scene,
+		    .window = &window,
+		});
+
 
 		/////////////////////////////////////////////////////////////////////////////////
 		/// Main application loop
@@ -578,7 +575,7 @@ int main()
 			camera.Update();
 
 			renderer.BeginFrame();
-			renderer.DrawScene(&scene, camera);
+			renderer.DrawScene(&scene);
 
 			if (renderer.IsSwapchainInvalidated())
 			{

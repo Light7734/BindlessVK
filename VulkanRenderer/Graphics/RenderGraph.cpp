@@ -95,8 +95,8 @@ void RenderGraph::BuildAttachmentResources()
 
 
 				CreateAttachmentResource(info, it != m_BackbufferAttachmentNames.end() ?
-				                                   AttachmentResource::Type::ePerImage :
-				                                   AttachmentResource::Type::eSingle);
+				                                   AttachmentResourceContainer::Type::ePerImage :
+				                                   AttachmentResourceContainer::Type::eSingle);
 
 				pass.attachments.push_back({
 				    .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -114,13 +114,14 @@ void RenderGraph::BuildAttachmentResources()
 				    .loadOp        = vk::AttachmentLoadOp::eClear,
 				    .storeOp       = vk::AttachmentStoreOp::eStore,
 				    .resourceIndex = static_cast<uint32_t>(m_AttachmentResources.size() - 1u),
+				    .clearValue    = info.clearValue,
 				});
 			}
 			// Read-Modify-Write ( alias the image )
 			else
 			{
 				uint32_t i = 0;
-				for (AttachmentResource& attachmentResource : m_AttachmentResources)
+				for (AttachmentResourceContainer& attachmentResource : m_AttachmentResources)
 				{
 					if (attachmentResource.size != info.size || attachmentResource.sizeType != info.sizeType)
 					{
@@ -167,7 +168,7 @@ void RenderGraph::BuildAttachmentResources()
 				                    info.input);
 
 
-				CreateAttachmentResource(info, AttachmentResource::Type::eSingle);
+				CreateAttachmentResource(info, AttachmentResourceContainer::Type::eSingle);
 
 				pass.attachments.push_back({
 				    .stageMask  = vk::PipelineStageFlagBits::eEarlyFragmentTests,
@@ -187,13 +188,14 @@ void RenderGraph::BuildAttachmentResources()
 				    .storeOp = vk::AttachmentStoreOp::eStore,
 
 				    .resourceIndex = static_cast<uint32_t>(m_AttachmentResources.size() - 1u),
+				    .clearValue    = info.clearValue,
 				});
 			}
 			// Read-Modify-Write ( alias the image )
 			else
 			{
 				uint32_t i = 0;
-				for (AttachmentResource& attachmentResource : m_AttachmentResources)
+				for (AttachmentResourceContainer& attachmentResource : m_AttachmentResources)
 				{
 					if (attachmentResource.size != info.size || attachmentResource.sizeType != info.sizeType)
 					{
@@ -336,6 +338,7 @@ void RenderGraph::BuildDescriptorSets()
 	{
 		RenderPass& pass = m_RenderPasses[passIndex++];
 
+
 		// Determine bindings
 		std::vector<vk::DescriptorSetLayoutBinding> bindings;
 		for (const RenderPassRecipe::BufferInputInfo info : recipe.bufferInputInfos)
@@ -367,21 +370,24 @@ void RenderGraph::BuildDescriptorSets()
 		pass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(layoutCreateInfo);
 
 		// Allocate descriptor sets
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		if (!recipe.bufferInputInfos.empty() || !recipe.textureInputInfos.empty())
 		{
-			vk::DescriptorSetAllocateInfo allocInfo {
-				m_DescriptorPool,
-				1u,
-				&pass.descriptorSetLayout,
-			};
-			pass.descriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
+			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			{
+				vk::DescriptorSetAllocateInfo allocInfo {
+					m_DescriptorPool,
+					1u,
+					&pass.descriptorSetLayout,
+				};
+				pass.descriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
 
-			std::string descriptorSetName = pass.name + " DescriptorSet #" + std::to_string(i);
-			m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-			    vk::ObjectType::eDescriptorSet,
-			    (uint64_t)(VkDescriptorSet)pass.descriptorSets.back(),
-			    descriptorSetName.c_str(),
-			});
+				std::string descriptorSetName = pass.name + " DescriptorSet #" + std::to_string(i);
+				m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+				    vk::ObjectType::eDescriptorSet,
+				    (uint64_t)(VkDescriptorSet)pass.descriptorSets.back(),
+				    descriptorSetName.c_str(),
+				});
+			}
 		}
 
 		// Create pipeline layout
@@ -505,7 +511,7 @@ void RenderGraph::WriteDescriptorSets()
 	}
 }
 
-void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResource::Type type)
+void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type)
 {
 	LOG(trace, "Creating image: {} <- ", info.name, info.input);
 	vk::ImageUsageFlags usage;
@@ -552,48 +558,52 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 		ASSERT(false, "Invalid attachment size type");
 	};
 
-	AttachmentResource resource = {
-		.type = type,
-
-		.lastWriteName = info.name,
-
-		.accessMask = {},
-		.stageMask  = vk::PipelineStageFlagBits::eTopOfPipe,
-		.layout     = vk::ImageLayout::eUndefined,
-		.format     = info.format,
+	AttachmentResourceContainer resourceContainer = {
+		.type        = type,
+		.imageFormat = info.format,
 
 		.extent           = extent,
 		.size             = info.size,
 		.sizeType         = info.sizeType,
 		.relativeSizeName = info.sizeRelativeName,
 
-		.images     = {},
-		.imageViews = {},
-
 		.sampleCount            = info.samples,
-		.transientMSResolveMode = {},
+		.transientMSResolveMode = vk::ResolveModeFlagBits::eNone,
 		.transientMSImage       = {},
 		.transientMSImageView   = {},
+		.lastWriteName          = info.name,
 	};
 
 	switch (type)
 	{
-	case AttachmentResource::Type::ePerImage:
+	case AttachmentResourceContainer::Type::ePerImage:
 	{
-		resource.images     = m_SwapchainImages;
-		resource.imageViews = m_SwapchainImageViews;
+		for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
+		{
+			resourceContainer.resources.push_back(AttachmentResource {
+			    .srcAccessMask  = {},
+			    .srcImageLayout = vk::ImageLayout::eUndefined,
+			    .srcStageMask   = vk::PipelineStageFlagBits::eTopOfPipe,
+			    .image          = m_SwapchainImages[i],
+			    .imageView      = m_SwapchainImageViews[i],
+			});
+		}
+
+		m_BackbufferResourceIndex = m_AttachmentResources.size();
 		break;
 	}
-	case AttachmentResource::Type::eSingle:
+	case AttachmentResourceContainer::Type::eSingle:
 	{
 		vk::ImageCreateInfo imageCreateInfo {
-			{},                          // flags
-			vk::ImageType::e2D,          // imageType
-			info.format,                 // format
-			extent,                      // extent
-			1u,                          // mipLevels
-			1u,                          // arrayLayers
-			vk::SampleCountFlagBits::e1, // samples
+			{},                 // flags
+			vk::ImageType::e2D, // imageType
+			info.format,        // format
+			extent,             // extent
+			1u,                 // mipLevels
+			1u,                 // arrayLayers
+
+			aspectMask & vk::ImageAspectFlagBits::eColor ? vk::SampleCountFlagBits::e1 : info.samples, // samples
+
 			vk::ImageTiling::eOptimal,   // tiling
 			usage,                       // usage
 			vk::SharingMode::eExclusive, // sharingMode
@@ -645,15 +655,21 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 		    imageViewName.c_str(),
 		});
 
-		resource.images     = { image };
-		resource.imageViews = { imageView };
+		resourceContainer.resources.push_back(AttachmentResource {
+		    .srcAccessMask  = {},
+		    .srcImageLayout = vk::ImageLayout::eUndefined,
+		    .srcStageMask   = vk::PipelineStageFlagBits::eTopOfPipe,
+		    .image          = image,
+		    .imageView      = imageView,
+		});
+
 		break;
 	}
 	default:
 		ASSERT(false, "Invalid attachment resource type");
 	}
 
-	if (static_cast<uint32_t>(info.samples) > 1)
+	if (static_cast<uint32_t>(info.samples) > 1 && aspectMask & vk::ImageAspectFlagBits::eColor)
 	{
 		vk::ImageCreateInfo imageCreateInfo {
 			{},                        // flags
@@ -717,11 +733,12 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 		    imageViewName.c_str(),
 		});
 
-		resource.transientMSImage     = image;
-		resource.transientMSImageView = imageView;
+		resourceContainer.transientMSImage       = image;
+		resourceContainer.transientMSImageView   = imageView;
+		resourceContainer.transientMSResolveMode = vk::ResolveModeFlagBits::eAverage;
 	}
 
-	m_AttachmentResources.push_back(resource);
+	m_AttachmentResources.push_back(resourceContainer);
 }
 
 void RenderGraph::Update(Scene* scene, uint32_t frameIndex)
@@ -763,71 +780,69 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 
 		std::vector<vk::RenderingAttachmentInfo> renderingColorAttachmentInfos;
 		vk::RenderingAttachmentInfo renderingDepthAttachmentInfo;
-
 		for (RenderPass::Attachment attachment : pass.attachments)
 		{
-			auto& resource = m_AttachmentResources[attachment.resourceIndex];
+			AttachmentResourceContainer& resourceContainer = m_AttachmentResources[attachment.resourceIndex];
 
-			auto [image, imageView, transientMSImage, transientMSImageView] =
-			    resource.GetResource(data.imageIndex, data.frameIndex);
+			AttachmentResource& resource = resourceContainer.GetResource(data.imageIndex, data.frameIndex);
 
 			vk::ImageMemoryBarrier imageBarrier = {
-				resource.accessMask,            // srcAccessMask
+				resource.srcAccessMask,         // srcAccessMask
 				attachment.accessMask,          // dstAccessMask
-				resource.layout,                // oldLayout
+				resource.srcImageLayout,        // oldLayout
 				attachment.layout,              // newLayout
 				m_QueueInfo.graphicsQueueIndex, // srcQueueFamilyIndex
 				m_QueueInfo.graphicsQueueIndex, // dstQueueFamilyIndex
-				image,                          // image
+				resource.image,                 // image
 				attachment.subresourceRange,    // subresourceRange
 				nullptr,                        // pNext
 			};
 
-			if (resource.accessMask != attachment.accessMask ||
-			    resource.layout != attachment.layout ||
-			    resource.stageMask != attachment.stageMask)
+			if ((resource.srcAccessMask != attachment.accessMask ||
+			     resource.srcImageLayout != attachment.layout ||
+			     resource.srcStageMask != attachment.stageMask) &&
+			    attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				cmd.pipelineBarrier(resource.stageMask,
+				if (!resource.image)
+				{
+					LOG(warn, "Applying barrier to invalid image");
+				}
+
+
+				if (pass.name == "ui")
+				{
+					LOG(trace, "Applying UI Color Barrier:");
+					LOG(trace, "{} -> {}", (uint32_t)resource.srcAccessMask, (uint32_t)attachment.accessMask);
+					LOG(trace, "{} -> {}", (uint32_t)resource.srcImageLayout, (uint32_t)attachment.layout);
+					LOG(trace, "{} -> {}", (uint32_t)resource.srcStageMask, (uint32_t)attachment.stageMask);
+				}
+				cmd.pipelineBarrier(resource.srcStageMask,
 				                    attachment.stageMask,
 				                    {},
 				                    {},
 				                    {},
 				                    imageBarrier);
+
+				resource.srcAccessMask  = attachment.accessMask;
+				resource.srcImageLayout = attachment.layout;
+				resource.srcStageMask   = attachment.stageMask;
+			}
+			else
+			{
+				LOG(trace, "Skipping image barrier of: {}", pass.name);
 			}
 
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			                       pass.pipelineLayout,
-			                       1ul, 1u, &pass.descriptorSets[data.frameIndex], 0ul, {});
 
 			vk::RenderingAttachmentInfo renderingAttachmentInfo {};
 			// Multi-sampled image
-			if (static_cast<uint32_t>(resource.sampleCount) > 1)
+			if (static_cast<uint32_t>(resourceContainer.sampleCount) > 1 && attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				vk::ImageMemoryBarrier transientMSImageBarrier = {
-					resource.accessMask,            // srcAccessMask
-					attachment.accessMask,          // dstAccessMask
-					resource.layout,                // oldLayout
-					attachment.layout,              // newLayout
-					m_QueueInfo.graphicsQueueIndex, // srcQueueFamilyIndex
-					m_QueueInfo.graphicsQueueIndex, // dstQueueFamilyIndex
-					transientMSImage,               // image
-					attachment.subresourceRange,    // subresourceRange
-					nullptr,                        // pNext
-				};
-
-				cmd.pipelineBarrier(resource.stageMask,
-				                    attachment.stageMask,
-				                    {},
-				                    {},
-				                    {},
-				                    transientMSImageBarrier);
-
 				renderingAttachmentInfo = {
-					transientMSImageView,
+					resourceContainer.transientMSImageView,
 					attachment.layout,
 
-					resource.transientMSResolveMode,
-					imageView,
+					resourceContainer.transientMSResolveMode,
+					resource.imageView,
 					attachment.layout,
 
 					attachment.loadOp,
@@ -840,7 +855,7 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 			else
 			{
 				renderingAttachmentInfo = {
-					imageView,
+					resource.imageView,
 					attachment.layout,
 
 					vk::ResolveModeFlagBits::eNone,
@@ -875,11 +890,18 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 			{},
 			static_cast<uint32_t>(renderingColorAttachmentInfos.size()),
 			renderingColorAttachmentInfos.data(),
-			&renderingDepthAttachmentInfo,
+			renderingDepthAttachmentInfo.imageView ? &renderingDepthAttachmentInfo : nullptr,
 			{},
 		};
 
 		cmd.beginRendering(renderingInfo);
+
+		if (!pass.descriptorSets.empty())
+		{
+			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+			                       pass.pipelineLayout,
+			                       1ul, 1u, &pass.descriptorSets[data.frameIndex], 0ul, {});
+		}
 
 		cmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
 		    (pass.name + " render action").c_str(),
@@ -893,4 +915,38 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 		cmd.endDebugUtilsLabelEXT();
 		i++;
 	}
+
+	AttachmentResource& backbufferResource = m_AttachmentResources[m_BackbufferResourceIndex].GetResource(data.imageIndex, data.frameIndex);
+
+	// Transition color image to present optimal
+	vk::ImageMemoryBarrier imageMemoryBarrier = {
+		backbufferResource.srcAccessMask,  // srcAccessMask
+		{},                                // dstAccessMask
+		backbufferResource.srcImageLayout, // oldLayout
+		vk::ImageLayout::ePresentSrcKHR,   // newLayout
+		{},
+		{},
+		backbufferResource.image, // image
+
+		/* subresourceRange */
+		vk::ImageSubresourceRange {
+		    vk::ImageAspectFlagBits::eColor,
+		    0u,
+		    1u,
+		    0u,
+		    1u,
+		},
+	};
+
+	cmd.pipelineBarrier(
+	    backbufferResource.srcStageMask,
+	    vk::PipelineStageFlagBits::eBottomOfPipe,
+	    {},
+	    {},
+	    {},
+	    imageMemoryBarrier);
+
+	backbufferResource.srcStageMask   = vk::PipelineStageFlagBits::eTopOfPipe;
+	backbufferResource.srcImageLayout = vk::ImageLayout::eUndefined;
+	backbufferResource.srcAccessMask  = {};
 }

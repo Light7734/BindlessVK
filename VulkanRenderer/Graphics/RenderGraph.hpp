@@ -6,7 +6,7 @@
 #include "Graphics/Buffer.hpp"
 #include "Graphics/Device.hpp"
 #include "Graphics/Model.hpp"
-#include "Scene/Camera.hpp"
+#include "Scene/CameraController.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/RenderPass.hpp"
 #include "Graphics/Texture.hpp"
@@ -163,6 +163,17 @@ private:
 
 	struct AttachmentResource
 	{
+		// State carried from last barrier
+		vk::AccessFlags srcAccessMask;
+		vk::ImageLayout srcImageLayout;
+		vk::PipelineStageFlags srcStageMask;
+
+		vk::Image image;
+		vk::ImageView imageView;
+	};
+
+	struct AttachmentResourceContainer
+	{
 		enum class Type
 		{
 			ePerImage,
@@ -170,21 +181,12 @@ private:
 			eSingle,
 		} type;
 
-		// Required for aliasing Read-Modify-Write attachments
-		std::string lastWriteName;
-
-		vk::AccessFlags accessMask;
-		vk::PipelineStageFlags stageMask;
-		vk::ImageLayout layout;
-		vk::Format format;
+		vk::Format imageFormat;
 
 		VkExtent3D extent;
 		glm::vec2 size;
 		RenderPassRecipe::SizeType sizeType;
 		std::string relativeSizeName;
-
-		std::vector<vk::Image> images;
-		std::vector<vk::ImageView> imageViews;
 
 		// Transient multi-sampled images
 		vk::SampleCountFlagBits sampleCount;
@@ -192,52 +194,26 @@ private:
 		AllocatedImage transientMSImage;
 		vk::ImageView transientMSImageView;
 
-		std::tuple<vk::Image, vk::ImageView, vk::Image, vk::ImageView> GetResource(uint32_t imageIndex, uint32_t frameIndex)
+		// Required for aliasing Read-Modify-Write attachments
+		std::string lastWriteName;
+
+		std::vector<AttachmentResource> resources;
+
+		inline AttachmentResource& GetResource(uint32_t imageIndex, uint32_t frameIndex)
 		{
-			switch (type)
-			{
-			case Type::ePerImage:
-			{
-				return std::make_tuple(
-				    images[imageIndex],
-				    imageViews[imageIndex],
-				    transientMSImage,
-				    transientMSImageView);
-			}
-
-			case Type::ePerFrame:
-			{
-				return std::make_tuple(
-				    images[frameIndex],
-				    imageViews[frameIndex],
-				    transientMSImage,
-				    transientMSImageView);
-			}
-
-			case Type::eSingle:
-			{
-				return std::make_tuple(
-				    images[0],
-				    imageViews[0],
-				    transientMSImage,
-				    transientMSImageView);
-			}
-
-			default:
-				ASSERT(false, "Invalid attachment resource type");
-				return {};
-			}
+			return type == Type::ePerImage ? resources[imageIndex] :
+			       type == Type::ePerFrame ? resources[frameIndex] :
+			                                 resources[0];
 		};
 	};
 
-	void CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResource::Type type);
-
+	void CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type);
 
 	std::string m_Name = {};
 
 	std::function<void(const RenderGraph::UpdateData&)> m_UpdateAction = {};
 
-	std::vector<AttachmentResource> m_AttachmentResources = {};
+	std::vector<AttachmentResourceContainer> m_AttachmentResources = {};
 
 	std::vector<RenderPassRecipe> m_Recipes = {};
 	std::vector<RenderPass> m_RenderPasses  = {};
@@ -255,6 +231,8 @@ private:
 	std::vector<RenderPassRecipe::BufferInputInfo> m_BufferInputInfos;
 
 	uint32_t m_MinUniformBufferOffsetAlignment;
+
+	uint32_t m_BackbufferResourceIndex;
 
 	////
 	std::unordered_map<uint64_t, Buffer*> m_BufferInputs = {};
