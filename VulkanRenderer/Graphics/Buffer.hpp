@@ -67,7 +67,7 @@ private:
 	vk::DeviceSize m_Stride    = {};
 };
 
-	// @todo: Merge 2 buffer classes into 1
+// @todo: Merge 2 buffer classes into 1
 class StagingBuffer
 {
 public:

@@ -44,7 +44,7 @@ Buffer::~Buffer()
 
 void* Buffer::MapBlock(uint32_t blockIndex)
 {
-	return (uint8_t*)m_Allocator.mapMemory(m_Buffer) + (m_BlockSize * blockIndex);
+	return ((uint8_t*)m_Allocator.mapMemory(m_Buffer)) + (m_BlockSize * blockIndex);
 }
 
 void Buffer::Unmap()
@@ -82,7 +82,7 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& createInfo)
 		if (createInfo.initialData)
 		{
 			// Copy starting data to staging buffer
-			memcpy(m_Allocator.mapMemory(m_StagingBuffer), createInfo.initialData, static_cast<size_t>(createInfo.minBlockSize ));
+			memcpy(m_Allocator.mapMemory(m_StagingBuffer), createInfo.initialData, static_cast<size_t>(createInfo.minBlockSize));
 			m_Allocator.unmapMemory(m_StagingBuffer);
 
 			// #TODO: Make simpler by calling an InstantSubmit function

@@ -46,12 +46,15 @@ public:
 		std::vector<vk::ImageView> swapchainImageViews;
 	};
 
-	struct UpdateData
+	struct BuildInfo
 	{
-		RenderGraph& graph;
-		uint32_t frameIndex;
-		vk::Device logicalDevice;
-		Scene* scene;
+		std::string backbufferName;
+
+		std::vector<RenderPass::CreateInfo::BufferInputInfo> bufferInputs;
+
+		std::vector<RenderPass::CreateInfo> renderPasses;
+
+		std::function<void(const RenderContext&)> updateAction;
 	};
 
 public:
@@ -61,57 +64,9 @@ public:
 
 	void Init(const CreateInfo& info);
 
-	void Build();
+	void Build(const BuildInfo& info);
 
-	void Update(Scene* scene, uint32_t frameIndex);
-
-	void Render(const RenderPass::RenderData& data);
-
-	/////////////////////////////////////////////////////////////////////////////////
-	/// Builder functions
-	inline RenderGraph& SetName(const std::string& name)
-	{
-		m_Name = name;
-		return *this;
-	}
-
-	inline RenderGraph& AddRenderPassRecipe(const RenderPassRecipe& recipe)
-	{
-		m_Recipes.push_back(recipe);
-		return *this;
-	}
-
-	inline RenderGraph& SetSwapchainContext()
-	{
-	}
-
-	inline RenderGraph& AddBufferInput(const RenderPassRecipe::BufferInputInfo& info)
-	{
-		ASSERT(info.type == vk::DescriptorType::eUniformBuffer || info.type == vk::DescriptorType::eStorageBuffer,
-		       "Invalid descriptor type for buffer input: {}",
-		       string_VkDescriptorType(static_cast<VkDescriptorType>(info.type)));
-		LOG(trace, "Adding buffer input info: {}", info.name);
-		m_BufferInputInfos.push_back(info);
-		return *this;
-	}
-
-	inline RenderGraph& AddTextureInput()
-	{
-		ASSERT(false, "Not implemented");
-		return *this;
-	}
-
-	inline RenderGraph& SetUpdateAction(std::function<void(const RenderGraph::UpdateData&)> action)
-	{
-		m_UpdateAction = action;
-		return *this;
-	}
-
-	inline RenderGraph& SetBackbuffer(const std::string& name)
-	{
-		m_SwapchainAttachmentNames.push_back(name);
-		return *this;
-	}
+	void Render(RenderContext context);
 
 	inline void* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
 	{
@@ -170,7 +125,7 @@ private:
 
 		VkExtent3D extent;
 		glm::vec2 size;
-		RenderPassRecipe::SizeType sizeType;
+		RenderPass::CreateInfo::SizeType sizeType;
 		std::string relativeSizeName;
 
 		// Transient multi-sampled images
@@ -192,7 +147,7 @@ private:
 		};
 	};
 
-	void CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type);
+	void CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type);
 
 private:
 	vk::Device m_LogicalDevice          = {};
@@ -202,38 +157,34 @@ private:
 	vk::CommandPool m_CommandPool       = {};
 	vk::DescriptorPool m_DescriptorPool = {};
 
-	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties;
+	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties = {};
 
 	QueueInfo m_QueueInfo = {};
 
-	std::string m_Name = {};
+
+	std::vector<RenderPass> m_RenderPasses = {};
 
 	vk::PipelineLayout m_PipelineLayout             = {};
 	vk::DescriptorSetLayout m_DescriptorSetLayout   = {};
 	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
 
-	std::function<void(const RenderGraph::UpdateData&)> m_UpdateAction = {};
+	std::function<void(const RenderContext&)> m_UpdateAction = {};
 
 	std::vector<AttachmentResourceContainer> m_AttachmentResources = {};
 
-	std::vector<RenderPass> m_RenderPasses = {};
+	std::unordered_map<uint64_t, Buffer*> m_BufferInputs = {};
 
 	std::vector<vk::Image> m_SwapchainImages         = {};
 	std::vector<vk::ImageView> m_SwapchainImageViews = {};
 	vk::Extent2D m_SwapchainExtent                   = {};
 
-	std::string m_SwapchainResourceName                 = {};
 	std::vector<std::string> m_SwapchainAttachmentNames = {};
+	std::string m_SwapchainResourceName                 = {};
+	uint32_t m_SwapchainResourceIndex                   = {};
 
 	vk::Format m_ColorFormat = {};
 	vk::Format m_DepthFormat = {};
 
-	uint32_t m_MinUniformBufferOffsetAlignment = {};
-
-	uint32_t m_BackbufferResourceIndex = {};
-
-	std::unordered_map<uint64_t, Buffer*> m_BufferInputs = {};
-
-	std::vector<RenderPassRecipe> m_Recipes = {};
-	std::vector<RenderPassRecipe::BufferInputInfo> m_BufferInputInfos;
+	std::vector<RenderPass::CreateInfo> m_RenderPassCreateInfos = {};
+	std::vector<RenderPass::CreateInfo::BufferInputInfo> m_BufferInputInfos;
 };

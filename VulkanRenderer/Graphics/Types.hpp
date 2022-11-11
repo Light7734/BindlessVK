@@ -4,6 +4,19 @@
 #include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan.hpp>
 
+struct RenderContext
+{
+	class RenderGraph* graph;
+	class RenderPass* pass;
+	class Scene* scene;
+
+	vk::Device logicalDevice;
+	vk::CommandBuffer cmd;
+
+	uint32_t imageIndex;
+	uint32_t frameIndex;
+};
+
 struct AllocatedImage
 {
 	AllocatedImage() = default;

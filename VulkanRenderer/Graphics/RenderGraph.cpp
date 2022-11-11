@@ -25,26 +25,26 @@ void RenderGraph::Init(const CreateInfo& info)
 	m_SwapchainImageViews = info.swapchainImageViews;
 
 	m_PhysicalDeviceProperties = m_PhysicalDevice.getProperties();
-
-	m_MinUniformBufferOffsetAlignment = m_PhysicalDevice.getProperties().limits.minUniformBufferOffsetAlignment;
 }
 
-void RenderGraph::Build()
+void RenderGraph::Build(const BuildInfo& info)
 {
-	m_RenderPasses.resize(m_Recipes.size(), RenderPass {});
+	m_RenderPassCreateInfos = info.renderPasses;
+	m_BufferInputInfos      = info.bufferInputs;
+	m_UpdateAction          = info.updateAction;
+
+	m_SwapchainAttachmentNames.push_back(info.backbufferName);
+	m_RenderPasses.resize(m_RenderPassCreateInfos.size(), RenderPass {});
 
 	ValidateGraph();
-
 	ReorderPasses();
 
 	BuildAttachmentResources();
 
 	BuildTextureInputs();
-
 	BuildBufferInputs();
 
 	BuildDescriptorSets();
-
 	WriteDescriptorSets();
 }
 
@@ -56,15 +56,14 @@ void RenderGraph::ValidateGraph()
 // @todo: Implement
 void RenderGraph::ReorderPasses()
 {
-	for (uint32_t i = m_Recipes.size(); i-- > 0;)
+	for (uint32_t i = m_RenderPassCreateInfos.size(); i-- > 0;)
 	{
-		auto& recipe                   = m_Recipes[i];
-		m_RenderPasses[i].name         = recipe.name;
-		m_RenderPasses[i].updateAction = recipe.updateAction;
-		m_RenderPasses[i].renderAction = recipe.renderAction;
+		m_RenderPasses[i].name         = m_RenderPassCreateInfos[i].name;
+		m_RenderPasses[i].updateAction = m_RenderPassCreateInfos[i].updateAction;
+		m_RenderPasses[i].renderAction = m_RenderPassCreateInfos[i].renderAction;
 
 
-		for (const RenderPassRecipe::AttachmentInfo& info : recipe.colorAttachmentInfos)
+		for (const RenderPass::CreateInfo::AttachmentInfo& info : m_RenderPassCreateInfos[i].colorAttachmentInfos)
 		{
 			auto it = std::find(m_SwapchainAttachmentNames.begin(),
 			                    m_SwapchainAttachmentNames.end(),
@@ -81,11 +80,11 @@ void RenderGraph::ReorderPasses()
 void RenderGraph::BuildAttachmentResources()
 {
 	uint32_t passIndex = 0u;
-	for (const RenderPassRecipe& recipe : m_Recipes)
+	for (const RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
 	{
 		RenderPass& pass = m_RenderPasses[passIndex++];
 
-		for (const RenderPassRecipe::AttachmentInfo& info : recipe.colorAttachmentInfos)
+		for (const RenderPass::CreateInfo::AttachmentInfo& info : renderPassCreateInfo.colorAttachmentInfos)
 		{
 			// Write only ( create new image )
 			if (info.input == "")
@@ -158,9 +157,9 @@ void RenderGraph::BuildAttachmentResources()
 			}
 		}
 
-		if (!recipe.depthStencilAttachmentInfo.name.empty())
+		if (!renderPassCreateInfo.depthStencilAttachmentInfo.name.empty())
 		{
-			const RenderPassRecipe::AttachmentInfo& info = recipe.depthStencilAttachmentInfo;
+			const RenderPass::CreateInfo::AttachmentInfo& info = renderPassCreateInfo.depthStencilAttachmentInfo;
 			// Write only ( create new image )
 			if (info.input == "")
 			{
@@ -242,12 +241,8 @@ void RenderGraph::BuildTextureInputs()
 
 void RenderGraph::BuildBufferInputs()
 {
-	for (RenderPassRecipe::BufferInputInfo& info : m_BufferInputInfos)
+	for (RenderPass::CreateInfo::BufferInputInfo& info : m_BufferInputInfos)
 	{
-		size_t old = info.size;
-		info.size  = (info.size + m_MinUniformBufferOffsetAlignment - 1) & -m_MinUniformBufferOffsetAlignment;
-		LOG(warn, "{} -> {} ({})", old, info.size, m_MinUniformBufferOffsetAlignment);
-
 		BufferCreateInfo bufferCreateInfo {
 			.logicalDevice  = m_LogicalDevice,
 			.physicalDevice = m_PhysicalDevice,
@@ -264,23 +259,22 @@ void RenderGraph::BuildBufferInputs()
 	}
 
 	uint32_t passIndex = 0u;
-	for (RenderPassRecipe& recipe : m_Recipes)
+	for (RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
 	{
 		RenderPass& pass = m_RenderPasses[passIndex++];
 
-		for (RenderPassRecipe::BufferInputInfo& info : recipe.bufferInputInfos)
+		for (RenderPass::CreateInfo::BufferInputInfo& info : renderPassCreateInfo.bufferInputInfos)
 		{
-			info.size = (info.size + m_MinUniformBufferOffsetAlignment - 1) & -m_MinUniformBufferOffsetAlignment;
 			BufferCreateInfo bufferCreateInfo {
-				.logicalDevice = m_LogicalDevice,
-                    .physicalDevice = m_PhysicalDevice,
-				.allocator     = m_Allocator,
-				.commandPool   = m_CommandPool,
-				.graphicsQueue = m_QueueInfo.graphicsQueue,
-				.usage         = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-				                                                                   vk::BufferUsageFlagBits::eStorageBuffer,
-				.minBlockSize  = info.size,
-				.blockCount    = MAX_FRAMES_IN_FLIGHT,
+				.logicalDevice  = m_LogicalDevice,
+				.physicalDevice = m_PhysicalDevice,
+				.allocator      = m_Allocator,
+				.commandPool    = m_CommandPool,
+				.graphicsQueue  = m_QueueInfo.graphicsQueue,
+				.usage          = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
+				                                                                    vk::BufferUsageFlagBits::eStorageBuffer,
+				.minBlockSize   = info.size,
+				.blockCount     = MAX_FRAMES_IN_FLIGHT,
 			};
 
 			pass.bufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -292,7 +286,7 @@ void RenderGraph::BuildDescriptorSets()
 {
 	{
 		std::vector<vk::DescriptorSetLayoutBinding> bindings;
-		for (const RenderPassRecipe::BufferInputInfo& info : m_BufferInputInfos)
+		for (const RenderPass::CreateInfo::BufferInputInfo& info : m_BufferInputInfos)
 		{
 			// Determine bindings
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
@@ -339,14 +333,14 @@ void RenderGraph::BuildDescriptorSets()
 	}
 
 	uint32_t passIndex = 0u;
-	for (const RenderPassRecipe& recipe : m_Recipes)
+	for (const RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
 	{
 		RenderPass& pass = m_RenderPasses[passIndex++];
 
 
 		// Determine bindings
 		std::vector<vk::DescriptorSetLayoutBinding> bindings;
-		for (const RenderPassRecipe::BufferInputInfo info : recipe.bufferInputInfos)
+		for (const RenderPass::CreateInfo::BufferInputInfo info : renderPassCreateInfo.bufferInputInfos)
 		{
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
 			    info.binding,
@@ -355,7 +349,7 @@ void RenderGraph::BuildDescriptorSets()
 			    info.stageMask,
 			});
 		}
-		for (const RenderPassRecipe::TextureInputInfo info : recipe.textureInputInfos)
+		for (const RenderPass::CreateInfo::TextureInputInfo info : renderPassCreateInfo.textureInputInfos)
 		{
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
 			    info.binding,
@@ -375,7 +369,7 @@ void RenderGraph::BuildDescriptorSets()
 		pass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(layoutCreateInfo);
 
 		// Allocate descriptor sets
-		if (!recipe.bufferInputInfos.empty() || !recipe.textureInputInfos.empty())
+		if (!renderPassCreateInfo.bufferInputInfos.empty() || !renderPassCreateInfo.textureInputInfos.empty())
 		{
 			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 			{
@@ -416,7 +410,7 @@ void RenderGraph::WriteDescriptorSets()
 	{
 		std::vector<vk::DescriptorBufferInfo> bufferInfos;
 		bufferInfos.reserve(m_BufferInputs.size() * MAX_FRAMES_IN_FLIGHT);
-		for (const RenderPassRecipe::BufferInputInfo info : m_BufferInputInfos)
+		for (const RenderPass::CreateInfo::BufferInputInfo info : m_BufferInputInfos)
 		{
 			std::vector<vk::WriteDescriptorSet> writes;
 
@@ -424,8 +418,8 @@ void RenderGraph::WriteDescriptorSets()
 			{
 				bufferInfos.push_back({
 				    *(m_BufferInputs[HashStr(info.name.c_str())]->GetBuffer()),
-				    info.size * i,
-				    info.size,
+				    m_BufferInputs[HashStr(info.name.c_str())]->GetBlockSize() * i,
+				    m_BufferInputs[HashStr(info.name.c_str())]->GetBlockSize(),
 				});
 
 
@@ -455,7 +449,7 @@ void RenderGraph::WriteDescriptorSets()
 
 
 	uint32_t passIndex = 0u;
-	for (const RenderPassRecipe& recipe : m_Recipes)
+	for (const RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
 	{
 		RenderPass& pass = m_RenderPasses[passIndex++];
 
@@ -463,7 +457,7 @@ void RenderGraph::WriteDescriptorSets()
 
 		std::vector<vk::DescriptorBufferInfo> bufferInfos;
 		bufferInfos.reserve(pass.bufferInputs.size() * MAX_FRAMES_IN_FLIGHT);
-		for (const RenderPassRecipe::BufferInputInfo info : recipe.bufferInputInfos)
+		for (const RenderPass::CreateInfo::BufferInputInfo info : renderPassCreateInfo.bufferInputInfos)
 		{
 			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 			{
@@ -487,7 +481,7 @@ void RenderGraph::WriteDescriptorSets()
 				}
 			}
 		}
-		for (const RenderPassRecipe::TextureInputInfo info : recipe.textureInputInfos)
+		for (const RenderPass::CreateInfo::TextureInputInfo info : renderPassCreateInfo.textureInputInfos)
 		{
 			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 			{
@@ -516,7 +510,7 @@ void RenderGraph::WriteDescriptorSets()
 	}
 }
 
-void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type)
+void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type)
 {
 	LOG(trace, "Creating image: {} <- ", info.name, info.input);
 	vk::ImageUsageFlags usage;
@@ -540,18 +534,18 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 	vk::Extent3D extent;
 	switch (info.sizeType)
 	{
-	case RenderPassRecipe::SizeType::eSwapchainRelative:
+	case RenderPass::CreateInfo::SizeType::eSwapchainRelative:
 		extent = {
 			.width  = static_cast<uint32_t>(m_SwapchainExtent.width * info.size.x),
 			.height = static_cast<uint32_t>(m_SwapchainExtent.height * info.size.y),
 			.depth  = 1,
 		};
 		break;
-	case RenderPassRecipe::SizeType::eRelative:
+	case RenderPass::CreateInfo::SizeType::eRelative:
 		ASSERT(false, "Unimplemented attachment size type: Relative");
 		break;
 
-	case RenderPassRecipe::SizeType::eAbsolute:
+	case RenderPass::CreateInfo::SizeType::eAbsolute:
 		extent = {
 			.width  = static_cast<uint32_t>(info.size.x),
 			.height = static_cast<uint32_t>(info.size.y),
@@ -594,7 +588,7 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 			});
 		}
 
-		m_BackbufferResourceIndex = m_AttachmentResources.size();
+		m_SwapchainResourceIndex = m_AttachmentResources.size();
 		break;
 	}
 	case AttachmentResourceContainer::Type::eSingle:
@@ -746,34 +740,22 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 	m_AttachmentResources.push_back(resourceContainer);
 }
 
-void RenderGraph::Update(Scene* scene, uint32_t frameIndex)
+void RenderGraph::Render(RenderContext context)
 {
-	m_UpdateAction({
-	    .graph         = *this,
-	    .frameIndex    = frameIndex,
-	    .logicalDevice = m_LogicalDevice,
-	    .scene         = scene,
-	});
+	m_UpdateAction(context);
 
-	for (RenderPass& pass : m_RenderPasses)
+	for (uint32_t i = 0; i < m_RenderPasses.size(); i++)
 	{
-		pass.updateAction({
-		    .renderPass    = pass,
-		    .frameIndex    = frameIndex,
-		    .logicalDevice = m_LogicalDevice,
-		    .scene         = scene,
-		});
+		context.pass = &m_RenderPasses[i];
+		context.pass->updateAction(context);
 	}
-}
 
-void RenderGraph::Render(const RenderPass::RenderData& data)
-{
 	// @todo: Setup render barriers
-	const auto cmd = data.cmd;
+	const auto cmd = context.cmd;
 
 	cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 	                       m_PipelineLayout,
-	                       0u, 1ul, &m_DescriptorSets[data.frameIndex], 0ul, {});
+	                       0u, 1ul, &m_DescriptorSets[context.frameIndex], 0ul, {});
 
 	size_t i = 0;
 	for (RenderPass& pass : m_RenderPasses)
@@ -789,7 +771,7 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 		{
 			AttachmentResourceContainer& resourceContainer = m_AttachmentResources[attachment.resourceIndex];
 
-			AttachmentResource& resource = resourceContainer.GetResource(data.imageIndex, data.frameIndex);
+			AttachmentResource& resource = resourceContainer.GetResource(context.imageIndex, context.frameIndex);
 
 			vk::ImageMemoryBarrier imageBarrier = {
 				resource.srcAccessMask,         // srcAccessMask
@@ -808,19 +790,6 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 			     resource.srcStageMask != attachment.stageMask) &&
 			    attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				if (!resource.image)
-				{
-					LOG(warn, "Applying barrier to invalid image");
-				}
-
-
-				if (pass.name == "ui")
-				{
-					LOG(trace, "Applying UI Color Barrier:");
-					LOG(trace, "{} -> {}", (uint32_t)resource.srcAccessMask, (uint32_t)attachment.accessMask);
-					LOG(trace, "{} -> {}", (uint32_t)resource.srcImageLayout, (uint32_t)attachment.layout);
-					LOG(trace, "{} -> {}", (uint32_t)resource.srcStageMask, (uint32_t)attachment.stageMask);
-				}
 				cmd.pipelineBarrier(resource.srcStageMask,
 				                    attachment.stageMask,
 				                    {},
@@ -831,10 +800,6 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 				resource.srcAccessMask  = attachment.accessMask;
 				resource.srcImageLayout = attachment.layout;
 				resource.srcStageMask   = attachment.stageMask;
-			}
-			else
-			{
-				LOG(trace, "Skipping image barrier of: {}", pass.name);
 			}
 
 
@@ -905,7 +870,7 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 		{
 			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 			                       pass.pipelineLayout,
-			                       1ul, 1u, &pass.descriptorSets[data.frameIndex], 0ul, {});
+			                       1ul, 1u, &pass.descriptorSets[context.frameIndex], 0ul, {});
 		}
 
 		cmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
@@ -913,7 +878,7 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 		    { 1.0, 1.0, 0.2, 1.0 },
 		}));
 
-		pass.renderAction(data);
+		pass.renderAction(context);
 		cmd.endDebugUtilsLabelEXT();
 
 		cmd.endRendering();
@@ -921,7 +886,7 @@ void RenderGraph::Render(const RenderPass::RenderData& data)
 		i++;
 	}
 
-	AttachmentResource& backbufferResource = m_AttachmentResources[m_BackbufferResourceIndex].GetResource(data.imageIndex, data.frameIndex);
+	AttachmentResource& backbufferResource = m_AttachmentResources[m_SwapchainResourceIndex].GetResource(context.imageIndex, context.frameIndex);
 
 	// Transition color image to present optimal
 	vk::ImageMemoryBarrier imageMemoryBarrier = {

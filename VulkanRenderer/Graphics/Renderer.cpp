@@ -23,39 +23,33 @@ struct SceneData
 	glm::vec4 lightPos;
 };
 
-void GraphUpdate(const RenderGraph::UpdateData& data)
+void GraphUpdate(const RenderContext& context)
 {
-	data.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-		*(CameraData*)data.graph.MapDescriptorBuffer("frame_data", data.frameIndex) = {
+	context.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
+		*(CameraData*)context.graph->MapDescriptorBuffer("frame_data", context.frameIndex) = {
 			.projection = cameraComp.GetProjection(),
 			.view       = cameraComp.GetView(transformComp.translation),
 			.viewPos    = glm::vec4(transformComp.translation, 1.0f),
 		};
-		data.graph.UnMapDescriptorBuffer("frame_data");
+		context.graph->UnMapDescriptorBuffer("frame_data");
 	});
 
-	data.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
-		SceneData* sceneData = (SceneData*)data.graph.MapDescriptorBuffer("scene_data", data.frameIndex);
+	context.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
+		SceneData* sceneData = (SceneData*)context.graph->MapDescriptorBuffer("scene_data", context.frameIndex);
 
 		sceneData[0] = {
 			.lightPos = glm::vec4(trasnformComp.translation, 1.0f),
 		};
-		data.graph.UnMapDescriptorBuffer("scene_data");
+		context.graph->UnMapDescriptorBuffer("scene_data");
 	});
 }
 
-void ForwardPassUpdate(const RenderPass::UpdateData& data)
+void ForwardPassUpdate(const RenderContext& context)
 {
-	vk::RenderingAttachmentInfo info;
-	RenderPass& renderPass    = data.renderPass;
-	const uint32_t frameIndex = data.frameIndex;
-	vk::Device logicalDevice  = data.logicalDevice;
-	Scene* scene              = data.scene;
-
-	vk::DescriptorSet* descriptorSet = &renderPass.descriptorSets[frameIndex];
+	vk::DescriptorSet descriptorSet = context.pass->descriptorSets[context.frameIndex];
 
 	// @todo: don't update every frame
-	data.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+	context.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
 		for (const auto* node : renderComp.model->nodes)
 		{
 			for (const auto& primitive : node->mesh)
@@ -74,7 +68,7 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 				std::vector<vk::WriteDescriptorSet> descriptorWrites = {
 
 					vk::WriteDescriptorSet {
-					    *descriptorSet,
+					    descriptorSet,
 					    0ul,
 					    albedoTextureIndex,
 					    1ul,
@@ -85,7 +79,7 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 					},
 
 					vk::WriteDescriptorSet {
-					    *descriptorSet,
+					    descriptorSet,
 					    0ul,
 					    metallicRoughnessTextureIndex,
 					    1ul,
@@ -96,7 +90,7 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 					},
 
 					vk::WriteDescriptorSet {
-					    *descriptorSet,
+					    descriptorSet,
 					    0ul,
 					    normalTextureIndex,
 					    1ul,
@@ -107,19 +101,19 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 					}
 				};
 
-				logicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
+				context.logicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
 			}
 		}
 	});
 }
 
-void ForwardPassRender(const RenderPass::RenderData& data)
+void ForwardPassRender(const RenderContext& context)
 {
 	VkDeviceSize offset { 0 };
 	vk::Pipeline currentPipeline = VK_NULL_HANDLE;
 
-	data.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		const auto cmd = data.cmd;
+	context.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
+		const auto cmd = context.cmd;
 
 		// bind pipeline
 		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
@@ -423,65 +417,73 @@ void Renderer::InitializeImGui(const DeviceContext& deviceContext, Window* windo
 
 void Renderer::CreateRenderGraph(const DeviceContext& deviceContext)
 {
-	RenderPassRecipe forwardPassRecipe;
-	forwardPassRecipe
-	    .SetName("forward")
-	    .AddColorOutput({
-	        .name       = "forwardpass",
-	        .size       = { 1.0, 1.0 },
-	        .sizeType   = RenderPassRecipe::SizeType::eSwapchainRelative,
-	        .format     = m_SurfaceInfo.format.format,
-	        .samples    = m_SampleCount,
-	        .clearValue = vk::ClearValue {
-	            vk::ClearColorValue { std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
-	        },
-	    })
-	    .SetDepthStencilOutput({
-	        .name       = "forward_depth",
-	        .size       = { 1.0, 1.0 },
-	        .sizeType   = RenderPassRecipe::SizeType::eSwapchainRelative,
-	        .format     = m_DepthFormat,
-	        .samples    = m_SampleCount,
-	        .clearValue = vk::ClearValue {
-	            vk::ClearDepthStencilValue { 1.0, 0 },
-	        },
-	    })
-	    .AddTextureInput({
-	        .name           = "texture_2ds",
-	        .binding        = 0,
-	        .count          = 32,
-	        .type           = vk::DescriptorType::eCombinedImageSampler,
-	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-	        .defaultTexture = m_DefaultTexture,
-	    })
-	    .AddTextureInput({
-	        .name           = "texture_cubes",
-	        .binding        = 1,
-	        .count          = 8u,
-	        .type           = vk::DescriptorType::eCombinedImageSampler,
-	        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-	        .defaultTexture = m_SkyboxTexture,
-	    })
-	    .SetUpdateAction(&ForwardPassUpdate)
-	    .SetRenderAction(&ForwardPassRender);
+	RenderPass::CreateInfo forwardPassCreateInfo {
+		.name         = "forwardpass",
+		.renderAction = &ForwardPassRender,
+		.updateAction = &ForwardPassUpdate,
 
-	RenderPassRecipe uiPassRecipe;
-	uiPassRecipe
-	    .SetName("ui")
-	    .AddColorOutput({
-	        .name     = "backbuffer",
-	        .size     = { 1.0, 1.0 },
-	        .sizeType = RenderPassRecipe::SizeType::eSwapchainRelative,
-	        .format   = m_SurfaceInfo.format.format,
-	        .samples  = m_SampleCount,
-	        .input    = "forwardpass",
-	    })
-	    .SetUpdateAction([](const RenderPass::UpdateData& data) {
-	    })
-	    .SetRenderAction([](const RenderPass::RenderData& data) {
+		.colorAttachmentInfos = {
+		    RenderPass::CreateInfo::AttachmentInfo {
+		        .name       = "forwardpass",
+		        .size       = { 1.0, 1.0 },
+		        .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		        .format     = m_SurfaceInfo.format.format,
+		        .samples    = m_SampleCount,
+		        .clearValue = vk::ClearValue {
+		            vk::ClearColorValue { std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
+		        },
+		    },
+		},
+
+		.depthStencilAttachmentInfo = RenderPass::CreateInfo::AttachmentInfo {
+		    .name       = "forward_depth",
+		    .size       = { 1.0, 1.0 },
+		    .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		    .format     = m_DepthFormat,
+		    .samples    = m_SampleCount,
+		    .clearValue = vk::ClearValue {
+		        vk::ClearDepthStencilValue { 1.0, 0 },
+		    },
+		},
+
+		.textureInputInfos = {
+		    RenderPass::CreateInfo::TextureInputInfo {
+		        .name           = "texture_2ds",
+		        .binding        = 0,
+		        .count          = 32,
+		        .type           = vk::DescriptorType::eCombinedImageSampler,
+		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+		        .defaultTexture = m_DefaultTexture,
+		    },
+		    RenderPass::CreateInfo::TextureInputInfo {
+		        .name           = "texture_cubes",
+		        .binding        = 1,
+		        .count          = 8u,
+		        .type           = vk::DescriptorType::eCombinedImageSampler,
+		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+		        .defaultTexture = m_SkyboxTexture,
+		    },
+		},
+	};
+
+	RenderPass::CreateInfo uiPassCreateInfo {
+		.name         = "ui",
+		.renderAction = [](const RenderContext& context) {
 		    ImGui::Render();
-		    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), data.cmd);
-	    });
+		    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), context.cmd); },
+
+		.updateAction         = [](const RenderContext& context) {},
+		.colorAttachmentInfos = {
+		    RenderPass::CreateInfo::AttachmentInfo {
+		        .name     = "backbuffer",
+		        .size     = { 1.0, 1.0 },
+		        .sizeType = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		        .format   = m_SurfaceInfo.format.format,
+		        .samples  = m_SampleCount,
+		        .input    = "forwardpass",
+		    },
+		},
+	};
 
 	m_RenderGraph.Init({
 	    .swapchainExtent     = m_SurfaceInfo.capabilities.maxImageExtent,
@@ -496,33 +498,37 @@ void Renderer::CreateRenderGraph(const DeviceContext& deviceContext)
 	    .swapchainImages     = m_SwapchainImages,
 	    .swapchainImageViews = m_SwapchainImageViews,
 	});
-	m_RenderGraph
-	    .SetName("SimpleGraph")
-	    .SetBackbuffer("backbuffer")
-	    .AddBufferInput({
-	        .name      = "frame_data",
-	        .binding   = 0,
-	        .count     = 1,
-	        .type      = vk::DescriptorType::eUniformBuffer,
-	        .stageMask = vk::ShaderStageFlagBits::eVertex,
 
-	        .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
-	        .initialData = nullptr,
-	    })
-	    .AddBufferInput({
-	        .name      = "scene_data",
-	        .binding   = 1,
-	        .count     = 1,
-	        .type      = vk::DescriptorType::eUniformBuffer,
-	        .stageMask = vk::ShaderStageFlagBits::eVertex,
+	m_RenderGraph.Build({
+	    .backbufferName = "backbuffer",
+	    .bufferInputs   = {
+	         RenderPass::CreateInfo::BufferInputInfo {
+	              .name      = "frame_data",
+	              .binding   = 0,
+	              .count     = 1,
+	              .type      = vk::DescriptorType::eUniformBuffer,
+	              .stageMask = vk::ShaderStageFlagBits::eVertex,
 
-	        .size        = sizeof(glm::vec4),
-	        .initialData = nullptr,
-	    })
-	    .AddRenderPassRecipe(forwardPassRecipe)
-	    .AddRenderPassRecipe(uiPassRecipe)
-	    .SetUpdateAction(&GraphUpdate)
-	    .Build();
+	              .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+	              .initialData = nullptr,
+            },
+	          RenderPass::CreateInfo::BufferInputInfo {
+	              .name      = "scene_data",
+	              .binding   = 1,
+	              .count     = 1,
+	              .type      = vk::DescriptorType::eUniformBuffer,
+	              .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	              .size        = sizeof(glm::vec4),
+	              .initialData = nullptr,
+            },
+        },
+	    .renderPasses = {
+	        forwardPassCreateInfo,
+	        uiPassCreateInfo,
+	    },
+	    .updateAction = &GraphUpdate,
+	});
 }
 
 void Renderer::BeginFrame()
@@ -559,13 +565,16 @@ void Renderer::DrawScene(Scene* scene)
 	auto cmd = m_CommandBuffers[m_CurrentFrame];
 	cmd.reset();
 
-	m_RenderGraph.Update(scene, m_CurrentFrame);
-
 	cmd.begin(vk::CommandBufferBeginInfo {});
 
 	m_RenderGraph.Render({
-	    .scene      = scene,
-	    .cmd        = cmd,
+	    .graph = &m_RenderGraph,
+	    .pass  = nullptr,
+	    .scene = scene,
+
+	    .logicalDevice = m_LogicalDevice,
+	    .cmd           = cmd,
+
 	    .imageIndex = imageIndex,
 	    .frameIndex = m_CurrentFrame,
 	});

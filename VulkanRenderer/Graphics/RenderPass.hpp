@@ -26,20 +26,67 @@
 
 struct RenderPass
 {
-	struct RenderData
+	struct CreateInfo
 	{
-		class Scene* scene;
-		vk::CommandBuffer cmd;
-		uint32_t imageIndex;
-		uint32_t frameIndex;
-	};
+	public:
+		enum class SizeType : uint8_t
+		{
+			eSwapchainRelative,
+			eRelative,
+			eAbsolute,
 
-	struct UpdateData
-	{
-		RenderPass& renderPass;
-		uint32_t frameIndex;
-		vk::Device logicalDevice;
-		class Scene* scene;
+			nCount,
+		};
+
+		struct AttachmentInfo
+		{
+			std::string name;
+			glm::vec2 size;
+			SizeType sizeType;
+			vk::Format format;
+			vk::SampleCountFlagBits samples;
+
+			std::string input;
+			std::string sizeRelativeName;
+
+			vk::ClearValue clearValue;
+		};
+
+		struct TextureInputInfo
+		{
+			std::string name;
+			uint32_t binding;
+			uint32_t count;
+			vk::DescriptorType type;
+			vk::ShaderStageFlagBits stageMask;
+
+			Texture* defaultTexture;
+		};
+
+		struct BufferInputInfo
+		{
+			std::string name;
+			uint32_t binding;
+			uint32_t count;
+			vk::DescriptorType type;
+			vk::ShaderStageFlagBits stageMask;
+
+			size_t size;
+			void* initialData;
+		};
+
+		std::string name;
+
+		std::function<void(const RenderContext& context)> renderAction;
+		std::function<void(const RenderContext& context)> updateAction;
+
+		std::vector<CreateInfo::AttachmentInfo> colorAttachmentInfos;
+		CreateInfo::AttachmentInfo depthStencilAttachmentInfo;
+
+		std::vector<CreateInfo::TextureInputInfo> textureInputInfos;
+		std::vector<CreateInfo::BufferInputInfo> bufferInputInfos;
+
+		void* userPointer;
 	};
 
 	struct Attachment
@@ -67,117 +114,8 @@ struct RenderPass
 	vk::DescriptorSetLayout descriptorSetLayout;
 	vk::PipelineLayout pipelineLayout;
 
-	std::function<void(const RenderPass::RenderData&)> renderAction = {};
-	std::function<void(const RenderPass::UpdateData&)> updateAction = {};
-};
+	std::function<void(const RenderContext& context)> renderAction;
+	std::function<void(const RenderContext& context)> updateAction;
 
-struct RenderPassRecipe
-{
-public:
-	enum class SizeType : uint8_t
-	{
-		eSwapchainRelative,
-		eRelative,
-		eAbsolute,
-
-		nCount,
-	};
-
-	struct AttachmentInfo
-	{
-		std::string name;
-		glm::vec2 size;
-		SizeType sizeType;
-		vk::Format format;
-		vk::SampleCountFlagBits samples;
-
-		std::string input;
-		std::string sizeRelativeName;
-
-		vk::ClearValue clearValue;
-	};
-
-	struct TextureInputInfo
-	{
-		std::string name;
-		uint32_t binding;
-		uint32_t count;
-		vk::DescriptorType type;
-		vk::ShaderStageFlagBits stageMask;
-
-		Texture* defaultTexture;
-	};
-
-	struct BufferInputInfo
-	{
-		std::string name;
-		uint32_t binding;
-		uint32_t count;
-		vk::DescriptorType type;
-		vk::ShaderStageFlagBits stageMask;
-
-		size_t size;
-		void* initialData;
-	};
-
-	std::string name = {};
-
-	std::function<void(const RenderPass::RenderData&)> renderAction = {};
-	std::function<void(const RenderPass::UpdateData&)> updateAction = {};
-
-	RenderPassRecipe::AttachmentInfo depthStencilAttachmentInfo        = {};
-	std::vector<RenderPassRecipe::AttachmentInfo> colorAttachmentInfos = {};
-
-	std::vector<RenderPassRecipe::TextureInputInfo> textureInputInfos;
-	std::vector<RenderPassRecipe::BufferInputInfo> bufferInputInfos;
-
-	///
-	/////////////////////////////////////////////////////////////////////////////////
-	/// Builder functions for convenience
-	inline RenderPassRecipe&
-	    SetName(const std::string& name)
-	{
-		this->name = name;
-		return *this;
-	}
-
-	inline RenderPassRecipe& SetRenderAction(std::function<void(const RenderPass::RenderData&)>&& renderAction)
-	{
-		this->renderAction = renderAction;
-		return *this;
-	}
-
-	inline RenderPassRecipe& SetUpdateAction(std::function<void(const RenderPass::UpdateData&)>&& updateAction)
-	{
-		this->updateAction = updateAction;
-		return *this;
-	}
-
-	inline RenderPassRecipe& AddColorOutput(const RenderPassRecipe::AttachmentInfo& info)
-	{
-		this->colorAttachmentInfos.push_back(info);
-		return *this;
-	}
-
-	inline RenderPassRecipe& SetDepthStencilOutput(const RenderPassRecipe::AttachmentInfo& info)
-	{
-		this->depthStencilAttachmentInfo = info;
-		return *this;
-	}
-
-	inline RenderPassRecipe& AddTextureInput(RenderPassRecipe::TextureInputInfo info)
-	{
-		textureInputInfos.push_back(info);
-		return *this;
-	}
-
-	inline RenderPassRecipe& AddBufferInput(RenderPassRecipe::BufferInputInfo info)
-	{
-		ASSERT(info.type == vk::DescriptorType::eUniformBuffer || info.type == vk::DescriptorType::eStorageBuffer,
-		       "Invalid descriptor type for buffer input: {}",
-		       string_VkDescriptorType(static_cast<VkDescriptorType>(info.type)));
-
-		bufferInputInfos.push_back(info);
-		return *this;
-	}
+	void* userPointer;
 };

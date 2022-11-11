@@ -226,7 +226,7 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .graphicsQueue  = m_GraphicsQueue,
 	    .usage          = vk::BufferUsageFlagBits::eVertexBuffer,
 	    .minBlockSize   = vertices.size() * sizeof(Model::Vertex),
-        .blockCount = 1u,
+	    .blockCount     = 1u,
 	    .initialData    = vertices.data(),
 	});
 
