@@ -33,7 +33,6 @@ class RenderGraph
 public:
 	struct CreateInfo
 	{
-		uint32_t swapchainImageCount;
 		vk::Extent2D swapchainExtent;
 		vk::DescriptorPool descriptorPool;
 		vk::Device logicalDevice;
@@ -110,27 +109,13 @@ public:
 
 	inline RenderGraph& SetBackbuffer(const std::string& name)
 	{
-		m_BackbufferAttachmentNames.push_back(name);
+		m_SwapchainAttachmentNames.push_back(name);
 		return *this;
 	}
 
 	inline void* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
 	{
-		uint8_t* map = (uint8_t*)(m_BufferInputs[HashStr(name)]->Map());
-
-		// @todo: stop this hacc
-		LOG(warn, "...");
-		for (uint32_t i = 0; i < m_BufferInputInfos.size(); i++)
-		{
-			LOG(warn, "{} =? {}", m_BufferInputInfos[i].name, name);
-			if (m_BufferInputInfos[i].name == name)
-			{
-				LOG(warn, "{} -> {} + {} * {}", name, (size_t)map, m_BufferInputInfos[i].size, frameIndex);
-				map += m_BufferInputInfos[i].size * frameIndex;
-			}
-		}
-
-		return (void*)map;
+		return m_BufferInputs[HashStr(name)]->MapBlock(frameIndex);
 	}
 
 	inline void UnMapDescriptorBuffer(const char* name)
@@ -209,48 +194,46 @@ private:
 
 	void CreateAttachmentResource(const RenderPassRecipe::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type);
 
+private:
+	vk::Device m_LogicalDevice          = {};
+	vk::PhysicalDevice m_PhysicalDevice = {};
+	vma::Allocator m_Allocator          = {};
+
+	vk::CommandPool m_CommandPool       = {};
+	vk::DescriptorPool m_DescriptorPool = {};
+
+	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties;
+
+	QueueInfo m_QueueInfo = {};
+
 	std::string m_Name = {};
+
+	vk::PipelineLayout m_PipelineLayout             = {};
+	vk::DescriptorSetLayout m_DescriptorSetLayout   = {};
+	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
 
 	std::function<void(const RenderGraph::UpdateData&)> m_UpdateAction = {};
 
 	std::vector<AttachmentResourceContainer> m_AttachmentResources = {};
 
-	std::vector<RenderPassRecipe> m_Recipes = {};
-	std::vector<RenderPass> m_RenderPasses  = {};
-	vk::Extent2D m_SwapchainExtent          = {};
-
-	std::string m_BackbufferResourceName = {};
-	std::vector<std::string> m_BackbufferAttachmentNames;
+	std::vector<RenderPass> m_RenderPasses = {};
 
 	std::vector<vk::Image> m_SwapchainImages         = {};
 	std::vector<vk::ImageView> m_SwapchainImageViews = {};
+	vk::Extent2D m_SwapchainExtent                   = {};
 
-	vk::Format m_ColorFormat;
-	vk::Format m_DepthFormat;
+	std::string m_SwapchainResourceName                 = {};
+	std::vector<std::string> m_SwapchainAttachmentNames = {};
 
-	std::vector<RenderPassRecipe::BufferInputInfo> m_BufferInputInfos;
+	vk::Format m_ColorFormat = {};
+	vk::Format m_DepthFormat = {};
 
-	uint32_t m_MinUniformBufferOffsetAlignment;
+	uint32_t m_MinUniformBufferOffsetAlignment = {};
 
-	uint32_t m_BackbufferResourceIndex;
+	uint32_t m_BackbufferResourceIndex = {};
 
-	////
 	std::unordered_map<uint64_t, Buffer*> m_BufferInputs = {};
 
-	vma::Allocator m_Allocator = {};
-
-	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
-
-	// std::vector<RenderPass::DescriptorInfo> m_DescriptorInfos = {};
-
-	uint32_t m_SwapchainImageCount      = {};
-	vk::DescriptorPool m_DescriptorPool = {};
-
-	vk::PipelineLayout m_PipelineLayout           = {};
-	vk::DescriptorSetLayout m_DescriptorSetLayout = {};
-
-	vk::Device m_LogicalDevice          = {};
-	vk::PhysicalDevice m_PhysicalDevice = {};
-	vk::CommandPool m_CommandPool       = {};
-	QueueInfo m_QueueInfo               = {};
+	std::vector<RenderPassRecipe> m_Recipes = {};
+	std::vector<RenderPassRecipe::BufferInputInfo> m_BufferInputInfos;
 };

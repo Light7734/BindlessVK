@@ -12,7 +12,6 @@ RenderGraph::~RenderGraph()
 
 void RenderGraph::Init(const CreateInfo& info)
 {
-	m_SwapchainImageCount = info.swapchainImageCount;
 	m_SwapchainExtent     = info.swapchainExtent;
 	m_LogicalDevice       = info.logicalDevice;
 	m_DescriptorPool      = info.descriptorPool;
@@ -24,6 +23,8 @@ void RenderGraph::Init(const CreateInfo& info)
 	m_DepthFormat         = info.depthFormat;
 	m_SwapchainImages     = info.swapchainImages;
 	m_SwapchainImageViews = info.swapchainImageViews;
+
+	m_PhysicalDeviceProperties = m_PhysicalDevice.getProperties();
 
 	m_MinUniformBufferOffsetAlignment = m_PhysicalDevice.getProperties().limits.minUniformBufferOffsetAlignment;
 }
@@ -65,13 +66,13 @@ void RenderGraph::ReorderPasses()
 
 		for (const RenderPassRecipe::AttachmentInfo& info : recipe.colorAttachmentInfos)
 		{
-			auto it = std::find(m_BackbufferAttachmentNames.begin(),
-			                    m_BackbufferAttachmentNames.end(),
+			auto it = std::find(m_SwapchainAttachmentNames.begin(),
+			                    m_SwapchainAttachmentNames.end(),
 			                    info.name);
 
-			if (it != m_BackbufferAttachmentNames.end())
+			if (it != m_SwapchainAttachmentNames.end())
 			{
-				m_BackbufferAttachmentNames.push_back(info.input);
+				m_SwapchainAttachmentNames.push_back(info.input);
 			}
 		}
 	}
@@ -89,12 +90,12 @@ void RenderGraph::BuildAttachmentResources()
 			// Write only ( create new image )
 			if (info.input == "")
 			{
-				auto it = std::find(m_BackbufferAttachmentNames.begin(),
-				                    m_BackbufferAttachmentNames.end(),
+				auto it = std::find(m_SwapchainAttachmentNames.begin(),
+				                    m_SwapchainAttachmentNames.end(),
 				                    info.input);
 
 
-				CreateAttachmentResource(info, it != m_BackbufferAttachmentNames.end() ?
+				CreateAttachmentResource(info, it != m_SwapchainAttachmentNames.end() ?
 				                                   AttachmentResourceContainer::Type::ePerImage :
 				                                   AttachmentResourceContainer::Type::eSingle);
 
@@ -163,8 +164,8 @@ void RenderGraph::BuildAttachmentResources()
 			// Write only ( create new image )
 			if (info.input == "")
 			{
-				auto it = std::find(m_BackbufferAttachmentNames.begin(),
-				                    m_BackbufferAttachmentNames.end(),
+				auto it = std::find(m_SwapchainAttachmentNames.begin(),
+				                    m_SwapchainAttachmentNames.end(),
 				                    info.input);
 
 
@@ -248,13 +249,15 @@ void RenderGraph::BuildBufferInputs()
 		LOG(warn, "{} -> {} ({})", old, info.size, m_MinUniformBufferOffsetAlignment);
 
 		BufferCreateInfo bufferCreateInfo {
-			.logicalDevice = m_LogicalDevice,
-			.allocator     = m_Allocator,
-			.commandPool   = m_CommandPool,
-			.graphicsQueue = m_QueueInfo.graphicsQueue,
-			.usage         = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-			                                                                   vk::BufferUsageFlagBits::eStorageBuffer,
-			.size          = info.size * MAX_FRAMES_IN_FLIGHT,
+			.logicalDevice  = m_LogicalDevice,
+			.physicalDevice = m_PhysicalDevice,
+			.allocator      = m_Allocator,
+			.commandPool    = m_CommandPool,
+			.graphicsQueue  = m_QueueInfo.graphicsQueue,
+			.usage          = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
+			                                                                    vk::BufferUsageFlagBits::eStorageBuffer,
+			.minBlockSize   = info.size,
+			.blockCount     = MAX_FRAMES_IN_FLIGHT,
 		};
 
 		m_BufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -270,12 +273,14 @@ void RenderGraph::BuildBufferInputs()
 			info.size = (info.size + m_MinUniformBufferOffsetAlignment - 1) & -m_MinUniformBufferOffsetAlignment;
 			BufferCreateInfo bufferCreateInfo {
 				.logicalDevice = m_LogicalDevice,
+                    .physicalDevice = m_PhysicalDevice,
 				.allocator     = m_Allocator,
 				.commandPool   = m_CommandPool,
 				.graphicsQueue = m_QueueInfo.graphicsQueue,
 				.usage         = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
 				                                                                   vk::BufferUsageFlagBits::eStorageBuffer,
-				.size          = info.size * MAX_FRAMES_IN_FLIGHT,
+				.minBlockSize  = info.size,
+				.blockCount    = MAX_FRAMES_IN_FLIGHT,
 			};
 
 			pass.bufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -578,7 +583,7 @@ void RenderGraph::CreateAttachmentResource(const RenderPassRecipe::AttachmentInf
 	{
 	case AttachmentResourceContainer::Type::ePerImage:
 	{
-		for (uint32_t i = 0; i < m_SwapchainImageCount; i++)
+		for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
 		{
 			resourceContainer.resources.push_back(AttachmentResource {
 			    .srcAccessMask  = {},

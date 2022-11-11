@@ -225,7 +225,8 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .commandPool    = m_CommandPool,
 	    .graphicsQueue  = m_GraphicsQueue,
 	    .usage          = vk::BufferUsageFlagBits::eVertexBuffer,
-	    .size           = vertices.size() * sizeof(Model::Vertex),
+	    .minBlockSize   = vertices.size() * sizeof(Model::Vertex),
+        .blockCount = 1u,
 	    .initialData    = vertices.data(),
 	});
 
@@ -244,7 +245,8 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .commandPool    = m_CommandPool,
 	    .graphicsQueue  = m_GraphicsQueue,
 	    .usage          = vk::BufferUsageFlagBits::eIndexBuffer,
-	    .size           = indices.size() * sizeof(uint32_t),
+	    .minBlockSize   = indices.size() * sizeof(uint32_t),
+	    .blockCount     = 1u,
 	    .initialData    = indices.data(),
 	});
 

@@ -73,18 +73,13 @@ private:
 	void CreateDescriptorPools();
 
 	void CreateSwapchain();
-	void CreateImageViews();
-	void CreateResolveColorImage();
-	void CreateDepthImage();
-	void CreateCommandPool();
 
+	void CreateCommandPool();
 	void InitializeImGui(const DeviceContext& deviceContext, Window* window);
 	void CreateRenderGraph(const DeviceContext& deviceContex);
 
 	void SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd);
 	void PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex);
-
-	void WriteDescriptorSetsDefaultValues();
 
 private:
 	UploadContext m_UploadContext = {};
@@ -133,6 +128,4 @@ private:
 
 	Texture* m_DefaultTexture = {};
 	Texture* m_SkyboxTexture  = {};
-
-	// Descriptor sets
 };

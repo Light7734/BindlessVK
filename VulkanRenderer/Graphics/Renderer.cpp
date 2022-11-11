@@ -25,7 +25,6 @@ struct SceneData
 
 void GraphUpdate(const RenderGraph::UpdateData& data)
 {
-	LOG(warn, "frame_data...");
 	data.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
 		*(CameraData*)data.graph.MapDescriptorBuffer("frame_data", data.frameIndex) = {
 			.projection = cameraComp.GetProjection(),
@@ -35,7 +34,6 @@ void GraphUpdate(const RenderGraph::UpdateData& data)
 		data.graph.UnMapDescriptorBuffer("frame_data");
 	});
 
-	LOG(warn, "scene_data...");
 	data.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
 		SceneData* sceneData = (SceneData*)data.graph.MapDescriptorBuffer("scene_data", data.frameIndex);
 
@@ -53,7 +51,6 @@ void ForwardPassUpdate(const RenderPass::UpdateData& data)
 	const uint32_t frameIndex = data.frameIndex;
 	vk::Device logicalDevice  = data.logicalDevice;
 	Scene* scene              = data.scene;
-
 
 	vk::DescriptorSet* descriptorSet = &renderPass.descriptorSets[frameIndex];
 
@@ -192,7 +189,6 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	m_SampleCount = deviceContext.maxSupportedSampleCount;
 
 	CreateSwapchain();
-	CreateImageViews();
 	CreateCommandPool();
 	InitializeImGui(deviceContext, window);
 	CreateRenderGraph(deviceContext);
@@ -312,10 +308,7 @@ void Renderer::CreateSwapchain()
 
 	m_Swapchain       = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
 	m_SwapchainImages = m_LogicalDevice.getSwapchainImagesKHR(m_Swapchain);
-}
 
-void Renderer::CreateImageViews()
-{
 	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
 	{
 		vk::ImageViewCreateInfo imageViewCreateInfo {
@@ -364,68 +357,6 @@ void Renderer::CreateImageViews()
 		    viewName.c_str(),
 		});
 	}
-}
-
-void Renderer::CreateResolveColorImage()
-{
-}
-
-void Renderer::CreateDepthImage()
-{
-	// Create depth image
-	vk::ImageCreateInfo imageCreateInfo {
-		{},                 // flags
-		vk::ImageType::e2D, // imageType
-		m_DepthFormat,      // format
-
-		/* extent */
-		vk::Extent3D {
-		    m_SurfaceInfo.capabilities.currentExtent.width,  // width
-		    m_SurfaceInfo.capabilities.currentExtent.height, // height
-		    1u,                                              // depth
-		},
-		1u,                                              // mipLevels
-		1u,                                              // arrayLayers
-		m_SampleCount,                                   // samples
-		vk::ImageTiling::eOptimal,                       // tiling
-		vk::ImageUsageFlagBits::eDepthStencilAttachment, // usage
-		vk::SharingMode::eExclusive,                     // sharingMode
-		0u,                                              // queueFamilyIndexCount
-		nullptr,                                         // pQueueFamilyIndices
-		vk::ImageLayout::eUndefined,                     // initialLayout
-	};
-
-	vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-	m_DepthTarget = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
-
-	// Create depth image-view
-	vk::ImageViewCreateInfo imageViewCreateInfo {
-		{},                     // flags
-		m_DepthTarget,          // image
-		vk::ImageViewType::e2D, // viewType
-		m_DepthFormat,          // format
-
-		/* components */
-		vk::ComponentMapping {
-		    // Don't swizzle the colors around...
-		    vk::ComponentSwizzle::eIdentity, // t
-		    vk::ComponentSwizzle::eIdentity, // g
-		    vk::ComponentSwizzle::eIdentity, // b
-		    vk::ComponentSwizzle::eIdentity, // a
-		},
-
-		/* subresourceRange */
-		vk::ImageSubresourceRange {
-		    vk::ImageAspectFlagBits::eDepth, // aspectMask
-		    0u,                              // baseMipLevel
-		    1u,                              // levelCount
-		    0u,                              // baseArrayLayer
-		    1u,                              // layerCount
-		},
-	};
-
-	m_DepthTargetView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
 }
 
 void Renderer::CreateCommandPool()
@@ -553,7 +484,6 @@ void Renderer::CreateRenderGraph(const DeviceContext& deviceContext)
 	    });
 
 	m_RenderGraph.Init({
-	    .swapchainImageCount = static_cast<uint32_t>(m_SwapchainImages.size()),
 	    .swapchainExtent     = m_SurfaceInfo.capabilities.maxImageExtent,
 	    .descriptorPool      = m_DescriptorPool,
 	    .logicalDevice       = deviceContext.logicalDevice,

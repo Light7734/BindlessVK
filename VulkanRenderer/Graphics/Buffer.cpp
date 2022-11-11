@@ -2,15 +2,21 @@
 
 Buffer::Buffer(BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
-    , m_BufferSize(createInfo.size)
     , m_Allocator(createInfo.allocator)
+    , m_BlockCount(createInfo.blockCount)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create buffer and write the initial data to it(if any)
 	{
+		const vk::DeviceSize minAlignment = createInfo.physicalDevice.getProperties().limits.minUniformBufferOffsetAlignment;
+
+		// Round up minBlockSize to be the next multiple of minUniformBufferOffsetAlignment
+		m_BlockSize = (createInfo.minBlockSize + minAlignment - 1) & -minAlignment;
+		m_WholeSize = m_BlockSize * m_BlockCount;
+
 		vk::BufferCreateInfo bufferCreateInfo {
 			{},                          //flags
-			createInfo.size,             // size
+			m_WholeSize,                 // size
 			createInfo.usage,            // usage
 			vk::SharingMode::eExclusive, // sharingMode
 		};
@@ -19,7 +25,7 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
 
 		if (createInfo.initialData)
 		{
-			memcpy(m_Allocator.mapMemory(m_Buffer), createInfo.initialData, static_cast<size_t>(createInfo.size));
+			memcpy(m_Allocator.mapMemory(m_Buffer), createInfo.initialData, static_cast<size_t>(m_WholeSize));
 			m_Allocator.unmapMemory(m_Buffer);
 		}
 	}
@@ -36,9 +42,9 @@ Buffer::~Buffer()
 	m_Allocator.destroyBuffer(m_Buffer, m_Buffer);
 }
 
-void* Buffer::Map()
+void* Buffer::MapBlock(uint32_t blockIndex)
 {
-	return m_Allocator.mapMemory(m_Buffer);
+	return (uint8_t*)m_Allocator.mapMemory(m_Buffer) + (m_BlockSize * blockIndex);
 }
 
 void Buffer::Unmap()
@@ -50,19 +56,22 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
     , m_Allocator(createInfo.allocator)
 {
+	// @todo: Merge 2 buffer classes into 1
+	ASSERT(createInfo.blockCount == 1, "Block count for staging buffers SHOULD be 1 (this will be fixed)");
+
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create buffer & staging buffer, then write the initial data to it(if any)
 	{
 		vk::BufferCreateInfo bufferCreateInfo {
 			{},                                                       //flags
-			createInfo.size,                                          // size
+			createInfo.minBlockSize,                                  // size
 			vk::BufferUsageFlagBits::eTransferDst | createInfo.usage, // usage
 			vk::SharingMode::eExclusive,                              // sharingMode
 		};
 
 		vk::BufferCreateInfo stagingBufferCrateInfo {
 			{},                                    //flags
-			createInfo.size,                       // size
+			createInfo.minBlockSize,               // size
 			vk::BufferUsageFlagBits::eTransferSrc, // usage
 			vk::SharingMode::eExclusive,           // sharingMode
 		};
@@ -73,7 +82,7 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& createInfo)
 		if (createInfo.initialData)
 		{
 			// Copy starting data to staging buffer
-			memcpy(m_Allocator.mapMemory(m_StagingBuffer), createInfo.initialData, static_cast<size_t>(createInfo.size));
+			memcpy(m_Allocator.mapMemory(m_StagingBuffer), createInfo.initialData, static_cast<size_t>(createInfo.minBlockSize ));
 			m_Allocator.unmapMemory(m_StagingBuffer);
 
 			// #TODO: Make simpler by calling an InstantSubmit function
@@ -92,9 +101,9 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& createInfo)
 
 			cmdBuffer.begin(beginInfo);
 			vk::BufferCopy bufferCopy {
-				0u,              // srcOffset
-				0u,              // dstOffset
-				createInfo.size, // size
+				0u,                      // srcOffset
+				0u,                      // dstOffset
+				createInfo.minBlockSize, // size
 			};
 			cmdBuffer.copyBuffer(m_StagingBuffer, m_Buffer, 1u, &bufferCopy);
 			cmdBuffer.end();
