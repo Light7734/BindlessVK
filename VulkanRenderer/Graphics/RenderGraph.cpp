@@ -512,7 +512,6 @@ void RenderGraph::WriteDescriptorSets()
 
 void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type)
 {
-	LOG(trace, "Creating image: {} <- ", info.name, info.input);
 	vk::ImageUsageFlags usage;
 	vk::ImageAspectFlags aspectMask;
 	if (info.format == m_ColorFormat)
@@ -612,7 +611,6 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		};
 
 		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
-		LOG(trace, "69696969");
 		AllocatedImage image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		std::string imageName = info.name + " Image";
@@ -689,7 +687,6 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		};
 
 		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
-		LOG(trace, "ABABABABAB");
 		AllocatedImage image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		std::string imageName = info.name + " TransientMS Image";
@@ -752,6 +749,7 @@ void RenderGraph::Render(RenderContext context)
 
 	// @todo: Setup render barriers
 	const auto cmd = context.cmd;
+	cmd.begin(vk::CommandBufferBeginInfo {});
 
 	cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 	                       m_PipelineLayout,

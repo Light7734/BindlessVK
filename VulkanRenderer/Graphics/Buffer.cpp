@@ -4,6 +4,7 @@ Buffer::Buffer(BufferCreateInfo& createInfo)
     : m_LogicalDevice(createInfo.logicalDevice)
     , m_Allocator(createInfo.allocator)
     , m_BlockCount(createInfo.blockCount)
+    , m_MinBlockSize(createInfo.minBlockSize)
 {
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create buffer and write the initial data to it(if any)

@@ -10,149 +10,12 @@
 #include <filesystem>
 #include <imgui.h>
 
-struct CameraData
-{
-	glm::mat4 projection;
-	glm::mat4 view;
-	glm::vec4 viewPos;
-};
-
-// @todo:
-struct SceneData
-{
-	glm::vec4 lightPos;
-};
-
-void GraphUpdate(const RenderContext& context)
-{
-	context.scene->GetRegistry()->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-		*(CameraData*)context.graph->MapDescriptorBuffer("frame_data", context.frameIndex) = {
-			.projection = cameraComp.GetProjection(),
-			.view       = cameraComp.GetView(transformComp.translation),
-			.viewPos    = glm::vec4(transformComp.translation, 1.0f),
-		};
-		context.graph->UnMapDescriptorBuffer("frame_data");
-	});
-
-	context.scene->GetRegistry()->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
-		SceneData* sceneData = (SceneData*)context.graph->MapDescriptorBuffer("scene_data", context.frameIndex);
-
-		sceneData[0] = {
-			.lightPos = glm::vec4(trasnformComp.translation, 1.0f),
-		};
-		context.graph->UnMapDescriptorBuffer("scene_data");
-	});
-}
-
-void ForwardPassUpdate(const RenderContext& context)
-{
-	vk::DescriptorSet descriptorSet = context.pass->descriptorSets[context.frameIndex];
-
-	// @todo: don't update every frame
-	context.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		for (const auto* node : renderComp.model->nodes)
-		{
-			for (const auto& primitive : node->mesh)
-			{
-				const auto& model    = renderComp.model;
-				const auto& material = model->materialParameters[primitive.materialIndex];
-
-				uint32_t albedoTextureIndex            = material.albedoTextureIndex;
-				uint32_t normalTextureIndex            = material.normalTextureIndex;
-				uint32_t metallicRoughnessTextureIndex = material.metallicRoughnessTextureIndex;
-
-				Texture* albedoTexture            = model->textures[albedoTextureIndex];
-				Texture* normalTexture            = model->textures[normalTextureIndex];
-				Texture* metallicRoughnessTexture = model->textures[metallicRoughnessTextureIndex];
-
-				std::vector<vk::WriteDescriptorSet> descriptorWrites = {
-
-					vk::WriteDescriptorSet {
-					    descriptorSet,
-					    0ul,
-					    albedoTextureIndex,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &albedoTexture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					},
-
-					vk::WriteDescriptorSet {
-					    descriptorSet,
-					    0ul,
-					    metallicRoughnessTextureIndex,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &metallicRoughnessTexture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					},
-
-					vk::WriteDescriptorSet {
-					    descriptorSet,
-					    0ul,
-					    normalTextureIndex,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &normalTexture->descriptorInfo,
-					    nullptr,
-					    nullptr,
-					}
-				};
-
-				context.logicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
-			}
-		}
-	});
-}
-
-void ForwardPassRender(const RenderContext& context)
-{
-	VkDeviceSize offset { 0 };
-	vk::Pipeline currentPipeline = VK_NULL_HANDLE;
-
-	context.scene->GetRegistry()->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		const auto cmd = context.cmd;
-
-		// bind pipeline
-		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
-		if (currentPipeline != newPipeline)
-		{
-			LOG(trace, "Binding pipeline fpass");
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
-			LOG(trace, "Bound pipeline fpass");
-			currentPipeline = newPipeline;
-		}
-		// bind buffers
-		cmd.bindVertexBuffers(0, 1, renderComp.model->vertexBuffer->GetBuffer(), &offset);
-		cmd.bindIndexBuffer(*(renderComp.model->indexBuffer->GetBuffer()), 0u, vk::IndexType::eUint32);
-
-		// draw primitves
-		for (const auto* node : renderComp.model->nodes)
-		{
-			for (const auto& primitive : node->mesh)
-			{
-				uint32_t textureIndex = renderComp.model->materialParameters[primitive.materialIndex].albedoTextureIndex;
-				cmd.drawIndexed(primitive.indexCount, 1ull, primitive.firstIndex, 0ull, textureIndex); // @todo: lol fix this garbage
-			}
-		}
-	});
-}
-
-
 Renderer::Renderer(const Renderer::CreateInfo& info)
     : m_LogicalDevice(info.deviceContext.logicalDevice)
     , m_Allocator(info.deviceContext.allocator)
     , m_DepthFormat(info.deviceContext.depthFormat)
-    , m_DefaultTexture(info.defaultTexture)
-    , m_SkyboxTexture(info.skyboxTexture)
 
 {
-	// Validate create info
-	ASSERT(info.window && info.skyboxTexture && info.defaultTexture,
-	       "Incomplete renderer create info");
-
 	CreateSyncObjects();
 	CreateDescriptorPools();
 	RecreateSwapchainResources(info.window, info.deviceContext);
@@ -185,7 +48,6 @@ void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceCo
 	CreateSwapchain();
 	CreateCommandPool();
 	InitializeImGui(deviceContext, window);
-	CreateRenderGraph(deviceContext);
 
 	m_SwapchainInvalidated = false;
 	m_LogicalDevice.waitIdle();
@@ -214,12 +76,6 @@ void Renderer::DestroySwapchain()
 	{
 		m_LogicalDevice.destroyImageView(imageView);
 	}
-
-	m_LogicalDevice.destroyImageView(m_DepthTargetView);
-	m_LogicalDevice.destroyImageView(m_ColorTargetView);
-
-	m_Allocator.destroyImage(m_DepthTarget, m_DepthTarget);
-	m_Allocator.destroyImage(m_ColorTarget, m_ColorTarget);
 
 	m_LogicalDevice.destroySwapchainKHR(m_Swapchain);
 };
@@ -415,76 +271,8 @@ void Renderer::InitializeImGui(const DeviceContext& deviceContext, Window* windo
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void Renderer::CreateRenderGraph(const DeviceContext& deviceContext)
+void Renderer::BuildRenderGraph(const DeviceContext& deviceContext, RenderGraph::BuildInfo buildInfo)
 {
-	RenderPass::CreateInfo forwardPassCreateInfo {
-		.name         = "forwardpass",
-		.renderAction = &ForwardPassRender,
-		.updateAction = &ForwardPassUpdate,
-
-		.colorAttachmentInfos = {
-		    RenderPass::CreateInfo::AttachmentInfo {
-		        .name       = "forwardpass",
-		        .size       = { 1.0, 1.0 },
-		        .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
-		        .format     = m_SurfaceInfo.format.format,
-		        .samples    = m_SampleCount,
-		        .clearValue = vk::ClearValue {
-		            vk::ClearColorValue { std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
-		        },
-		    },
-		},
-
-		.depthStencilAttachmentInfo = RenderPass::CreateInfo::AttachmentInfo {
-		    .name       = "forward_depth",
-		    .size       = { 1.0, 1.0 },
-		    .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
-		    .format     = m_DepthFormat,
-		    .samples    = m_SampleCount,
-		    .clearValue = vk::ClearValue {
-		        vk::ClearDepthStencilValue { 1.0, 0 },
-		    },
-		},
-
-		.textureInputInfos = {
-		    RenderPass::CreateInfo::TextureInputInfo {
-		        .name           = "texture_2ds",
-		        .binding        = 0,
-		        .count          = 32,
-		        .type           = vk::DescriptorType::eCombinedImageSampler,
-		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-		        .defaultTexture = m_DefaultTexture,
-		    },
-		    RenderPass::CreateInfo::TextureInputInfo {
-		        .name           = "texture_cubes",
-		        .binding        = 1,
-		        .count          = 8u,
-		        .type           = vk::DescriptorType::eCombinedImageSampler,
-		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-		        .defaultTexture = m_SkyboxTexture,
-		    },
-		},
-	};
-
-	RenderPass::CreateInfo uiPassCreateInfo {
-		.name         = "ui",
-		.renderAction = [](const RenderContext& context) {
-		    ImGui::Render();
-		    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), context.cmd); },
-
-		.updateAction         = [](const RenderContext& context) {},
-		.colorAttachmentInfos = {
-		    RenderPass::CreateInfo::AttachmentInfo {
-		        .name     = "backbuffer",
-		        .size     = { 1.0, 1.0 },
-		        .sizeType = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
-		        .format   = m_SurfaceInfo.format.format,
-		        .samples  = m_SampleCount,
-		        .input    = "forwardpass",
-		    },
-		},
-	};
-
 	m_RenderGraph.Init({
 	    .swapchainExtent     = m_SurfaceInfo.capabilities.maxImageExtent,
 	    .descriptorPool      = m_DescriptorPool,
@@ -499,36 +287,7 @@ void Renderer::CreateRenderGraph(const DeviceContext& deviceContext)
 	    .swapchainImageViews = m_SwapchainImageViews,
 	});
 
-	m_RenderGraph.Build({
-	    .backbufferName = "backbuffer",
-	    .bufferInputs   = {
-	         RenderPass::CreateInfo::BufferInputInfo {
-	              .name      = "frame_data",
-	              .binding   = 0,
-	              .count     = 1,
-	              .type      = vk::DescriptorType::eUniformBuffer,
-	              .stageMask = vk::ShaderStageFlagBits::eVertex,
-
-	              .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
-	              .initialData = nullptr,
-            },
-	          RenderPass::CreateInfo::BufferInputInfo {
-	              .name      = "scene_data",
-	              .binding   = 1,
-	              .count     = 1,
-	              .type      = vk::DescriptorType::eUniformBuffer,
-	              .stageMask = vk::ShaderStageFlagBits::eVertex,
-
-	              .size        = sizeof(glm::vec4),
-	              .initialData = nullptr,
-            },
-        },
-	    .renderPasses = {
-	        forwardPassCreateInfo,
-	        uiPassCreateInfo,
-	    },
-	    .updateAction = &GraphUpdate,
-	});
+	m_RenderGraph.Build(buildInfo);
 }
 
 void Renderer::BeginFrame()
@@ -562,11 +321,11 @@ void Renderer::DrawScene(Scene* scene)
 		ASSERT(result == vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
 	}
 
+	static uint32_t counter = 0u;
+
 	auto cmd = m_CommandBuffers[m_CurrentFrame];
-	cmd.reset();
 
-	cmd.begin(vk::CommandBufferBeginInfo {});
-
+	LOG(trace, "{}--", counter);
 	m_RenderGraph.Render({
 	    .graph = &m_RenderGraph,
 	    .pass  = nullptr,
@@ -578,17 +337,22 @@ void Renderer::DrawScene(Scene* scene)
 	    .imageIndex = imageIndex,
 	    .frameIndex = m_CurrentFrame,
 	});
+	LOG(trace, "D");
 
-	cmd.end();
+	counter++;
 
 	SubmitQueue(m_RenderSemaphores[m_CurrentFrame], m_PresentSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
+	LOG(trace, "E");
 	PresentFrame(m_PresentSemaphores[m_CurrentFrame], imageIndex);
+	LOG(trace, "F: {} - {}", m_CurrentFrame, imageIndex);
 
 	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Renderer::SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd)
 {
+	cmd.end();
+
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submitInfo {
 		1u,               // waitSemaphoreCount

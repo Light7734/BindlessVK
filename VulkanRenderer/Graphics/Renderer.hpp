@@ -35,8 +35,6 @@ public:
 	{
 		DeviceContext deviceContext;
 		Window* window;
-		Texture* defaultTexture;
-		Texture* skyboxTexture;
 	};
 
 public:
@@ -49,6 +47,8 @@ public:
 	void BeginFrame();
 	void Draw();
 	void DrawScene(class Scene* scene);
+
+	void BuildRenderGraph(const DeviceContext& deviceContex, RenderGraph::BuildInfo buildInfo);
 
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
@@ -76,7 +76,6 @@ private:
 
 	void CreateCommandPool();
 	void InitializeImGui(const DeviceContext& deviceContext, Window* window);
-	void CreateRenderGraph(const DeviceContext& deviceContex);
 
 	void SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd);
 	void PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex);
@@ -90,7 +89,7 @@ private:
 
 	vma::Allocator m_Allocator = {};
 
-	RenderGraph m_RenderGraph;
+	RenderGraph m_RenderGraph = {};
 
 	// Sync objects
 	std::array<vk::Fence, MAX_FRAMES_IN_FLIGHT> m_RenderFences          = {};
@@ -105,17 +104,6 @@ private:
 	std::vector<vk::Image> m_SwapchainImages         = {};
 	std::vector<vk::ImageView> m_SwapchainImageViews = {};
 
-
-	RenderPass m_ForwardPass;
-	RenderPass m_UIPass;
-
-	// Render Targets
-	AllocatedImage m_ColorTarget    = {};
-	vk::ImageView m_ColorTargetView = {};
-
-	AllocatedImage m_DepthTarget    = {};
-	vk::ImageView m_DepthTargetView = {};
-
 	vk::SampleCountFlagBits m_SampleCount = vk::SampleCountFlagBits::e1;
 
 	// Pools
@@ -125,7 +113,4 @@ private:
 	std::vector<vk::CommandBuffer> m_CommandBuffers = {};
 
 	uint32_t m_CurrentFrame = 0ul;
-
-	Texture* m_DefaultTexture = {};
-	Texture* m_SkyboxTexture  = {};
 };

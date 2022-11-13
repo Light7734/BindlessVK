@@ -43,9 +43,9 @@ public:
 		return m_WholeSize;
 	}
 
-	inline vk::DeviceSize GetBlockStride() const
+	inline vk::DeviceSize GetValidBlockSize() const
 	{
-		return m_Stride;
+		return m_MinBlockSize;
 	}
 
 	void* MapBlock(uint32_t blockIndex);
@@ -62,9 +62,9 @@ private:
 
 	uint32_t m_BlockCount = {};
 
-	vk::DeviceSize m_BlockSize = {};
-	vk::DeviceSize m_WholeSize = {};
-	vk::DeviceSize m_Stride    = {};
+	vk::DeviceSize m_BlockSize    = {};
+	vk::DeviceSize m_WholeSize    = {};
+	vk::DeviceSize m_MinBlockSize = {};
 };
 
 // @todo: Merge 2 buffer classes into 1

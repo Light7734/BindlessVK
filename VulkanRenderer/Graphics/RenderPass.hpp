@@ -77,8 +77,8 @@ struct RenderPass
 
 		std::string name;
 
-		std::function<void(const RenderContext& context)> renderAction;
 		std::function<void(const RenderContext& context)> updateAction;
+		std::function<void(const RenderContext& context)> renderAction;
 
 		std::vector<CreateInfo::AttachmentInfo> colorAttachmentInfos;
 		CreateInfo::AttachmentInfo depthStencilAttachmentInfo;

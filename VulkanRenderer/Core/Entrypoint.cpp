@@ -3,6 +3,9 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
+#include "Graphics/Passes/ForwardPass.hpp"
+#include "Graphics/Passes/Graph.hpp"
+#include "Graphics/Passes/UserInterfacePass.hpp"
 #include "Graphics/RenderGraph.hpp"
 #include "Graphics/RenderPass.hpp"
 #include "Scene/CameraController.hpp"
@@ -461,6 +464,115 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	scene.AddComponent<LightComponent>(light, 12);
 }
 
+void CreateRenderGraph(Renderer& renderer, TextureSystem& textureSystem, const DeviceContext& deviceContext)
+{
+	vk::Format colorFormat              = deviceContext.surfaceInfo.format.format;
+	vk::Format deppthFormat             = deviceContext.depthFormat;
+	vk::SampleCountFlagBits sampleCount = deviceContext.maxSupportedSampleCount;
+
+	Texture* defaultTexture     = textureSystem.GetTexture("default");
+	Texture* defaultTextureCube = textureSystem.GetTexture("default_cube");
+
+	RenderPass::CreateInfo forwardPassCreateInfo {
+		.name         = "forwardpass",
+		.updateAction = &ForwardPassUpdate,
+		.renderAction = &ForwardPassRender,
+
+		.colorAttachmentInfos = {
+		    RenderPass::CreateInfo::AttachmentInfo {
+		        .name       = "forwardpass",
+		        .size       = { 1.0, 1.0 },
+		        .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		        .format     = colorFormat,
+		        .samples    = sampleCount,
+		        .clearValue = vk::ClearValue {
+		            vk::ClearColorValue { std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
+		        },
+		    },
+		},
+
+		.depthStencilAttachmentInfo = RenderPass::CreateInfo::AttachmentInfo {
+		    .name       = "forward_depth",
+		    .size       = { 1.0, 1.0 },
+		    .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		    .format     = deppthFormat,
+		    .samples    = sampleCount,
+		    .clearValue = vk::ClearValue {
+		        vk::ClearDepthStencilValue { 1.0, 0 },
+		    },
+		},
+
+		.textureInputInfos = {
+		    RenderPass::CreateInfo::TextureInputInfo {
+		        .name           = "texture_2ds",
+		        .binding        = 0,
+		        .count          = 32,
+		        .type           = vk::DescriptorType::eCombinedImageSampler,
+		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+		        .defaultTexture = defaultTexture,
+		    },
+		    RenderPass::CreateInfo::TextureInputInfo {
+		        .name           = "texture_cubes",
+		        .binding        = 1,
+		        .count          = 8u,
+		        .type           = vk::DescriptorType::eCombinedImageSampler,
+		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+		        .defaultTexture = defaultTextureCube,
+		    },
+		},
+	};
+
+	RenderPass::CreateInfo uiPassCreateInfo {
+		.name         = "ui",
+		.updateAction = &UserInterfacePassUpdate,
+		.renderAction = &UserInterfacePassRender,
+
+		.colorAttachmentInfos = {
+		    RenderPass::CreateInfo::AttachmentInfo {
+		        .name     = "backbuffer",
+		        .size     = { 1.0, 1.0 },
+		        .sizeType = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		        .format   = colorFormat,
+		        .samples  = sampleCount,
+		        .input    = "forwardpass",
+		    },
+		},
+	};
+
+	renderer.BuildRenderGraph(
+	    deviceContext,
+	    {
+	        .backbufferName = "backbuffer",
+	        .bufferInputs   = {
+	              RenderPass::CreateInfo::BufferInputInfo {
+	                  .name      = "frame_data",
+	                  .binding   = 0,
+	                  .count     = 1,
+	                  .type      = vk::DescriptorType::eUniformBuffer,
+	                  .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	                  .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+	                  .initialData = nullptr,
+                },
+	              RenderPass::CreateInfo::BufferInputInfo {
+	                  .name      = "scene_data",
+	                  .binding   = 1,
+	                  .count     = 1,
+	                  .type      = vk::DescriptorType::eUniformBuffer,
+	                  .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	                  .size        = sizeof(glm::vec4),
+	                  .initialData = nullptr,
+                },
+            },
+	        .renderPasses = {
+	            forwardPassCreateInfo,
+	            uiPassCreateInfo,
+	        },
+	        .updateAction = &RenderGraphUpdate,
+	    });
+}
+
 int main()
 {
 	Logger::Init();
@@ -518,17 +630,15 @@ int main()
 
 
 		textureSystem.CreateFromKTX({
-		    "skybox",
+		    "default_cube",
 		    "Assets/cubemap_yokohama_rgba.ktx",
 		    Texture::Type::eCubeMap,
 		});
 
 		// Renderer
 		Renderer renderer({
-		    .deviceContext  = deviceContext,
-		    .window         = &window,
-		    .defaultTexture = textureSystem.GetTexture("default"),
-		    .skyboxTexture  = textureSystem.GetTexture("skybox"),
+		    .deviceContext = deviceContext,
+		    .window        = &window,
 		});
 
 		// MaterialSystem
@@ -556,6 +666,8 @@ int main()
 
 		LoadModels(modelSystem, textureSystem);
 		LoadEntities(scene, materialSystem, modelSystem);
+
+		CreateRenderGraph(renderer, textureSystem, deviceContext);
 
 		CameraController camera({
 		    .scene  = &scene,

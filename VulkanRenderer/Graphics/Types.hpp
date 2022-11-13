@@ -47,6 +47,7 @@ struct AllocatedBuffer
 	inline operator vk::Buffer() { return buffer; }
 	inline operator vma::Allocation() { return allocation; }
 
+
 	vk::Buffer buffer          = {};
 	vma::Allocation allocation = {};
 };
