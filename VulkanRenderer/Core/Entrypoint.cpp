@@ -3,7 +3,12 @@
 #include "Core/Base.hpp"
 #include "Core/Window.hpp"
 #include "Graphics/Device.hpp"
-#include "Scene/Camera.hpp"
+#include "Graphics/Passes/ForwardPass.hpp"
+#include "Graphics/Passes/Graph.hpp"
+#include "Graphics/Passes/UserInterfacePass.hpp"
+#include "Graphics/RenderGraph.hpp"
+#include "Graphics/RenderPass.hpp"
+#include "Scene/CameraController.hpp"
 // #include "Graphics/Pipeline.hpp"
 #include "Graphics/Renderer.hpp"
 // #include "Graphics/Shader.hpp"
@@ -433,6 +438,139 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	                                                materialSystem.GetMaterial("skybox"), // Material
 	                                                modelSystem.GetModel("skybox")        // Mesh
 	);
+
+	Entity light = scene.CreateEntity();
+	scene.AddComponent<TransformComponent>(light,
+	                                       glm::vec3(2.0f, 2.0f, 1.0f), // Translation
+	                                       glm::vec3(1.0f),             // Scale
+	                                       glm::vec3(0.0f, 0.0, 0.0)    // Rotation
+	);
+
+	Entity camera = scene.CreateEntity();
+	scene.AddComponent<TransformComponent>(camera,
+	                                       glm::vec3(6.0, 7.0, 2.5),
+	                                       glm::vec3(1.0),
+	                                       glm::vec3(0.0f, 0.0, 0.0));
+	scene.AddComponent<CameraComponent>(camera,
+	                                    45.0f,
+	                                    5.0, 1.0,
+	                                    0.001f, 100.0f,
+	                                    225.0, 0.0,
+	                                    glm::vec3(0.0f, 0.0f, -1.0f),
+	                                    glm::vec3(0.0f, -1.0f, 0.0f),
+	                                    10.0f);
+
+
+	scene.AddComponent<LightComponent>(light, 12);
+}
+
+void CreateRenderGraph(Renderer& renderer, TextureSystem& textureSystem, const DeviceContext& deviceContext)
+{
+	vk::Format colorFormat              = deviceContext.surfaceInfo.format.format;
+	vk::Format deppthFormat             = deviceContext.depthFormat;
+	vk::SampleCountFlagBits sampleCount = deviceContext.maxSupportedSampleCount;
+
+	Texture* defaultTexture     = textureSystem.GetTexture("default");
+	Texture* defaultTextureCube = textureSystem.GetTexture("default_cube");
+
+	RenderPass::CreateInfo forwardPassCreateInfo {
+		.name         = "forwardpass",
+		.updateAction = &ForwardPassUpdate,
+		.renderAction = &ForwardPassRender,
+
+		.colorAttachmentInfos = {
+		    RenderPass::CreateInfo::AttachmentInfo {
+		        .name       = "forwardpass",
+		        .size       = { 1.0, 1.0 },
+		        .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		        .format     = colorFormat,
+		        .samples    = sampleCount,
+		        .clearValue = vk::ClearValue {
+		            vk::ClearColorValue { std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
+		        },
+		    },
+		},
+
+		.depthStencilAttachmentInfo = RenderPass::CreateInfo::AttachmentInfo {
+		    .name       = "forward_depth",
+		    .size       = { 1.0, 1.0 },
+		    .sizeType   = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		    .format     = deppthFormat,
+		    .samples    = sampleCount,
+		    .clearValue = vk::ClearValue {
+		        vk::ClearDepthStencilValue { 1.0, 0 },
+		    },
+		},
+
+		.textureInputInfos = {
+		    RenderPass::CreateInfo::TextureInputInfo {
+		        .name           = "texture_2ds",
+		        .binding        = 0,
+		        .count          = 32,
+		        .type           = vk::DescriptorType::eCombinedImageSampler,
+		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+		        .defaultTexture = defaultTexture,
+		    },
+		    RenderPass::CreateInfo::TextureInputInfo {
+		        .name           = "texture_cubes",
+		        .binding        = 1,
+		        .count          = 8u,
+		        .type           = vk::DescriptorType::eCombinedImageSampler,
+		        .stageMask      = vk::ShaderStageFlagBits::eFragment,
+		        .defaultTexture = defaultTextureCube,
+		    },
+		},
+	};
+
+	RenderPass::CreateInfo uiPassCreateInfo {
+		.name         = "ui",
+		.updateAction = &UserInterfacePassUpdate,
+		.renderAction = &UserInterfacePassRender,
+
+		.colorAttachmentInfos = {
+		    RenderPass::CreateInfo::AttachmentInfo {
+		        .name     = "backbuffer",
+		        .size     = { 1.0, 1.0 },
+		        .sizeType = RenderPass::CreateInfo::SizeType::eSwapchainRelative,
+		        .format   = colorFormat,
+		        .samples  = sampleCount,
+		        .input    = "forwardpass",
+		    },
+		},
+	};
+
+	renderer.BuildRenderGraph(
+	    deviceContext,
+	    {
+	        .backbufferName = "backbuffer",
+	        .bufferInputs   = {
+	              RenderPass::CreateInfo::BufferInputInfo {
+	                  .name      = "frame_data",
+	                  .binding   = 0,
+	                  .count     = 1,
+	                  .type      = vk::DescriptorType::eUniformBuffer,
+	                  .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	                  .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+	                  .initialData = nullptr,
+                },
+	              RenderPass::CreateInfo::BufferInputInfo {
+	                  .name      = "scene_data",
+	                  .binding   = 1,
+	                  .count     = 1,
+	                  .type      = vk::DescriptorType::eUniformBuffer,
+	                  .stageMask = vk::ShaderStageFlagBits::eVertex,
+
+	                  .size        = sizeof(glm::vec4),
+	                  .initialData = nullptr,
+                },
+            },
+	        .renderPasses = {
+	            forwardPassCreateInfo,
+	            uiPassCreateInfo,
+	        },
+	        .updateAction = &RenderGraphUpdate,
+	    });
 }
 
 int main()
@@ -492,17 +630,15 @@ int main()
 
 
 		textureSystem.CreateFromKTX({
-		    "skybox",
+		    "default_cube",
 		    "Assets/cubemap_yokohama_rgba.ktx",
 		    Texture::Type::eCubeMap,
 		});
 
 		// Renderer
 		Renderer renderer({
-		    .deviceContext  = deviceContext,
-		    .window         = &window,
-		    .defaultTexture = textureSystem.GetTexture("default"),
-		    .skyboxTexture  = textureSystem.GetTexture("skybox"),
+		    .deviceContext = deviceContext,
+		    .window        = &window,
 		});
 
 		// MaterialSystem
@@ -520,16 +656,6 @@ int main()
 
 		// Scene
 		Scene scene;
-		Camera camera({
-		    .position  = { 2.0f, 2.0f, 0.5f },
-		    .speed     = 1.0f,
-		    .nearPlane = 0.001f,
-		    .farPlane  = 100.0f,
-		    .width     = 5.0f,
-		    .height    = 5.0f,
-		    .window    = &window,
-		});
-
 		/////////////////////////////////////////////////////////////////////////////////
 		/// Load assets
 		LoadShaders(materialSystem);
@@ -540,6 +666,14 @@ int main()
 
 		LoadModels(modelSystem, textureSystem);
 		LoadEntities(scene, materialSystem, modelSystem);
+
+		CreateRenderGraph(renderer, textureSystem, deviceContext);
+
+		CameraController camera({
+		    .scene  = &scene,
+		    .window = &window,
+		});
+
 
 		/////////////////////////////////////////////////////////////////////////////////
 		/// Main application loop
@@ -553,7 +687,7 @@ int main()
 			camera.Update();
 
 			renderer.BeginFrame();
-			renderer.DrawScene(&scene, camera);
+			renderer.DrawScene(&scene);
 
 			if (renderer.IsSwapchainInvalidated())
 			{

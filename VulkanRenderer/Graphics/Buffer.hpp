@@ -13,7 +13,10 @@ struct BufferCreateInfo
 	vk::CommandPool commandPool;
 	vk::Queue graphicsQueue;
 	vk::BufferUsageFlags usage;
-	vk::DeviceSize size;
+
+	vk::DeviceSize minBlockSize;
+	uint32_t blockCount;
+
 	const void* initialData = {};
 };
 
@@ -25,18 +28,46 @@ public:
 
 	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
 
-	void* Map();
+	inline vk::DescriptorBufferInfo* GetDescriptorInfo()
+	{
+		return &m_DescriptorInfo;
+	}
+
+	inline vk::DeviceSize GetBlockSize() const
+	{
+		return m_BlockSize;
+	}
+
+	inline vk::DeviceSize GetWholeSize() const
+	{
+		return m_WholeSize;
+	}
+
+	inline vk::DeviceSize GetValidBlockSize() const
+	{
+		return m_MinBlockSize;
+	}
+
+	void* MapBlock(uint32_t blockIndex);
+
 	void Unmap();
 
 private:
+	vk::DescriptorBufferInfo m_DescriptorInfo;
 	vk::Device m_LogicalDevice = {};
 
 	vma::Allocator m_Allocator = {};
 
-	AllocatedBuffer m_Buffer    = {};
-	vk::DeviceSize m_BufferSize = {};
+	AllocatedBuffer m_Buffer = {};
+
+	uint32_t m_BlockCount = {};
+
+	vk::DeviceSize m_BlockSize    = {};
+	vk::DeviceSize m_WholeSize    = {};
+	vk::DeviceSize m_MinBlockSize = {};
 };
 
+// @todo: Merge 2 buffer classes into 1
 class StagingBuffer
 {
 public:

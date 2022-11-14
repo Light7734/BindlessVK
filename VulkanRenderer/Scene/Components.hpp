@@ -19,7 +19,9 @@ struct TransformComponent
 
 	TransformComponent(const TransformComponent&) = default;
 
-	TransformComponent(const glm::vec3& _translation, const glm::vec3& _scale = glm::vec3(1.0), const glm::vec3& _rotation = glm::vec3(0.0f))
+	TransformComponent(const glm::vec3& _translation,
+	                   const glm::vec3& _scale    = glm::vec3(1.0),
+	                   const glm::vec3& _rotation = glm::vec3(0.0f))
 	    : translation(_translation)
 	    , scale(_scale)
 	    , rotation(_rotation)
@@ -50,4 +52,64 @@ struct StaticMeshRendererComponent
 
 	Material* material;
 	Model* model;
+};
+
+struct CameraComponent
+{
+	CameraComponent(const CameraComponent&) = default;
+	CameraComponent(float fov,
+	                float width, float aspectRatio,
+	                float nearPlane, float farPlane,
+	                double yaw, double pitch,
+	                glm::vec3 front, glm::vec3 up,
+	                float speed)
+
+	    : fov(fov)
+	    , width(width)
+	    , aspectRatio(aspectRatio)
+	    , nearPlane(nearPlane)
+	    , farPlane(farPlane)
+	    , yaw(yaw)
+	    , pitch(pitch)
+	    , front(front)
+	    , up(up)
+        , speed(speed)
+
+	{
+	}
+
+	glm::mat4 GetProjection()
+	{
+		return glm::perspective(fov, aspectRatio, nearPlane, farPlane);
+	}
+
+	glm::mat4 GetView(const glm::vec3& position)
+	{
+		return glm::lookAt(position, position + front, up);
+	}
+
+	float fov;
+
+	float width;
+	float aspectRatio;
+
+	float nearPlane;
+	float farPlane;
+
+	double yaw;
+	double pitch;
+
+	glm::vec3 front;
+	glm::vec3 up;
+
+	float speed;
+};
+
+// @todo:
+struct LightComponent
+{
+	LightComponent(const LightComponent&) = default;
+	LightComponent(uint32_t b)
+	    : a(b) {}
+	uint32_t a;
 };

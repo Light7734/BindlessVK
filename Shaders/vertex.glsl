@@ -18,9 +18,12 @@ layout(location = 7) out mat3 outTBN;
 layout(std140, set = 0, binding = 0) uniform FrameData {
     mat4 projection;
     mat4 view;
-    vec4 lightPos;
     vec4 viewPos;
 } U_FrameData;
+
+layout(std140, set = 0, binding = 1) uniform SceneData {
+    vec4 lightPos;
+} U_SceneData;
 
 
 void main() 
@@ -39,7 +42,7 @@ void main()
 
     outNormal = mat3(U_FrameData.view) * inNormal;
 
-    outLightVec = U_FrameData.lightPos.xyz;
+    outLightVec = U_SceneData.lightPos.xyz;
     outViewVec = U_FrameData.viewPos.xyz;
 
     outTexIndex = gl_InstanceIndex;

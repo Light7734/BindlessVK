@@ -53,7 +53,7 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 			       "Material doesn't have required values");
 
 			model.materialParameters.push_back({
-			    .albedoFactor = glm::vec4(1.0),
+			    .albedoFactor       = glm::vec4(1.0),
 			    .albedoTextureIndex = material.values["baseColorTexture"].TextureIndex(),
 			});
 		}
@@ -225,9 +225,18 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .commandPool    = m_CommandPool,
 	    .graphicsQueue  = m_GraphicsQueue,
 	    .usage          = vk::BufferUsageFlagBits::eVertexBuffer,
-	    .size           = vertices.size() * sizeof(Model::Vertex),
+	    .minBlockSize   = vertices.size() * sizeof(Model::Vertex),
+	    .blockCount     = 1u,
 	    .initialData    = vertices.data(),
 	});
+
+	std::string vertexBufferName(std::string(info.name) + " VertexBuffer");
+	m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    vk::ObjectType::eBuffer,
+	    (uint64_t)(VkBuffer)(*model.vertexBuffer->GetBuffer()),
+	    vertexBufferName.c_str(),
+	});
+
 
 	model.indexBuffer = new StagingBuffer({
 	    .logicalDevice  = m_LogicalDevice,
@@ -236,8 +245,16 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    .commandPool    = m_CommandPool,
 	    .graphicsQueue  = m_GraphicsQueue,
 	    .usage          = vk::BufferUsageFlagBits::eIndexBuffer,
-	    .size           = indices.size() * sizeof(uint32_t),
+	    .minBlockSize   = indices.size() * sizeof(uint32_t),
+	    .blockCount     = 1u,
 	    .initialData    = indices.data(),
+	});
+
+	std::string indexBufferName(std::string(info.name) + " IndexBuffer");
+	m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    vk::ObjectType::eBuffer,
+	    (uint64_t)(VkBuffer)(*model.indexBuffer->GetBuffer()),
+	    indexBufferName.c_str(),
 	});
 }
 
