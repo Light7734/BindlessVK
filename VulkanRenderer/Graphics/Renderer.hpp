@@ -33,7 +33,7 @@ class Renderer
 public:
 	struct CreateInfo
 	{
-		DeviceContext deviceContext;
+		Device* device;
 		Window* window;
 	};
 
@@ -41,19 +41,16 @@ public:
 	Renderer(const Renderer::CreateInfo& createInfo);
 	~Renderer();
 
-	void RecreateSwapchainResources(Window* window, DeviceContext context);
+	void RecreateSwapchainResources(Window* window);
 	void DestroySwapchain();
 
 	void BeginFrame();
 	void Draw();
 	void DrawScene(class Scene* scene);
 
-	void BuildRenderGraph(const DeviceContext& deviceContex, RenderGraph::BuildInfo buildInfo);
-
+	void BuildRenderGraph(RenderGraph::BuildInfo buildInfo);
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
-
-	inline QueueInfo GetQueueInfo() const { return m_QueueInfo; }
 
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
 	inline uint32_t GetImageCount() const { return m_SwapchainImages.size(); }
@@ -75,20 +72,15 @@ private:
 	void CreateSwapchain();
 
 	void CreateCommandPool();
-	void InitializeImGui(const DeviceContext& deviceContext, Window* window);
+	void InitializeImGui(Window* window);
 
 	void SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd);
 	void PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex);
 
 private:
 	UploadContext m_UploadContext = {};
-	vk::Device m_LogicalDevice    = {};
-	QueueInfo m_QueueInfo         = {};
-	SurfaceInfo m_SurfaceInfo     = {};
-	vk::Format m_DepthFormat      = {};
 
-	vma::Allocator m_Allocator = {};
-
+	Device* m_Device          = {};
 	RenderGraph m_RenderGraph = {};
 
 	// Sync objects

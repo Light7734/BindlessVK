@@ -106,42 +106,46 @@ VkBool32 VulkanDebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messa
 	return static_cast<VkBool32>(VK_FALSE);
 }
 
-Device::Device(const Device::CreateInfo& info)
-    : m_Layers(info.layers)
-    , m_InstanceExtensions(info.instanceExtensions)
-    , m_LogicalDeviceExtensions(info.logicalDeviceExtensions)
+DeviceSystem::DeviceSystem(const Device::CreateInfo& info)
+    : m_Device({})
 {
+	m_Device.layers             = info.layers;
+	m_Device.instanceExtensions = info.instanceExtensions;
+	m_Device.deviceExtensions   = info.deviceExtensions;
+
+
 	// Initialize default dispatcher
-	m_VkGetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_VkGetInstanceProcAddr);
+	m_Device.vkGetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Device.vkGetInstanceProcAddr);
 
 	CheckLayerSupport();
 	CreateVulkanInstance(info);
 	PickPhysicalDevice();
 	CreateLogicalDevice();
 	CreateAllocator();
+	FetchSurfaceInfo();
 }
 
-Device::~Device()
+DeviceSystem::~DeviceSystem()
 {
-	m_LogicalDevice.waitIdle();
-	m_Allocator.destroy();
+	m_Device.logical.waitIdle();
+	m_Device.allocator.destroy();
 
-	m_LogicalDevice.destroy(nullptr);
+	m_Device.logical.destroy(nullptr);
 
-	m_Instance.destroySurfaceKHR(m_SurfaceInfo.surface, nullptr);
+	m_Device.instance.destroySurfaceKHR(m_Device.surface, nullptr);
 
-	m_Instance.destroyDebugUtilsMessengerEXT(m_DebugUtilMessenger);
-	m_Instance.destroy();
+	m_Device.instance.destroyDebugUtilsMessengerEXT(m_DebugUtilMessenger);
+	m_Device.instance.destroy();
 }
 
-void Device::CheckLayerSupport()
+void DeviceSystem::CheckLayerSupport()
 {
 	std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
 	ASSERT(!availableLayers.empty(), "No instance layer found");
 
 	// Check if we support all the required layers
-	for (const char* requiredLayerName : m_Layers)
+	for (const char* requiredLayerName : m_Device.layers)
 	{
 		bool layerFound = false;
 
@@ -158,7 +162,7 @@ void Device::CheckLayerSupport()
 	}
 }
 
-void Device::CreateVulkanInstance(const Device::CreateInfo& info)
+void DeviceSystem::CreateVulkanInstance(const Device::CreateInfo& info)
 {
 	vk::ApplicationInfo applicationInfo {
 		"BindlessVK",             // pApplicationName
@@ -180,38 +184,38 @@ void Device::CreateVulkanInstance(const Device::CreateInfo& info)
 	// If debugging is not enabled, remove validation layer from instance layers
 	if (!info.enableDebugging)
 	{
-		auto validationLayerIt = std::find(m_Layers.begin(), m_Layers.end(), "VK_LAYER_KHRONOS_validation");
-		if (validationLayerIt != m_Layers.end())
+		auto validationLayerIt = std::find(m_Device.layers.begin(), m_Device.layers.end(), "VK_LAYER_KHRONOS_validation");
+		if (validationLayerIt != m_Device.layers.end())
 		{
-			m_Layers.erase(validationLayerIt);
+			m_Device.layers.erase(validationLayerIt);
 		}
 	}
 
 	// Create the vulkan instance
 	std::vector<const char*> windowExtensions = info.window->GetRequiredExtensions();
-	m_InstanceExtensions.insert(m_InstanceExtensions.end(), windowExtensions.begin(), windowExtensions.end());
+	m_Device.instanceExtensions.insert(m_Device.instanceExtensions.end(), windowExtensions.begin(), windowExtensions.end());
 
 	vk::InstanceCreateInfo instanceCreateInfo {
-		{},                                                 // flags
-		&applicationInfo,                                   // pApplicationInfo
-		static_cast<uint32_t>(m_Layers.size()),             // enabledLayerCount
-		m_Layers.data(),                                    // ppEnabledLayerNames
-		static_cast<uint32_t>(m_InstanceExtensions.size()), // enabledExtensionCount
-		m_InstanceExtensions.data(),                        // ppEnabledExtensionNames
+		{},                                                        // flags
+		&applicationInfo,                                          // pApplicationInfo
+		static_cast<uint32_t>(m_Device.layers.size()),             // enabledLayerCount
+		m_Device.layers.data(),                                    // ppEnabledLayerNames
+		static_cast<uint32_t>(m_Device.instanceExtensions.size()), // enabledExtensionCount
+		m_Device.instanceExtensions.data(),                        // ppEnabledExtensionNames
 	};
 
-	VKC(vk::createInstance(&instanceCreateInfo, nullptr, &m_Instance));
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Instance);
-	m_SurfaceInfo.surface = info.window->CreateSurface(m_Instance);
+	VKC(vk::createInstance(&instanceCreateInfo, nullptr, &m_Device.instance));
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Device.instance);
+	m_Device.surface = info.window->CreateSurface(m_Device.instance);
 
 
-	m_DebugUtilMessenger = m_Instance.createDebugUtilsMessengerEXT(debugMessengerCreateInfo);
+	m_DebugUtilMessenger = m_Device.instance.createDebugUtilsMessengerEXT(debugMessengerCreateInfo);
 }
 
-void Device::PickPhysicalDevice()
+void DeviceSystem::PickPhysicalDevice()
 {
 	// Fetch physical devices with vulkan support
-	std::vector<vk::PhysicalDevice> devices = m_Instance.enumeratePhysicalDevices();
+	std::vector<vk::PhysicalDevice> devices = m_Device.instance.enumeratePhysicalDevices();
 	ASSERT(devices.size(), "No physical device with vulkan support found");
 
 	// Select the most suitable physical device
@@ -241,28 +245,28 @@ void Device::PickPhysicalDevice()
 				// Check if current queue index supports any or all desired queues
 				if (queueFamilyProperties.queueFlags & vk::QueueFlagBits::eGraphics)
 				{
-					m_QueueInfo.graphicsQueueIndex = index;
+					m_Device.graphicsQueueIndex = index;
 				}
 
-				if (device.getSurfaceSupportKHR(index, m_SurfaceInfo.surface))
+				if (device.getSurfaceSupportKHR(index, m_Device.surface))
 				{
-					m_QueueInfo.presentQueueIndex = index;
+					m_Device.presentQueueIndex = index;
 				}
 
 				index++;
 
 				// Device does supports all the required queues!
-				if (m_QueueInfo.graphicsQueueIndex != UINT32_MAX && m_QueueInfo.presentQueueIndex != UINT32_MAX)
+				if (m_Device.graphicsQueueIndex != UINT32_MAX && m_Device.presentQueueIndex != UINT32_MAX)
 				{
 					break;
 				}
 			}
 
 			// Device doesn't support all the required queues!
-			if (m_QueueInfo.graphicsQueueIndex == UINT32_MAX || m_QueueInfo.presentQueueIndex == UINT32_MAX)
+			if (m_Device.graphicsQueueIndex == UINT32_MAX || m_Device.presentQueueIndex == UINT32_MAX)
 			{
-				m_QueueInfo.graphicsQueueIndex = UINT32_MAX;
-				m_QueueInfo.presentQueueIndex  = UINT32_MAX;
+				m_Device.graphicsQueueIndex = UINT32_MAX;
+				m_Device.presentQueueIndex  = UINT32_MAX;
 				continue;
 			}
 		}
@@ -276,7 +280,7 @@ void Device::PickPhysicalDevice()
 				continue;
 
 			bool failed = false;
-			for (const auto& requiredExtensionName : m_LogicalDeviceExtensions)
+			for (const auto& requiredExtensionName : m_Device.deviceExtensions)
 			{
 				bool found = false;
 				for (const auto& extension : deviceExtensionsProperties)
@@ -299,19 +303,14 @@ void Device::PickPhysicalDevice()
 				continue;
 		}
 
-		/** Check if swap chain is adequate **/
+		/** Check if surface is adequate **/
 		{
-			// Fetch swap chain capabilities
-			m_SurfaceInfo.capabilities = device.getSurfaceCapabilitiesKHR(m_SurfaceInfo.surface);
+			m_Device.surfaceCapabilities = device.getSurfaceCapabilitiesKHR(m_Device.surface);
 
-			// Fetch swap chain formats
-			m_SurfaceInfo.supportedFormats = device.getSurfaceFormatsKHR(m_SurfaceInfo.surface);
-			if (m_SurfaceInfo.supportedFormats.empty())
+			if (device.getSurfaceFormatsKHR(m_Device.surface).empty())
 				continue;
 
-			// Fetch swap chain present modes
-			m_SurfaceInfo.supportedPresentModes = device.getSurfacePresentModesKHR(m_SurfaceInfo.surface);
-			if (m_SurfaceInfo.supportedPresentModes.empty())
+			if (device.getSurfacePresentModesKHR(m_Device.surface).empty())
 				continue;
 		}
 
@@ -320,58 +319,76 @@ void Device::PickPhysicalDevice()
 
 		score += properties.limits.maxImageDimension2D;
 
-		m_PhysicalDevice = score > highScore ? device : m_PhysicalDevice;
+		m_Device.physical = score > highScore ? device : m_Device.physical;
 	}
-	ASSERT(m_PhysicalDevice, "No suitable physical device found");
+	ASSERT(m_Device.physical, "No suitable physical device found");
 
 	// Cache the selected physical device's properties
-	m_PhysicalDeviceProperties = m_PhysicalDevice.getProperties();
+	m_Device.properties = m_Device.physical.getProperties();
 
 	// Determine max sample counts
-	vk::Flags<vk::SampleCountFlagBits> counts = m_PhysicalDeviceProperties.limits.framebufferColorSampleCounts & m_PhysicalDeviceProperties.limits.framebufferDepthSampleCounts;
+	vk::Flags<vk::SampleCountFlagBits> color      = m_Device.properties.limits.framebufferColorSampleCounts;
+	vk::Flags<vk::SampleCountFlagBits> depth      = m_Device.properties.limits.framebufferDepthSampleCounts;
+	vk::Flags<vk::SampleCountFlagBits> depthColor = color & depth;
 
-	m_MaxSupportedSampleCount = counts & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
-	                            counts & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
-	                            counts & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
-	                            counts & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
-	                            counts & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
-	                            counts & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
-	                                                                    vk::SampleCountFlagBits::e1;
-
+	m_Device.maxColorSamples =
+	    color & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
+	    color & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
+	    color & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
+	    color & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
+	    color & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
+	    color & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
+	                                           vk::SampleCountFlagBits::e1;
+	m_Device.maxDepthSamples =
+	    depth & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
+	    depth & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
+	    depth & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
+	    depth & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
+	    depth & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
+	    depth & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
+	                                           vk::SampleCountFlagBits::e1;
+	m_Device.maxDepthColorSamples =
+	    depthColor & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
+	    depthColor & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
+	    depthColor & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
+	    depthColor & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
+	    depthColor & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
+	    depthColor & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
+	                                                vk::SampleCountFlagBits::e1;
 
 	// Select depth format
 	// bool hasStencilComponent = false;
 	vk::FormatProperties formatProperties;
 	for (vk::Format format : { vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint })
 	{
-		formatProperties = m_PhysicalDevice.getFormatProperties(format);
+		formatProperties = m_Device.physical.getFormatProperties(format);
 		if ((formatProperties.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment) == vk::FormatFeatureFlagBits::eDepthStencilAttachment)
 		{
-			m_DepthFormat = format;
-			// hasStencilComponent = format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
+			m_Device.depthFormat = format;
+			m_Device.hasStencil  = format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint;
 		}
 	}
 }
 
-void Device::CreateLogicalDevice()
+void DeviceSystem::CreateLogicalDevice()
 {
 	std::vector<vk::DeviceQueueCreateInfo> queuesCreateInfo;
 
 	float queuePriority = 1.0f; // Always 1.0
 	queuesCreateInfo.push_back({
-	    {},                             // flags
-	    m_QueueInfo.graphicsQueueIndex, // queueFamilyIndex
-	    1u,                             // queueCount
-	    &queuePriority,                 // pQueuePriorities
+	    {},                          // flags
+	    m_Device.graphicsQueueIndex, // queueFamilyIndex
+	    1u,                          // queueCount
+	    &queuePriority,              // pQueuePriorities
 	});
 
-	if (m_QueueInfo.presentQueueIndex != m_QueueInfo.graphicsQueueIndex)
+	if (m_Device.presentQueueIndex != m_Device.graphicsQueueIndex)
 	{
 		queuesCreateInfo.push_back({
-		    {},                            // flags
-		    m_QueueInfo.presentQueueIndex, // queueFamilyIndex
-		    1u,                            // queueCount
-		    &queuePriority,                // pQueuePriorities
+		    {},                         // flags
+		    m_Device.presentQueueIndex, // queueFamilyIndex
+		    1u,                         // queueCount
+		    &queuePriority,             // pQueuePriorities
 		});
 	}
 
@@ -443,23 +460,23 @@ void Device::CreateLogicalDevice()
 		queuesCreateInfo.data(),                                 // pQueueCreateInfos
 		0u,                                                      // enabledLayerCount
 		nullptr,                                                 // ppEnabledLayerNames
-		static_cast<uint32_t>(m_LogicalDeviceExtensions.size()), // enabledExtensionCount
-		m_LogicalDeviceExtensions.data(),                        // ppEnabledExtensionNames
+		static_cast<uint32_t>(m_Device.deviceExtensions.size()), // enabledExtensionCount
+		m_Device.deviceExtensions.data(),                        // ppEnabledExtensionNames
 		&physicalDeviceFeatures,                                 // pEnabledFeatures
 		&dynamicRenderingFeatures,
 	};
 
-	m_LogicalDevice = m_PhysicalDevice.createDevice(logicalDeviceCreateInfo);
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_LogicalDevice);
+	m_Device.logical = m_Device.physical.createDevice(logicalDeviceCreateInfo);
+	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Device.logical);
 
-	m_QueueInfo.graphicsQueue = m_LogicalDevice.getQueue(m_QueueInfo.graphicsQueueIndex, 0u);
-	m_QueueInfo.presentQueue  = m_LogicalDevice.getQueue(m_QueueInfo.presentQueueIndex, 0u);
+	m_Device.graphicsQueue = m_Device.logical.getQueue(m_Device.graphicsQueueIndex, 0u);
+	m_Device.presentQueue  = m_Device.logical.getQueue(m_Device.presentQueueIndex, 0u);
 
-	ASSERT(m_QueueInfo.graphicsQueue, "Failed to fetch graphics queue");
-	ASSERT(m_QueueInfo.presentQueue, "Failed to fetch present queue");
+	ASSERT(m_Device.graphicsQueue, "Failed to fetch graphics queue");
+	ASSERT(m_Device.presentQueue, "Failed to fetch present queue");
 }
 
-void Device::CreateAllocator()
+void DeviceSystem::CreateAllocator()
 {
 	vma::VulkanFunctions vulkanFunctions(
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
@@ -489,83 +506,46 @@ void Device::CreateAllocator()
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceBufferMemoryRequirements,
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceImageMemoryRequirements);
 
-	vma::AllocatorCreateInfo allocCreateInfo({},               // flags
-	                                         m_PhysicalDevice, // physicalDevice
-	                                         m_LogicalDevice,  // device
-	                                         {},               // preferredLargeHeapBlockSize
-	                                         {},               // pAllocationCallbacks
-	                                         {},               // pDeviceMemoryCallbacks
-	                                         {},               // pHeapSizeLimit
-	                                         &vulkanFunctions, // pVulkanFunctions
-	                                         m_Instance,       // instance
-	                                         {});              // vulkanApiVersion
+	vma::AllocatorCreateInfo allocCreateInfo({},                // flags
+	                                         m_Device.physical, // physicalDevice
+	                                         m_Device.logical,  // device
+	                                         {},                // preferredLargeHeapBlockSize
+	                                         {},                // pAllocationCallbacks
+	                                         {},                // pDeviceMemoryCallbacks
+	                                         {},                // pHeapSizeLimit
+	                                         &vulkanFunctions,  // pVulkanFunctions
+	                                         m_Device.instance, // instance
+	                                         {});               // vulkanApiVersion
 
 
-	m_Allocator = vma::createAllocator(allocCreateInfo);
+	m_Device.allocator = vma::createAllocator(allocCreateInfo);
 }
 
-SurfaceInfo Device::FetchSurfaceInfo()
+void DeviceSystem::FetchSurfaceInfo()
 {
-	m_SurfaceInfo.capabilities = m_PhysicalDevice.getSurfaceCapabilitiesKHR(m_SurfaceInfo.surface);
+	m_Device.surfaceCapabilities = m_Device.physical.getSurfaceCapabilitiesKHR(m_Device.surface);
+
+	std::vector<vk::SurfaceFormatKHR> supportedFormats    = m_Device.physical.getSurfaceFormatsKHR(m_Device.surface);
+	std::vector<vk::PresentModeKHR> supportedPresentModes = m_Device.physical.getSurfacePresentModesKHR(m_Device.surface);
 
 	// Select surface format
-	m_SurfaceInfo.format = m_SurfaceInfo.supportedFormats[0]; // default
-	for (const auto& surfaceFormat : m_SurfaceInfo.supportedFormats)
+	m_Device.surfaceFormat = supportedFormats[0]; // default
+	for (const auto& surfaceFormat : supportedFormats)
 	{
 		if (surfaceFormat.format == vk::Format::eB8G8R8A8Srgb && surfaceFormat.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
 		{
-			m_SurfaceInfo.format = surfaceFormat;
+			m_Device.surfaceFormat = surfaceFormat;
 			break;
 		}
 	}
 
 	// Select present mode
-	m_SurfaceInfo.presentMode = m_SurfaceInfo.supportedPresentModes[0]; // default
-	for (const auto& presentMode : m_SurfaceInfo.supportedPresentModes)
+	m_Device.presentMode = supportedPresentModes[0]; // default
+	for (const auto& presentMode : supportedPresentModes)
 	{
 		if (presentMode == vk::PresentModeKHR::eFifo)
 		{
-			m_SurfaceInfo.presentMode = presentMode;
+			m_Device.presentMode = presentMode;
 		}
-	}
-
-	m_SurfaceInfo.supportedFormats      = m_PhysicalDevice.getSurfaceFormatsKHR(m_SurfaceInfo.surface);
-	m_SurfaceInfo.supportedPresentModes = m_PhysicalDevice.getSurfacePresentModesKHR(m_SurfaceInfo.surface);
-
-	return m_SurfaceInfo;
-}
-
-vk::Format Device::FetchDepthFormat()
-{
-	vk::Format result = {};
-}
-
-void Device::LogDebugInfo()
-{
-	/////////////////////////////////////////////////////////////////////////////////
-	// Log debug information about the selected physical device, layers, extensions, etc.
-	{
-		// #TODO:
-		LOG(info, "Device created:");
-
-		LOG(info, "    PhysicalDevice:");
-		LOG(info, "        apiVersion: {}", m_PhysicalDeviceProperties.apiVersion);
-
-		LOG(info, "        vendorID: {}", m_PhysicalDeviceProperties.vendorID);
-		LOG(info, "        deviceID: {}", m_PhysicalDeviceProperties.deviceID);
-		LOG(info, "        deviceType: {}", static_cast<int>(m_PhysicalDeviceProperties.deviceType)); // #todo: Stringify
-		LOG(info, "        deviceName: {}", m_PhysicalDeviceProperties.deviceName);
-
-		LOG(info, "    Layers:");
-		for (auto layer : m_Layers)
-			LOG(info, "        {}", layer);
-
-		LOG(info, "    Extensions:");
-		for (auto extension : m_InstanceExtensions)
-			LOG(info, "        {}", extension);
-
-		LOG(info, "    Queues:");
-		LOG(info, "        Graphics: {}", m_QueueInfo.graphicsQueueIndex);
-		LOG(info, "        Present: {}", m_QueueInfo.presentQueueIndex);
 	}
 }

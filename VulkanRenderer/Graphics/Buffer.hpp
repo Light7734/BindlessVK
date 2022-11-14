@@ -1,17 +1,15 @@
 #pragma once
 
 #include "Core/Base.hpp"
+#include "Graphics/Device.hpp"
 #include "Graphics/Types.hpp"
 
 #include <vulkan/vulkan.hpp>
 
 struct BufferCreateInfo
 {
-	vk::Device logicalDevice;
-	vk::PhysicalDevice physicalDevice;
-	vma::Allocator allocator;
+	Device* device;
 	vk::CommandPool commandPool;
-	vk::Queue graphicsQueue;
 	vk::BufferUsageFlags usage;
 
 	vk::DeviceSize minBlockSize;
@@ -23,7 +21,7 @@ struct BufferCreateInfo
 class Buffer
 {
 public:
-	Buffer(BufferCreateInfo& createInfo);
+	Buffer(BufferCreateInfo& info);
 	~Buffer();
 
 	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
@@ -53,10 +51,9 @@ public:
 	void Unmap();
 
 private:
-	vk::DescriptorBufferInfo m_DescriptorInfo;
-	vk::Device m_LogicalDevice = {};
+	Device* m_Device = {};
 
-	vma::Allocator m_Allocator = {};
+	vk::DescriptorBufferInfo m_DescriptorInfo = {};
 
 	AllocatedBuffer m_Buffer = {};
 
@@ -78,9 +75,7 @@ public:
 	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
 
 private:
-	vk::Device m_LogicalDevice = {};
-
-	vma::Allocator m_Allocator = {};
+	Device* m_Device = {};
 
 	AllocatedBuffer m_Buffer        = {};
 	AllocatedBuffer m_StagingBuffer = {};

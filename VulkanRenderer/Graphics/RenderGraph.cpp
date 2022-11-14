@@ -12,19 +12,12 @@ RenderGraph::~RenderGraph()
 
 void RenderGraph::Init(const CreateInfo& info)
 {
+	m_Device              = info.device;
 	m_SwapchainExtent     = info.swapchainExtent;
-	m_LogicalDevice       = info.logicalDevice;
 	m_DescriptorPool      = info.descriptorPool;
-	m_PhysicalDevice      = info.physicalDevice;
-	m_Allocator           = info.allocator;
 	m_CommandPool         = info.commandPool;
-	m_QueueInfo           = info.queueInfo;
-	m_ColorFormat         = info.colorFormat;
-	m_DepthFormat         = info.depthFormat;
 	m_SwapchainImages     = info.swapchainImages;
 	m_SwapchainImageViews = info.swapchainImageViews;
-
-	m_PhysicalDeviceProperties = m_PhysicalDevice.getProperties();
 }
 
 void RenderGraph::Build(const BuildInfo& info)
@@ -58,7 +51,7 @@ void RenderGraph::CreateCommandBuffers()
 		MAX_FRAMES_IN_FLIGHT * (uint32_t)m_RenderPassCreateInfos.size(),
 	};
 
-	m_SecondaryCommandBuffers = m_LogicalDevice.allocateCommandBuffers(cmdBufferallocInfo);
+	m_SecondaryCommandBuffers = m_Device->logical.allocateCommandBuffers(cmdBufferallocInfo);
 }
 
 // @todo: Implement
@@ -257,15 +250,12 @@ void RenderGraph::BuildBufferInputs()
 	for (RenderPass::CreateInfo::BufferInputInfo& info : m_BufferInputInfos)
 	{
 		BufferCreateInfo bufferCreateInfo {
-			.logicalDevice  = m_LogicalDevice,
-			.physicalDevice = m_PhysicalDevice,
-			.allocator      = m_Allocator,
-			.commandPool    = m_CommandPool,
-			.graphicsQueue  = m_QueueInfo.graphicsQueue,
-			.usage          = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-			                                                                    vk::BufferUsageFlagBits::eStorageBuffer,
-			.minBlockSize   = info.size,
-			.blockCount     = MAX_FRAMES_IN_FLIGHT,
+			.device       = m_Device,
+			.commandPool  = m_CommandPool,
+			.usage        = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
+			                                                                  vk::BufferUsageFlagBits::eStorageBuffer,
+			.minBlockSize = info.size,
+			.blockCount   = MAX_FRAMES_IN_FLIGHT,
 		};
 
 		m_BufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -279,15 +269,12 @@ void RenderGraph::BuildBufferInputs()
 		for (RenderPass::CreateInfo::BufferInputInfo& info : renderPassCreateInfo.bufferInputInfos)
 		{
 			BufferCreateInfo bufferCreateInfo {
-				.logicalDevice  = m_LogicalDevice,
-				.physicalDevice = m_PhysicalDevice,
-				.allocator      = m_Allocator,
-				.commandPool    = m_CommandPool,
-				.graphicsQueue  = m_QueueInfo.graphicsQueue,
-				.usage          = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-				                                                                    vk::BufferUsageFlagBits::eStorageBuffer,
-				.minBlockSize   = info.size,
-				.blockCount     = MAX_FRAMES_IN_FLIGHT,
+				.device       = m_Device,
+				.commandPool  = m_CommandPool,
+				.usage        = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
+				                                                                  vk::BufferUsageFlagBits::eStorageBuffer,
+				.minBlockSize = info.size,
+				.blockCount   = MAX_FRAMES_IN_FLIGHT,
 			};
 
 			pass.bufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -316,7 +303,7 @@ void RenderGraph::BuildDescriptorSets()
 			bindings.data(),
 
 		};
-		m_DescriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(layoutCreateInfo);
+		m_DescriptorSetLayout = m_Device->logical.createDescriptorSetLayout(layoutCreateInfo);
 
 		// Allocate descriptor sets
 		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -326,10 +313,10 @@ void RenderGraph::BuildDescriptorSets()
 				1,
 				&m_DescriptorSetLayout,
 			};
-			m_DescriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
+			m_DescriptorSets.push_back(m_Device->logical.allocateDescriptorSets(allocInfo)[0]);
 
 			std::string descriptorSetName = "render_graph DescriptorSet #" + std::to_string(i);
-			m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+			m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 			    vk::ObjectType::eDescriptorSet,
 			    (uint64_t)(VkDescriptorSet)m_DescriptorSets.back(),
 			    descriptorSetName.c_str(),
@@ -342,7 +329,7 @@ void RenderGraph::BuildDescriptorSets()
 			&m_DescriptorSetLayout, // pSetLayouts
 		};
 
-		m_PipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo);
+		m_PipelineLayout = m_Device->logical.createPipelineLayout(pipelineLayoutCreateInfo);
 	}
 
 	uint32_t passIndex = 0u;
@@ -379,7 +366,7 @@ void RenderGraph::BuildDescriptorSets()
 			bindings.data(),
 
 		};
-		pass.descriptorSetLayout = m_LogicalDevice.createDescriptorSetLayout(layoutCreateInfo);
+		pass.descriptorSetLayout = m_Device->logical.createDescriptorSetLayout(layoutCreateInfo);
 
 		// Allocate descriptor sets
 		if (!renderPassCreateInfo.bufferInputInfos.empty() || !renderPassCreateInfo.textureInputInfos.empty())
@@ -391,10 +378,10 @@ void RenderGraph::BuildDescriptorSets()
 					1u,
 					&pass.descriptorSetLayout,
 				};
-				pass.descriptorSets.push_back(m_LogicalDevice.allocateDescriptorSets(allocInfo)[0]);
+				pass.descriptorSets.push_back(m_Device->logical.allocateDescriptorSets(allocInfo)[0]);
 
 				std::string descriptorSetName = pass.name + " DescriptorSet #" + std::to_string(i);
-				m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+				m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 				    vk::ObjectType::eDescriptorSet,
 				    (uint64_t)(VkDescriptorSet)pass.descriptorSets.back(),
 				    descriptorSetName.c_str(),
@@ -414,7 +401,7 @@ void RenderGraph::BuildDescriptorSets()
 			layouts.data(), // pSetLayouts
 		};
 
-		pass.pipelineLayout = m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo);
+		pass.pipelineLayout = m_Device->logical.createPipelineLayout(pipelineLayoutCreateInfo);
 	}
 }
 
@@ -450,13 +437,13 @@ void RenderGraph::WriteDescriptorSets()
 				}
 			}
 
-			m_LogicalDevice.updateDescriptorSets(
+			m_Device->logical.updateDescriptorSets(
 			    static_cast<uint32_t>(writes.size()),
 			    writes.data(),
 			    0u,
 			    nullptr);
 
-			m_LogicalDevice.waitIdle();
+			m_Device->logical.waitIdle();
 		}
 	}
 
@@ -513,13 +500,13 @@ void RenderGraph::WriteDescriptorSets()
 			}
 		}
 
-		m_LogicalDevice.updateDescriptorSets(
+		m_Device->logical.updateDescriptorSets(
 		    static_cast<uint32_t>(writes.size()),
 		    writes.data(),
 		    0u,
 		    nullptr);
 
-		m_LogicalDevice.waitIdle();
+		m_Device->logical.waitIdle();
 	}
 }
 
@@ -529,12 +516,12 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 
 	vk::ImageUsageFlags usage;
 	vk::ImageAspectFlags aspectMask;
-	if (info.format == m_ColorFormat)
+	if (info.format == m_Device->surfaceFormat.format)
 	{
 		usage      = vk::ImageUsageFlagBits::eColorAttachment;
 		aspectMask = vk::ImageAspectFlagBits::eColor;
 	}
-	else if (info.format == m_DepthFormat)
+	else if (info.format == m_Device->depthFormat)
 	{
 		usage      = vk::ImageUsageFlagBits::eDepthStencilAttachment;
 		aspectMask = vk::ImageAspectFlagBits::eDepth;
@@ -626,10 +613,10 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		};
 
 		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
-		AllocatedImage image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+		AllocatedImage image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		std::string imageName = info.name + " Image";
-		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
 		    imageName.c_str(),
@@ -659,9 +646,9 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 			    1u,         // layerCount
 			},
 		};
-		vk::ImageView imageView   = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		vk::ImageView imageView   = m_Device->logical.createImageView(imageViewCreateInfo, nullptr);
 		std::string imageViewName = info.name + " ImageView";
-		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)imageView,
 		    imageViewName.c_str(),
@@ -702,10 +689,10 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		};
 
 		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
-		AllocatedImage image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+		AllocatedImage image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		std::string imageName = info.name + " TransientMS Image";
-		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
 		    imageName.c_str(),
@@ -736,9 +723,9 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 			    1u,         // layerCount
 			},
 		};
-		vk::ImageView imageView   = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		vk::ImageView imageView   = m_Device->logical.createImageView(imageViewCreateInfo, nullptr);
 		std::string imageViewName = info.name + " TransientMS ImageView";
-		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)imageView,
 		    imageViewName.c_str(),
@@ -779,11 +766,11 @@ void RenderGraph::Render(RenderContext context)
 		{
 			if (attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				colorAttachmentFormats.push_back(m_ColorFormat);
+				colorAttachmentFormats.push_back(m_Device->surfaceFormat.format);
 			}
 			else
 			{
-				depthAttachmentFormat = m_DepthFormat;
+				depthAttachmentFormat = m_Device->depthFormat;
 			}
 		}
 
@@ -847,15 +834,15 @@ void RenderGraph::Render(RenderContext context)
 			AttachmentResource& resource = resourceContainer.GetResource(context.imageIndex, context.frameIndex);
 
 			vk::ImageMemoryBarrier imageBarrier = {
-				resource.srcAccessMask,         // srcAccessMask
-				attachment.accessMask,          // dstAccessMask
-				resource.srcImageLayout,        // oldLayout
-				attachment.layout,              // newLayout
-				m_QueueInfo.graphicsQueueIndex, // srcQueueFamilyIndex
-				m_QueueInfo.graphicsQueueIndex, // dstQueueFamilyIndex
-				resource.image,                 // image
-				attachment.subresourceRange,    // subresourceRange
-				nullptr,                        // pNext
+				resource.srcAccessMask,       // srcAccessMask
+				attachment.accessMask,        // dstAccessMask
+				resource.srcImageLayout,      // oldLayout
+				attachment.layout,            // newLayout
+				m_Device->graphicsQueueIndex, // srcQueueFamilyIndex
+				m_Device->graphicsQueueIndex, // dstQueueFamilyIndex
+				resource.image,               // image
+				attachment.subresourceRange,  // subresourceRange
+				nullptr,                      // pNext
 			};
 
 			if ((resource.srcAccessMask != attachment.accessMask ||

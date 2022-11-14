@@ -8,31 +8,26 @@
 
 
 TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
-    : m_LogicalDevice(info.deviceContext.logicalDevice)
-    , m_PhysicalDevice(info.deviceContext.physicalDevice)
-    , m_Allocator(info.deviceContext.allocator)
-    , m_PhysicalDeviceProps(info.deviceContext.physicalDeviceProperties)
-    , m_GraphicsQueue(info.deviceContext.queueInfo.graphicsQueue)
-
+    : m_Device(info.device)
 {
-	ASSERT(m_PhysicalDevice.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
+	ASSERT(m_Device->physical.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
 	           vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
 	       "Texture image format(eR8G8B8A8Srgb) does not support linear blitting");
 
 	vk::CommandPoolCreateInfo commandPoolCreateInfo {
 		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
-		info.deviceContext.queueInfo.graphicsQueueIndex,    // queueFamilyIndex
+		m_Device->graphicsQueueIndex,                       // queueFamilyIndex
 	};
-	m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+	m_UploadContext.cmdPool = m_Device->logical.createCommandPool(commandPoolCreateInfo, nullptr);
 
 	vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
 		m_UploadContext.cmdPool,
 		vk::CommandBufferLevel::ePrimary,
 		1u,
 	};
-	m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
+	m_UploadContext.cmdBuffer = m_Device->logical.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
 
-	m_UploadContext.fence = m_LogicalDevice.createFence({});
+	m_UploadContext.fence = m_Device->logical.createFence({});
 }
 
 Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
@@ -81,7 +76,7 @@ Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 		vma::AllocationCreateInfo imageAllocInfo({},
 		                                         vma::MemoryUsage::eGpuOnly,
 		                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
-		texture.image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+		texture.image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		// Create staging buffer
 		vk::BufferCreateInfo stagingBufferCrateInfo {
@@ -94,11 +89,11 @@ Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 		vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, { vk::MemoryPropertyFlagBits::eHostCached });
 
 		AllocatedBuffer stagingBuffer;
-		stagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
+		stagingBuffer = m_Device->allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 
 		// Copy data to staging buffer
-		memcpy(m_Allocator.mapMemory(stagingBuffer), info.pixels, info.size);
-		m_Allocator.unmapMemory(stagingBuffer);
+		memcpy(m_Device->allocator.mapMemory(stagingBuffer), info.pixels, info.size);
+		m_Device->allocator.unmapMemory(stagingBuffer);
 
 		ImmediateSubmit([&](vk::CommandBuffer cmd) {
 			TransitionLayout(texture, cmd, 0u, texture.mipLevels, 1u, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
@@ -155,7 +150,7 @@ Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 		});
 
 		// Copy buffer to image is executed, delete the staging buffer
-		m_Allocator.destroyBuffer(stagingBuffer, stagingBuffer);
+		m_Device->allocator.destroyBuffer(stagingBuffer, stagingBuffer);
 
 		/////////////////////////////////////////////////////////////////////////////////
 		// Create image views
@@ -185,7 +180,7 @@ Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 				},
 			};
 
-			texture.imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+			texture.imageView = m_Device->logical.createImageView(imageViewCreateInfo, nullptr);
 		}
 		/////////////////////////////////////////////////////////////////////////////////
 		// Create image samplers
@@ -213,7 +208,7 @@ Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 			};
 
 			/// @todo Should we separate samplers and textures?
-			texture.sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
+			texture.sampler = m_Device->logical.createSampler(samplerCreateInfo, nullptr);
 		}
 
 		texture.descriptorInfo = {
@@ -269,11 +264,11 @@ Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
 
 	AllocatedBuffer stagingBuffer;
 	vma::AllocationCreateInfo bufferAllocInfo({}, vma::MemoryUsage::eCpuOnly, { vk::MemoryPropertyFlagBits::eHostCached });
-	stagingBuffer = m_Allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
+	stagingBuffer = m_Device->allocator.createBuffer(stagingBufferCrateInfo, bufferAllocInfo);
 
 	// Copy data to staging buffer
-	memcpy(m_Allocator.mapMemory(stagingBuffer), data, texture.size);
-	m_Allocator.unmapMemory(stagingBuffer);
+	memcpy(m_Device->allocator.mapMemory(stagingBuffer), data, texture.size);
+	m_Device->allocator.unmapMemory(stagingBuffer);
 
 	std::vector<vk::BufferImageCopy> bufferCopies;
 
@@ -338,7 +333,7 @@ Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
 	vma::AllocationCreateInfo imageAllocInfo({},
 	                                         vma::MemoryUsage::eGpuOnly,
 	                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
-	texture.image = m_Allocator.createImage(imageCreateInfo, imageAllocInfo);
+	texture.image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 	ImmediateSubmit([&](vk::CommandBuffer&& cmd) {
 		TransitionLayout(texture, cmd, 0u, texture.mipLevels, 6u, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
@@ -375,7 +370,7 @@ Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
 			},
 		};
 
-		texture.imageView = m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr);
+		texture.imageView = m_Device->logical.createImageView(imageViewCreateInfo, nullptr);
 	}
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create image samplers
@@ -403,7 +398,7 @@ Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
 		};
 
 		/// @todo Should we separate samplers and textures?
-		texture.sampler = m_LogicalDevice.createSampler(samplerCreateInfo, nullptr);
+		texture.sampler = m_Device->logical.createSampler(samplerCreateInfo, nullptr);
 	}
 
 	texture.descriptorInfo = {
@@ -414,7 +409,7 @@ Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
 
 	/////////////////////////////////////////////////////////////////////////////////
 	/// Cleanup
-	m_Allocator.destroyBuffer(stagingBuffer, stagingBuffer);
+	m_Device->allocator.destroyBuffer(stagingBuffer, stagingBuffer);
 	ktxTexture_Destroy(textureKtx);
 
 	return &m_Textures[HashStr(info.name.c_str())];
@@ -466,9 +461,9 @@ TextureSystem::~TextureSystem()
 {
 	for (auto& [key, value] : m_Textures)
 	{
-		m_LogicalDevice.destroySampler(value.sampler, nullptr);
-		m_LogicalDevice.destroyImageView(value.imageView, nullptr);
-		m_Allocator.destroyImage(value.image, value.image);
+		m_Device->logical.destroySampler(value.sampler, nullptr);
+		m_Device->logical.destroyImageView(value.imageView, nullptr);
+		m_Device->allocator.destroyImage(value.image, value.image);
 	}
 }
 
@@ -568,9 +563,9 @@ void TextureSystem::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& fun
 
 	vk::SubmitInfo submitInfo { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
 
-	m_GraphicsQueue.submit(submitInfo, m_UploadContext.fence);
-	VKC(m_LogicalDevice.waitForFences(m_UploadContext.fence, true, UINT_MAX));
+	m_Device->graphicsQueue.submit(submitInfo, m_UploadContext.fence);
+	VKC(m_Device->logical.waitForFences(m_UploadContext.fence, true, UINT_MAX));
 
-	m_LogicalDevice.resetFences(m_UploadContext.fence);
-	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool, {});
+	m_Device->logical.resetFences(m_UploadContext.fence);
+	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool, {});
 }

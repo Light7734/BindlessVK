@@ -33,15 +33,10 @@ class RenderGraph
 public:
 	struct CreateInfo
 	{
+		Device* device;
 		vk::Extent2D swapchainExtent;
 		vk::DescriptorPool descriptorPool;
-		vk::Device logicalDevice;
-		vk::PhysicalDevice physicalDevice;
-		vma::Allocator allocator;
 		vk::CommandPool commandPool;
-		vk::Format colorFormat;
-		vk::Format depthFormat;
-		QueueInfo queueInfo;
 		std::vector<vk::Image> swapchainImages;
 		std::vector<vk::ImageView> swapchainImageViews;
 	};
@@ -152,18 +147,11 @@ private:
 	void CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type);
 
 private:
-	vk::Device m_LogicalDevice          = {};
-	vk::PhysicalDevice m_PhysicalDevice = {};
-	vma::Allocator m_Allocator          = {};
-
-	vk::CommandPool m_CommandPool       = {};
-	vk::DescriptorPool m_DescriptorPool = {};
-
-	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties = {};
-
-	QueueInfo m_QueueInfo = {};
+	Device* m_Device = {};
 
 
+	vk::CommandPool m_CommandPool          = {};
+	vk::DescriptorPool m_DescriptorPool    = {};
 	std::vector<RenderPass> m_RenderPasses = {};
 
 	vk::PipelineLayout m_PipelineLayout             = {};
@@ -184,10 +172,7 @@ private:
 	std::string m_SwapchainResourceName                 = {};
 	uint32_t m_SwapchainResourceIndex                   = {};
 
-	vk::Format m_ColorFormat = {};
-	vk::Format m_DepthFormat = {};
-
-	std::vector<RenderPass::CreateInfo> m_RenderPassCreateInfos = {};
+	std::vector<RenderPass::CreateInfo> m_RenderPassCreateInfos             = {};
 	std::vector<RenderPass::CreateInfo::BufferInputInfo> m_BufferInputInfos = {};
 
 	std::vector<vk::CommandBuffer> m_SecondaryCommandBuffers = {};

@@ -67,8 +67,13 @@ void LoadShaderEffects(MaterialSystem& materialSystem)
 	});
 }
 
-void LoadShaderPasses(MaterialSystem& materialSystem, vk::Format colorAttachmentFormat, vk::Format depthAttachmentFormat, vk::Extent2D extent, vk::SampleCountFlagBits sampleCount)
+void LoadShaderPasses(MaterialSystem& materialSystem, Device* device)
 {
+	const vk::Extent2D extent                 = device->surfaceCapabilities.maxImageExtent;
+	const vk::SampleCountFlagBits sampleCount = device->maxDepthColorSamples;
+	const vk::Format colorAttachmentFormat    = device->surfaceFormat.format;
+	const vk::Format depthAttachmentFormat    = device->depthFormat;
+
 	{
 		// @TODO: Load from files instead of hard-coding
 		std::vector<vk::VertexInputBindingDescription> inputBindings {
@@ -464,11 +469,11 @@ void LoadEntities(Scene& scene, MaterialSystem& materialSystem, ModelSystem& mod
 	scene.AddComponent<LightComponent>(light, 12);
 }
 
-void CreateRenderGraph(Renderer& renderer, TextureSystem& textureSystem, const DeviceContext& deviceContext)
+void CreateRenderGraph(Renderer& renderer, TextureSystem& textureSystem, Device* device)
 {
-	vk::Format colorFormat              = deviceContext.surfaceInfo.format.format;
-	vk::Format deppthFormat             = deviceContext.depthFormat;
-	vk::SampleCountFlagBits sampleCount = deviceContext.maxSupportedSampleCount;
+	const vk::Format colorFormat              = device->surfaceFormat.format;
+	const vk::Format deppthFormat             = device->depthFormat;
+	const vk::SampleCountFlagBits sampleCount = device->maxDepthColorSamples;
 
 	Texture* defaultTexture     = textureSystem.GetTexture("default");
 	Texture* defaultTextureCube = textureSystem.GetTexture("default_cube");
@@ -540,7 +545,6 @@ void CreateRenderGraph(Renderer& renderer, TextureSystem& textureSystem, const D
 	};
 
 	renderer.BuildRenderGraph(
-	    deviceContext,
 	    {
 	        .backbufferName = "backbuffer",
 	        .bufferInputs   = {
@@ -596,13 +600,13 @@ int main()
 		});
 
 		// Device
-		Device device({
+		DeviceSystem deviceSystem({
 		    .window             = &window,
 		    .layers             = { "VK_LAYER_KHRONOS_validation" },
 		    .instanceExtensions = {
 		        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 		    },
-		    .logicalDeviceExtensions = {
+		    .deviceExtensions = {
 		        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 		    },
@@ -610,12 +614,11 @@ int main()
 		    .debugMessageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
 		    .debugMessageTypes    = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
 		});
-		DeviceContext deviceContext = device.GetContext();
-
+		Device* device = deviceSystem.GetDevice();
 
 		// textureSystem
 		TextureSystem textureSystem({
-		    .deviceContext = deviceContext,
+		    .device = device,
 		});
 
 		uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
@@ -637,20 +640,19 @@ int main()
 
 		// Renderer
 		Renderer renderer({
-		    .deviceContext = deviceContext,
-		    .window        = &window,
+		    .device = device,
+		    .window = &window,
 		});
 
 		// MaterialSystem
 		MaterialSystem materialSystem({
-		    deviceContext.logicalDevice,
+		    .device = device,
 		});
 
 		// modelSystem
 		ModelSystem modelSystem({
-		    deviceContext,
-		    renderer.GetCommandPool(),
-		    renderer.GetQueueInfo().graphicsQueue,
+		    .device      = device,
+		    .commandPool = renderer.GetCommandPool(),
 		});
 
 
@@ -660,14 +662,14 @@ int main()
 		/// Load assets
 		LoadShaders(materialSystem);
 		LoadShaderEffects(materialSystem);
-		LoadShaderPasses(materialSystem, deviceContext.surfaceInfo.format.format, deviceContext.depthFormat, deviceContext.surfaceInfo.capabilities.currentExtent, deviceContext.maxSupportedSampleCount);
+		LoadShaderPasses(materialSystem, device);
 		LoadMasterMaterials(materialSystem);
 		LoadMaterials(materialSystem);
 
 		LoadModels(modelSystem, textureSystem);
 		LoadEntities(scene, materialSystem, modelSystem);
 
-		CreateRenderGraph(renderer, textureSystem, deviceContext);
+		CreateRenderGraph(renderer, textureSystem, device);
 
 		CameraController camera({
 		    .scene  = &scene,
@@ -691,10 +693,10 @@ int main()
 
 			if (renderer.IsSwapchainInvalidated())
 			{
-				renderer.RecreateSwapchainResources(&window, device.GetContext());
+				renderer.RecreateSwapchainResources(&window);
 
 				materialSystem.DestroyAllMaterials();
-				LoadShaderPasses(materialSystem, deviceContext.surfaceInfo.format.format, deviceContext.depthFormat, deviceContext.surfaceInfo.capabilities.currentExtent, deviceContext.maxSupportedSampleCount);
+				LoadShaderPasses(materialSystem, device);
 				LoadMasterMaterials(materialSystem);
 				LoadMaterials(materialSystem);
 

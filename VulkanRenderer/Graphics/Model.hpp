@@ -83,9 +83,8 @@ class ModelSystem
 public:
 	struct CreateInfo
 	{
-		DeviceContext deviceContext;
+		Device* device;
 		vk::CommandPool commandPool;
-		vk::Queue graphicsQueue;
 	};
 
 public:
@@ -99,12 +98,7 @@ public:
 	inline Model* GetModel(const char* name) { return &m_Models[HashStr(name)]; }
 
 private:
-	vk::Device m_LogicalDevice;
-	vk::PhysicalDevice m_PhysicalDevice;
-	vma::Allocator m_Allocator;
+	Device* m_Device;
 	vk::CommandPool m_CommandPool;
-	vk::Queue m_GraphicsQueue;
-
-
 	std::unordered_map<uint64_t, Model> m_Models;
 };

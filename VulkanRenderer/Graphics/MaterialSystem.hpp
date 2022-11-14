@@ -117,7 +117,7 @@ class MaterialSystem
 public:
 	struct CreateInfo
 	{
-		vk::Device logicalDevice;
+		Device* device;
 	};
 
 public:
@@ -145,7 +145,7 @@ public:
 	void CreateMaterial(const Material::CreateInfo& info);
 
 private:
-	vk::Device m_LogicalDevice          = {};
+	Device* m_Device;
 	vk::DescriptorPool m_DescriptorPool = {};
 
 	std::unordered_map<uint64_t, Shader> m_Shaders             = {};

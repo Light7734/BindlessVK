@@ -8,87 +8,78 @@
 #include <vk_mem_alloc.hpp>
 #include <vulkan/vulkan.hpp>
 
-class Window;
-
-struct UniformMVP
+struct Device
 {
-	glm::mat4 model;
-	glm::mat4 view;
-	glm::mat4 proj;
-};
-
-struct SurfaceInfo
-{
-	vk::SurfaceKHR surface = VK_NULL_HANDLE;
-	vk::SurfaceCapabilitiesKHR capabilities;
-	vk::SurfaceFormatKHR format;
-	vk::PresentModeKHR presentMode;
-
-	std::vector<vk::SurfaceFormatKHR> supportedFormats;
-	std::vector<vk::PresentModeKHR> supportedPresentModes;
-};
-
-struct QueueInfo
-{
-	// WARN!: These should be coherent in memory
-	uint32_t graphicsQueueIndex = UINT32_MAX;
-	uint32_t presentQueueIndex  = UINT32_MAX;
-
-	vk::Queue graphicsQueue = VK_NULL_HANDLE;
-	vk::Queue presentQueue  = VK_NULL_HANDLE;
-};
-struct DeviceContext
-{
-	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
-	vk::Instance instance;
-	vk::Device logicalDevice;
-	vk::PhysicalDevice physicalDevice;
-	vk::PhysicalDeviceProperties physicalDeviceProperties;
-	vk::SampleCountFlagBits maxSupportedSampleCount;
-	vma::Allocator allocator;
-	vk::Format depthFormat;
-	QueueInfo queueInfo;
-	SurfaceInfo surfaceInfo;
-};
-
-class Device
-{
-public:
 	struct CreateInfo
 	{
-		Window* window;
+		class Window* window;
 
 		std::vector<const char*> layers;
 		std::vector<const char*> instanceExtensions;
-		std::vector<const char*> logicalDeviceExtensions;
+		std::vector<const char*> deviceExtensions;
 
 		bool enableDebugging;
 		vk::DebugUtilsMessageSeverityFlagsEXT debugMessageSeverity;
 		vk::DebugUtilsMessageTypeFlagsEXT debugMessageTypes;
+
+		std::function<VkBool32(VkDebugUtilsMessageSeverityFlagBitsEXT,
+		                       VkDebugUtilsMessageTypeFlagsEXT,
+		                       const VkDebugUtilsMessengerCallbackDataEXT*,
+		                       void*)>
+		    debugMessageCallback;
 	};
 
-public:
-	Device(const Device::CreateInfo& info);
-	~Device();
+	// Layers & Extensions
+	std::vector<const char*> layers;
+	std::vector<const char*> instanceExtensions;
+	std::vector<const char*> deviceExtensions;
 
-	void LogDebugInfo();
+	// instance
+	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
+	vk::Instance instance;
+
+	// device
+	vk::Device logical;
+	vk::PhysicalDevice physical;
+
+	vk::PhysicalDeviceProperties properties;
+
+	vk::Format depthFormat;
+	bool hasStencil;
+
+	vk::SampleCountFlagBits maxDepthColorSamples;
+	vk::SampleCountFlagBits maxColorSamples;
+	vk::SampleCountFlagBits maxDepthSamples;
+
+	// queue
+	vk::Queue graphicsQueue;
+	vk::Queue presentQueue;
+
+	uint32_t graphicsQueueIndex;
+	uint32_t presentQueueIndex;
+
+	// surface
+	vk::SurfaceKHR surface;
+	vk::SurfaceCapabilitiesKHR surfaceCapabilities;
+
+	vk::SurfaceFormatKHR surfaceFormat;
+	vk::PresentModeKHR presentMode;
+
+	// allocator
+	vma::Allocator allocator;
+};
+
+class DeviceSystem
+{
+public:
+	DeviceSystem(const Device::CreateInfo& info);
+	~DeviceSystem();
 
 	void DrawFrame();
 
-	inline DeviceContext GetContext()
+	inline Device* GetDevice()
 	{
-		return DeviceContext {
-			m_VkGetInstanceProcAddr,
-			m_Instance,
-			m_LogicalDevice,
-			m_PhysicalDevice,
-			m_PhysicalDeviceProperties,
-			m_MaxSupportedSampleCount,
-			m_Allocator,
-			m_DepthFormat,
-			m_QueueInfo,
-			FetchSurfaceInfo(),
-		};
+		return &m_Device;
 	}
 
 private:
@@ -98,35 +89,12 @@ private:
 	void CreateLogicalDevice();
 	void CreateAllocator();
 
-	SurfaceInfo FetchSurfaceInfo();
-	vk::Format FetchDepthFormat();
-
+	void FetchSurfaceInfo();
+	void FetchDepthFormat();
 
 private:
+	Device m_Device;
+
 	vk::DynamicLoader m_DynamicLoader;
-	PFN_vkGetInstanceProcAddr m_VkGetInstanceProcAddr;
-
-	// Instance
-	vk::Instance m_Instance = {};
-
-	// Layers & Extensions
-	std::vector<const char*> m_Layers                  = {};
-	std::vector<const char*> m_InstanceExtensions      = {};
-	std::vector<const char*> m_LogicalDeviceExtensions = {};
-
 	vk::DebugUtilsMessengerEXT m_DebugUtilMessenger = {};
-
-	// Device
-	vk::Device m_LogicalDevice                              = {};
-	vk::PhysicalDevice m_PhysicalDevice                     = {};
-	vk::PhysicalDeviceProperties m_PhysicalDeviceProperties = {};
-	vk::SampleCountFlagBits m_MaxSupportedSampleCount       = vk::SampleCountFlagBits::e1;
-	vk::Format m_DepthFormat                                = {};
-
-
-	// Queue & Surface
-	QueueInfo m_QueueInfo     = {};
-	SurfaceInfo m_SurfaceInfo = {};
-
-	vma::Allocator m_Allocator = {};
 };

@@ -6,11 +6,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 ModelSystem::ModelSystem(const ModelSystem::CreateInfo& info)
-    : m_LogicalDevice(info.deviceContext.logicalDevice)
-    , m_PhysicalDevice(info.deviceContext.physicalDevice)
-    , m_Allocator(info.deviceContext.allocator)
+    : m_Device(info.device)
     , m_CommandPool(info.commandPool)
-    , m_GraphicsQueue(info.graphicsQueue)
 {
 }
 
@@ -219,19 +216,16 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	} // Load nodes
 
 	model.vertexBuffer = new StagingBuffer({
-	    .logicalDevice  = m_LogicalDevice,
-	    .physicalDevice = m_PhysicalDevice,
-	    .allocator      = m_Allocator,
-	    .commandPool    = m_CommandPool,
-	    .graphicsQueue  = m_GraphicsQueue,
-	    .usage          = vk::BufferUsageFlagBits::eVertexBuffer,
-	    .minBlockSize   = vertices.size() * sizeof(Model::Vertex),
-	    .blockCount     = 1u,
-	    .initialData    = vertices.data(),
+	    .device       = m_Device,
+	    .commandPool  = m_CommandPool,
+	    .usage        = vk::BufferUsageFlagBits::eVertexBuffer,
+	    .minBlockSize = vertices.size() * sizeof(Model::Vertex),
+	    .blockCount   = 1u,
+	    .initialData  = vertices.data(),
 	});
 
 	std::string vertexBufferName(std::string(info.name) + " VertexBuffer");
-	m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 	    vk::ObjectType::eBuffer,
 	    (uint64_t)(VkBuffer)(*model.vertexBuffer->GetBuffer()),
 	    vertexBufferName.c_str(),
@@ -239,19 +233,16 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 
 
 	model.indexBuffer = new StagingBuffer({
-	    .logicalDevice  = m_LogicalDevice,
-	    .physicalDevice = m_PhysicalDevice,
-	    .allocator      = m_Allocator,
-	    .commandPool    = m_CommandPool,
-	    .graphicsQueue  = m_GraphicsQueue,
-	    .usage          = vk::BufferUsageFlagBits::eIndexBuffer,
-	    .minBlockSize   = indices.size() * sizeof(uint32_t),
-	    .blockCount     = 1u,
-	    .initialData    = indices.data(),
+	    .device       = m_Device,
+	    .commandPool  = m_CommandPool,
+	    .usage        = vk::BufferUsageFlagBits::eIndexBuffer,
+	    .minBlockSize = indices.size() * sizeof(uint32_t),
+	    .blockCount   = 1u,
+	    .initialData  = indices.data(),
 	});
 
 	std::string indexBufferName(std::string(info.name) + " IndexBuffer");
-	m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 	    vk::ObjectType::eBuffer,
 	    (uint64_t)(VkBuffer)(*model.indexBuffer->GetBuffer()),
 	    indexBufferName.c_str(),

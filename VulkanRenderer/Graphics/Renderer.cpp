@@ -11,46 +11,41 @@
 #include <imgui.h>
 
 Renderer::Renderer(const Renderer::CreateInfo& info)
-    : m_LogicalDevice(info.deviceContext.logicalDevice)
-    , m_Allocator(info.deviceContext.allocator)
-    , m_DepthFormat(info.deviceContext.depthFormat)
-
+    :m_Device(info.device)
 {
 	CreateSyncObjects();
 	CreateDescriptorPools();
-	RecreateSwapchainResources(info.window, info.deviceContext);
+	RecreateSwapchainResources(info.window);
 }
 
 Renderer::~Renderer()
 {
 	DestroySwapchain();
 
-	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool, nullptr);
+	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		m_LogicalDevice.destroyFence(m_RenderFences[i], nullptr);
-		m_LogicalDevice.destroySemaphore(m_RenderSemaphores[i], nullptr);
-		m_LogicalDevice.destroySemaphore(m_PresentSemaphores[i], nullptr);
+		m_Device->logical.destroyFence(m_RenderFences[i], nullptr);
+		m_Device->logical.destroySemaphore(m_RenderSemaphores[i], nullptr);
+		m_Device->logical.destroySemaphore(m_PresentSemaphores[i], nullptr);
 	}
 
-	m_LogicalDevice.destroyFence(m_UploadContext.fence);
+	m_Device->logical.destroyFence(m_UploadContext.fence);
 }
 
-void Renderer::RecreateSwapchainResources(Window* window, DeviceContext deviceContext)
+void Renderer::RecreateSwapchainResources(Window* window)
 {
 	DestroySwapchain();
 
-	m_SurfaceInfo = deviceContext.surfaceInfo;
-	m_QueueInfo   = deviceContext.queueInfo;
-	m_SampleCount = deviceContext.maxSupportedSampleCount;
+	m_SampleCount = m_Device->maxDepthColorSamples;
 
 	CreateSwapchain();
 	CreateCommandPool();
-	InitializeImGui(deviceContext, window);
+	InitializeImGui(window);
 
 	m_SwapchainInvalidated = false;
-	m_LogicalDevice.waitIdle();
+	m_Device->logical.waitIdle();
 }
 
 void Renderer::DestroySwapchain()
@@ -60,24 +55,24 @@ void Renderer::DestroySwapchain()
 		return;
 	}
 
-	m_LogicalDevice.waitIdle();
+	m_Device->logical.waitIdle();
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
-	m_LogicalDevice.resetCommandPool(m_CommandPool);
-	m_LogicalDevice.resetCommandPool(m_UploadContext.cmdPool);
-	m_LogicalDevice.destroyCommandPool(m_UploadContext.cmdPool);
-	m_LogicalDevice.destroyCommandPool(m_CommandPool);
+	m_Device->logical.resetCommandPool(m_CommandPool);
+	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool);
+	m_Device->logical.destroyCommandPool(m_UploadContext.cmdPool);
+	m_Device->logical.destroyCommandPool(m_CommandPool);
 
-	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
+	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
 
 	for (const auto& imageView : m_SwapchainImageViews)
 	{
-		m_LogicalDevice.destroyImageView(imageView);
+		m_Device->logical.destroyImageView(imageView);
 	}
 
-	m_LogicalDevice.destroySwapchainKHR(m_Swapchain);
+	m_Device->logical.destroySwapchainKHR(m_Swapchain);
 };
 
 void Renderer::CreateSyncObjects()
@@ -90,12 +85,12 @@ void Renderer::CreateSyncObjects()
 			vk::FenceCreateFlagBits::eSignaled, // flags
 		};
 
-		m_RenderFences[i]      = m_LogicalDevice.createFence(fenceCreateInfo, nullptr);
-		m_RenderSemaphores[i]  = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
-		m_PresentSemaphores[i] = m_LogicalDevice.createSemaphore(semaphoreCreateInfo, nullptr);
+		m_RenderFences[i]      = m_Device->logical.createFence(fenceCreateInfo, nullptr);
+		m_RenderSemaphores[i]  = m_Device->logical.createSemaphore(semaphoreCreateInfo, nullptr);
+		m_PresentSemaphores[i] = m_Device->logical.createSemaphore(semaphoreCreateInfo, nullptr);
 	}
 
-	m_UploadContext.fence = m_LogicalDevice.createFence({}, nullptr);
+	m_UploadContext.fence = m_Device->logical.createFence({}, nullptr);
 }
 
 void Renderer::CreateDescriptorPools()
@@ -122,13 +117,13 @@ void Renderer::CreateDescriptorPools()
 		poolSizes.data(),                                   // pPoolSizes
 	};
 
-	m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 }
 
 void Renderer::CreateSwapchain()
 {
-	const uint32_t minImage = m_SurfaceInfo.capabilities.minImageCount;
-	const uint32_t maxImage = m_SurfaceInfo.capabilities.maxImageCount;
+	const uint32_t minImage = m_Device->surfaceCapabilities.minImageCount;
+	const uint32_t maxImage = m_Device->surfaceCapabilities.maxImageCount;
 
 	uint32_t imageCount = maxImage >= DESIRED_SWAPCHAIN_IMAGES && minImage <= DESIRED_SWAPCHAIN_IMAGES ? DESIRED_SWAPCHAIN_IMAGES :
 	                      maxImage == 0ul && minImage <= DESIRED_SWAPCHAIN_IMAGES                      ? DESIRED_SWAPCHAIN_IMAGES :
@@ -136,36 +131,36 @@ void Renderer::CreateSwapchain()
 	                      minImage == 0ul && maxImage >= 2ul                                           ? 2ul :
 	                                                                                                     minImage;
 	// Create swapchain
-	bool sameQueueIndex = m_QueueInfo.graphicsQueueIndex == m_QueueInfo.presentQueueIndex;
+	bool sameQueueIndex = m_Device->graphicsQueueIndex == m_Device->presentQueueIndex;
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo {
 		{},                                                                          // flags
-		m_SurfaceInfo.surface,                                                       // surface
+		m_Device->surface,                                                           // surface
 		imageCount,                                                                  // minImageCount
-		m_SurfaceInfo.format.format,                                                 // imageFormat
-		m_SurfaceInfo.format.colorSpace,                                             // imageColorSpace
-		m_SurfaceInfo.capabilities.currentExtent,                                    // imageExtent
+		m_Device->surfaceFormat.format,                                              // imageFormat
+		m_Device->surfaceFormat.colorSpace,                                          // imageColorSpace
+		m_Device->surfaceCapabilities.currentExtent,                                 // imageExtent
 		1u,                                                                          // imageArrayLayers
 		vk::ImageUsageFlagBits::eColorAttachment,                                    // imageUsage
 		sameQueueIndex ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent, // imageSharingMode
 		sameQueueIndex ? 0u : 2u,                                                    // queueFamilyIndexCount
-		sameQueueIndex ? nullptr : &m_QueueInfo.graphicsQueueIndex,                  // pQueueFamilyIndices
-		m_SurfaceInfo.capabilities.currentTransform,                                 // preTransform
+		sameQueueIndex ? nullptr : &m_Device->graphicsQueueIndex,                    // pQueueFamilyIndices
+		m_Device->surfaceCapabilities.currentTransform,                              // preTransform
 		vk::CompositeAlphaFlagBitsKHR::eOpaque,                                      // compositeAlpha -> No alpha-blending between multiple windows
-		m_SurfaceInfo.presentMode,                                                   // presentMode
+		m_Device->presentMode,                                                       // presentMode
 		VK_TRUE,                                                                     // clipped -> Don't render the obsecured pixels
 		VK_NULL_HANDLE,                                                              // oldSwapchain
 	};
 
-	m_Swapchain       = m_LogicalDevice.createSwapchainKHR(swapchainCreateInfo, nullptr);
-	m_SwapchainImages = m_LogicalDevice.getSwapchainImagesKHR(m_Swapchain);
+	m_Swapchain       = m_Device->logical.createSwapchainKHR(swapchainCreateInfo, nullptr);
+	m_SwapchainImages = m_Device->logical.getSwapchainImagesKHR(m_Swapchain);
 
 	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
 	{
 		vk::ImageViewCreateInfo imageViewCreateInfo {
-			{},                          // flags
-			m_SwapchainImages[i],        // image
-			vk::ImageViewType::e2D,      // viewType
-			m_SurfaceInfo.format.format, // format
+			{},                             // flags
+			m_SwapchainImages[i],           // image
+			vk::ImageViewType::e2D,         // viewType
+			m_Device->surfaceFormat.format, // format
 
 			/* components */
 			vk::ComponentMapping {
@@ -187,21 +182,21 @@ void Renderer::CreateSwapchain()
 			},
 		};
 
-		m_SwapchainImageViews.push_back(m_LogicalDevice.createImageView(imageViewCreateInfo, nullptr));
+		m_SwapchainImageViews.push_back(m_Device->logical.createImageView(imageViewCreateInfo, nullptr));
 	}
 
 
 	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
 	{
 		std::string imageName("swap_chain Image #" + std::to_string(i));
-		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)m_SwapchainImages[i],
 		    imageName.c_str(),
 		});
 
 		std::string viewName("swap_chain ImageView #" + std::to_string(i));
-		m_LogicalDevice.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)m_SwapchainImageViews[i],
 		    viewName.c_str(),
@@ -214,46 +209,46 @@ void Renderer::CreateCommandPool()
 	// renderer
 	vk::CommandPoolCreateInfo commandPoolCreateInfo {
 		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
-		m_QueueInfo.graphicsQueueIndex,                     // queueFamilyIndex
+		m_Device->graphicsQueueIndex,                       // queueFamilyIndex
 	};
 
-	m_CommandPool           = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
-	m_UploadContext.cmdPool = m_LogicalDevice.createCommandPool(commandPoolCreateInfo, nullptr);
+	m_CommandPool           = m_Device->logical.createCommandPool(commandPoolCreateInfo, nullptr);
+	m_UploadContext.cmdPool = m_Device->logical.createCommandPool(commandPoolCreateInfo, nullptr);
 
 	vk::CommandBufferAllocateInfo cmdBufferAllocInfo {
 		m_CommandPool,                    // commandPool
 		vk::CommandBufferLevel::ePrimary, // level
 		MAX_FRAMES_IN_FLIGHT,             // commandBufferCount
 	};
-	m_CommandBuffers = m_LogicalDevice.allocateCommandBuffers(cmdBufferAllocInfo);
+	m_CommandBuffers = m_Device->logical.allocateCommandBuffers(cmdBufferAllocInfo);
 
 	vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
 		m_UploadContext.cmdPool,
 		vk::CommandBufferLevel::ePrimary,
 		1u,
 	};
-	m_UploadContext.cmdBuffer = m_LogicalDevice.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
+	m_UploadContext.cmdBuffer = m_Device->logical.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
 }
 
-void Renderer::InitializeImGui(const DeviceContext& deviceContext, Window* window)
+void Renderer::InitializeImGui(Window* window)
 {
 	ImGui::CreateContext();
 
 	ImGui_ImplGlfw_InitForVulkan(window->GetGlfwHandle(), true);
 
 	ImGui_ImplVulkan_InitInfo initInfo {
-		.Instance              = deviceContext.instance,
-		.PhysicalDevice        = deviceContext.physicalDevice,
-		.Device                = m_LogicalDevice,
-		.Queue                 = m_QueueInfo.graphicsQueue,
+		.Instance              = m_Device->instance,
+		.PhysicalDevice        = m_Device->physical,
+		.Device                = m_Device->logical,
+		.Queue                 = m_Device->graphicsQueue,
 		.DescriptorPool        = m_DescriptorPool,
 		.UseDynamicRendering   = true,
-		.ColorAttachmentFormat = static_cast<VkFormat>(m_SurfaceInfo.format.format),
+		.ColorAttachmentFormat = static_cast<VkFormat>(m_Device->surfaceFormat.format),
 		.MinImageCount         = MAX_FRAMES_IN_FLIGHT,
 		.ImageCount            = MAX_FRAMES_IN_FLIGHT,
 		.MSAASamples           = static_cast<VkSampleCountFlagBits>(m_SampleCount),
 	};
-	std::pair userData = std::make_pair(deviceContext.vkGetInstanceProcAddr, deviceContext.instance);
+	std::pair userData = std::make_pair(m_Device->vkGetInstanceProcAddr, m_Device->instance);
 
 	ASSERT(ImGui_ImplVulkan_LoadFunctions(
 	           [](const char* func, void* data) {
@@ -271,18 +266,13 @@ void Renderer::InitializeImGui(const DeviceContext& deviceContext, Window* windo
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
-void Renderer::BuildRenderGraph(const DeviceContext& deviceContext, RenderGraph::BuildInfo buildInfo)
+void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
 {
 	m_RenderGraph.Init({
-	    .swapchainExtent     = m_SurfaceInfo.capabilities.maxImageExtent,
+	    .device              = m_Device,
+	    .swapchainExtent     = m_Device->surfaceCapabilities.maxImageExtent,
 	    .descriptorPool      = m_DescriptorPool,
-	    .logicalDevice       = deviceContext.logicalDevice,
-	    .physicalDevice      = deviceContext.physicalDevice,
-	    .allocator           = m_Allocator,
 	    .commandPool         = m_CommandPool,
-	    .colorFormat         = m_SurfaceInfo.format.format,
-	    .depthFormat         = m_DepthFormat,
-	    .queueInfo           = m_QueueInfo,
 	    .swapchainImages     = m_SwapchainImages,
 	    .swapchainImageViews = m_SwapchainImageViews,
 	});
@@ -305,14 +295,14 @@ void Renderer::DrawScene(Scene* scene)
 	if (m_SwapchainInvalidated)
 		return;
 
-	VKC(m_LogicalDevice.waitForFences(1u, &m_RenderFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
-	VKC(m_LogicalDevice.resetFences(1u, &m_RenderFences[m_CurrentFrame]));
+	VKC(m_Device->logical.waitForFences(1u, &m_RenderFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
+	VKC(m_Device->logical.resetFences(1u, &m_RenderFences[m_CurrentFrame]));
 
 	uint32_t imageIndex;
-	vk::Result result = m_LogicalDevice.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_RenderSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
+	vk::Result result = m_Device->logical.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_RenderSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
 	{
-		m_LogicalDevice.waitIdle();
+		m_Device->logical.waitIdle();
 		m_SwapchainInvalidated = true;
 		return;
 	}
@@ -330,7 +320,7 @@ void Renderer::DrawScene(Scene* scene)
 	    .pass  = nullptr,
 	    .scene = scene,
 
-	    .logicalDevice = m_LogicalDevice,
+	    .logicalDevice = m_Device->logical,
 	    .cmd           = cmd,
 
 	    .imageIndex = imageIndex,
@@ -360,7 +350,7 @@ void Renderer::SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSema
 		&signalSemaphore, // pSignalSemaphores
 	};
 
-	VKC(m_QueueInfo.graphicsQueue.submit(1u, &submitInfo, signalFence));
+	VKC(m_Device->graphicsQueue.submit(1u, &submitInfo, signalFence));
 }
 
 void Renderer::PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex)
@@ -376,17 +366,17 @@ void Renderer::PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex)
 
 	try
 	{
-		vk::Result result = m_QueueInfo.presentQueue.presentKHR(presentInfo);
+		vk::Result result = m_Device->presentQueue.presentKHR(presentInfo);
 		if (result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
 		{
-			m_LogicalDevice.waitIdle();
+			m_Device->logical.waitIdle();
 			m_SwapchainInvalidated = true;
 			return;
 		}
 	}
 	catch (vk::OutOfDateKHRError err) // OutOfDateKHR is not considered a success value and throws an error (presentKHR)
 	{
-		m_LogicalDevice.waitIdle();
+		m_Device->logical.waitIdle();
 		m_SwapchainInvalidated = true;
 		return;
 	}
@@ -408,9 +398,9 @@ void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function
 
 	vk::SubmitInfo submitInfo { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
 
-	m_QueueInfo.graphicsQueue.submit(submitInfo, m_UploadContext.fence);
-	VKC(m_LogicalDevice.waitForFences(m_UploadContext.fence, true, UINT_MAX));
-	m_LogicalDevice.resetFences(m_UploadContext.fence);
+	m_Device->graphicsQueue.submit(submitInfo, m_UploadContext.fence);
+	VKC(m_Device->logical.waitForFences(m_UploadContext.fence, true, UINT_MAX));
+	m_Device->logical.resetFences(m_UploadContext.fence);
 
-	m_LogicalDevice.resetCommandPool(m_CommandPool, {});
+	m_Device->logical.resetCommandPool(m_CommandPool, {});
 }

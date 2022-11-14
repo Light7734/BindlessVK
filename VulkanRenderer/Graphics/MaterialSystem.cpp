@@ -8,7 +8,7 @@
 static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't");
 
 MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
-    : m_LogicalDevice(info.logicalDevice)
+    : m_Device(info.device)
 {
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{ vk::DescriptorType::eSampler, 1000 },
@@ -32,27 +32,27 @@ MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
 		poolSizes.data(),                        // pPoolSizes
 	};
 
-	m_DescriptorPool = m_LogicalDevice.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 }
 
 MaterialSystem::~MaterialSystem()
 {
 	DestroyAllMaterials();
 
-	m_LogicalDevice.destroyDescriptorPool(m_DescriptorPool);
+	m_Device->logical.destroyDescriptorPool(m_DescriptorPool);
 
 	for (auto& [key, val] : m_ShaderEffects)
 	{
-		m_LogicalDevice.destroyDescriptorSetLayout(val.setsLayout[0]);
-		m_LogicalDevice.destroyDescriptorSetLayout(val.setsLayout[1]);
-		m_LogicalDevice.destroyPipelineLayout(val.pipelineLayout);
+		m_Device->logical.destroyDescriptorSetLayout(val.setsLayout[0]);
+		m_Device->logical.destroyDescriptorSetLayout(val.setsLayout[1]);
+		m_Device->logical.destroyPipelineLayout(val.pipelineLayout);
 
 		static_assert(ShaderEffect().setsLayout.size() == 2, "Sets layout has been resized");
 	}
 
 	for (auto& [key, val] : m_Shaders)
 	{
-		m_LogicalDevice.destroyShaderModule(val.module);
+		m_Device->logical.destroyShaderModule(val.module);
 	}
 
 
@@ -64,10 +64,10 @@ void MaterialSystem::DestroyAllMaterials()
 {
 	for (auto& [key, val] : m_ShaderPasses)
 	{
-		m_LogicalDevice.destroyPipeline(val.pipeline);
+		m_Device->logical.destroyPipeline(val.pipeline);
 	}
 
-	m_LogicalDevice.resetDescriptorPool(m_DescriptorPool);
+	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
 
 	m_ShaderPasses.clear();
 	m_MasterMaterials.clear();
@@ -95,9 +95,9 @@ void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
 
 	test                          = std::string(info.name);
 	m_Shaders[HashStr(info.name)] = {
-		m_LogicalDevice.createShaderModule(createInfo), // module
-		info.stage,                                     // stage
-		code,                                           // code
+		m_Device->logical.createShaderModule(createInfo), // module
+		info.stage,                                       // stage
+		code,                                             // code
 	};
 }
 
@@ -149,7 +149,7 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 			static_cast<uint32_t>(set.size()), // bindingCount
 			set.data(),                        // pBindings
 		};
-		setsLayout[index++] = m_LogicalDevice.createDescriptorSetLayout(setLayoutCreateInfo);
+		setsLayout[index++] = m_Device->logical.createDescriptorSetLayout(setLayoutCreateInfo);
 	}
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
 		{},                                       // flags
@@ -159,9 +159,9 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 
 
 	m_ShaderEffects[HashStr(info.name)] = {
-		info.shaders,                                                   // shaders
-		m_LogicalDevice.createPipelineLayout(pipelineLayoutCreateInfo), // piplineLayout
-		setsLayout                                                      // setsLayout
+		info.shaders,                                                     // shaders
+		m_Device->logical.createPipelineLayout(pipelineLayoutCreateInfo), // piplineLayout
+		setsLayout                                                        // setsLayout
 	};
 }
 
@@ -209,7 +209,7 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 		&pipelineRenderingCreateInfo,
 	};
 
-	auto pipeline = m_LogicalDevice.createGraphicsPipeline({}, graphicsPipelineCreateInfo);
+	auto pipeline = m_Device->logical.createGraphicsPipeline({}, graphicsPipelineCreateInfo);
 	VKC(pipeline.result)
 
 	m_ShaderPasses[HashStr(info.name)] = {
@@ -235,7 +235,7 @@ void MaterialSystem::CreateMaterial(const Material::CreateInfo& info)
 	};
 
 	vk::DescriptorSet set;
-	VKC(m_LogicalDevice.allocateDescriptorSets(&allocateInfo, &set));
+	VKC(m_Device->logical.allocateDescriptorSets(&allocateInfo, &set));
 
 	m_Materials[HashStr(info.name)] = {
 		info.base,

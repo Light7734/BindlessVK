@@ -79,7 +79,7 @@ class TextureSystem
 public:
 	struct CreateInfo
 	{
-		DeviceContext deviceContext;
+		Device* device;
 	};
 
 public:
@@ -120,14 +120,8 @@ private:
 	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
-	UploadContext m_UploadContext = {};
+	Device* m_Device = {};
 
-	vk::Device m_LogicalDevice                         = {};
-	vk::PhysicalDevice m_PhysicalDevice                = {};
-	vk::PhysicalDeviceProperties m_PhysicalDeviceProps = {};
-	vk::Queue m_GraphicsQueue;
-
-	vma::Allocator m_Allocator = {};
-
+	UploadContext m_UploadContext                    = {};
 	std::unordered_map<uint64_t, Texture> m_Textures = {};
 };
