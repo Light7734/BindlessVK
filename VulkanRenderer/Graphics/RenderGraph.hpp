@@ -79,6 +79,8 @@ public:
 	}
 
 private:
+	void CreateCommandBuffers();
+
 	void ValidateGraph();
 	void ReorderPasses();
 
@@ -186,5 +188,9 @@ private:
 	vk::Format m_DepthFormat = {};
 
 	std::vector<RenderPass::CreateInfo> m_RenderPassCreateInfos = {};
-	std::vector<RenderPass::CreateInfo::BufferInputInfo> m_BufferInputInfos;
+	std::vector<RenderPass::CreateInfo::BufferInputInfo> m_BufferInputInfos = {};
+
+	std::vector<vk::CommandBuffer> m_SecondaryCommandBuffers = {};
+
+	vk::SampleCountFlagBits m_SampleCount = {};
 };
