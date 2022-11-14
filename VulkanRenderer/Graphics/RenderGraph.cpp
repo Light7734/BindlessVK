@@ -36,6 +36,8 @@ void RenderGraph::Build(const BuildInfo& info)
 	m_SwapchainAttachmentNames.push_back(info.backbufferName);
 	m_RenderPasses.resize(m_RenderPassCreateInfos.size(), RenderPass {});
 
+	CreateCommandBuffers();
+
 	ValidateGraph();
 	ReorderPasses();
 
@@ -46,6 +48,17 @@ void RenderGraph::Build(const BuildInfo& info)
 
 	BuildDescriptorSets();
 	WriteDescriptorSets();
+}
+
+void RenderGraph::CreateCommandBuffers()
+{
+	vk::CommandBufferAllocateInfo cmdBufferallocInfo {
+		m_CommandPool,
+		vk::CommandBufferLevel::eSecondary,
+		MAX_FRAMES_IN_FLIGHT * (uint32_t)m_RenderPassCreateInfos.size(),
+	};
+
+	m_SecondaryCommandBuffers = m_LogicalDevice.allocateCommandBuffers(cmdBufferallocInfo);
 }
 
 // @todo: Implement
@@ -512,6 +525,8 @@ void RenderGraph::WriteDescriptorSets()
 
 void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type)
 {
+	m_SampleCount = info.samples;
+
 	vk::ImageUsageFlags usage;
 	vk::ImageAspectFlags aspectMask;
 	if (info.format == m_ColorFormat)
@@ -740,6 +755,8 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 void RenderGraph::Render(RenderContext context)
 {
 	m_UpdateAction(context);
+	// @todo: Setup render barriers
+	const auto primaryCmd = context.cmd;
 
 	for (uint32_t i = 0; i < m_RenderPasses.size(); i++)
 	{
@@ -747,18 +764,76 @@ void RenderGraph::Render(RenderContext context)
 		context.pass->updateAction(context);
 	}
 
-	// @todo: Setup render barriers
-	const auto cmd = context.cmd;
-	cmd.begin(vk::CommandBufferBeginInfo {});
 
-	cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-	                       m_PipelineLayout,
-	                       0u, 1ul, &m_DescriptorSets[context.frameIndex], 0ul, {});
+	primaryCmd.begin(vk::CommandBufferBeginInfo {});
+
 
 	size_t i = 0;
 	for (RenderPass& pass : m_RenderPasses)
 	{
-		cmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
+		vk::CommandBuffer passCmd = m_SecondaryCommandBuffers[(context.frameIndex * m_RenderPasses.size()) + i];
+
+		std::vector<vk::Format> colorAttachmentFormats = {};
+		vk::Format depthAttachmentFormat               = {};
+		for (RenderPass::Attachment attachment : pass.attachments)
+		{
+			if (attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
+			{
+				colorAttachmentFormats.push_back(m_ColorFormat);
+			}
+			else
+			{
+				depthAttachmentFormat = m_DepthFormat;
+			}
+		}
+
+
+		vk::CommandBufferInheritanceRenderingInfo inheritanceRenderingInfo {
+			{},
+			{},
+			(uint32_t)colorAttachmentFormats.size(),
+			colorAttachmentFormats.data(),
+			depthAttachmentFormat,
+			{},
+			m_SampleCount,
+			{}
+		};
+
+		vk::CommandBufferInheritanceInfo inheritanceInfo {
+			{},
+			{},
+			{},
+			{},
+			{},
+			{},
+
+			&inheritanceRenderingInfo,
+		};
+		passCmd.begin(vk::CommandBufferBeginInfo {
+		    vk::CommandBufferUsageFlagBits::eRenderPassContinue,
+		    &inheritanceInfo,
+		});
+
+		passCmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+		                           m_PipelineLayout,
+		                           0u, 1ul, &m_DescriptorSets[context.frameIndex], 0ul, {});
+		if (!pass.descriptorSets.empty())
+		{
+			passCmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+			                           pass.pipelineLayout,
+			                           1ul, 1u, &pass.descriptorSets[context.frameIndex], 0ul, {});
+		}
+		context.cmd = passCmd;
+		pass.renderAction(context);
+		passCmd.end();
+
+		i++;
+	}
+
+	i = 0;
+	for (RenderPass& pass : m_RenderPasses)
+	{
+		primaryCmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
 		    pass.name.c_str(),
 		    { 1.0, 1.0, 0.8, 1.0 },
 		}));
@@ -788,12 +863,12 @@ void RenderGraph::Render(RenderContext context)
 			     resource.srcStageMask != attachment.stageMask) &&
 			    attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				cmd.pipelineBarrier(resource.srcStageMask,
-				                    attachment.stageMask,
-				                    {},
-				                    {},
-				                    {},
-				                    imageBarrier);
+				primaryCmd.pipelineBarrier(resource.srcStageMask,
+				                           attachment.stageMask,
+				                           {},
+				                           {},
+				                           {},
+				                           imageBarrier);
 
 				resource.srcAccessMask  = attachment.accessMask;
 				resource.srcImageLayout = attachment.layout;
@@ -849,7 +924,7 @@ void RenderGraph::Render(RenderContext context)
 
 
 		vk::RenderingInfo renderingInfo {
-			{}, // flags
+			vk::RenderingFlagBits::eContentsSecondaryCommandBuffers, // flags
 			vk::Rect2D {
 			    { 0, 0 },
 			    m_SwapchainExtent,
@@ -862,25 +937,19 @@ void RenderGraph::Render(RenderContext context)
 			{},
 		};
 
-		cmd.beginRendering(renderingInfo);
+		primaryCmd.beginRendering(renderingInfo);
 
-		if (!pass.descriptorSets.empty())
-		{
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			                       pass.pipelineLayout,
-			                       1ul, 1u, &pass.descriptorSets[context.frameIndex], 0ul, {});
-		}
 
-		cmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
+		primaryCmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
 		    (pass.name + " render action").c_str(),
 		    { 1.0, 1.0, 0.2, 1.0 },
 		}));
 
-		pass.renderAction(context);
-		cmd.endDebugUtilsLabelEXT();
+		primaryCmd.executeCommands(m_SecondaryCommandBuffers[(context.frameIndex * m_RenderPasses.size()) + i]);
+		primaryCmd.endRendering();
 
-		cmd.endRendering();
-		cmd.endDebugUtilsLabelEXT();
+		primaryCmd.endDebugUtilsLabelEXT();
+		primaryCmd.endDebugUtilsLabelEXT();
 		i++;
 	}
 
@@ -906,7 +975,7 @@ void RenderGraph::Render(RenderContext context)
 		},
 	};
 
-	cmd.pipelineBarrier(
+	primaryCmd.pipelineBarrier(
 	    backbufferResource.srcStageMask,
 	    vk::PipelineStageFlagBits::eBottomOfPipe,
 	    {},

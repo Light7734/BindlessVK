@@ -325,7 +325,6 @@ void Renderer::DrawScene(Scene* scene)
 
 	auto cmd = m_CommandBuffers[m_CurrentFrame];
 
-	LOG(trace, "{}--", counter);
 	m_RenderGraph.Render({
 	    .graph = &m_RenderGraph,
 	    .pass  = nullptr,
@@ -337,14 +336,11 @@ void Renderer::DrawScene(Scene* scene)
 	    .imageIndex = imageIndex,
 	    .frameIndex = m_CurrentFrame,
 	});
-	LOG(trace, "D");
 
 	counter++;
 
 	SubmitQueue(m_RenderSemaphores[m_CurrentFrame], m_PresentSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
-	LOG(trace, "E");
 	PresentFrame(m_PresentSemaphores[m_CurrentFrame], imageIndex);
-	LOG(trace, "F: {} - {}", m_CurrentFrame, imageIndex);
 
 	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
 }

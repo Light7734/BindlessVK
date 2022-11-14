@@ -81,9 +81,7 @@ inline void ForwardPassRender(const RenderContext& context)
 		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
 		if (currentPipeline != newPipeline)
 		{
-			LOG(trace, "Binding pipeline fpass");
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
-			LOG(trace, "Bound pipeline fpass");
 			currentPipeline = newPipeline;
 		}
 		// bind buffers
