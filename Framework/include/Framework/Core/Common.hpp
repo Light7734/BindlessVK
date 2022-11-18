@@ -35,7 +35,7 @@ public:
 			spdlog::set_pattern("%^%n@%! ==> %v%$");
 			spdlog::set_level(spdlog::level::trace);
 
-			s_Logger = spdlog::stdout_color_mt("Renderer");
+			s_Logger = spdlog::stdout_color_mt("Framework");
 		}
 
 		return s_Logger;

@@ -83,8 +83,9 @@ public:
 	};
 
 public:
-	TextureSystem(const TextureSystem::CreateInfo& info);
 	TextureSystem() = default;
+	void Init(const TextureSystem::CreateInfo& info);
+
 	~TextureSystem();
 
 	Texture* CreateFromBuffer(const Texture::CreateInfoBuffer& info);

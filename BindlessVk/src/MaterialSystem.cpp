@@ -6,9 +6,10 @@ static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was a
 
 namespace BINDLESSVK_NAMESPACE {
 
-MaterialSystem::MaterialSystem(const MaterialSystem::CreateInfo& info)
-    : m_Device(info.device)
+void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 {
+	m_Device = info.device;
+
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{ vk::DescriptorType::eSampler, 1000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 1000 },

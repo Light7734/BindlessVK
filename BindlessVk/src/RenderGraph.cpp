@@ -25,7 +25,8 @@ void RenderGraph::Build(const BuildInfo& info)
 {
 	m_RenderPassCreateInfos = info.renderPasses;
 	m_BufferInputInfos      = info.bufferInputs;
-	m_UpdateAction          = info.updateAction;
+	m_OnUpdate              = info.onUpdate;
+	m_OnBeginFrame          = info.onBeginFrame;
 
 	m_SwapchainAttachmentNames.push_back(info.backbufferName);
 	m_RenderPasses.resize(m_RenderPassCreateInfos.size(), RenderPass {});
@@ -66,8 +67,9 @@ void RenderGraph::ReorderPasses()
 	for (uint32_t i = m_RenderPassCreateInfos.size(); i-- > 0;)
 	{
 		m_RenderPasses[i].name         = m_RenderPassCreateInfos[i].name;
-		m_RenderPasses[i].updateAction = m_RenderPassCreateInfos[i].updateAction;
-		m_RenderPasses[i].renderAction = m_RenderPassCreateInfos[i].renderAction;
+		m_RenderPasses[i].onUpdate     = m_RenderPassCreateInfos[i].onUpdate;
+		m_RenderPasses[i].onRender     = m_RenderPassCreateInfos[i].onRender;
+		m_RenderPasses[i].onBeginFrame = m_RenderPassCreateInfos[i].onBeginFrame;
 
 
 		for (const RenderPass::CreateInfo::AttachmentInfo& info : m_RenderPassCreateInfos[i].colorAttachmentInfos)
@@ -740,16 +742,26 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 	m_AttachmentResources.push_back(resourceContainer);
 }
 
-void RenderGraph::Render(RenderContext context)
+void RenderGraph::BeginFrame(RenderContext context)
 {
-	m_UpdateAction(context);
+	m_OnBeginFrame(context);
+
+	for (RenderPass& pass : m_RenderPasses)
+	{
+		pass.onBeginFrame(context);
+	}
+}
+
+void RenderGraph::EndFrame(RenderContext context)
+{
+	m_OnUpdate(context);
 	// @todo: Setup render barriers
 	const auto primaryCmd = context.cmd;
 
 	for (uint32_t i = 0; i < m_RenderPasses.size(); i++)
 	{
 		context.pass = &m_RenderPasses[i];
-		context.pass->updateAction(context);
+		context.pass->onUpdate(context);
 	}
 
 
@@ -812,7 +824,7 @@ void RenderGraph::Render(RenderContext context)
 			                           1ul, 1u, &pass.descriptorSets[context.frameIndex], 0ul, {});
 		}
 		context.cmd = passCmd;
-		pass.renderAction(context);
+		pass.onRender(context);
 		passCmd.end();
 
 		i++;

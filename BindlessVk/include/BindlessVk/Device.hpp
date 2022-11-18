@@ -16,10 +16,10 @@ struct Device
 		std::function<vk::SurfaceKHR(vk::Instance)> createWindowSurfaceFunc;
 
 		bool enableDebugging;
-		vk::DebugUtilsMessageSeverityFlagsEXT debugMessageSeverity;
-		vk::DebugUtilsMessageTypeFlagsEXT debugMessageTypes;
-
-		PFN_vkDebugUtilsMessengerCallbackEXT debugMessageCallback;
+		vk::DebugUtilsMessageSeverityFlagsEXT debugMessengerSeverities;
+		vk::DebugUtilsMessageTypeFlagsEXT debugMessengerTypes;
+		PFN_vkDebugUtilsMessengerCallbackEXT debugMessengerCallback;
+		void* debugMessengerUserPointer;
 	};
 
 	// Layers & Extensions
@@ -66,7 +66,9 @@ struct Device
 class DeviceSystem
 {
 public:
-	DeviceSystem(const Device::CreateInfo& info);
+	DeviceSystem() = default;
+	void Init(const Device::CreateInfo& info);
+
 	~DeviceSystem();
 
 	void DrawFrame();
@@ -87,7 +89,7 @@ private:
 	void FetchDepthFormat();
 
 private:
-	Device m_Device;
+	Device m_Device = {};
 
 	vk::DynamicLoader m_DynamicLoader;
 	vk::DebugUtilsMessengerEXT m_DebugUtilMessenger = {};

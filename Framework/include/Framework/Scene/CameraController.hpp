@@ -20,6 +20,8 @@ public:
 	};
 
 public:
+	CameraController() = default;
+
 	CameraController(const CreateInfo& info)
 	    : m_Window(info.window)
 	    , m_Scene(info.scene)

@@ -8,9 +8,9 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-TextureSystem::TextureSystem(const TextureSystem::CreateInfo& info)
-    : m_Device(info.device)
+void TextureSystem::Init(const TextureSystem::CreateInfo& info)
 {
+	m_Device = info.device;
 	BVK_ASSERT(!(m_Device->physical.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
 	             vk::FormatFeatureFlagBits::eSampledImageFilterLinear),
 	           "Texture image format(eR8G8B8A8Srgb) does not support linear blitting");

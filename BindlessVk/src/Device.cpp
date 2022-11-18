@@ -6,8 +6,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
 
-DeviceSystem::DeviceSystem(const Device::CreateInfo& info)
-    : m_Device({})
+void DeviceSystem::Init(const Device::CreateInfo& info)
 {
 	m_Device.layers             = info.layers;
 	m_Device.instanceExtensions = info.instanceExtensions;
@@ -73,13 +72,12 @@ void DeviceSystem::CreateVulkanInstance(const Device::CreateInfo& info)
 	};
 
 	vk::DebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {
-		{},                        // flags
-		info.debugMessageSeverity, // messageSeverity
-		info.debugMessageTypes,    // messageType
+		{},                            // flags
+		info.debugMessengerSeverities, // messageSeverity
+		info.debugMessengerTypes,      // messageType
+		info.debugMessengerCallback,
+		info.debugMessengerUserPointer,
 	};
-
-	// Setup validation layer message callback
-	debugMessengerCreateInfo.pfnUserCallback = info.debugMessageCallback;
 
 	// If debugging is not enabled, remove validation layer from instance layers
 	if (!info.enableDebugging)

@@ -1,11 +1,13 @@
 #include "Framework/Core/Window.hpp"
 
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 
-Window::Window(const WindowCreateInfo& createInfo)
-    : m_Specs(createInfo.specs)
+void Window::Init(const WindowCreateInfo& createInfo)
 {
+	m_Specs = createInfo.specs;
+
 	// Initialzie glfw
 	ASSERT(glfwInit(), "Failed to initalize glfw");
 

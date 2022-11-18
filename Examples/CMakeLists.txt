@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 add_executable(
     Example_Development
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/Development/Development.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Example_Development/Entrypoint.cpp
 )
 
 set_target_properties(
@@ -45,6 +45,6 @@ target_link_libraries(
 )
 
 target_precompile_headers(
-    BindlessVk 
+    Example_Development
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
 )

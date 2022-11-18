@@ -21,7 +21,9 @@ struct WindowCreateInfo
 class Window
 {
 public:
-	Window(const WindowCreateInfo& createInfo);
+	Window() = default;
+	void Init(const WindowCreateInfo& createInfo);
+
 	~Window();
 
 	std::vector<const char*> GetRequiredExtensions();

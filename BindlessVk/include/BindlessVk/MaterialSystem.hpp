@@ -121,9 +121,9 @@ public:
 	};
 
 public:
-	MaterialSystem(const MaterialSystem::CreateInfo& info);
-
 	MaterialSystem() = default;
+	void Init(const MaterialSystem::CreateInfo& info);
+
 	~MaterialSystem();
 
 	void DestroyAllMaterials();

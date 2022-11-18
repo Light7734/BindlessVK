@@ -69,8 +69,9 @@ struct RenderPass
 
 		std::string name;
 
-		std::function<void(const RenderContext& context)> updateAction;
-		std::function<void(const RenderContext& context)> renderAction;
+		std::function<void(const RenderContext& context)> onUpdate;
+		std::function<void(const RenderContext& context)> onRender;
+		std::function<void(const RenderContext& context)> onBeginFrame;
 
 		std::vector<CreateInfo::AttachmentInfo> colorAttachmentInfos;
 		CreateInfo::AttachmentInfo depthStencilAttachmentInfo;
@@ -106,8 +107,9 @@ struct RenderPass
 	vk::DescriptorSetLayout descriptorSetLayout;
 	vk::PipelineLayout pipelineLayout;
 
-	std::function<void(const RenderContext& context)> renderAction;
-	std::function<void(const RenderContext& context)> updateAction;
+	std::function<void(const RenderContext& context)> onRender;
+	std::function<void(const RenderContext& context)> onUpdate;
+	std::function<void(const RenderContext& context)> onBeginFrame;
 
 	void* userPointer;
 };

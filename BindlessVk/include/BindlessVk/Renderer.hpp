@@ -23,19 +23,22 @@ public:
 	};
 
 public:
-	Renderer(const Renderer::CreateInfo& createInfo);
+	Renderer() = default;
+	void Init(const Renderer::CreateInfo& createInfo);
+
 	~Renderer();
 
 	void RecreateSwapchainResources();
 	void DestroySwapchain();
 
-	void BeginFrame();
-	void Draw();
-	void DrawScene(void* userPointer);
+	void BeginFrame(void* userPointer);
+	void EndFrame(void* userPointer);
 
 	void BuildRenderGraph(RenderGraph::BuildInfo buildInfo);
 
 	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
+
+	inline vk::DescriptorPool GetDescriptorPool() const { return m_DescriptorPool; }
 
 	inline vk::CommandPool GetCommandPool() const { return m_CommandPool; }
 	inline uint32_t GetImageCount() const { return m_SwapchainImages.size(); }
@@ -57,7 +60,6 @@ private:
 	void CreateSwapchain();
 
 	void CreateCommandPool();
-	void InitializeImGui();
 
 	void SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd);
 	void PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex);

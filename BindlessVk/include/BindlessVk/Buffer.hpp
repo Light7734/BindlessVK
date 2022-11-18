@@ -10,6 +10,8 @@ namespace BINDLESSVK_NAMESPACE {
 
 struct BufferCreateInfo
 {
+	const char* name;
+
 	Device* device;
 	vk::CommandPool commandPool;
 	vk::BufferUsageFlags usage;

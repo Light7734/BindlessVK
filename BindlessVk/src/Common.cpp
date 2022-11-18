@@ -2,7 +2,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-#ifdef BVK_NOT_CONFIGURED
+#ifdef BVK_LOG_NOT_CONFIGURED
 std::shared_ptr<spdlog::logger> Logger::s_Logger = {};
 #endif
 

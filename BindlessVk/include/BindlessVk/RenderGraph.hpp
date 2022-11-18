@@ -36,7 +36,8 @@ public:
 
 		std::vector<RenderPass::CreateInfo> renderPasses;
 
-		std::function<void(const RenderContext&)> updateAction;
+		std::function<void(const RenderContext&)> onUpdate;
+		std::function<void(const RenderContext&)> onBeginFrame;
 	};
 
 public:
@@ -48,7 +49,8 @@ public:
 
 	void Build(const BuildInfo& info);
 
-	void Render(RenderContext context);
+	void BeginFrame(RenderContext context);
+	void EndFrame(RenderContext context);
 
 	inline void* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
 	{
@@ -145,7 +147,8 @@ private:
 	vk::DescriptorSetLayout m_DescriptorSetLayout   = {};
 	std::vector<vk::DescriptorSet> m_DescriptorSets = {};
 
-	std::function<void(const RenderContext&)> m_UpdateAction = {};
+	std::function<void(const RenderContext&)> m_OnUpdate     = {};
+	std::function<void(const RenderContext&)> m_OnBeginFrame = {};
 
 	std::vector<AttachmentResourceContainer> m_AttachmentResources = {};
 

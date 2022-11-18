@@ -1,6 +1,7 @@
 #include "BindlessVk/Buffer.hpp"
 
 #include "BindlessVk/BindlessVkConfig.hpp"
+#include "BindlessVk/Model.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -60,7 +61,7 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& info)
     : m_Device(info.device)
 {
 	// @todo: Merge 2 buffer classes into 1
-	BVK_ASSERT(info.blockCount == 1, "Block count for staging buffers SHOULD be 1 (this will be fixed)");
+	BVK_ASSERT(info.blockCount != 1, "Block count for staging buffers SHOULD be 1 (this will be fixed)");
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create buffer & staging buffer, then write the initial data to it(if any)
@@ -88,7 +89,7 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& info)
 			memcpy(m_Device->allocator.mapMemory(m_StagingBuffer), info.initialData, static_cast<size_t>(info.minBlockSize));
 			m_Device->allocator.unmapMemory(m_StagingBuffer);
 
-			// #TODO: Make simpler by calling an InstantSubmit function
+			// @todo: Move insant submits to a separate function
 			// Allocate cmd buffer
 			vk::CommandBufferAllocateInfo allocInfo {
 				info.commandPool,                 // commandPool
@@ -121,7 +122,7 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& info)
 				0u,         // signalSemaphoreCount
 				nullptr,    // pSignalSemaphores
 			};
-
+			BVK_ASSERT(m_Device->graphicsQueue.submit(1u, &submitInfo, VK_NULL_HANDLE));
 
 			// Wait for and free cmd buffer
 			m_Device->graphicsQueue.waitIdle();

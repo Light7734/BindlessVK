@@ -87,14 +87,17 @@ public:
 	};
 
 public:
-	ModelSystem(const ModelSystem::CreateInfo& info);
 	ModelSystem() = default;
+	void Init(const ModelSystem::CreateInfo& info);
 
 	~ModelSystem();
 
 	void LoadModel(const Model::CreateInfo& info);
 
-	inline Model* GetModel(const char* name) { return &m_Models[HashStr(name)]; }
+	inline Model* GetModel(const char* name)
+	{
+		return &m_Models[HashStr(name)];
+	}
 
 private:
 	Device* m_Device;

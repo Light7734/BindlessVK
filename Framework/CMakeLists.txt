@@ -4,6 +4,7 @@ add_library(
     Framework
 
     # Core
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Application.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Common.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Core/Window.cpp
 

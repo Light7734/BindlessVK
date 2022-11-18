@@ -4,16 +4,13 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Renderer::Renderer(const Renderer::CreateInfo& info)
-    : m_Device(info.device)
-{
-	CreateSyncObjects();
-	CreateDescriptorPools();
-	RecreateSwapchainResources();
-}
-
 Renderer::~Renderer()
 {
+	if (!m_Device)
+	{
+		return;
+	}
+
 	DestroySwapchain();
 
 	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
@@ -28,6 +25,15 @@ Renderer::~Renderer()
 	m_Device->logical.destroyFence(m_UploadContext.fence);
 }
 
+void Renderer::Init(const Renderer::CreateInfo& info)
+{
+	m_Device = info.device;
+
+	CreateSyncObjects();
+	CreateDescriptorPools();
+	RecreateSwapchainResources();
+}
+
 void Renderer::RecreateSwapchainResources()
 {
 	DestroySwapchain();
@@ -36,7 +42,6 @@ void Renderer::RecreateSwapchainResources()
 
 	CreateSwapchain();
 	CreateCommandPool();
-	// InitializeImGui();
 
 	m_SwapchainInvalidated = false;
 	m_Device->logical.waitIdle();
@@ -51,9 +56,6 @@ void Renderer::DestroySwapchain()
 
 	m_Device->logical.waitIdle();
 	//
-	// ImGui_ImplVulkan_Shutdown();
-	// ImGui_ImplGlfw_Shutdown();
-	// ImGui::DestroyContext();
 
 	m_Device->logical.resetCommandPool(m_CommandPool);
 	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool);
@@ -225,42 +227,6 @@ void Renderer::CreateCommandPool()
 	m_UploadContext.cmdBuffer = m_Device->logical.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
 }
 
-void Renderer::InitializeImGui()
-{
-	// ImGui::CreateContext();
-	//
-	// ImGui_ImplGlfw_InitForVulkan(window->GetGlfwHandle(), true);
-	//
-	// ImGui_ImplVulkan_InitInfo initInfo {
-	// 	.Instance              = m_Device->instance,
-	// 	.PhysicalDevice        = m_Device->physical,
-	// 	.Device                = m_Device->logical,
-	// 	.Queue                 = m_Device->graphicsQueue,
-	// 	.DescriptorPool        = m_DescriptorPool,
-	// 	.UseDynamicRendering   = true,
-	// 	.ColorAttachmentFormat = static_cast<VkFormat>(m_Device->surfaceFormat.format),
-	// 	.MinImageCount         = MAX_FRAMES_IN_FLIGHT,
-	// 	.ImageCount            = MAX_FRAMES_IN_FLIGHT,
-	// 	.MSAASamples           = static_cast<VkSampleCountFlagBits>(m_SampleCount),
-	// };
-	// std::pair userData = std::make_pair(m_Device->vkGetInstanceProcAddr, m_Device->instance);
-	//
-	// BVK_ASSERT(!ImGui_ImplVulkan_LoadFunctions(
-	//                [](const char* func, void* data) {
-	// 	               auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
-	// 	               return vkGetProcAddr(instance, func);
-	//                },
-	//                (void*)&userData),
-	//            "ImGui failed to load vulkan functions");
-	//
-	// ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
-	//
-	// ImmediateSubmit([](vk::CommandBuffer cmd) {
-	// 	ImGui_ImplVulkan_CreateFontsTexture(cmd);
-	// });
-	// ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
-
 void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
 {
 	m_RenderGraph.Init({
@@ -274,17 +240,24 @@ void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
 	m_RenderGraph.Build(buildInfo);
 }
 
-void Renderer::BeginFrame()
+void Renderer::BeginFrame(void* userPointer)
 {
-	// ImGui_ImplVulkan_NewFrame();
-	// ImGui_ImplGlfw_NewFrame();
-	// ImGui::NewFrame();
-	//
-	// ImGui::ShowDemoWindow();
-	// CVar::DrawImguiEditor();
+	auto cmd = m_CommandBuffers[m_CurrentFrame];
+
+	m_RenderGraph.BeginFrame({
+	    .graph       = &m_RenderGraph,
+	    .pass        = nullptr,
+	    .userPointer = userPointer,
+
+	    .logicalDevice = m_Device->logical,
+	    .cmd           = {},
+
+	    .imageIndex = {},
+	    .frameIndex = m_CurrentFrame,
+	});
 }
 
-void Renderer::DrawScene(void* userPointer)
+void Renderer::EndFrame(void* userPointer)
 {
 	if (m_SwapchainInvalidated)
 		return;
@@ -309,7 +282,7 @@ void Renderer::DrawScene(void* userPointer)
 
 	auto cmd = m_CommandBuffers[m_CurrentFrame];
 
-	m_RenderGraph.Render({
+	m_RenderGraph.EndFrame({
 	    .graph       = &m_RenderGraph,
 	    .pass        = nullptr,
 	    .userPointer = userPointer,
