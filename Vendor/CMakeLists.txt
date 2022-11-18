@@ -51,4 +51,3 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/glm/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui
 )
-

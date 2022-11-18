@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(VulkanRenderer LANGUAGES C CXX)
+project(BindlessVk LANGUAGES C CXX)
 
 include_directories(
     ${CMAKE_SOURCE_DIR}/Vendor/ktx/include
@@ -17,7 +17,9 @@ add_subdirectory(Vendor/)
 
 add_subdirectory(AssetBaker/)
 add_subdirectory(AssetParser/)
-add_subdirectory(VulkanRenderer/)
+add_subdirectory(BindlessVk/)
+add_subdirectory(Framework/)
+add_subdirectory(Examples/)
 
 set(CMAKE_BUILD_TYPE DEBUG)
 
