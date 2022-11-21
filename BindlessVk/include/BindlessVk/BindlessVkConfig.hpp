@@ -29,7 +29,7 @@
 	#define CAT_TOKEN(a, b)       CAT_INDIRECTION(a, b)
 
     // Logging
-	#define BVK_LOG(logLevel, ...) SPDLOG_LOGGER_CALL(Logger::Get(), spdlog::level::trace, __VA_ARGS__)
+	#define BVK_LOG(logLevel, ...) SPDLOG_LOGGER_CALL(Logger::Get(), (spdlog::level::level_enum)logLevel, __VA_ARGS__)
 
 namespace BINDLESSVK_NAMESPACE {
 class Logger

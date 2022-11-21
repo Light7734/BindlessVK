@@ -35,18 +35,26 @@ public:
 	{
 	}
 
-	virtual void OnVulkanReady() override
-	{
-	}
-
 	virtual void OnTick(double deltaTime) override
 	{
 		m_Renderer.BeginFrame(&m_Scene);
 
+		if (m_Renderer.IsSwapchainInvalidated())
+		{
+			m_DeviceSystem.UpdateSurfaceInfo();
+			m_Renderer.OnSwapchainInvalidated();
+			m_CameraController.OnWindowResize(m_Window.GetFramebufferSize().width,
+			                                  m_Window.GetFramebufferSize().height);
+
+			LoadShaderPasses();
+			LoadMasterMaterials();
+			LoadMaterials();
+		}
+
 		ImGui::ShowDemoWindow();
 		CVar::DrawImguiEditor();
 
-        m_CameraController.Update();
+		m_CameraController.Update();
 
 		m_Renderer.EndFrame(&m_Scene);
 	}
@@ -107,7 +115,7 @@ private:
 	{
 		bvk::Device* device = m_DeviceSystem.GetDevice();
 
-		const vk::Extent2D extent                 = device->surfaceCapabilities.maxImageExtent;
+		const vk::Extent2D extent                 = device->surfaceCapabilities.currentExtent;
 		const vk::SampleCountFlagBits sampleCount = device->maxDepthColorSamples;
 		const vk::Format colorAttachmentFormat    = device->surfaceFormat.format;
 		const vk::Format depthAttachmentFormat    = device->depthFormat;
@@ -623,8 +631,3 @@ private:
 		});
 	}
 };
-
-Application* CreateApplication()
-{
-	return new DevelopmentExampleApplication();
-}

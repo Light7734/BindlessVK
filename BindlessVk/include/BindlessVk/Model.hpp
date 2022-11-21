@@ -90,7 +90,7 @@ public:
 	ModelSystem() = default;
 	void Init(const ModelSystem::CreateInfo& info);
 
-	~ModelSystem();
+	void Reset();
 
 	void LoadModel(const Model::CreateInfo& info);
 

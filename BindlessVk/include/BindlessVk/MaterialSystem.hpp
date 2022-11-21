@@ -122,9 +122,10 @@ public:
 
 public:
 	MaterialSystem() = default;
+
 	void Init(const MaterialSystem::CreateInfo& info);
 
-	~MaterialSystem();
+	void Reset();
 
 	void DestroyAllMaterials();
 

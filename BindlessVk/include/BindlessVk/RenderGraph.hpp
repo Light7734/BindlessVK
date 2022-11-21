@@ -42,12 +42,12 @@ public:
 
 public:
 	RenderGraph();
-
-	~RenderGraph();
+	void Reset();
 
 	void Init(const CreateInfo& info);
 
 	void Build(const BuildInfo& info);
+	void OnSwapchainInvalidated(std::vector<vk::Image> swapchainImages, std::vector<vk::ImageView> swapchainImageViews);
 
 	void BeginFrame(RenderContext context);
 	void EndFrame(RenderContext context);
@@ -76,6 +76,7 @@ private:
 	void BuildDescriptorSets();
 	void WriteDescriptorSets();
 
+
 private:
 	struct ImageAttachment
 	{
@@ -94,7 +95,7 @@ private:
 		vk::ImageLayout srcImageLayout;
 		vk::PipelineStageFlags srcStageMask;
 
-		vk::Image image;
+		AllocatedImage image;
 		vk::ImageView imageView;
 	};
 
@@ -125,6 +126,8 @@ private:
 
 		std::vector<AttachmentResource> resources;
 
+		RenderPass::CreateInfo::AttachmentInfo cachedCreateInfo;
+
 		inline AttachmentResource& GetResource(uint32_t imageIndex, uint32_t frameIndex)
 		{
 			return type == Type::ePerImage ? resources[imageIndex] :
@@ -133,11 +136,11 @@ private:
 		};
 	};
 
-	void CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type);
+	void CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type, uint32_t recreateResourceIndex);
+
 
 private:
 	Device* m_Device = {};
-
 
 	vk::CommandPool m_CommandPool          = {};
 	vk::DescriptorPool m_DescriptorPool    = {};
@@ -156,7 +159,6 @@ private:
 
 	std::vector<vk::Image> m_SwapchainImages         = {};
 	std::vector<vk::ImageView> m_SwapchainImageViews = {};
-	vk::Extent2D m_SwapchainExtent                   = {};
 
 	std::vector<std::string> m_SwapchainAttachmentNames = {};
 	std::string m_SwapchainResourceName                 = {};

@@ -21,6 +21,11 @@ struct AllocatedImage
 {
 	AllocatedImage() = default;
 
+	AllocatedImage(vk::Image image)
+	    : image(image)
+	{
+	}
+
 	AllocatedImage(std::pair<vk::Image, vma::Allocation> pair)
 	    : image(pair.first)
 	    , allocation(pair.second)
@@ -29,6 +34,8 @@ struct AllocatedImage
 
 	inline operator vk::Image() { return image; }
 	inline operator vma::Allocation() { return allocation; }
+
+	inline bool HasAllocation() const { return !!allocation; }
 
 	vk::Image image            = {};
 	vma::Allocation allocation = {};

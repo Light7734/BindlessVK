@@ -26,7 +26,7 @@ void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
 	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-		{},                                      // flags
+		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
 		100,                                     // maxSets
 		static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
 		poolSizes.data(),                        // pPoolSizes
@@ -35,7 +35,7 @@ void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
 }
 
-MaterialSystem::~MaterialSystem()
+void MaterialSystem::Reset()
 {
 	DestroyAllMaterials();
 
@@ -167,6 +167,12 @@ void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
 
 void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 {
+	if (m_ShaderPasses.contains(HashStr(info.name)))
+	{
+		BVK_LOG(LogLvl::eWarn, "Recreating shader pass: {}", info.name);
+		m_Device->logical.destroyPipeline(m_ShaderPasses[HashStr(info.name)].pipeline);
+	}
+
 	std::vector<vk::PipelineShaderStageCreateInfo> stages(info.effect->shaders.size());
 
 	uint32_t index = 0;
@@ -233,6 +239,12 @@ void MaterialSystem::CreateMaterial(const Material::CreateInfo& info)
 		1ull,             // descriptorSetCount
 		&info.base->shader->effect->setsLayout.back(),
 	};
+
+	if (m_Materials.contains(HashStr(info.name)))
+	{
+		m_Device->logical.freeDescriptorSets(m_DescriptorPool, m_Materials[HashStr(info.name)].descriptorSet);
+		BVK_LOG(LogLvl::eWarn, "Recreating material: {}", info.name);
+	}
 
 	vk::DescriptorSet set;
 	BVK_ASSERT(m_Device->logical.allocateDescriptorSets(&allocateInfo, &set));

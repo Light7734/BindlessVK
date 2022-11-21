@@ -14,6 +14,16 @@ void ModelSystem::Init(const ModelSystem::CreateInfo& info)
 	m_CommandPool = info.commandPool;
 }
 
+void ModelSystem::Reset()
+{
+	for (auto& [key, val] : m_Models)
+	{
+		delete val.vertexBuffer;
+		delete val.indexBuffer;
+	}
+}
+
+
 void ModelSystem::LoadModel(const Model::CreateInfo& info)
 {
 	tinygltf::Model input;
@@ -252,10 +262,6 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	    (uint64_t)(VkBuffer)(*model.indexBuffer->GetBuffer()),
 	    indexBufferName.c_str(),
 	});
-}
-
-ModelSystem::~ModelSystem()
-{
 }
 
 } // namespace BINDLESSVK_NAMESPACE

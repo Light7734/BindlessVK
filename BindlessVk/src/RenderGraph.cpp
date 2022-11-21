@@ -8,8 +8,67 @@ RenderGraph::RenderGraph()
 {
 }
 
-RenderGraph::~RenderGraph()
+void RenderGraph::Reset()
 {
+	BVK_LOG(LogLvl::eWarn, "2");
+
+	uint32_t i = 0;
+	for (AttachmentResourceContainer& resourceContainer : m_AttachmentResources)
+	{
+		if (resourceContainer.sizeType == RenderPass::CreateInfo::SizeType::eSwapchainRelative)
+		{
+			//  Destroy image resources if it's not from swapchain
+			if (resourceContainer.type != AttachmentResourceContainer::Type::ePerImage)
+			{
+				for (AttachmentResource& resource : resourceContainer.resources)
+				{
+					m_Device->logical.destroyImageView(resource.imageView);
+					m_Device->allocator.destroyImage(resource.image, resource.image);
+				}
+			}
+			resourceContainer.resources.clear();
+
+			m_Device->logical.destroyImageView(resourceContainer.transientMSImageView);
+			m_Device->allocator.destroyImage(resourceContainer.transientMSImage, resourceContainer.transientMSImage);
+
+			resourceContainer.transientMSImage     = {};
+			resourceContainer.transientMSImageView = VK_NULL_HANDLE;
+		}
+
+		i++;
+	}
+
+	for (vk::DescriptorSet descriptorSet : m_DescriptorSets)
+	{
+		m_Device->logical.freeDescriptorSets(m_DescriptorPool, descriptorSet);
+	}
+
+	for (vk::CommandBuffer commandBuffer : m_SecondaryCommandBuffers)
+	{
+		m_Device->logical.freeCommandBuffers(m_CommandPool, commandBuffer);
+	}
+
+	for (auto& [key, val] : m_BufferInputs)
+	{
+		delete val;
+	}
+	m_Device->logical.destroyPipelineLayout(m_PipelineLayout);
+	m_Device->logical.destroyDescriptorSetLayout(m_DescriptorSetLayout);
+
+	for (RenderPass& pass : m_RenderPasses)
+	{
+		for (auto& [key, val] : pass.bufferInputs)
+		{
+			delete val;
+		}
+
+		m_Device->logical.destroyDescriptorSetLayout(pass.descriptorSetLayout);
+		m_Device->logical.destroyPipelineLayout(pass.pipelineLayout);
+		for (vk::DescriptorSet descriptorSet : pass.descriptorSets)
+		{
+			m_Device->logical.freeDescriptorSets(m_DescriptorPool, descriptorSet);
+		}
+	}
 }
 
 void RenderGraph::Init(const CreateInfo& info)
@@ -103,9 +162,11 @@ void RenderGraph::BuildAttachmentResources()
 				                    info.input);
 
 
-				CreateAttachmentResource(info, it != m_SwapchainAttachmentNames.end() ?
-				                                   AttachmentResourceContainer::Type::ePerImage :
-				                                   AttachmentResourceContainer::Type::eSingle);
+				CreateAttachmentResource(info,
+				                         it != m_SwapchainAttachmentNames.end() ?
+				                             AttachmentResourceContainer::Type::ePerImage :
+				                             AttachmentResourceContainer::Type::eSingle,
+				                         UINT32_MAX);
 
 				pass.attachments.push_back({
 				    .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
@@ -177,7 +238,7 @@ void RenderGraph::BuildAttachmentResources()
 				                    info.input);
 
 
-				CreateAttachmentResource(info, AttachmentResourceContainer::Type::eSingle);
+				CreateAttachmentResource(info, AttachmentResourceContainer::Type::eSingle, UINT32_MAX);
 
 				pass.attachments.push_back({
 				    .stageMask  = vk::PipelineStageFlagBits::eEarlyFragmentTests,
@@ -513,7 +574,7 @@ void RenderGraph::WriteDescriptorSets()
 	}
 }
 
-void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type)
+void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type, uint32_t recreateResourceIndex)
 {
 	m_SampleCount = info.samples;
 
@@ -540,8 +601,8 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 	{
 	case RenderPass::CreateInfo::SizeType::eSwapchainRelative:
 		extent = {
-			.width  = static_cast<uint32_t>(m_Device->surfaceCapabilities.maxImageExtent.width * info.size.x),
-			.height = static_cast<uint32_t>(m_Device->surfaceCapabilities.maxImageExtent.height * info.size.y),
+			.width  = static_cast<uint32_t>(m_Device->framebufferExtent.width * info.size.x),
+			.height = static_cast<uint32_t>(m_Device->framebufferExtent.height * info.size.y),
 			.depth  = 1,
 		};
 		break;
@@ -575,6 +636,7 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		.transientMSImage       = {},
 		.transientMSImageView   = {},
 		.lastWriteName          = info.name,
+		.cachedCreateInfo       = info,
 	};
 
 	switch (type)
@@ -592,7 +654,10 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 			});
 		}
 
-		m_SwapchainResourceIndex = m_AttachmentResources.size();
+		if (recreateResourceIndex == UINT32_MAX)
+		{
+			m_SwapchainResourceIndex = m_AttachmentResources.size();
+		}
 		break;
 	}
 	case AttachmentResourceContainer::Type::eSingle:
@@ -692,6 +757,7 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		};
 
 		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
 		AllocatedImage image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
 
 		std::string imageName = info.name + " TransientMS Image";
@@ -739,7 +805,48 @@ void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::Attachm
 		resourceContainer.transientMSResolveMode = vk::ResolveModeFlagBits::eAverage;
 	}
 
-	m_AttachmentResources.push_back(resourceContainer);
+	if (recreateResourceIndex != UINT32_MAX)
+	{
+		m_AttachmentResources[recreateResourceIndex] = resourceContainer;
+	}
+	else
+	{
+		m_AttachmentResources.push_back(resourceContainer);
+	}
+}
+
+void RenderGraph::OnSwapchainInvalidated(std::vector<vk::Image> swapchainImages, std::vector<vk::ImageView> swapchainImageViews)
+{
+	m_SwapchainImages     = swapchainImages;
+	m_SwapchainImageViews = swapchainImageViews;
+
+	uint32_t i = 0;
+	for (AttachmentResourceContainer& resourceContainer : m_AttachmentResources)
+	{
+		if (resourceContainer.sizeType == RenderPass::CreateInfo::SizeType::eSwapchainRelative)
+		{
+			//  Destroy image resources if it's not from swapchain
+			if (resourceContainer.type != AttachmentResourceContainer::Type::ePerImage)
+			{
+				for (AttachmentResource& resource : resourceContainer.resources)
+				{
+					m_Device->logical.destroyImageView(resource.imageView);
+					m_Device->allocator.destroyImage(resource.image, resource.image);
+				}
+			}
+			resourceContainer.resources.clear();
+
+			m_Device->logical.destroyImageView(resourceContainer.transientMSImageView);
+			m_Device->allocator.destroyImage(resourceContainer.transientMSImage, resourceContainer.transientMSImage);
+
+			resourceContainer.transientMSImage     = {};
+			resourceContainer.transientMSImageView = VK_NULL_HANDLE;
+
+			CreateAttachmentResource(resourceContainer.cachedCreateInfo, resourceContainer.type, i);
+		}
+
+		i++;
+	}
 }
 
 void RenderGraph::BeginFrame(RenderContext context)
@@ -786,7 +893,6 @@ void RenderGraph::EndFrame(RenderContext context)
 				depthAttachmentFormat = m_Device->depthFormat;
 			}
 		}
-
 
 		vk::CommandBufferInheritanceRenderingInfo inheritanceRenderingInfo {
 			{},
@@ -927,7 +1033,7 @@ void RenderGraph::EndFrame(RenderContext context)
 			vk::RenderingFlagBits::eContentsSecondaryCommandBuffers, // flags
 			vk::Rect2D {
 			    { 0, 0 },
-			    m_Device->surfaceCapabilities.maxImageExtent,
+			    m_Device->framebufferExtent,
 			},
 			1u,
 			{},

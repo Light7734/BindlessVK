@@ -6,6 +6,30 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
 
+
+/// Callback function called after successful vkAllocateMemory.
+void vmaAllocateDeviceMemoryFunction(
+    VmaAllocator VMA_NOT_NULL allocator,
+    uint32_t memoryType,
+    VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
+    VkDeviceSize size,
+    void* VMA_NULLABLE pUserData)
+{
+	BVK_LOG(LogLvl::eTrace, "Allocate device memory -> {}", size);
+}
+
+/// Callback function called before vkFreeMemory.
+void vmaFreeDeviceMemoryFunction(
+    VmaAllocator VMA_NOT_NULL allocator,
+    uint32_t memoryType,
+    VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
+    VkDeviceSize size,
+    void* VMA_NULLABLE pUserData)
+{
+	BVK_LOG(LogLvl::eTrace, "Free device memory -> {}", size);
+}
+
+
 void DeviceSystem::Init(const Device::CreateInfo& info)
 {
 	m_Device.layers             = info.layers;
@@ -22,10 +46,10 @@ void DeviceSystem::Init(const Device::CreateInfo& info)
 	PickPhysicalDevice();
 	CreateLogicalDevice();
 	CreateAllocator();
-	FetchSurfaceInfo();
+	UpdateSurfaceInfo();
 }
 
-DeviceSystem::~DeviceSystem()
+void DeviceSystem::Reset()
 {
 	m_Device.logical.waitIdle();
 	m_Device.allocator.destroy();
@@ -404,22 +428,31 @@ void DeviceSystem::CreateAllocator()
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceBufferMemoryRequirements,
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceImageMemoryRequirements);
 
-	vma::AllocatorCreateInfo allocCreateInfo({},                // flags
-	                                         m_Device.physical, // physicalDevice
-	                                         m_Device.logical,  // device
-	                                         {},                // preferredLargeHeapBlockSize
-	                                         {},                // pAllocationCallbacks
-	                                         {},                // pDeviceMemoryCallbacks
-	                                         {},                // pHeapSizeLimit
-	                                         &vulkanFunctions,  // pVulkanFunctions
-	                                         m_Device.instance, // instance
-	                                         {});               // vulkanApiVersion
+	vma::DeviceMemoryCallbacks memCallbacks = {
+
+		&vmaAllocateDeviceMemoryFunction,
+		&vmaFreeDeviceMemoryFunction,
+		nullptr,
+	};
+
+	vma::AllocatorCreateInfo allocCreateInfo(
+	    {},                // flags
+	    m_Device.physical, // physicalDevice
+	    m_Device.logical,  // device
+	    {},                // preferredLargeHeapBlockSize
+	    {},                // pAllocationCallbacks
+	    &memCallbacks,
+	    {},                // pHeapSizeLimit
+	    &vulkanFunctions,  // pVulkanFunctions
+	    m_Device.instance, // instance
+	    {}                 // vulkanApiVersion
+	);
 
 
 	m_Device.allocator = vma::createAllocator(allocCreateInfo);
 }
 
-void DeviceSystem::FetchSurfaceInfo()
+void DeviceSystem::UpdateSurfaceInfo()
 {
 	m_Device.surfaceCapabilities = m_Device.physical.getSurfaceCapabilitiesKHR(m_Device.surface);
 
@@ -446,6 +479,8 @@ void DeviceSystem::FetchSurfaceInfo()
 			m_Device.presentMode = presentMode;
 		}
 	}
+
+	m_Device.framebufferExtent = std::clamp(m_Device.framebufferExtent, m_Device.surfaceCapabilities.minImageExtent, m_Device.surfaceCapabilities.maxImageExtent);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

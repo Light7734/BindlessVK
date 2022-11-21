@@ -5,14 +5,14 @@ int main(int argc, char* argv[])
 {
 	try
 	{
-		Application* application = CreateApplication();
+		DevelopmentExampleApplication application;
 
 		Timer deltaTimer;
-		while (!application->m_Window.ShouldClose())
+		while (!application.m_Window.ShouldClose())
 		{
-			application->m_Window.PollEvents();
+			application.m_Window.PollEvents();
 
-			application->OnTick(deltaTimer.ElapsedTime());
+			application.OnTick(deltaTimer.ElapsedTime());
 			deltaTimer.Reset();
 
 			// @todo: Handle swapchain invalidation

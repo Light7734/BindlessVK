@@ -4,16 +4,15 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Renderer::~Renderer()
+void Renderer::Reset()
 {
 	if (!m_Device)
 	{
 		return;
 	}
 
-	DestroySwapchain();
+	DestroySwapchainResources();
 
-	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
 
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
@@ -22,7 +21,21 @@ Renderer::~Renderer()
 		m_Device->logical.destroySemaphore(m_PresentSemaphores[i], nullptr);
 	}
 
+	BVK_LOG(LogLvl::eWarn, "1");
+	m_RenderGraph.Reset();
+	BVK_LOG(LogLvl::eWarn, "3");
+	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
+	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
+
+	m_Device->logical.resetCommandPool(m_CommandPool);
+	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool);
+	m_Device->logical.destroyCommandPool(m_UploadContext.cmdPool);
+	m_Device->logical.destroyCommandPool(m_CommandPool);
+
+
+	m_Device->logical.destroySwapchainKHR(m_Swapchain);
 	m_Device->logical.destroyFence(m_UploadContext.fence);
+	BVK_LOG(LogLvl::eWarn, "4");
 }
 
 void Renderer::Init(const Renderer::CreateInfo& info)
@@ -31,23 +44,25 @@ void Renderer::Init(const Renderer::CreateInfo& info)
 
 	CreateSyncObjects();
 	CreateDescriptorPools();
-	RecreateSwapchainResources();
+	CreateCommandPool();
+
+	// Recreates swapchain resources
+	OnSwapchainInvalidated();
 }
 
-void Renderer::RecreateSwapchainResources()
+void Renderer::OnSwapchainInvalidated()
 {
-	DestroySwapchain();
-
-	m_SampleCount = m_Device->maxDepthColorSamples;
+	DestroySwapchainResources();
 
 	CreateSwapchain();
-	CreateCommandPool();
+
+	m_RenderGraph.OnSwapchainInvalidated(m_SwapchainImages, m_SwapchainImageViews);
 
 	m_SwapchainInvalidated = false;
 	m_Device->logical.waitIdle();
 }
 
-void Renderer::DestroySwapchain()
+void Renderer::DestroySwapchainResources()
 {
 	if (!m_Swapchain)
 	{
@@ -55,21 +70,14 @@ void Renderer::DestroySwapchain()
 	}
 
 	m_Device->logical.waitIdle();
-	//
-
-	m_Device->logical.resetCommandPool(m_CommandPool);
-	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool);
-	m_Device->logical.destroyCommandPool(m_UploadContext.cmdPool);
-	m_Device->logical.destroyCommandPool(m_CommandPool);
-
-	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
 
 	for (const auto& imageView : m_SwapchainImageViews)
 	{
 		m_Device->logical.destroyImageView(imageView);
 	}
 
-	m_Device->logical.destroySwapchainKHR(m_Swapchain);
+	m_SwapchainImageViews.clear();
+	m_SwapchainImages.clear();
 };
 
 void Renderer::CreateSyncObjects()
@@ -108,10 +116,12 @@ void Renderer::CreateDescriptorPools()
 	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
 	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-		vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind, // flags
-		100,                                                // maxSets
-		static_cast<uint32_t>(poolSizes.size()),            // poolSizeCount
-		poolSizes.data(),                                   // pPoolSizes
+		vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind |
+		    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, // flags
+
+		100,                                     // maxSets
+		static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
+		poolSizes.data(),                        // pPoolSizes
 	};
 
 	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
@@ -128,14 +138,16 @@ void Renderer::CreateSwapchain()
 	                      minImage == 0ul && maxImage >= 2ul                                           ? 2ul :
 	                                                                                                     minImage;
 	// Create swapchain
-	bool sameQueueIndex = m_Device->graphicsQueueIndex == m_Device->presentQueueIndex;
+	bool sameQueueIndex           = m_Device->graphicsQueueIndex == m_Device->presentQueueIndex;
+	vk::SwapchainKHR oldSwapchain = m_Swapchain;
+
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo {
 		{},                                                                          // flags
 		m_Device->surface,                                                           // surface
 		imageCount,                                                                  // minImageCount
 		m_Device->surfaceFormat.format,                                              // imageFormat
 		m_Device->surfaceFormat.colorSpace,                                          // imageColorSpace
-		m_Device->surfaceCapabilities.currentExtent,                                 // imageExtent
+		m_Device->framebufferExtent,                                                 // imageExtent
 		1u,                                                                          // imageArrayLayers
 		vk::ImageUsageFlagBits::eColorAttachment,                                    // imageUsage
 		sameQueueIndex ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent, // imageSharingMode
@@ -145,10 +157,12 @@ void Renderer::CreateSwapchain()
 		vk::CompositeAlphaFlagBitsKHR::eOpaque,                                      // compositeAlpha -> No alpha-blending between multiple windows
 		m_Device->presentMode,                                                       // presentMode
 		VK_TRUE,                                                                     // clipped -> Don't render the obsecured pixels
-		VK_NULL_HANDLE,                                                              // oldSwapchain
+		oldSwapchain,                                                                // oldSwapchain
 	};
 
-	m_Swapchain       = m_Device->logical.createSwapchainKHR(swapchainCreateInfo, nullptr);
+	m_Swapchain = m_Device->logical.createSwapchainKHR(swapchainCreateInfo, nullptr);
+	m_Device->logical.destroySwapchainKHR(oldSwapchain);
+
 	m_SwapchainImages = m_Device->logical.getSwapchainImagesKHR(m_Swapchain);
 
 	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)

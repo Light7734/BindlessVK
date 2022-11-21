@@ -26,10 +26,10 @@ public:
 	Renderer() = default;
 	void Init(const Renderer::CreateInfo& createInfo);
 
-	~Renderer();
+	void Reset();
 
-	void RecreateSwapchainResources();
-	void DestroySwapchain();
+	void OnSwapchainInvalidated();
+	void DestroySwapchainResources();
 
 	void BeginFrame(void* userPointer);
 	void EndFrame(void* userPointer);
@@ -44,6 +44,7 @@ public:
 	inline uint32_t GetImageCount() const { return m_SwapchainImages.size(); }
 
 	inline bool IsSwapchainInvalidated() const { return m_SwapchainInvalidated; }
+
 
 private:
 	struct UploadContext
@@ -82,8 +83,6 @@ private:
 
 	std::vector<vk::Image> m_SwapchainImages         = {};
 	std::vector<vk::ImageView> m_SwapchainImageViews = {};
-
-	vk::SampleCountFlagBits m_SampleCount = vk::SampleCountFlagBits::e1;
 
 	// Pools
 	vk::CommandPool m_CommandPool       = {};

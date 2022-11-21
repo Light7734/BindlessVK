@@ -41,6 +41,13 @@ static void InitializeImgui(bvk::Device* device, bvk::Renderer& renderer, Window
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
+static void DestroyImgui()
+{
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+}
+
 
 Application::Application()
     : m_InstanceExtensions {
@@ -108,12 +115,20 @@ Application::Application()
 	InitializeImgui(device, m_Renderer, m_Window);
 
 
-	m_CameraController  = CameraController({ .scene = &m_Scene, .window = &m_Window });
+	m_CameraController = CameraController({ .scene = &m_Scene, .window = &m_Window });
 }
 
 
 Application::~Application()
 {
+	m_DeviceSystem.GetDevice()->logical.waitIdle();
+	DestroyImgui();
+
+	m_Renderer.Reset();
+	m_TextureSystem.Reset();
+	m_MaterialSystem.Reset();
+	m_ModelSystem.Reset();
+	m_DeviceSystem.Reset();
 }
 
 VkBool32 Application::VulkanDebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

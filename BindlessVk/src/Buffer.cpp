@@ -133,6 +133,7 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& info)
 
 StagingBuffer::~StagingBuffer()
 {
+	m_Device->logical.waitIdle();
 	if (m_Buffer.buffer)
 	{
 		m_Device->allocator.destroyBuffer(m_Buffer, m_Buffer);

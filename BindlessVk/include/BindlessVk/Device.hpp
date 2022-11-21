@@ -59,6 +59,8 @@ struct Device
 	vk::SurfaceFormatKHR surfaceFormat;
 	vk::PresentModeKHR presentMode;
 
+	vk::Extent2D framebufferExtent;
+
 	// allocator
 	vma::Allocator allocator;
 };
@@ -69,9 +71,9 @@ public:
 	DeviceSystem() = default;
 	void Init(const Device::CreateInfo& info);
 
-	~DeviceSystem();
+	void Reset();
 
-	void DrawFrame();
+	void UpdateSurfaceInfo();
 
 	inline Device* GetDevice()
 	{
@@ -84,9 +86,6 @@ private:
 	void PickPhysicalDevice();
 	void CreateLogicalDevice();
 	void CreateAllocator();
-
-	void FetchSurfaceInfo();
-	void FetchDepthFormat();
 
 private:
 	Device m_Device = {};

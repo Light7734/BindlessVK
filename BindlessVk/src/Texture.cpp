@@ -458,7 +458,7 @@ void TextureSystem::BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint3
 		mipHeight /= 2;
 }
 
-TextureSystem::~TextureSystem()
+void TextureSystem::Reset()
 {
 	for (auto& [key, value] : m_Textures)
 	{
@@ -466,6 +466,10 @@ TextureSystem::~TextureSystem()
 		m_Device->logical.destroyImageView(value.imageView, nullptr);
 		m_Device->allocator.destroyImage(value.image, value.image);
 	}
+
+	m_Device->logical.freeCommandBuffers(m_UploadContext.cmdPool, m_UploadContext.cmdBuffer);
+	m_Device->logical.destroyCommandPool(m_UploadContext.cmdPool);
+	m_Device->logical.destroyFence(m_UploadContext.fence);
 }
 
 void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)

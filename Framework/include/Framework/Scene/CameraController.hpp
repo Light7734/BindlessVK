@@ -66,6 +66,14 @@ public:
 		}
 	}
 
+	void OnWindowResize(int width, int height)
+	{
+		m_Scene->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
+			cameraComp.width       = width;
+			cameraComp.aspectRatio = width / (float)height;
+		});
+	}
+
 private:
 	void Move(float deltaTime, float xDelta, float yDelta)
 	{

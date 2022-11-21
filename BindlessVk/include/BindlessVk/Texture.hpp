@@ -86,7 +86,7 @@ public:
 	TextureSystem() = default;
 	void Init(const TextureSystem::CreateInfo& info);
 
-	~TextureSystem();
+	void Reset();
 
 	Texture* CreateFromBuffer(const Texture::CreateInfoBuffer& info);
 

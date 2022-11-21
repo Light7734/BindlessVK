@@ -17,8 +17,6 @@ public:
 	Application();
 	~Application();
 
-	virtual void OnVulkanReady() = 0;
-
 	static VkBool32 VulkanDebugMessageCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 	                                           VkDebugUtilsMessageTypeFlagsEXT messageTypes,
 	                                           const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
