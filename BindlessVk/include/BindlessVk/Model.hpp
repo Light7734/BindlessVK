@@ -12,6 +12,84 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+namespace VertexTypes {
+
+struct Model
+{
+	glm::vec3 position;
+	glm::vec3 normal;
+	glm::vec3 tangent;
+	glm::vec2 uv;
+	glm::vec3 color;
+
+	static constexpr std::array<vk::VertexInputBindingDescription, 1> GetBindings()
+	{
+		return {
+			vk::VertexInputBindingDescription {
+			    0u,                                                // binding
+			    static_cast<uint32_t>(sizeof(VertexTypes::Model)), // stride
+			    vk::VertexInputRate::eVertex,                      // inputRate
+			},
+		};
+	}
+
+	static constexpr std::array<vk::VertexInputAttributeDescription, 5> GetAttributes()
+	{
+		return {
+			vk::VertexInputAttributeDescription {
+			    0u,                                     // location
+			    0u,                                     // binding
+			    vk::Format::eR32G32B32Sfloat,           // format
+			    offsetof(VertexTypes::Model, position), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    1u,                                   // location
+			    0u,                                   // binding
+			    vk::Format::eR32G32B32Sfloat,         // format
+			    offsetof(VertexTypes::Model, normal), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    2u,                                    // location
+			    0u,                                    // binding
+			    vk::Format::eR32G32B32Sfloat,          // format
+			    offsetof(VertexTypes::Model, tangent), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    3u,                               // location
+			    0u,                               // binding
+			    vk::Format::eR32G32Sfloat,        // format
+			    offsetof(VertexTypes::Model, uv), // offset
+			},
+			vk::VertexInputAttributeDescription {
+			    4u,                                  // location
+			    0u,                                  // binding
+			    vk::Format::eR32G32B32Sfloat,        // format
+			    offsetof(VertexTypes::Model, color), // offset
+			},
+
+
+		};
+		offsetof(VertexTypes::Model, uv);
+	}
+
+	static vk::PipelineVertexInputStateCreateInfo GetVertexInputState()
+	{
+		static const auto bindings   = GetBindings();
+		static const auto attributes = GetAttributes();
+
+		return vk::PipelineVertexInputStateCreateInfo {
+			{},
+			static_cast<uint32_t>(bindings.size()),
+			bindings.data(),
+
+			static_cast<uint32_t>(attributes.size()),
+			attributes.data(),
+		};
+	}
+};
+
+} // namespace VertexTypes
+
 struct Model
 {
 public:

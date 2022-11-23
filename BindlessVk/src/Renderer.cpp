@@ -13,7 +13,6 @@ void Renderer::Reset()
 
 	DestroySwapchainResources();
 
-
 	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		m_Device->logical.destroyFence(m_RenderFences[i], nullptr);
@@ -21,9 +20,7 @@ void Renderer::Reset()
 		m_Device->logical.destroySemaphore(m_PresentSemaphores[i], nullptr);
 	}
 
-	BVK_LOG(LogLvl::eWarn, "1");
 	m_RenderGraph.Reset();
-	BVK_LOG(LogLvl::eWarn, "3");
 	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
 	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
 
@@ -35,7 +32,6 @@ void Renderer::Reset()
 
 	m_Device->logical.destroySwapchainKHR(m_Swapchain);
 	m_Device->logical.destroyFence(m_UploadContext.fence);
-	BVK_LOG(LogLvl::eWarn, "4");
 }
 
 void Renderer::Init(const Renderer::CreateInfo& info)
@@ -263,8 +259,8 @@ void Renderer::BeginFrame(void* userPointer)
 	    .pass        = nullptr,
 	    .userPointer = userPointer,
 
-	    .logicalDevice = m_Device->logical,
-	    .cmd           = {},
+	    .device = m_Device,
+	    .cmd    = {},
 
 	    .imageIndex = {},
 	    .frameIndex = m_CurrentFrame,
@@ -301,8 +297,8 @@ void Renderer::EndFrame(void* userPointer)
 	    .pass        = nullptr,
 	    .userPointer = userPointer,
 
-	    .logicalDevice = m_Device->logical,
-	    .cmd           = cmd,
+	    .device = m_Device,
+	    .cmd    = cmd,
 
 	    .imageIndex = imageIndex,
 	    .frameIndex = m_CurrentFrame,

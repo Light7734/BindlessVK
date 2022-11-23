@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common.hpp"
+#include "BindlessVk/Device.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -10,7 +11,7 @@ struct RenderContext
 	class RenderPass* pass;
 	void* userPointer;
 
-	vk::Device logicalDevice;
+	Device* device;
 	vk::CommandBuffer cmd;
 
 	uint32_t imageIndex;

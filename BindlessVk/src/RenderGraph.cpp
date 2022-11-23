@@ -10,8 +10,6 @@ RenderGraph::RenderGraph()
 
 void RenderGraph::Reset()
 {
-	BVK_LOG(LogLvl::eWarn, "2");
-
 	uint32_t i = 0;
 	for (AttachmentResourceContainer& resourceContainer : m_AttachmentResources)
 	{

@@ -33,6 +33,8 @@ void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 	};
 
 	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+
+	const vk::Extent2D& extent = m_Device->framebufferExtent;
 }
 
 void MaterialSystem::Reset()
@@ -70,7 +72,6 @@ void MaterialSystem::DestroyAllMaterials()
 	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
 
 	m_ShaderPasses.clear();
-	m_MasterMaterials.clear();
 	m_Materials.clear();
 }
 
@@ -224,12 +225,34 @@ void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
 	};
 }
 
-void MaterialSystem::CreateMasterMaterial(const MasterMaterial::CreateInfo& info)
+void MaterialSystem::CreatePipelineConfiguration(const PipelineConfiguration::CreateInfo& info)
 {
-	m_MasterMaterials[HashStr(info.name)] = {
-		info.shaderPass,
-		info.defaultParameters,
+	PipelineConfiguration& configuration = m_PipelineConfigurations[HashStr(info.name)];
+
+
+	configuration = PipelineConfiguration {
+		.vertexInputState   = info.vertexInputState,
+		.inputAssemblyState = info.inputAssemblyState,
+		.tessellationState  = info.tessellationState,
+		.viewportState      = info.viewportState,
+		.rasterizationState = info.rasterizationState,
+		.multisampleState   = info.multisampleState,
+		.depthStencilState  = info.depthStencilState,
+
+		.colorBlendAttachments = info.colorBlendAttachments,
+		.colorBlendState       = info.colorBlendState,
+
+		.dynamicStates = info.dynamicStates,
 	};
+
+	configuration.dynamicState = {
+		{},
+		static_cast<uint32_t>(configuration.dynamicStates.size()),
+		configuration.dynamicStates.data(),
+	};
+
+	configuration.colorBlendState.attachmentCount = configuration.colorBlendAttachments.size();
+	configuration.colorBlendState.pAttachments    = configuration.colorBlendAttachments.data();
 }
 
 void MaterialSystem::CreateMaterial(const Material::CreateInfo& info)
@@ -237,7 +260,7 @@ void MaterialSystem::CreateMaterial(const Material::CreateInfo& info)
 	vk::DescriptorSetAllocateInfo allocateInfo {
 		m_DescriptorPool, // descriptorPool
 		1ull,             // descriptorSetCount
-		&info.base->shader->effect->setsLayout.back(),
+		&info.shaderPass->effect->setsLayout.back(),
 	};
 
 	if (m_Materials.contains(HashStr(info.name)))
@@ -250,11 +273,11 @@ void MaterialSystem::CreateMaterial(const Material::CreateInfo& info)
 	BVK_ASSERT(m_Device->logical.allocateDescriptorSets(&allocateInfo, &set));
 
 	m_Materials[HashStr(info.name)] = {
-		info.base,
-		info.parameters,
-		set,
-		info.textures,
-		static_cast<uint32_t>(HashStr(info.name)),
+		.shaderPass    = info.shaderPass,
+		.parameters    = info.parameters,
+		.descriptorSet = set,
+		.textures      = info.textures,
+		.sortKey       = static_cast<uint32_t>(HashStr(info.name)),
 	};
 
 	// @todo Bind textures

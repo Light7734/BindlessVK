@@ -23,9 +23,12 @@ public:
 	{
 		LoadShaders();
 		LoadShaderEffects();
+
+		LoadPipelineConfigurations();
 		LoadShaderPasses();
-		LoadMasterMaterials();
+
 		LoadMaterials();
+
 		LoadModels();
 		LoadEntities();
 		CreateRenderGraph();
@@ -46,8 +49,6 @@ public:
 			m_CameraController.OnWindowResize(m_Window.GetFramebufferSize().width,
 			                                  m_Window.GetFramebufferSize().height);
 
-			LoadShaderPasses();
-			LoadMasterMaterials();
 			LoadMaterials();
 		}
 
@@ -95,7 +96,7 @@ private:
 	{
 		// @TODO: Load from files instead of hard-coding
 		m_MaterialSystem.CreateShaderEffect({
-		    "default",
+		    "opaque_mesh",
 		    {
 		        m_MaterialSystem.GetShader("defaultVertex"),
 		        m_MaterialSystem.GetShader("defaultFragment"),
@@ -111,325 +112,172 @@ private:
 		});
 	}
 
+	void LoadPipelineConfigurations()
+	{
+		bvk::Device* device = m_DeviceSystem.GetDevice();
+
+		m_MaterialSystem.CreatePipelineConfiguration({
+		    .name               = "opaque_mesh",
+		    .vertexInputState   = bvk::VertexTypes::Model::GetVertexInputState(),
+		    .inputAssemblyState = {
+		        {}, // flags
+		        vk::PrimitiveTopology::eTriangleList,
+		        VK_FALSE,
+		    },
+		    .tessellationState = {},
+		    .viewportState     = {
+		            {}, // flags
+		            1u, // viewportCount
+		            {}, // pViewports
+		            1u, // scissorCount
+		            {}, // pScissors
+            },
+		    .rasterizationState = {
+		        {},                          // flags
+		        VK_FALSE,                    // depthClampEnable
+		        VK_FALSE,                    // rasterizerdiscardEnable
+		        vk::PolygonMode::eFill,      // polygonMode
+		        vk::CullModeFlagBits::eBack, // cullMode
+		        vk::FrontFace::eClockwise,   // frontFace
+		        VK_FALSE,                    // depthBiasEnable
+		        0.0f,                        // depthBiasConstantFactor
+		        0.0f,                        // depthBiasClamp
+		        0.0f,                        // depthBiasSlopeFactor
+		        1.0f,                        // lineWidth
+		    },
+		    .multisampleState = {
+		        {},
+		        device->maxDepthColorSamples,
+		        VK_FALSE,
+		        {},
+		        VK_FALSE,
+		        VK_FALSE,
+		    },
+		    .depthStencilState = {
+		        {},
+		        VK_TRUE,              // depthTestEnable
+		        VK_TRUE,              // depthWriteEnable
+		        vk::CompareOp::eLess, // depthCompareOp
+		        VK_FALSE,             // depthBoundsTestEnable
+		        VK_FALSE,             // stencilTestEnable
+		        {},                   // front
+		        {},                   // back
+		        0.0f,                 // minDepthBounds
+		        1.0,                  // maxDepthBounds
+		    },
+		    .colorBlendAttachments = {
+		        {
+		            VK_FALSE,                           // blendEnable
+		            vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
+		            vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
+		            vk::BlendOp::eAdd,                  // colorBlendOp
+		            vk::BlendFactor::eOne,              // srcAlphaBlendFactor
+		            vk::BlendFactor::eZero,             // dstAlphaBlendFactor
+		            vk::BlendOp::eAdd,                  // alphaBlendOp
+
+		            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA // colorWriteMask
+		        },
+		    },
+		    .colorBlendState = {},
+		    .dynamicStates   = {
+		          vk::DynamicState::eViewport,
+		          vk::DynamicState::eScissor,
+            },
+		});
+
+		m_MaterialSystem.CreatePipelineConfiguration({
+		    .name               = "skybox",
+		    .vertexInputState   = bvk::VertexTypes::Model::GetVertexInputState(),
+		    .inputAssemblyState = {
+		        {},
+		        vk::PrimitiveTopology::eTriangleList,
+		        VK_FALSE,
+		    },
+		    .tessellationState = {},
+		    .viewportState     = {
+		            {}, // flags
+		            1u, // viewportCount
+		            {}, // pViewports
+		            1u, // scissorCount
+		            {}, // pScissors
+            },
+		    .rasterizationState = {
+		        {},
+		        VK_FALSE,
+		        VK_FALSE,
+		        vk::PolygonMode::eFill,
+		        vk::CullModeFlagBits::eBack,
+		        vk::FrontFace::eCounterClockwise,
+		        VK_FALSE,
+		        0.0f,
+		        0.0f,
+		        0.0f,
+		        1.0f,
+		    },
+		    .multisampleState = {
+		        {},
+		        device->maxDepthColorSamples,
+		        VK_FALSE,
+		        {},
+		        VK_FALSE,
+		        VK_FALSE,
+		    },
+		    .depthStencilState = {
+		        {},
+		        VK_TRUE,                     // depthTestEnable
+		        VK_TRUE,                     // depthWriteEnable
+		        vk::CompareOp::eLessOrEqual, // depthCompareOp
+		        VK_FALSE,                    // depthBoundsTestEnable
+		        VK_FALSE,                    // stencilTestEnable
+		        {},                          // front
+		        {},                          // back
+		        0.0f,                        // minDepthBounds
+		        1.0,                         // maxDepthBounds
+		    },
+		    .colorBlendAttachments = {
+		        {
+		            VK_FALSE,                           // blendEnable
+		            vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
+		            vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
+		            vk::BlendOp::eAdd,                  // colorBlendOp
+		            vk::BlendFactor::eOne,              // srcAlphaBlendFactor
+		            vk::BlendFactor::eZero,             // dstAlphaBlendFactor
+		            vk::BlendOp::eAdd,                  // alphaBlendOp
+
+		            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA // colorWriteMask
+		        },
+		    },
+		    .colorBlendState = {},
+		    .dynamicStates   = {
+		          vk::DynamicState::eViewport,
+		          vk::DynamicState::eScissor,
+            },
+		});
+	}
+
 	void LoadShaderPasses()
 	{
 		bvk::Device* device = m_DeviceSystem.GetDevice();
 
-		const vk::Extent2D extent                 = device->surfaceCapabilities.currentExtent;
-		const vk::SampleCountFlagBits sampleCount = device->maxDepthColorSamples;
-		const vk::Format colorAttachmentFormat    = device->surfaceFormat.format;
-		const vk::Format depthAttachmentFormat    = device->depthFormat;
+		// create shader passes
+		m_MaterialSystem.CreateShaderPass({
+		    .name   = "opaque_mesh",
+		    .effect = m_MaterialSystem.GetShaderEffect("opaque_mesh"),
 
-		{
-			// @TODO: Load from files instead of hard-coding
-			std::vector<vk::VertexInputBindingDescription> inputBindings {
-				vk::VertexInputBindingDescription {
-				    0u,                                                // binding
-				    static_cast<uint32_t>(sizeof(bvk::Model::Vertex)), // stride
-				    vk::VertexInputRate::eVertex,                      // inputRate
-				},
-			};
-			std::vector<vk::VertexInputAttributeDescription> inputAttributes {
-				vk::VertexInputAttributeDescription {
-				    0u,                           // location
-				    0u,                           // binding
-				    vk::Format::eR32G32B32Sfloat, // format
-				    0u,                           // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    1u,                           // location
-				    0u,                           // binding
-				    vk::Format::eR32G32B32Sfloat, // format
-				    sizeof(glm::vec3),            // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    2u,                                    // location
-				    0u,                                    // binding
-				    vk::Format::eR32G32B32Sfloat,          // format
-				    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    3u,                                                        // location
-				    0u,                                                        // binding
-				    vk::Format::eR32G32Sfloat,                                 // format
-				    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    4u,                           // location
-				    0u,                           // binding
-				    vk::Format::eR32G32B32Sfloat, // format
-				    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) +
-				        sizeof(glm::vec3), // offset
-				},
-			};
+		    .colorAttachmentFormat = device->surfaceFormat.format,
+		    .depthAttachmentFormat = device->depthFormat,
 
-			// Viewport state
-			vk::Viewport viewport {
-				0.0f,                              // x
-				0.0f,                              // y
-				static_cast<float>(extent.width),  // width
-				static_cast<float>(extent.height), // height
-				0.0f,                              // minDepth
-				1.0f,                              // maxDepth
-			};
-
-			vk::Rect2D scissors {
-				{ 0, 0 }, // offset
-				extent    // extent
-			};
-
-			vk::PipelineColorBlendAttachmentState colorBlendAttachment {
-				VK_FALSE,                           // blendEnable
-				vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
-				vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-				vk::BlendOp::eAdd,                  // colorBlendOp
-				vk::BlendFactor::eOne,              // srcAlphaBlendFactor
-				vk::BlendFactor::eZero,             // dstAlphaBlendFactor
-				vk::BlendOp::eAdd,                  // alphaBlendOp
-
-				vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-				    vk::ColorComponentFlagBits::eB |
-				    vk::ColorComponentFlagBits::eA, // colorWriteMask
-			};
-
-			// create shader passes
-			m_MaterialSystem.CreateShaderPass({
-			    "default",
-			    {
-			        vk::PipelineVertexInputStateCreateInfo {
-			            {},
-			            static_cast<uint32_t>(inputBindings.size()),
-			            inputBindings.data(),
-			            static_cast<uint32_t>(inputAttributes.size()),
-			            inputAttributes.data(),
-			        },
-			        vk::PipelineInputAssemblyStateCreateInfo {
-			            {},
-			            vk::PrimitiveTopology::eTriangleList,
-			            VK_FALSE,
-			        },
-			        vk::PipelineTessellationStateCreateInfo {},
-			        vk::PipelineViewportStateCreateInfo {
-			            {},
-			            1u,
-			            &viewport,
-			            1u,
-			            &scissors,
-			        },
-			        vk::PipelineRasterizationStateCreateInfo {
-			            {},
-			            VK_FALSE,
-			            VK_FALSE,
-			            vk::PolygonMode::eFill,
-			            vk::CullModeFlagBits::eBack,
-			            vk::FrontFace::eClockwise,
-			            VK_FALSE,
-			            0.0f,
-			            0.0f,
-			            0.0f,
-			            1.0f,
-			        },
-			        vk::PipelineMultisampleStateCreateInfo {
-			            {},
-			            sampleCount,
-			            VK_FALSE,
-			            {},
-			            VK_FALSE,
-			            VK_FALSE,
-			        },
-			        vk::PipelineDepthStencilStateCreateInfo {
-			            {},
-			            VK_TRUE,              // depthTestEnable
-			            VK_TRUE,              // depthWriteEnable
-			            vk::CompareOp::eLess, // depthCompareOp
-			            VK_FALSE,             // depthBoundsTestEnable
-			            VK_FALSE,             // stencilTestEnable
-			            {},                   // front
-			            {},                   // back
-			            0.0f,                 // minDepthBounds
-			            1.0,                  // maxDepthBounds
-			        },
-			        vk::PipelineColorBlendStateCreateInfo {
-			            {},                         // flags
-			            VK_FALSE,                   // logicOpEnable
-			            vk::LogicOp::eCopy,         // logicOp
-			            1u,                         // attachmentCount
-			            &colorBlendAttachment,      // pAttachments
-			            { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
-			        },
-			        vk::PipelineDynamicStateCreateInfo {},
-			    },
-			    m_MaterialSystem.GetShaderEffect("default"),
-			    colorAttachmentFormat,
-			    depthAttachmentFormat,
-			});
-		}
-
-		{
-			std::vector<vk::VertexInputBindingDescription> inputBindings {
-				vk::VertexInputBindingDescription {
-				    0u,                                                // binding
-				    static_cast<uint32_t>(sizeof(bvk::Model::Vertex)), // stride
-				    vk::VertexInputRate::eVertex,                      // inputRate
-				},
-			};
-			std::vector<vk::VertexInputAttributeDescription> inputAttributes {
-				vk::VertexInputAttributeDescription {
-				    0u,                           // location
-				    0u,                           // binding
-				    vk::Format::eR32G32B32Sfloat, // format
-				    0u,                           // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    1u,                           // location
-				    0u,                           // binding
-				    vk::Format::eR32G32B32Sfloat, // format
-				    sizeof(glm::vec3),            // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    2u,                                    // location
-				    0u,                                    // binding
-				    vk::Format::eR32G32B32Sfloat,          // format
-				    sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    3u,                                                        // location
-				    0u,                                                        // binding
-				    vk::Format::eR32G32Sfloat,                                 // format
-				    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec3), // offset
-				},
-				vk::VertexInputAttributeDescription {
-				    4u,                           // location
-				    0u,                           // binding
-				    vk::Format::eR32G32B32Sfloat, // format
-				    sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2) +
-				        sizeof(glm::vec3), // offset
-				},
-			};
-			// Viewport state
-			vk::Viewport viewport {
-				0.0f,                              // x
-				0.0f,                              // y
-				static_cast<float>(extent.width),  // width
-				static_cast<float>(extent.height), // height
-				0.0f,                              // minDepth
-				1.0f,                              // maxDepth
-			};
-
-			vk::Rect2D scissors {
-				{ 0, 0 }, // offset
-				extent    // extent
-			};
-
-			vk::PipelineColorBlendAttachmentState colorBlendAttachment {
-				VK_FALSE,                           // blendEnable
-				vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
-				vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-				vk::BlendOp::eAdd,                  // colorBlendOp
-				vk::BlendFactor::eOne,              // srcAlphaBlendFactor
-				vk::BlendFactor::eZero,             // dstAlphaBlendFactor
-				vk::BlendOp::eAdd,                  // alphaBlendOp
-
-				vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-				    vk::ColorComponentFlagBits::eB |
-				    vk::ColorComponentFlagBits::eA, // colorWriteMask
-			};
-
-			// create shader passes
-			m_MaterialSystem.CreateShaderPass({
-			    "skybox",
-			    {
-
-			        vk::PipelineVertexInputStateCreateInfo {
-			            {},
-			            static_cast<uint32_t>(inputBindings.size()),
-			            inputBindings.data(),
-			            static_cast<uint32_t>(inputAttributes.size()),
-			            inputAttributes.data(),
-			        },
-
-			        vk::PipelineInputAssemblyStateCreateInfo {
-			            {},
-			            vk::PrimitiveTopology::eTriangleList,
-			            VK_FALSE,
-			        },
-
-			        vk::PipelineTessellationStateCreateInfo {},
-
-			        vk::PipelineViewportStateCreateInfo {
-			            {},
-			            1u,
-			            &viewport,
-			            1u,
-			            &scissors,
-			        },
-
-			        vk::PipelineRasterizationStateCreateInfo {
-			            {},
-			            VK_FALSE,
-			            VK_FALSE,
-			            vk::PolygonMode::eFill,
-			            vk::CullModeFlagBits::eBack,
-			            vk::FrontFace::eCounterClockwise,
-			            VK_FALSE,
-			            0.0f,
-			            0.0f,
-			            0.0f,
-			            1.0f,
-			        },
-			        vk::PipelineMultisampleStateCreateInfo {
-			            {},
-			            sampleCount,
-			            VK_FALSE,
-			            {},
-			            VK_FALSE,
-			            VK_FALSE,
-			        },
-
-			        vk::PipelineDepthStencilStateCreateInfo {
-			            {},
-			            VK_TRUE,                     // depthTestEnable
-			            VK_TRUE,                     // depthWriteEnable
-			            vk::CompareOp::eLessOrEqual, // depthCompareOp
-			            VK_FALSE,                    // depthBoundsTestEnable
-			            VK_FALSE,                    // stencilTestEnable
-			            {},                          // front
-			            {},                          // back
-			            0.0f,                        // minDepthBounds
-			            1.0,                         // maxDepthBounds
-			        },
-
-			        vk::PipelineColorBlendStateCreateInfo {
-			            {},                         // flags
-			            VK_FALSE,                   // logicOpEnable
-			            vk::LogicOp::eCopy,         // logicOp
-			            1u,                         // attachmentCount
-			            &colorBlendAttachment,      // pAttachments
-			            { 0.0f, 0.0f, 0.0f, 0.0f }, // blendConstants
-			        },
-			        vk::PipelineDynamicStateCreateInfo {},
-			    },
-
-			    m_MaterialSystem.GetShaderEffect("skybox"),
-			    colorAttachmentFormat,
-			    depthAttachmentFormat,
-			});
-		}
-	}
-
-	void LoadMasterMaterials()
-	{
-		// @TODO: Load from files instead of hard-coding
-		m_MaterialSystem.CreateMasterMaterial({
-		    "default",
-		    m_MaterialSystem.GetShaderPass("default"),
-		    {},
+		    .pipelineConfiguration = m_MaterialSystem.GetPipelineConfiguration("opaque_mesh"),
 		});
 
-		m_MaterialSystem.CreateMasterMaterial({
-		    "skybox",
-		    m_MaterialSystem.GetShaderPass("skybox"),
-		    {},
+		m_MaterialSystem.CreateShaderPass({
+		    .name   = "skybox",
+		    .effect = m_MaterialSystem.GetShaderEffect("skybox"),
+
+		    .colorAttachmentFormat = device->surfaceFormat.format,
+		    .depthAttachmentFormat = device->depthFormat,
+
+		    .pipelineConfiguration = m_MaterialSystem.GetPipelineConfiguration("skybox"),
 		});
 	}
 
@@ -437,17 +285,17 @@ private:
 	{
 		// @TODO: Load from files instead of hard-coding
 		m_MaterialSystem.CreateMaterial({
-		    "default",
-		    m_MaterialSystem.GetMasterMaterial("default"),
-		    {},
-		    {},
+		    .name       = "opaque_mesh",
+		    .shaderPass = m_MaterialSystem.GetShaderPass("opaque_mesh"),
+		    .parameters = {},
+		    .textures   = {},
 		});
 
 		m_MaterialSystem.CreateMaterial({
-		    "skybox",
-		    m_MaterialSystem.GetMasterMaterial("skybox"),
-		    {},
-		    {},
+		    .name       = "skybox",
+		    .shaderPass = m_MaterialSystem.GetShaderPass("skybox"),
+		    .parameters = {},
+		    .textures   = {},
 		});
 	}
 
@@ -456,7 +304,7 @@ private:
 		// @TODO: Load from files instead of hard-coding
 		m_ModelSystem.LoadModel({
 		    m_TextureSystem,
-		    "default",
+		    "flight_helmet",
 		    "Assets/FlightHelmet/FlightHelmet.gltf",
 		});
 
@@ -481,8 +329,8 @@ private:
 
 		m_Scene.emplace<StaticMeshRendererComponent>(
 		    testModel,
-		    m_MaterialSystem.GetMaterial("default"), // Material
-		    m_ModelSystem.GetModel("default")        // Mesh
+		    m_MaterialSystem.GetMaterial("opaque_mesh"), // Material
+		    m_ModelSystem.GetModel("flight_helmet")      // Mesh
 		);
 
 		Entity skybox = m_Scene.create();

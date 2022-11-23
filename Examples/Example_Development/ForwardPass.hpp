@@ -63,7 +63,7 @@ inline void ForwardPassUpdate(const bvk::RenderContext& context)
 					}
 				};
 
-				context.logicalDevice.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
+				context.device->logical.updateDescriptorSets(static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0ull, nullptr);
 			}
 		}
 	});
@@ -71,19 +71,27 @@ inline void ForwardPassUpdate(const bvk::RenderContext& context)
 
 inline void ForwardPassRender(const bvk::RenderContext& context)
 {
+	const auto& cmd = context.cmd;
+
 	VkDeviceSize offset { 0 };
 	vk::Pipeline currentPipeline = VK_NULL_HANDLE;
 
 	Scene* scene = (Scene*)context.userPointer;
-
 	scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>).each([&](TransformComponent& transformComp, StaticMeshRendererComponent& renderComp) {
-		const auto cmd = context.cmd;
-
 		// bind pipeline
-		vk::Pipeline newPipeline = renderComp.material->base->shader->pipeline;
+		vk::Pipeline newPipeline = renderComp.material->shaderPass->pipeline;
 		if (currentPipeline != newPipeline)
 		{
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, newPipeline);
+			cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, context.device->framebufferExtent } });
+			cmd.setViewport(0, { vk::Viewport {
+			                       0.0f,
+			                       0.0f,
+			                       (float)context.device->framebufferExtent.width,
+			                       (float)context.device->framebufferExtent.height,
+			                       0.0f,
+			                       1.0f } });
+
 			currentPipeline = newPipeline;
 		}
 		// bind buffers

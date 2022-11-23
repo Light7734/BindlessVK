@@ -10,6 +10,24 @@ namespace BINDLESSVK_NAMESPACE {
 
 struct PipelineConfiguration
 {
+	struct CreateInfo
+	{
+		const char* name;
+
+		vk::PipelineVertexInputStateCreateInfo vertexInputState;
+		vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState;
+		vk::PipelineTessellationStateCreateInfo tessellationState;
+		vk::PipelineViewportStateCreateInfo viewportState;
+		vk::PipelineRasterizationStateCreateInfo rasterizationState;
+		vk::PipelineMultisampleStateCreateInfo multisampleState;
+		vk::PipelineDepthStencilStateCreateInfo depthStencilState;
+
+		std::vector<vk::PipelineColorBlendAttachmentState> colorBlendAttachments;
+		vk::PipelineColorBlendStateCreateInfo colorBlendState;
+
+		std::vector<vk::DynamicState> dynamicStates;
+	};
+
 	vk::PipelineVertexInputStateCreateInfo vertexInputState;
 	vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState;
 	vk::PipelineTessellationStateCreateInfo tessellationState;
@@ -17,7 +35,11 @@ struct PipelineConfiguration
 	vk::PipelineRasterizationStateCreateInfo rasterizationState;
 	vk::PipelineMultisampleStateCreateInfo multisampleState;
 	vk::PipelineDepthStencilStateCreateInfo depthStencilState;
+
+	std::vector<vk::PipelineColorBlendAttachmentState> colorBlendAttachments;
 	vk::PipelineColorBlendStateCreateInfo colorBlendState;
+
+	std::vector<vk::DynamicState> dynamicStates;
 	vk::PipelineDynamicStateCreateInfo dynamicState;
 };
 
@@ -48,6 +70,7 @@ struct Shader
 };
 
 /// @brief Shaders and pipeline layout for creating ShaderPasses
+/// usually a pair of vertex and fragment <Shader>s
 struct ShaderEffect
 {
 	struct CreateInfo
@@ -68,28 +91,14 @@ struct ShaderPass
 	struct CreateInfo
 	{
 		const char* name;
-		PipelineConfiguration pipelineConfiguration;
 		ShaderEffect* effect;
 		vk::Format colorAttachmentFormat;
 		vk::Format depthAttachmentFormat;
+		PipelineConfiguration pipelineConfiguration;
 	};
 
 	ShaderEffect* effect;
 	vk::Pipeline pipeline;
-};
-
-/// @brief Template for materials to base themselves off of
-struct MasterMaterial
-{
-	struct CreateInfo
-	{
-		const char* name;
-		ShaderPass* shaderPass;
-		MaterialParameters defaultParameters;
-	};
-
-	ShaderPass* shader;
-	MaterialParameters defaultParameters;
 };
 
 /// @brief Graphics state needed to render an object during a renderpass
@@ -98,12 +107,12 @@ struct Material
 	struct CreateInfo
 	{
 		const char* name;
-		MasterMaterial* base;
+		ShaderPass* shaderPass;
 		MaterialParameters parameters;
 		std::vector<class Texture*> textures;
 	};
 
-	MasterMaterial* base;
+	ShaderPass* shaderPass;
 	MaterialParameters parameters;
 
 	vk::DescriptorSet descriptorSet;
@@ -132,16 +141,17 @@ public:
 	inline Shader* GetShader(const char* name) { return &m_Shaders[HashStr(name)]; }
 	inline ShaderEffect* GetShaderEffect(const char* name) { return &m_ShaderEffects[HashStr(name)]; }
 	inline ShaderPass* GetShaderPass(const char* name) { return &m_ShaderPasses[HashStr(name)]; }
-	inline MasterMaterial* GetMasterMaterial(const char* name) { return &m_MasterMaterials[HashStr(name)]; }
 	inline Material* GetMaterial(const char* name) { return &m_Materials[HashStr(name)]; }
 
+	inline const PipelineConfiguration& GetPipelineConfiguration(const char* name) const { return m_PipelineConfigurations.at(HashStr(name)); }
+
 	void LoadShader(const Shader::CreateInfo& info);
+
+	void CreatePipelineConfiguration(const PipelineConfiguration::CreateInfo& info);
 
 	void CreateShaderEffect(const ShaderEffect::CreateInfo& info);
 
 	void CreateShaderPass(const ShaderPass::CreateInfo& info);
-
-	void CreateMasterMaterial(const MasterMaterial::CreateInfo& info);
 
 	void CreateMaterial(const Material::CreateInfo& info);
 
@@ -153,8 +163,9 @@ private:
 	std::unordered_map<uint64_t, ShaderEffect> m_ShaderEffects = {};
 	std::unordered_map<uint64_t, ShaderPass> m_ShaderPasses    = {};
 
-	std::unordered_map<uint64_t, MasterMaterial> m_MasterMaterials = {};
-	std::unordered_map<uint64_t, Material> m_Materials             = {};
+	std::unordered_map<uint64_t, PipelineConfiguration> m_PipelineConfigurations = {};
+
+	std::unordered_map<uint64_t, Material> m_Materials = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE
