@@ -12,7 +12,17 @@
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 
-#define BINDLESSVK_NAMESPACE bvk
+#ifndef BINDLESSVK_NAMESPACE
+	#define BINDLESSVK_NAMESPACE bvk
+#endif
+
+#ifndef BVK_MAX_FRAMES_IN_FLIGHT
+	#define BVK_MAX_FRAMES_IN_FLIGHT 3
+#endif
+
+#ifndef BVK_DESIRED_SWAPCHAIN_IMAGES
+	#define BVK_DESIRED_SWAPCHAIN_IMAGES 3
+#endif
 
 namespace BINDLESSVK_NAMESPACE {
 

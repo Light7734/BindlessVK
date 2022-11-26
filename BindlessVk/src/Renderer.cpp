@@ -13,7 +13,7 @@ void Renderer::Reset()
 
 	DestroySwapchainResources();
 
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		m_Device->logical.destroyFence(m_RenderFences[i], nullptr);
 		m_Device->logical.destroySemaphore(m_RenderSemaphores[i], nullptr);
@@ -24,14 +24,7 @@ void Renderer::Reset()
 	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
 	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
 
-	m_Device->logical.resetCommandPool(m_CommandPool);
-	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool);
-	m_Device->logical.destroyCommandPool(m_UploadContext.cmdPool);
-	m_Device->logical.destroyCommandPool(m_CommandPool);
-
-
 	m_Device->logical.destroySwapchainKHR(m_Swapchain);
-	m_Device->logical.destroyFence(m_UploadContext.fence);
 }
 
 void Renderer::Init(const Renderer::CreateInfo& info)
@@ -40,7 +33,7 @@ void Renderer::Init(const Renderer::CreateInfo& info)
 
 	CreateSyncObjects();
 	CreateDescriptorPools();
-	CreateCommandPool();
+	CreateCmdBuffers();
 
 	// Recreates swapchain resources
 	OnSwapchainInvalidated();
@@ -78,7 +71,7 @@ void Renderer::DestroySwapchainResources()
 
 void Renderer::CreateSyncObjects()
 {
-	for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		vk::SemaphoreCreateInfo semaphoreCreateInfo {};
 
@@ -90,8 +83,6 @@ void Renderer::CreateSyncObjects()
 		m_RenderSemaphores[i]  = m_Device->logical.createSemaphore(semaphoreCreateInfo, nullptr);
 		m_PresentSemaphores[i] = m_Device->logical.createSemaphore(semaphoreCreateInfo, nullptr);
 	}
-
-	m_UploadContext.fence = m_Device->logical.createFence({}, nullptr);
 }
 
 void Renderer::CreateDescriptorPools()
@@ -211,30 +202,20 @@ void Renderer::CreateSwapchain()
 	}
 }
 
-void Renderer::CreateCommandPool()
+void Renderer::CreateCmdBuffers()
 {
-	// renderer
-	vk::CommandPoolCreateInfo commandPoolCreateInfo {
-		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
-		m_Device->graphicsQueueIndex,                       // queueFamilyIndex
-	};
+	m_CommandBuffers.resize(BVK_MAX_FRAMES_IN_FLIGHT);
 
-	m_CommandPool           = m_Device->logical.createCommandPool(commandPoolCreateInfo, nullptr);
-	m_UploadContext.cmdPool = m_Device->logical.createCommandPool(commandPoolCreateInfo, nullptr);
+	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		vk::CommandBufferAllocateInfo cmdBufferAllocInfo {
+			m_Device->GetCmdPool(i),          // commandPool
+			vk::CommandBufferLevel::ePrimary, // level
+			1u,                               // commandBufferCount
+		};
 
-	vk::CommandBufferAllocateInfo cmdBufferAllocInfo {
-		m_CommandPool,                    // commandPool
-		vk::CommandBufferLevel::ePrimary, // level
-		MAX_FRAMES_IN_FLIGHT,             // commandBufferCount
-	};
-	m_CommandBuffers = m_Device->logical.allocateCommandBuffers(cmdBufferAllocInfo);
-
-	vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
-		m_UploadContext.cmdPool,
-		vk::CommandBufferLevel::ePrimary,
-		1u,
-	};
-	m_UploadContext.cmdBuffer = m_Device->logical.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
+		m_CommandBuffers[i] = m_Device->logical.allocateCommandBuffers(cmdBufferAllocInfo)[0];
+	}
 }
 
 void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
@@ -242,7 +223,6 @@ void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
 	m_RenderGraph.Init({
 	    .device              = m_Device,
 	    .descriptorPool      = m_DescriptorPool,
-	    .commandPool         = m_CommandPool,
 	    .swapchainImages     = m_SwapchainImages,
 	    .swapchainImageViews = m_SwapchainImageViews,
 	});
@@ -252,8 +232,6 @@ void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
 
 void Renderer::BeginFrame(void* userPointer)
 {
-	auto cmd = m_CommandBuffers[m_CurrentFrame];
-
 	m_RenderGraph.BeginFrame({
 	    .graph       = &m_RenderGraph,
 	    .pass        = nullptr,
@@ -290,6 +268,7 @@ void Renderer::EndFrame(void* userPointer)
 
 	static uint32_t counter = 0u;
 
+	m_Device->logical.resetCommandPool(m_Device->GetCmdPool(m_CurrentFrame));
 	auto cmd = m_CommandBuffers[m_CurrentFrame];
 
 	m_RenderGraph.EndFrame({
@@ -309,7 +288,7 @@ void Renderer::EndFrame(void* userPointer)
 	SubmitQueue(m_RenderSemaphores[m_CurrentFrame], m_PresentSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
 	PresentFrame(m_PresentSemaphores[m_CurrentFrame], imageIndex);
 
-	m_CurrentFrame = (m_CurrentFrame + 1u) % MAX_FRAMES_IN_FLIGHT;
+	m_CurrentFrame = (m_CurrentFrame + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
 }
 
 void Renderer::SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd)
@@ -357,28 +336,5 @@ void Renderer::PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex)
 		m_SwapchainInvalidated = true;
 		return;
 	}
-}
-
-void Renderer::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
-{
-	vk::CommandBuffer cmd = m_UploadContext.cmdBuffer;
-
-	vk::CommandBufferBeginInfo beginInfo {
-		vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-	};
-
-	cmd.begin(beginInfo);
-
-	function(cmd);
-
-	cmd.end();
-
-	vk::SubmitInfo submitInfo { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
-
-	m_Device->graphicsQueue.submit(submitInfo, m_UploadContext.fence);
-	BVK_ASSERT(m_Device->logical.waitForFences(m_UploadContext.fence, true, UINT_MAX));
-	m_Device->logical.resetFences(m_UploadContext.fence);
-
-	m_Device->logical.resetCommandPool(m_CommandPool, {});
 }
 } // namespace BINDLESSVK_NAMESPACE

@@ -19,8 +19,8 @@ static void InitializeImgui(bvk::Device* device, bvk::Renderer& renderer, Window
 		.DescriptorPool        = renderer.GetDescriptorPool(),
 		.UseDynamicRendering   = true,
 		.ColorAttachmentFormat = static_cast<VkFormat>(device->surfaceFormat.format),
-		.MinImageCount         = MAX_FRAMES_IN_FLIGHT,
-		.ImageCount            = MAX_FRAMES_IN_FLIGHT,
+		.MinImageCount         = BVK_MAX_FRAMES_IN_FLIGHT,
+		.ImageCount            = BVK_MAX_FRAMES_IN_FLIGHT,
 		.MSAASamples           = static_cast<VkSampleCountFlagBits>(device->maxDepthColorSamples),
 	};
 	std::pair userData = std::make_pair(device->vkGetInstanceProcAddr, device->instance);
@@ -35,9 +35,10 @@ static void InitializeImgui(bvk::Device* device, bvk::Renderer& renderer, Window
 
 	ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
 
-	renderer.ImmediateSubmit([](vk::CommandBuffer cmd) {
+	device->ImmediateSubmit([](vk::CommandBuffer cmd) {
 		ImGui_ImplVulkan_CreateFontsTexture(cmd);
 	});
+
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
@@ -76,11 +77,26 @@ Application::Application()
 	    .deviceExtensions   = m_DeviceExtensions,
 	    .windowExtensions   = m_Window.GetRequiredExtensions(),
 
-	    .createWindowSurfaceFunc = [&](vk::Instance instance) { return m_Window.CreateSurface(instance); },
+	    .createWindowSurfaceFunc =
+	        [&](vk::Instance instance) {
+		        return m_Window.CreateSurface(instance);
+	        },
 
-	    .enableDebugging           = true,
-	    .debugMessengerSeverities  = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-	    .debugMessengerTypes       = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+	    .getWindowFramebufferExtentFunc =
+	        [&]() {
+		        return m_Window.GetFramebufferSize();
+	        },
+
+	    .enableDebugging          = true,
+	    .debugMessengerSeverities = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
+	                                vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo |
+	                                vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+	                                vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+
+	    .debugMessengerTypes = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+	                           vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
+	                           vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+
 	    .debugMessengerCallback    = &VulkanDebugMessageCallback,
 	    .debugMessengerUserPointer = this,
 	});
@@ -109,7 +125,7 @@ Application::Application()
 	m_MaterialSystem.Init({ device });
 
 	// @todo: refactor out getting a command pool from renderer
-	m_ModelSystem.Init({ device, m_Renderer.GetCommandPool() });
+	m_ModelSystem.Init({ device });
 
 
 	InitializeImgui(device, m_Renderer, m_Window);

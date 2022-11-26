@@ -13,7 +13,6 @@ struct BufferCreateInfo
 	const char* name;
 
 	Device* device;
-	vk::CommandPool commandPool;
 	vk::BufferUsageFlags usage;
 
 	vk::DeviceSize minBlockSize;

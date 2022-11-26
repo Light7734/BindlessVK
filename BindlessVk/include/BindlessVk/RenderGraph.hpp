@@ -23,7 +23,6 @@ public:
 	{
 		Device* device;
 		vk::DescriptorPool descriptorPool;
-		vk::CommandPool commandPool;
 		std::vector<vk::Image> swapchainImages;
 		std::vector<vk::ImageView> swapchainImageViews;
 	};
@@ -42,17 +41,22 @@ public:
 
 public:
 	RenderGraph();
+
 	void Reset();
 
 	void Init(const CreateInfo& info);
 
 	void Build(const BuildInfo& info);
-	void OnSwapchainInvalidated(std::vector<vk::Image> swapchainImages, std::vector<vk::ImageView> swapchainImageViews);
+
+	void OnSwapchainInvalidated(std::vector<vk::Image> swapchainImages,
+	                            std::vector<vk::ImageView> swapchainImageViews);
 
 	void BeginFrame(RenderContext context);
+
 	void EndFrame(RenderContext context);
 
-	inline void* MapDescriptorBuffer(const char* name, uint32_t frameIndex)
+	inline void* MapDescriptorBuffer(const char* name,
+	                                 uint32_t frameIndex)
 	{
 		return m_BufferInputs[HashStr(name)]->MapBlock(frameIndex);
 	}
@@ -63,6 +67,17 @@ public:
 	}
 
 private:
+	inline vk::CommandBuffer GetCmd(uint32_t passIndex,
+	                                uint32_t frameIndex,
+	                                uint32_t threadIndex) const
+	{
+		const uint32_t numPass    = m_RenderPasses.size();
+		const uint32_t numThreads = m_Device->numThreads;
+
+		return m_SecondaryCommandBuffers
+		    [passIndex + (numPass * (threadIndex + (numThreads * frameIndex)))];
+	}
+
 	void CreateCommandBuffers();
 
 	void ValidateGraph();
@@ -142,7 +157,6 @@ private:
 private:
 	Device* m_Device = {};
 
-	vk::CommandPool m_CommandPool          = {};
 	vk::DescriptorPool m_DescriptorPool    = {};
 	std::vector<RenderPass> m_RenderPasses = {};
 

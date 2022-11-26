@@ -6,14 +6,6 @@
 
 #include <glm/glm.hpp>
 
-#ifndef MAX_FRAMES_IN_FLIGHT
-	#define MAX_FRAMES_IN_FLIGHT 3
-#endif
-
-#ifndef DESIRED_SWAPCHAIN_IMAGES
-	#define DESIRED_SWAPCHAIN_IMAGES 3
-#endif
-
 namespace BINDLESSVK_NAMESPACE {
 
 struct RenderPass

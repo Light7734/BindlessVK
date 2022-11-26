@@ -11,7 +11,6 @@ namespace BINDLESSVK_NAMESPACE {
 void ModelSystem::Init(const ModelSystem::CreateInfo& info)
 {
 	m_Device      = info.device;
-	m_CommandPool = info.commandPool;
 }
 
 void ModelSystem::Reset()
@@ -231,7 +230,6 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	model.vertexBuffer = new StagingBuffer({
 	    .name         = info.name,
 	    .device       = m_Device,
-	    .commandPool  = m_CommandPool,
 	    .usage        = vk::BufferUsageFlagBits::eVertexBuffer,
 	    .minBlockSize = vertices.size() * sizeof(Model::Vertex),
 	    .blockCount   = 1u,
@@ -249,7 +247,6 @@ void ModelSystem::LoadModel(const Model::CreateInfo& info)
 	model.indexBuffer = new StagingBuffer({
 	    .name         = info.name,
 	    .device       = m_Device,
-	    .commandPool  = m_CommandPool,
 	    .usage        = vk::BufferUsageFlagBits::eIndexBuffer,
 	    .minBlockSize = indices.size() * sizeof(uint32_t),
 	    .blockCount   = 1u,

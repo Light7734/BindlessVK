@@ -106,24 +106,14 @@ public:
 	}
 
 private:
-	struct UploadContext
-	{
-		vk::CommandBuffer cmdBuffer;
-		vk::CommandPool cmdPool;
-		vk::Fence fence;
-	};
-
-private:
 	void BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight);
 
-	void ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function);
 	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
 	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
 	Device* m_Device = {};
 
-	UploadContext m_UploadContext                    = {};
 	std::unordered_map<uint64_t, Texture> m_Textures = {};
 };
 

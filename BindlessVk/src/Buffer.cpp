@@ -89,44 +89,15 @@ StagingBuffer::StagingBuffer(const BufferCreateInfo& info)
 			memcpy(m_Device->allocator.mapMemory(m_StagingBuffer), info.initialData, static_cast<size_t>(info.minBlockSize));
 			m_Device->allocator.unmapMemory(m_StagingBuffer);
 
-			// @todo: Move insant submits to a separate function
-			// Allocate cmd buffer
-			vk::CommandBufferAllocateInfo allocInfo {
-				info.commandPool,                 // commandPool
-				vk::CommandBufferLevel::ePrimary, // level
-				1u,                               // commandBufferCount
-			};
-			vk::CommandBuffer cmdBuffer = m_Device->logical.allocateCommandBuffers(allocInfo)[0];
+			m_Device->ImmediateSubmit([&](vk::CommandBuffer cmd) {
+				vk::BufferCopy bufferCopy {
+					0u,                // srcOffset
+					0u,                // dstOffset
+					info.minBlockSize, // size
+				};
 
-			// Record cmd buffer
-			vk::CommandBufferBeginInfo beginInfo {
-				vk::CommandBufferUsageFlagBits::eOneTimeSubmit, // flags
-			};
-
-			cmdBuffer.begin(beginInfo);
-			vk::BufferCopy bufferCopy {
-				0u,                // srcOffset
-				0u,                // dstOffset
-				info.minBlockSize, // size
-			};
-			cmdBuffer.copyBuffer(m_StagingBuffer, m_Buffer, 1u, &bufferCopy);
-			cmdBuffer.end();
-
-			// Submit cmd buffer
-			vk::SubmitInfo submitInfo {
-				0u,         // waitSemaphoreCount
-				nullptr,    // pWaitSemaphores
-				nullptr,    // pWaitDstStageMask
-				1u,         // commandBufferCount
-				&cmdBuffer, // pCommandBuffers
-				0u,         // signalSemaphoreCount
-				nullptr,    // pSignalSemaphores
-			};
-			BVK_ASSERT(m_Device->graphicsQueue.submit(1u, &submitInfo, VK_NULL_HANDLE));
-
-			// Wait for and free cmd buffer
-			m_Device->graphicsQueue.waitIdle();
-			m_Device->logical.freeCommandBuffers(info.commandPool, 1u, &cmdBuffer);
+				cmd.copyBuffer(m_StagingBuffer, m_Buffer, 1u, &bufferCopy);
+			});
 		}
 	}
 }

@@ -19,16 +19,6 @@ void TextureSystem::Init(const TextureSystem::CreateInfo& info)
 		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
 		m_Device->graphicsQueueIndex,                       // queueFamilyIndex
 	};
-	m_UploadContext.cmdPool = m_Device->logical.createCommandPool(commandPoolCreateInfo, nullptr);
-
-	vk::CommandBufferAllocateInfo uploadContextCmdBufferAllocInfo {
-		m_UploadContext.cmdPool,
-		vk::CommandBufferLevel::ePrimary,
-		1u,
-	};
-	m_UploadContext.cmdBuffer = m_Device->logical.allocateCommandBuffers(uploadContextCmdBufferAllocInfo)[0];
-
-	m_UploadContext.fence = m_Device->logical.createFence({});
 }
 
 Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
@@ -96,7 +86,7 @@ Texture* TextureSystem::CreateFromBuffer(const Texture::CreateInfoBuffer& info)
 		memcpy(m_Device->allocator.mapMemory(stagingBuffer), info.pixels, info.size);
 		m_Device->allocator.unmapMemory(stagingBuffer);
 
-		ImmediateSubmit([&](vk::CommandBuffer cmd) {
+		m_Device->ImmediateSubmit([&](vk::CommandBuffer cmd) {
 			TransitionLayout(texture, cmd, 0u, texture.mipLevels, 1u, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 
 			vk::BufferImageCopy bufferImageCopy {
@@ -336,7 +326,7 @@ Texture* TextureSystem::CreateFromKTX(const Texture::CreateInfoKTX& info)
 	                                         vk::MemoryPropertyFlagBits::eDeviceLocal);
 	texture.image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
 
-	ImmediateSubmit([&](vk::CommandBuffer&& cmd) {
+	m_Device->ImmediateSubmit([&](vk::CommandBuffer&& cmd) {
 		TransitionLayout(texture, cmd, 0u, texture.mipLevels, 6u, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 		cmd.copyBufferToImage(stagingBuffer, texture.image, vk::ImageLayout::eTransferDstOptimal, static_cast<uint32_t>(bufferCopies.size()), bufferCopies.data());
 		TransitionLayout(texture, cmd, 0u, texture.mipLevels, 6u, vk::ImageLayout::eTransferDstOptimal, texture.layout);
@@ -466,10 +456,6 @@ void TextureSystem::Reset()
 		m_Device->logical.destroyImageView(value.imageView, nullptr);
 		m_Device->allocator.destroyImage(value.image, value.image);
 	}
-
-	m_Device->logical.freeCommandBuffers(m_UploadContext.cmdPool, m_UploadContext.cmdBuffer);
-	m_Device->logical.destroyCommandPool(m_UploadContext.cmdPool);
-	m_Device->logical.destroyFence(m_UploadContext.fence);
 }
 
 void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout)
@@ -552,27 +538,5 @@ void TextureSystem::TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuff
 	    1, &imageMemBarrier);
 }
 
-void TextureSystem::ImmediateSubmit(std::function<void(vk::CommandBuffer)>&& function)
-{
-	vk::CommandBuffer cmd = m_UploadContext.cmdBuffer;
-
-	vk::CommandBufferBeginInfo beginInfo {
-		vk::CommandBufferUsageFlagBits::eOneTimeSubmit,
-	};
-
-	cmd.begin(beginInfo);
-
-	function(cmd);
-
-	cmd.end();
-
-	vk::SubmitInfo submitInfo { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
-
-	m_Device->graphicsQueue.submit(submitInfo, m_UploadContext.fence);
-	BVK_ASSERT(m_Device->logical.waitForFences(m_UploadContext.fence, true, UINT_MAX));
-
-	m_Device->logical.resetFences(m_UploadContext.fence);
-	m_Device->logical.resetCommandPool(m_UploadContext.cmdPool, {});
-}
 
 } // namespace BINDLESSVK_NAMESPACE

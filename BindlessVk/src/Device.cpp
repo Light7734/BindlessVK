@@ -37,6 +37,11 @@ void DeviceSystem::Init(const Device::CreateInfo& info)
 	m_Device.deviceExtensions   = info.deviceExtensions;
 	m_Device.windowExtensions   = info.windowExtensions;
 
+	m_Device.getWindowFramebufferExtentFunc = info.getWindowFramebufferExtentFunc;
+
+	// @todo: multi-threading support
+	m_Device.numThreads = 1u;
+
 	// Initialize default dispatcher
 	m_Device.vkGetInstanceProcAddr = m_DynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(m_Device.vkGetInstanceProcAddr);
@@ -47,13 +52,23 @@ void DeviceSystem::Init(const Device::CreateInfo& info)
 	CreateLogicalDevice();
 	CreateAllocator();
 	UpdateSurfaceInfo();
+
+	CreateCommandPools();
 }
 
 void DeviceSystem::Reset()
 {
 	m_Device.logical.waitIdle();
-	m_Device.allocator.destroy();
 
+	m_Device.logical.destroyFence(m_Device.immediateFence);
+	m_Device.logical.destroyCommandPool(m_Device.immediateCmdPool);
+
+	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		m_Device.logical.destroyCommandPool(m_Device.dynamicCmdPools[i]);
+	}
+
+	m_Device.allocator.destroy();
 	m_Device.logical.destroy(nullptr);
 
 	m_Device.instance.destroySurfaceKHR(m_Device.surface, nullptr);
@@ -452,12 +467,34 @@ void DeviceSystem::CreateAllocator()
 	m_Device.allocator = vma::createAllocator(allocCreateInfo);
 }
 
+void DeviceSystem::CreateCommandPools()
+{
+	vk::CommandPoolCreateInfo createInfo {
+		{},
+		m_Device.graphicsQueueIndex,
+	};
+
+	for (uint32_t i = 0; i < m_Device.numThreads; i++)
+	{
+		for (uint32_t j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; j++)
+		{
+			m_Device.dynamicCmdPools.push_back(m_Device.logical.createCommandPool(createInfo));
+		}
+	}
+
+	m_Device.immediateFence   = m_Device.logical.createFence({});
+	m_Device.immediateCmdPool = m_Device.logical.createCommandPool(createInfo);
+}
+
 void DeviceSystem::UpdateSurfaceInfo()
 {
 	m_Device.surfaceCapabilities = m_Device.physical.getSurfaceCapabilitiesKHR(m_Device.surface);
 
-	std::vector<vk::SurfaceFormatKHR> supportedFormats    = m_Device.physical.getSurfaceFormatsKHR(m_Device.surface);
-	std::vector<vk::PresentModeKHR> supportedPresentModes = m_Device.physical.getSurfacePresentModesKHR(m_Device.surface);
+	std::vector<vk::SurfaceFormatKHR> supportedFormats =
+	    m_Device.physical.getSurfaceFormatsKHR(m_Device.surface);
+
+	std::vector<vk::PresentModeKHR> supportedPresentModes =
+	    m_Device.physical.getSurfacePresentModesKHR(m_Device.surface);
 
 	// Select surface format
 	m_Device.surfaceFormat = supportedFormats[0]; // default
@@ -480,7 +517,12 @@ void DeviceSystem::UpdateSurfaceInfo()
 		}
 	}
 
-	m_Device.framebufferExtent = std::clamp(m_Device.framebufferExtent, m_Device.surfaceCapabilities.minImageExtent, m_Device.surfaceCapabilities.maxImageExtent);
+	vk::Extent2D framebufferExtent = m_Device.getWindowFramebufferExtentFunc();
+
+	m_Device.framebufferExtent = std::clamp(framebufferExtent,
+	                                        m_Device.surfaceCapabilities.minImageExtent,
+	                                        m_Device.surfaceCapabilities.maxImageExtent);
 }
+
 
 } // namespace BINDLESSVK_NAMESPACE

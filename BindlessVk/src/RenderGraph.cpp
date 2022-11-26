@@ -41,9 +41,21 @@ void RenderGraph::Reset()
 		m_Device->logical.freeDescriptorSets(m_DescriptorPool, descriptorSet);
 	}
 
+	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		for (uint32_t j = 0; j < m_Device->numThreads; j++)
+		{
+			vk::CommandPool pool = m_Device->GetCmdPool(i, j);
+
+			for (uint32_t k = 0; k < m_RenderPasses.size(); k++)
+			{
+				m_Device->logical.freeCommandBuffers(pool, GetCmd(k, i, j));
+			}
+		}
+	}
+
 	for (vk::CommandBuffer commandBuffer : m_SecondaryCommandBuffers)
 	{
-		m_Device->logical.freeCommandBuffers(m_CommandPool, commandBuffer);
 	}
 
 	for (auto& [key, val] : m_BufferInputs)
@@ -73,7 +85,6 @@ void RenderGraph::Init(const CreateInfo& info)
 {
 	m_Device              = info.device;
 	m_DescriptorPool      = info.descriptorPool;
-	m_CommandPool         = info.commandPool;
 	m_SwapchainImages     = info.swapchainImages;
 	m_SwapchainImageViews = info.swapchainImageViews;
 }
@@ -104,13 +115,27 @@ void RenderGraph::Build(const BuildInfo& info)
 
 void RenderGraph::CreateCommandBuffers()
 {
-	vk::CommandBufferAllocateInfo cmdBufferallocInfo {
-		m_CommandPool,
-		vk::CommandBufferLevel::eSecondary,
-		MAX_FRAMES_IN_FLIGHT * (uint32_t)m_RenderPassCreateInfos.size(),
-	};
+	size_t numPass = m_RenderPassCreateInfos.size();
+	m_SecondaryCommandBuffers.resize(BVK_MAX_FRAMES_IN_FLIGHT *
+	                                 m_Device->numThreads *
+	                                 numPass);
 
-	m_SecondaryCommandBuffers = m_Device->logical.allocateCommandBuffers(cmdBufferallocInfo);
+	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		for (uint32_t j = 0; j < m_Device->numThreads; j++)
+		{
+			vk::CommandBufferAllocateInfo cmdBufferallocInfo {
+				m_Device->GetCmdPool(i, j),
+				vk::CommandBufferLevel::eSecondary,
+				(uint32_t)numPass,
+			};
+
+			BVK_LOG(LogLvl::eTrace, "{}/{} - {}", i, BVK_MAX_FRAMES_IN_FLIGHT, j);
+			m_Device->logical.allocateCommandBuffers(
+			    &cmdBufferallocInfo,
+			    &m_SecondaryCommandBuffers[numPass * (j + (m_Device->numThreads * i))]);
+		}
+	}
 }
 
 // @todo: Implement
@@ -313,11 +338,10 @@ void RenderGraph::BuildBufferInputs()
 	{
 		BufferCreateInfo bufferCreateInfo {
 			.device       = m_Device,
-			.commandPool  = m_CommandPool,
 			.usage        = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
 			                                                                  vk::BufferUsageFlagBits::eStorageBuffer,
 			.minBlockSize = info.size,
-			.blockCount   = MAX_FRAMES_IN_FLIGHT,
+			.blockCount   = BVK_MAX_FRAMES_IN_FLIGHT,
 		};
 
 		m_BufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -332,11 +356,10 @@ void RenderGraph::BuildBufferInputs()
 		{
 			BufferCreateInfo bufferCreateInfo {
 				.device       = m_Device,
-				.commandPool  = m_CommandPool,
 				.usage        = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
 				                                                                  vk::BufferUsageFlagBits::eStorageBuffer,
 				.minBlockSize = info.size,
-				.blockCount   = MAX_FRAMES_IN_FLIGHT,
+				.blockCount   = BVK_MAX_FRAMES_IN_FLIGHT,
 			};
 
 			pass.bufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
@@ -368,7 +391,7 @@ void RenderGraph::BuildDescriptorSets()
 		m_DescriptorSetLayout = m_Device->logical.createDescriptorSetLayout(layoutCreateInfo);
 
 		// Allocate descriptor sets
-		for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 		{
 			vk::DescriptorSetAllocateInfo allocInfo {
 				m_DescriptorPool,
@@ -433,7 +456,7 @@ void RenderGraph::BuildDescriptorSets()
 		// Allocate descriptor sets
 		if (!renderPassCreateInfo.bufferInputInfos.empty() || !renderPassCreateInfo.textureInputInfos.empty())
 		{
-			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 			{
 				vk::DescriptorSetAllocateInfo allocInfo {
 					m_DescriptorPool,
@@ -471,12 +494,12 @@ void RenderGraph::WriteDescriptorSets()
 {
 	{
 		std::vector<vk::DescriptorBufferInfo> bufferInfos;
-		bufferInfos.reserve(m_BufferInputs.size() * MAX_FRAMES_IN_FLIGHT);
+		bufferInfos.reserve(m_BufferInputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
 		for (const RenderPass::CreateInfo::BufferInputInfo info : m_BufferInputInfos)
 		{
 			std::vector<vk::WriteDescriptorSet> writes;
 
-			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 			{
 				bufferInfos.push_back({
 				    *(m_BufferInputs[HashStr(info.name.c_str())]->GetBuffer()),
@@ -518,10 +541,10 @@ void RenderGraph::WriteDescriptorSets()
 		std::vector<vk::WriteDescriptorSet> writes;
 
 		std::vector<vk::DescriptorBufferInfo> bufferInfos;
-		bufferInfos.reserve(pass.bufferInputs.size() * MAX_FRAMES_IN_FLIGHT);
+		bufferInfos.reserve(pass.bufferInputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
 		for (const RenderPass::CreateInfo::BufferInputInfo info : renderPassCreateInfo.bufferInputInfos)
 		{
-			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 			{
 				bufferInfos.push_back({
 				    *(pass.bufferInputs[HashStr(info.name.c_str())]->GetBuffer()),
@@ -545,7 +568,7 @@ void RenderGraph::WriteDescriptorSets()
 		}
 		for (const RenderPass::CreateInfo::TextureInputInfo info : renderPassCreateInfo.textureInputInfos)
 		{
-			for (uint32_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 			{
 				for (uint32_t j = 0; j < info.count; j++)
 				{
@@ -1049,7 +1072,9 @@ void RenderGraph::EndFrame(RenderContext context)
 		    { 1.0, 1.0, 0.2, 1.0 },
 		}));
 
-		primaryCmd.executeCommands(m_SecondaryCommandBuffers[(context.frameIndex * m_RenderPasses.size()) + i]);
+		const uint32_t threadIndex = 0; // <- @todo
+		primaryCmd.executeCommands(m_SecondaryCommandBuffers[i + m_RenderPasses.size() * (threadIndex + m_Device->numThreads * context.frameIndex)]);
+
 		primaryCmd.endRendering();
 
 		primaryCmd.endDebugUtilsLabelEXT();

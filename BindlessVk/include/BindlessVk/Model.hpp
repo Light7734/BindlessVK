@@ -161,7 +161,6 @@ public:
 	struct CreateInfo
 	{
 		Device* device;
-		vk::CommandPool commandPool;
 	};
 
 public:
