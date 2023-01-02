@@ -31,3 +31,6 @@
 [submodule "Vendor/stb"]
 	path = Vendor/stb
 	url = git@github.com:nothings/stb
+[submodule "Vendor/fmt"]
+	path = Vendor/fmt
+	url = git@github.com:fmtlib/fmt
