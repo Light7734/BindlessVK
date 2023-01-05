@@ -24,9 +24,11 @@
 	#define BVK_DESIRED_SWAPCHAIN_IMAGES 3
 #endif
 
+
 namespace BINDLESSVK_NAMESPACE {
 
-// @note: values should reflect spdlog::level::level_enum
+//@note: If BVK_LOG is not overriden by the user
+// then values should reflect spdlog::level::level_enum
 enum class LogLvl
 {
 	eTrace    = 0,

@@ -7,13 +7,13 @@ int main(int argc, char* argv[])
 	{
 		DevelopmentExampleApplication application;
 
-		Timer deltaTimer;
-		while (!application.m_Window.ShouldClose())
+		Timer delta_timer;
+		while (!application.m_window.should_close())
 		{
-			application.m_Window.PollEvents();
+			application.m_window.poll_events();
 
-			application.OnTick(deltaTimer.ElapsedTime());
-			deltaTimer.Reset();
+			application.on_tick(delta_timer.elapsed_time());
+			delta_timer.reset();
 
 			// @todo: Handle swapchain invalidation
 		}

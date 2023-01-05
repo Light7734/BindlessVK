@@ -4,7 +4,8 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#define LOG(logLevel, ...) SPDLOG_LOGGER_CALL(Logger::Get(), spdlog::level::logLevel, __VA_ARGS__)
+#define LOG(logLevel, ...) \
+	SPDLOG_LOGGER_CALL(Logger::Get(), spdlog::level::logLevel, __VA_ARGS__)
 
 // Token indirection (for __FILE and __LINE__)
 #define TOKEN_INDIRECTION(token) token
@@ -15,9 +16,9 @@
 #define CAT_TOKEN(a, b)       CAT_INDIRECTION(a, b)
 
 // Assertions
-#define ASSERT(x, ...)                                                    \
-	if (!(x))                                                             \
-	{                                                                     \
+#define ASSERT(x, ...)                                                \
+	if (!(x))                                                           \
+	{                                                                   \
 		LOG(critical, __VA_ARGS__);                                       \
 		throw FrameworkException(#x, TKNIND(__FILE__), TKNIND(__LINE__)); \
 	}
@@ -25,29 +26,29 @@
 class Logger
 {
 private:
-	static std::shared_ptr<spdlog::logger> s_Logger;
+	static std::shared_ptr<spdlog::logger> s_logger;
 
 public:
 	static std::shared_ptr<spdlog::logger> Get()
 	{
-		if (!s_Logger)
+		if (!s_logger)
 		{
 			spdlog::set_pattern("%^%n@%! ==> %v%$");
 			spdlog::set_level(spdlog::level::trace);
 
-			s_Logger = spdlog::stdout_color_mt("Framework");
+			s_logger = spdlog::stdout_color_mt("Framework");
 		}
 
-		return s_Logger;
+		return s_logger;
 	}
 };
 
 struct FrameworkException: std::exception
 {
 	FrameworkException(const char* statement, const char* file, int line)
-	    : statement(statement)
-	    , file(file)
-	    , line(line)
+	  : statement(statement)
+	  , file(file)
+	  , line(line)
 	{
 	}
 

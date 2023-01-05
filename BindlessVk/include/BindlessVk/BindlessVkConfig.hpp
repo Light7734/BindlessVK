@@ -6,7 +6,7 @@
 
 #if !defined(BVK_ASSERT)
 	#define BVK_ASSERT(x, ...)                                                    \
-		if (((bool)(x)))                                                          \
+		if (((bool)(x))) [[unlikely]]                                             \
 		{                                                                         \
 			BVK_LOG(LogLvl::eCritical, "" __VA_ARGS__);                           \
 			BVK_LOG(LogLvl::eCritical, "Assertion failed({}): {}", (int)(x), #x); \
@@ -20,34 +20,35 @@
 	#include <spdlog/spdlog.h>
 	#include <spdlog/sinks/stdout_color_sinks.h>
 
-    // Token indirection (for __FILE__ and __LINE__)
+// Token indirection (for __FILE__ and __LINE__)
 	#define TOKEN_INDIRECTION(token) token
 	#define TKNIND(token)            TOKEN_INDIRECTION(token)
 
-    // Concatinate tokens
+// Concatinate tokens
 	#define CAT_INDIRECTION(a, b) a##b
 	#define CAT_TOKEN(a, b)       CAT_INDIRECTION(a, b)
 
-    // Logging
-	#define BVK_LOG(logLevel, ...) SPDLOG_LOGGER_CALL(Logger::Get(), (spdlog::level::level_enum)logLevel, __VA_ARGS__)
+// Logging
+	#define BVK_LOG(logLevel, ...) \
+		SPDLOG_LOGGER_CALL(Logger::get(), (spdlog::level::level_enum)logLevel, __VA_ARGS__)
 
 namespace BINDLESSVK_NAMESPACE {
 class Logger
 {
 private:
-	static std::shared_ptr<spdlog::logger> s_Logger;
+	static std::shared_ptr<spdlog::logger> s_logger;
 
 public:
-	static std::shared_ptr<spdlog::logger> Get()
+	static std::shared_ptr<spdlog::logger> get()
 	{
-		if (!s_Logger)
+		if (!s_logger)
 		{
 			spdlog::set_pattern("%^%n@%! ==> %v%$");
 			spdlog::set_level(spdlog::level::trace);
 
-			s_Logger = spdlog::stdout_color_mt("BindlessVk");
+			s_logger = spdlog::stdout_color_mt("BindlessVk");
 		}
-		return s_Logger;
+		return s_logger;
 	}
 };
 } // namespace BINDLESSVK_NAMESPACE

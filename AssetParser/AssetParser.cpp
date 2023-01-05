@@ -6,20 +6,20 @@
 
 namespace Assets {
 
-bool SaveBinaryFile(const char* path, const AssetFile& file)
+bool save_binary_file(const char* path, const AssetFile& file)
 {
 	std::ofstream outstream(path, std::ios::binary | std::ios::out);
 
 	outstream.write((const char*)&file.version, sizeof(uint32_t));
 	outstream.write((const char*)&file.type, sizeof(AssetFile::Type));
 
-	uint32_t jsonSize = file.json.size();
-	uint32_t blobSize = file.blob.size();
-	outstream.write((const char*)&jsonSize, sizeof(uint32_t));
-	outstream.write((const char*)&blobSize, sizeof(uint32_t));
+	uint32_t json_size = file.json.size();
+	uint32_t blob_size = file.blob.size();
+	outstream.write((const char*)&json_size, sizeof(uint32_t));
+	outstream.write((const char*)&blob_size, sizeof(uint32_t));
 
-	outstream.write(file.json.c_str(), jsonSize);
-	outstream.write((const char*)file.blob.data(), blobSize);
+	outstream.write(file.json.c_str(), json_size);
+	outstream.write((const char*)file.blob.data(), blob_size);
 
 	outstream.close();
 
@@ -28,7 +28,7 @@ bool SaveBinaryFile(const char* path, const AssetFile& file)
 	return true;
 }
 
-bool LoadBinaryFile(const char* path, AssetFile& outFile)
+bool load_binary_file(const char* path, AssetFile& out_file)
 {
 	std::ifstream instream(path, std::ios::binary);
 	instream.seekg(0ull);
@@ -36,18 +36,18 @@ bool LoadBinaryFile(const char* path, AssetFile& outFile)
 	if (!instream.is_open())
 		return false;
 
-	instream.read((char*)&outFile.version, sizeof(uint32_t));
-	instream.read((char*)&outFile.type, sizeof(AssetFile::Type));
+	instream.read((char*)&out_file.version, sizeof(uint32_t));
+	instream.read((char*)&out_file.type, sizeof(AssetFile::Type));
 
-	uint32_t jsonSize;
-	uint32_t blobSize;
-	instream.read((char*)&jsonSize, sizeof(uint32_t));
-	instream.read((char*)&blobSize, sizeof(uint32_t));
+	uint32_t json_size;
+	uint32_t blob_size;
+	instream.read((char*)&json_size, sizeof(uint32_t));
+	instream.read((char*)&blob_size, sizeof(uint32_t));
 
-	outFile.json.resize(jsonSize);
-	outFile.blob.resize(blobSize);
-	instream.read((char*)outFile.json.data(), jsonSize);
-	instream.read((char*)outFile.blob.data(), blobSize);
+	out_file.json.resize(json_size);
+	out_file.blob.resize(blob_size);
+	instream.read((char*)out_file.json.data(), json_size);
+	instream.read((char*)out_file.blob.data(), blob_size);
 
 	instream.close();
 

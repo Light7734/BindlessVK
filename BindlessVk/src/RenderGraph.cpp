@@ -2,1119 +2,1238 @@
 
 #include "BindlessVk/Texture.hpp"
 
+#include <fmt/format.h>
+
 namespace BINDLESSVK_NAMESPACE {
 
 RenderGraph::RenderGraph()
 {
 }
 
-void RenderGraph::Reset()
+void RenderGraph::reset()
 {
-	uint32_t i = 0;
-	for (AttachmentResourceContainer& resourceContainer : m_AttachmentResources)
+	for (auto& resource_container : m_attachment_resources)
 	{
-		if (resourceContainer.sizeType == RenderPass::CreateInfo::SizeType::eSwapchainRelative)
+		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
 		{
 			//  Destroy image resources if it's not from swapchain
-			if (resourceContainer.type != AttachmentResourceContainer::Type::ePerImage)
+			if (resource_container.type != AttachmentResourceContainer::Type::ePerImage)
 			{
-				for (AttachmentResource& resource : resourceContainer.resources)
+				for (auto& resource : resource_container.resources)
 				{
-					m_Device->logical.destroyImageView(resource.imageView);
-					m_Device->allocator.destroyImage(resource.image, resource.image);
+					m_device->logical.destroyImageView(resource.image_view);
+					m_device->allocator.destroyImage(resource.image, resource.image);
 				}
 			}
-			resourceContainer.resources.clear();
+			resource_container.resources.clear();
 
-			m_Device->logical.destroyImageView(resourceContainer.transientMSImageView);
-			m_Device->allocator.destroyImage(resourceContainer.transientMSImage, resourceContainer.transientMSImage);
+			m_device->logical.destroyImageView(resource_container.transient_ms_image_view);
 
-			resourceContainer.transientMSImage     = {};
-			resourceContainer.transientMSImageView = VK_NULL_HANDLE;
+			m_device->allocator.destroyImage(
+			    resource_container.transient_ms_image,
+			    resource_container.transient_ms_image
+			);
+
+			resource_container.transient_ms_image = {};
+			resource_container.transient_ms_image_view = VK_NULL_HANDLE;
 		}
-
-		i++;
 	}
 
-	for (vk::DescriptorSet descriptorSet : m_DescriptorSets)
+	for (const auto& descriptor_set : m_sets)
 	{
-		m_Device->logical.freeDescriptorSets(m_DescriptorPool, descriptorSet);
+		m_device->logical.freeDescriptorSets(m_descriptor_pool, descriptor_set);
 	}
 
-	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		for (uint32_t j = 0; j < m_Device->numThreads; j++)
+		for (u32 j = 0; j < m_device->num_threads; ++j)
 		{
-			vk::CommandPool pool = m_Device->GetCmdPool(i, j);
+			vk::CommandPool pool = m_device->get_cmd_pool(i, j);
 
-			for (uint32_t k = 0; k < m_RenderPasses.size(); k++)
+			for (u32 k = 0; k < m_renderpasses.size(); ++k)
 			{
-				m_Device->logical.freeCommandBuffers(pool, GetCmd(k, i, j));
+				m_device->logical.freeCommandBuffers(pool, get_cmd(k, i, j));
 			}
 		}
 	}
 
-	for (vk::CommandBuffer commandBuffer : m_SecondaryCommandBuffers)
-	{
-	}
+	// for (vk::CommandBuffer command_buffer : m_secondary_cmd_buffers) {
+	// }
 
-	for (auto& [key, val] : m_BufferInputs)
+	for (auto& [key, val] : m_buffer_inputs)
 	{
 		delete val;
 	}
-	m_Device->logical.destroyPipelineLayout(m_PipelineLayout);
-	m_Device->logical.destroyDescriptorSetLayout(m_DescriptorSetLayout);
 
-	for (RenderPass& pass : m_RenderPasses)
+	m_device->logical.destroyPipelineLayout(m_pipeline_layout);
+	m_device->logical.destroyDescriptorSetLayout(m_descriptor_set_layout);
+
+	for (auto& pass : m_renderpasses)
 	{
-		for (auto& [key, val] : pass.bufferInputs)
+		for (auto& [key, val] : pass.buffer_inputs)
 		{
 			delete val;
 		}
 
-		m_Device->logical.destroyDescriptorSetLayout(pass.descriptorSetLayout);
-		m_Device->logical.destroyPipelineLayout(pass.pipelineLayout);
-		for (vk::DescriptorSet descriptorSet : pass.descriptorSets)
+		m_device->logical.destroyDescriptorSetLayout(pass.descriptor_set_layout);
+		m_device->logical.destroyPipelineLayout(pass.pipeline_layout);
+		for (auto descriptor_set : pass.descriptor_sets)
 		{
-			m_Device->logical.freeDescriptorSets(m_DescriptorPool, descriptorSet);
+			m_device->logical.freeDescriptorSets(m_descriptor_pool, descriptor_set);
 		}
 	}
 }
 
-void RenderGraph::Init(const CreateInfo& info)
+void RenderGraph::init(
+    Device* device,
+    vk::DescriptorPool descriptor_pool,
+    vec<vk::Image> swapchain_images,
+    vec<vk::ImageView> swapchain_image_views
+)
 {
-	m_Device              = info.device;
-	m_DescriptorPool      = info.descriptorPool;
-	m_SwapchainImages     = info.swapchainImages;
-	m_SwapchainImageViews = info.swapchainImageViews;
+	m_device = device;
+	m_descriptor_pool = descriptor_pool;
+	m_swapchain_images = swapchain_images;
+	m_swapchain_image_views = swapchain_image_views;
 }
 
-void RenderGraph::Build(const BuildInfo& info)
+void RenderGraph::build(
+    std::string backbuffer_name,
+
+    vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
+
+    vec<Renderpass::CreateInfo> renderpasses,
+
+    void (*on_update)(Device*, RenderGraph*, u32, void*),
+    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
+
+    vk::DebugUtilsLabelEXT update_debug_label,
+    vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label
+)
 {
-	m_RenderPassCreateInfos = info.renderPasses;
-	m_BufferInputInfos      = info.bufferInputs;
-	m_OnUpdate              = info.onUpdate;
-	m_OnBeginFrame          = info.onBeginFrame;
+	// Assign graph members
+	m_renderpasses_info = renderpasses;
+	m_buffer_inputs_info = buffer_inputs;
+	m_on_update = on_update ? on_update : [](Device*, RenderGraph*, u32, void*) {
+	};
 
-	m_SwapchainAttachmentNames.push_back(info.backbufferName);
-	m_RenderPasses.resize(m_RenderPassCreateInfos.size(), RenderPass {});
+	m_on_begin_frame = on_begin_frame ? on_begin_frame : [](Device*, RenderGraph*, u32, void*) {
+	};
 
-	CreateCommandBuffers();
 
-	ValidateGraph();
-	ReorderPasses();
+	m_swapchain_attachment_names.push_back(backbuffer_name);
 
-	BuildAttachmentResources();
+	m_update_debug_label = update_debug_label;
+	m_backbuffer_barrier_debug_label = backbuffer_barrier_debug_label;
 
-	BuildTextureInputs();
-	BuildBufferInputs();
-
-	BuildDescriptorSets();
-	WriteDescriptorSets();
-}
-
-void RenderGraph::CreateCommandBuffers()
-{
-	size_t numPass = m_RenderPassCreateInfos.size();
-	m_SecondaryCommandBuffers.resize(BVK_MAX_FRAMES_IN_FLIGHT *
-	                                 m_Device->numThreads *
-	                                 numPass);
-
-	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	// Assign passes' members
+	m_renderpasses.resize(m_renderpasses_info.size(), Renderpass {});
+	for (u32 i = m_renderpasses_info.size(); i-- > 0;)
 	{
-		for (uint32_t j = 0; j < m_Device->numThreads; j++)
+		auto& pass = m_renderpasses[i];
+		auto& pass_info = m_renderpasses_info[i];
+
+		pass.name = pass_info.name;
+
+		pass.on_begin_frame = pass_info.on_begin_frame ?
+		                          pass_info.on_begin_frame :
+		                          [](Device*, class RenderGraph*, Renderpass*, uint32_t, void*) {
+		                          };
+
+		pass.on_update = pass_info.on_update ?
+		                     pass_info.on_update :
+		                     [](Device*, class RenderGraph*, Renderpass*, uint32_t, void*) {
+		                     };
+
+		pass.on_render = pass_info.on_render ? pass_info.on_render :
+		                                       [](Device*,
+		                                          class RenderGraph*,
+		                                          Renderpass*,
+		                                          vk::CommandBuffer cmd,
+		                                          uint32_t,
+		                                          uint32_t,
+		                                          void*) {
+		                                       };
+
+		pass.update_debug_label = pass_info.update_debug_label;
+		pass.barrier_debug_label = pass_info.barrier_debug_label;
+		pass.render_debug_label = pass_info.render_debug_label;
+
+		for (const auto& attachment_info : m_renderpasses_info[i].color_attachments_info)
+		{
+			auto it = std::find(
+			    m_swapchain_attachment_names.begin(),
+			    m_swapchain_attachment_names.end(),
+			    attachment_info.name
+			);
+
+			if (it != m_swapchain_attachment_names.end())
+			{
+				m_swapchain_attachment_names.push_back(attachment_info.input);
+			}
+		}
+	}
+
+	create_cmd_buffers();
+
+	validate_graph();
+	reorder_passes();
+
+	build_attachment_resources();
+
+	build_graph_texture_inputs();
+	build_passes_texture_inputs();
+
+	build_graph_buffer_inputs();
+	build_passes_buffer_inputs();
+
+	build_graph_sets();
+	build_passes_sets();
+
+	write_graph_sets();
+	write_passes_sets();
+
+	build_pass_cmd_buffer_begin_infos();
+}
+
+void RenderGraph::create_cmd_buffers()
+{
+	u32 num_pass = m_renderpasses_info.size();
+	m_secondary_cmd_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT * m_device->num_threads * num_pass);
+
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
+	{
+		for (u32 j = 0; j < m_device->num_threads; ++j)
 		{
 			vk::CommandBufferAllocateInfo cmdBufferallocInfo {
-				m_Device->GetCmdPool(i, j),
+				m_device->get_cmd_pool(i, j),
 				vk::CommandBufferLevel::eSecondary,
-				(uint32_t)numPass,
+				num_pass,
 			};
 
-			BVK_LOG(LogLvl::eTrace, "{}/{} - {}", i, BVK_MAX_FRAMES_IN_FLIGHT, j);
-			m_Device->logical.allocateCommandBuffers(
+			BVK_ASSERT(m_device->logical.allocateCommandBuffers(
 			    &cmdBufferallocInfo,
-			    &m_SecondaryCommandBuffers[numPass * (j + (m_Device->numThreads * i))]);
+			    &m_secondary_cmd_buffers[num_pass * (j + (m_device->num_threads * i))]
+			));
 		}
 	}
 }
 
 // @todo: Implement
-void RenderGraph::ValidateGraph()
+void RenderGraph::validate_graph()
 {
+	BVK_LOG(LogLvl::eWarn, "Unimplemented function call");
 }
 
 // @todo: Implement
-void RenderGraph::ReorderPasses()
+void RenderGraph::reorder_passes()
 {
-	for (uint32_t i = m_RenderPassCreateInfos.size(); i-- > 0;)
-	{
-		m_RenderPasses[i].name         = m_RenderPassCreateInfos[i].name;
-		m_RenderPasses[i].onUpdate     = m_RenderPassCreateInfos[i].onUpdate;
-		m_RenderPasses[i].onRender     = m_RenderPassCreateInfos[i].onRender;
-		m_RenderPasses[i].onBeginFrame = m_RenderPassCreateInfos[i].onBeginFrame;
-
-
-		for (const RenderPass::CreateInfo::AttachmentInfo& info : m_RenderPassCreateInfos[i].colorAttachmentInfos)
-		{
-			auto it = std::find(m_SwapchainAttachmentNames.begin(),
-			                    m_SwapchainAttachmentNames.end(),
-			                    info.name);
-
-			if (it != m_SwapchainAttachmentNames.end())
-			{
-				m_SwapchainAttachmentNames.push_back(info.input);
-			}
-		}
-	}
 }
 
-void RenderGraph::BuildAttachmentResources()
+void RenderGraph::build_attachment_resources()
 {
-	uint32_t passIndex = 0u;
-	for (const RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
+	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
 	{
-		RenderPass& pass = m_RenderPasses[passIndex++];
+		auto& pass = m_renderpasses[i];
+		const auto& pass_info = m_renderpasses_info[i];
 
-		for (const RenderPass::CreateInfo::AttachmentInfo& info : renderPassCreateInfo.colorAttachmentInfos)
+		for (u32 j = 0; j < pass_info.color_attachments_info.size(); ++j)
 		{
-			// Write only ( create new image )
-			if (info.input == "")
+			const auto& color_attachment_info = pass_info.color_attachments_info[j];
+
+			// Write only ; create new resource
+			if (color_attachment_info.input == "")
 			{
-				auto it = std::find(m_SwapchainAttachmentNames.begin(),
-				                    m_SwapchainAttachmentNames.end(),
-				                    info.input);
+				// Read/writes to a backbuffer resource?
+				auto it = std::find(
+				    m_swapchain_attachment_names.begin(),
+				    m_swapchain_attachment_names.end(),
+				    color_attachment_info.input
+				);
 
-
-				CreateAttachmentResource(info,
-				                         it != m_SwapchainAttachmentNames.end() ?
-				                             AttachmentResourceContainer::Type::ePerImage :
-				                             AttachmentResourceContainer::Type::eSingle,
-				                         UINT32_MAX);
+				create_attachment_resource(
+				    color_attachment_info,
+				    it != m_swapchain_attachment_names.end() ?
+				        AttachmentResourceContainer::Type::ePerImage :
+				        AttachmentResourceContainer::Type::eSingle,
+				    UINT32_MAX
+				);
 
 				pass.attachments.push_back({
-				    .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-				    .accessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-				    .layout     = vk::ImageLayout::eColorAttachmentOptimal,
-				    /* subresourceRange */
-				    .subresourceRange = vk::ImageSubresourceRange {
-				        vk::ImageAspectFlagBits::eColor, // aspectMask
-				        0u,                              // baseMipLevel
-				        1u,                              // levelCount
-				        0u,                              // baseArrayLayer
-				        1u,                              // layerCount
-				    },
-
-				    .loadOp        = vk::AttachmentLoadOp::eClear,
-				    .storeOp       = vk::AttachmentStoreOp::eStore,
-				    .resourceIndex = static_cast<uint32_t>(m_AttachmentResources.size() - 1u),
-				    .clearValue    = info.clearValue,
+				    vk::PipelineStageFlagBits::eColorAttachmentOutput,
+				    vk::AccessFlagBits::eColorAttachmentWrite,
+				    vk::ImageLayout::eColorAttachmentOptimal,
+				    { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 },
+				    vk::AttachmentLoadOp::eClear,
+				    vk::AttachmentStoreOp::eStore,
+				    static_cast<u32>(m_attachment_resources.size() - 1),
+				    color_attachment_info.clear_value,
 				});
 			}
-			// Read-Modify-Write ( alias the image )
+			// Read-Write ; use existing resource
 			else
 			{
-				uint32_t i = 0;
-				for (AttachmentResourceContainer& attachmentResource : m_AttachmentResources)
+				for (u32 k = 0; k < m_attachment_resources.size(); ++k)
 				{
-					if (attachmentResource.size != info.size || attachmentResource.sizeType != info.sizeType)
-					{
-						BVK_ASSERT(ErrorCodes::eUnsupported, "ReadWrite attachment with different size from input is currently not supported");
-					}
+					auto& resource_container = m_attachment_resources[k];
+					if (resource_container.last_write_name != color_attachment_info.input)
+						continue;
 
-					if (attachmentResource.lastWriteName == info.input)
-					{
-						attachmentResource.lastWriteName = info.name;
+					BVK_ASSERT(
+					    resource_container.size != color_attachment_info.size
+					        || resource_container.size_type != color_attachment_info.size_type,
+					    "ReadWrite attachment with different size from input is currently not "
+					    "supported"
+					);
 
-						pass.attachments.push_back({
-						    .stageMask  = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-						    .accessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-						    .layout     = vk::ImageLayout::eColorAttachmentOptimal,
-						    /* subresourceRange */
-						    .subresourceRange = vk::ImageSubresourceRange {
-						        vk::ImageAspectFlagBits::eColor, // aspectMask
-						        0u,                              // baseMipLevel
-						        1u,                              // levelCount
-						        0u,                              // baseArrayLayer
-						        1u,                              // layerCount
-						    },
+					resource_container.last_write_name = color_attachment_info.name;
+					pass.attachments.push_back({
+					    vk::PipelineStageFlagBits::eColorAttachmentOutput,
+					    vk::AccessFlagBits::eColorAttachmentWrite,
+					    vk::ImageLayout::eColorAttachmentOptimal,
+					    vk::ImageSubresourceRange {
+					        vk::ImageAspectFlagBits::eColor,
+					        0,
+					        1,
+					        0,
+					        1,
+					    },
+					    vk::AttachmentLoadOp::eLoad,
+					    vk::AttachmentStoreOp::eStore,
+					    k,
+					});
 
-						    .loadOp        = vk::AttachmentLoadOp::eLoad,
-						    .storeOp       = vk::AttachmentStoreOp::eStore,
-						    .resourceIndex = i,
-						});
-						break;
-					}
-
-					i++;
+					break;
 				}
 			}
 		}
 
-		if (!renderPassCreateInfo.depthStencilAttachmentInfo.name.empty())
+		if (pass_info.depth_stencil_attachment_info.name.empty())
+			continue;
+
+		const auto& depth_stencil_attachment_info = pass_info.depth_stencil_attachment_info;
+		// Write only ; create new resource
+		if (depth_stencil_attachment_info.input == "")
 		{
-			const RenderPass::CreateInfo::AttachmentInfo& info = renderPassCreateInfo.depthStencilAttachmentInfo;
-			// Write only ( create new image )
-			if (info.input == "")
+			auto it = std::find(
+			    m_swapchain_attachment_names.begin(),
+			    m_swapchain_attachment_names.end(),
+			    depth_stencil_attachment_info.input
+			);
+
+
+			create_attachment_resource(
+			    depth_stencil_attachment_info,
+			    AttachmentResourceContainer::Type::eSingle,
+			    UINT32_MAX
+			);
+
+			pass.attachments.push_back({
+			    vk::PipelineStageFlagBits::eEarlyFragmentTests,
+			    vk::AccessFlagBits::eDepthStencilAttachmentWrite
+			        | vk::AccessFlagBits::eDepthStencilAttachmentRead,
+			    vk::ImageLayout::eDepthAttachmentOptimal,
+			    vk::ImageSubresourceRange {
+			        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
+			        0,
+			        1,
+			        0,
+			        1,
+			    },
+			    vk::AttachmentLoadOp::eClear,
+			    vk::AttachmentStoreOp::eStore,
+			    static_cast<u32>(m_attachment_resources.size() - 1u),
+			    depth_stencil_attachment_info.clear_value,
+			});
+		}
+		// Read-Write ; use existing resource
+		else
+		{
+			for (u32 k = 0; k < m_attachment_resources.size(); ++k)
 			{
-				auto it = std::find(m_SwapchainAttachmentNames.begin(),
-				                    m_SwapchainAttachmentNames.end(),
-				                    info.input);
+				auto& resource_container = m_attachment_resources[k];
+				if (resource_container.last_write_name == depth_stencil_attachment_info.input)
+					continue;
 
+				BVK_ASSERT(
+				    resource_container.size != depth_stencil_attachment_info.size
+				        || resource_container.size_type != depth_stencil_attachment_info.size_type,
+				    "ReadWrite attachment with different size from input is currently not "
+				    "supported"
+				);
 
-				CreateAttachmentResource(info, AttachmentResourceContainer::Type::eSingle, UINT32_MAX);
-
+				resource_container.last_write_name = depth_stencil_attachment_info.name;
 				pass.attachments.push_back({
-				    .stageMask  = vk::PipelineStageFlagBits::eEarlyFragmentTests,
-				    .accessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead,
-				    .layout     = vk::ImageLayout::eDepthAttachmentOptimal,
-				    /* subresourceRange */
-				    .subresourceRange = vk::ImageSubresourceRange {
-				        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, // aspectMask
-
-				        0u, // baseMipLevel
-				        1u, // levelCount
-				        0u, // baseArrayLayer
-				        1u, // layerCount
+				    vk::PipelineStageFlagBits::eEarlyFragmentTests,
+				    vk::AccessFlagBits::eDepthStencilAttachmentWrite
+				        | vk::AccessFlagBits::eDepthStencilAttachmentRead,
+				    vk::ImageLayout::eDepthAttachmentOptimal,
+				    vk::ImageSubresourceRange {
+				        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
+				        0,
+				        1,
+				        0,
+				        1,
 				    },
-
-				    .loadOp  = vk::AttachmentLoadOp::eClear,
-				    .storeOp = vk::AttachmentStoreOp::eStore,
-
-				    .resourceIndex = static_cast<uint32_t>(m_AttachmentResources.size() - 1u),
-				    .clearValue    = info.clearValue,
+				    vk::AttachmentLoadOp::eLoad,
+				    vk::AttachmentStoreOp::eStore,
+				    1,
 				});
-			}
-			// Read-Modify-Write ( alias the image )
-			else
-			{
-				uint32_t i = 0;
-				for (AttachmentResourceContainer& attachmentResource : m_AttachmentResources)
-				{
-					if (attachmentResource.size != info.size || attachmentResource.sizeType != info.sizeType)
-					{
-						BVK_ASSERT(true, "ReadWrite attachment with different size from input is currently not supported");
-					}
 
-					if (attachmentResource.lastWriteName == info.input)
-					{
-						attachmentResource.lastWriteName = info.name;
-
-						pass.attachments.push_back({
-						    .stageMask  = vk::PipelineStageFlagBits::eEarlyFragmentTests,
-						    .accessMask = vk::AccessFlagBits::eDepthStencilAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentRead,
-						    .layout     = vk::ImageLayout::eDepthAttachmentOptimal,
-						    /* subresourceRange */
-						    .subresourceRange = vk::ImageSubresourceRange {
-						        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, // aspectMask
-
-						        0u, // baseMipLevel
-						        1u, // levelCount
-						        0u, // baseArrayLayer
-						        1u, // layerCount
-						    },
-
-						    .loadOp        = vk::AttachmentLoadOp::eLoad,
-						    .storeOp       = vk::AttachmentStoreOp::eStore,
-						    .resourceIndex = 1u,
-						});
-						break;
-					}
-
-					i++;
-				}
+				break;
 			}
 		}
 	}
 }
 
-
-void RenderGraph::BuildTextureInputs()
+void RenderGraph::build_graph_texture_inputs()
 {
 }
 
-void RenderGraph::BuildBufferInputs()
+void RenderGraph::build_passes_texture_inputs()
 {
-	for (RenderPass::CreateInfo::BufferInputInfo& info : m_BufferInputInfos)
-	{
-		BufferCreateInfo bufferCreateInfo {
-			.device       = m_Device,
-			.usage        = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-			                                                                  vk::BufferUsageFlagBits::eStorageBuffer,
-			.minBlockSize = info.size,
-			.blockCount   = BVK_MAX_FRAMES_IN_FLIGHT,
-		};
+}
 
-		m_BufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
+void RenderGraph::build_graph_buffer_inputs()
+{
+	for (auto& buffer_input_info : m_buffer_inputs_info)
+	{
+		m_buffer_inputs.emplace(
+		    HashStr(buffer_input_info.name.c_str()),
+		    new Buffer(
+		        buffer_input_info.name.c_str(),
+		        m_device,
+		        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
+		            vk::BufferUsageFlagBits::eUniformBuffer :
+		            vk::BufferUsageFlagBits::eStorageBuffer,
+		        buffer_input_info.size,
+		        BVK_MAX_FRAMES_IN_FLIGHT
+		    )
+		);
 	}
+}
 
-	uint32_t passIndex = 0u;
-	for (RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
+void RenderGraph::build_passes_buffer_inputs()
+{
+	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
 	{
-		RenderPass& pass = m_RenderPasses[passIndex++];
+		auto& pass = m_renderpasses[i];
+		const auto& pass_info = m_renderpasses_info[i];
 
-		for (RenderPass::CreateInfo::BufferInputInfo& info : renderPassCreateInfo.bufferInputInfos)
+		for (auto& buffer_input_info : pass_info.buffer_inputs_info)
 		{
-			BufferCreateInfo bufferCreateInfo {
-				.device       = m_Device,
-				.usage        = info.type == vk::DescriptorType::eUniformBuffer ? vk::BufferUsageFlagBits::eUniformBuffer :
-				                                                                  vk::BufferUsageFlagBits::eStorageBuffer,
-				.minBlockSize = info.size,
-				.blockCount   = BVK_MAX_FRAMES_IN_FLIGHT,
-			};
-
-			pass.bufferInputs.emplace(HashStr(info.name.c_str()), new Buffer(bufferCreateInfo));
+			pass.buffer_inputs.emplace(
+			    HashStr(buffer_input_info.name.c_str()),
+			    new Buffer(
+			        buffer_input_info.name.c_str(),
+			        m_device,
+			        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
+			            vk::BufferUsageFlagBits::eUniformBuffer :
+			            vk::BufferUsageFlagBits::eStorageBuffer,
+			        buffer_input_info.size,
+			        BVK_MAX_FRAMES_IN_FLIGHT
+			    )
+			);
 		}
 	}
 }
 
-void RenderGraph::BuildDescriptorSets()
+void RenderGraph::build_graph_sets()
 {
+	// Create set & pipeline layout
+	vec<vk::DescriptorSetLayoutBinding> bindings;
+	for (const auto& buffer_input_info : m_buffer_inputs_info)
 	{
-		std::vector<vk::DescriptorSetLayoutBinding> bindings;
-		for (const RenderPass::CreateInfo::BufferInputInfo& info : m_BufferInputInfos)
-		{
-			// Determine bindings
-			bindings.push_back(vk::DescriptorSetLayoutBinding {
-			    info.binding,
-			    info.type,
-			    info.count,
-			    info.stageMask,
-			});
-		}
-		// Create descriptor set layout
-		vk::DescriptorSetLayoutCreateInfo layoutCreateInfo {
-			{}, // flags
-			static_cast<uint32_t>(bindings.size()),
-			bindings.data(),
-
-		};
-		m_DescriptorSetLayout = m_Device->logical.createDescriptorSetLayout(layoutCreateInfo);
-
-		// Allocate descriptor sets
-		for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-		{
-			vk::DescriptorSetAllocateInfo allocInfo {
-				m_DescriptorPool,
-				1,
-				&m_DescriptorSetLayout,
-			};
-			m_DescriptorSets.push_back(m_Device->logical.allocateDescriptorSets(allocInfo)[0]);
-
-			std::string descriptorSetName = "render_graph DescriptorSet #" + std::to_string(i);
-			m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-			    vk::ObjectType::eDescriptorSet,
-			    (uint64_t)(VkDescriptorSet)m_DescriptorSets.back(),
-			    descriptorSetName.c_str(),
-			});
-		}
-
-		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
-			{},
-			1ull,                   // setLayoutCount
-			&m_DescriptorSetLayout, // pSetLayouts
-		};
-
-		m_PipelineLayout = m_Device->logical.createPipelineLayout(pipelineLayoutCreateInfo);
+		bindings.push_back(vk::DescriptorSetLayoutBinding {
+		    buffer_input_info.binding,
+		    buffer_input_info.type,
+		    buffer_input_info.count,
+		    buffer_input_info.stage_mask,
+		});
 	}
+	m_descriptor_set_layout = m_device->logical.createDescriptorSetLayout({
+	    {},
+	    static_cast<u32>(bindings.size()),
+	    bindings.data(),
+	});
+	m_pipeline_layout = m_device->logical.createPipelineLayout({ {}, 1, &m_descriptor_set_layout });
 
-	uint32_t passIndex = 0u;
-	for (const RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
+	// Allocate sets
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		RenderPass& pass = m_RenderPasses[passIndex++];
+		m_sets.push_back(m_device->logical.allocateDescriptorSets({
+		    m_descriptor_pool,
+		    1,
+		    &m_descriptor_set_layout,
+		})[0]);
 
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eDescriptorSet,
+		    (uint64_t)(VkDescriptorSet)m_sets.back(),
+		    fmt::format("render_graph_descriptor_set_{}", i).c_str(),
+		});
+	}
+}
 
-		// Determine bindings
-		std::vector<vk::DescriptorSetLayoutBinding> bindings;
-		for (const RenderPass::CreateInfo::BufferInputInfo info : renderPassCreateInfo.bufferInputInfos)
+void RenderGraph::build_passes_sets()
+{
+	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	{
+		Renderpass& pass = m_renderpasses[i];
+		const auto& pass_info = m_renderpasses_info[i];
+
+		// Create set & pipeline layout
+		vec<vk::DescriptorSetLayoutBinding> bindings;
+		for (const auto& buffer_input_info : pass_info.buffer_inputs_info)
 		{
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
-			    info.binding,
-			    info.type,
-			    info.count,
-			    info.stageMask,
+			    buffer_input_info.binding,
+			    buffer_input_info.type,
+			    buffer_input_info.count,
+			    buffer_input_info.stage_mask,
 			});
 		}
-		for (const RenderPass::CreateInfo::TextureInputInfo info : renderPassCreateInfo.textureInputInfos)
+		for (const auto& texture_input_info : pass_info.texture_inputs_info)
 		{
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
-			    info.binding,
-			    info.type,
-			    info.count,
-			    info.stageMask,
+			    texture_input_info.binding,
+			    texture_input_info.type,
+			    texture_input_info.count,
+			    texture_input_info.stage_mask,
 			});
 		}
-
-		// Create descriptor set layout
-		vk::DescriptorSetLayoutCreateInfo layoutCreateInfo {
-			{}, // flags
-			static_cast<uint32_t>(bindings.size()),
-			bindings.data(),
-
+		pass.descriptor_set_layout = m_device->logical.createDescriptorSetLayout(
+		    { {}, static_cast<u32>(bindings.size()), bindings.data() }
+		);
+		arr<vk::DescriptorSetLayout, 2> layouts {
+			m_descriptor_set_layout,
+			pass.descriptor_set_layout,
 		};
-		pass.descriptorSetLayout = m_Device->logical.createDescriptorSetLayout(layoutCreateInfo);
+		pass.pipeline_layout = m_device->logical.createPipelineLayout({ {}, 2ull, layouts.data() });
 
 		// Allocate descriptor sets
-		if (!renderPassCreateInfo.bufferInputInfos.empty() || !renderPassCreateInfo.textureInputInfos.empty())
+		if (!pass_info.buffer_inputs_info.empty() || !pass_info.texture_inputs_info.empty())
 		{
-			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
 			{
-				vk::DescriptorSetAllocateInfo allocInfo {
-					m_DescriptorPool,
-					1u,
-					&pass.descriptorSetLayout,
-				};
-				pass.descriptorSets.push_back(m_Device->logical.allocateDescriptorSets(allocInfo)[0]);
+				auto set = m_device->logical.allocateDescriptorSets({
+				    m_descriptor_pool,
+				    1u,
+				    &pass.descriptor_set_layout,
+				})[0];
 
-				std::string descriptorSetName = pass.name + " DescriptorSet #" + std::to_string(i);
-				m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+				pass.descriptor_sets.push_back(set);
+
+				m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 				    vk::ObjectType::eDescriptorSet,
-				    (uint64_t)(VkDescriptorSet)pass.descriptorSets.back(),
-				    descriptorSetName.c_str(),
+				    (uint64_t)(VkDescriptorSet)pass.descriptor_sets.back(),
+				    fmt::format("{}_descriptor_set_{}", pass.name, i).c_str(),
 				});
 			}
 		}
+	}
+}
 
-		// Create pipeline layout
-		std::array<vk::DescriptorSetLayout, 2> layouts {
-			m_DescriptorSetLayout,
-			pass.descriptorSetLayout
-		};
+void RenderGraph::write_graph_sets()
+{
+	vec<vk::DescriptorBufferInfo> buffers_info;
+	buffers_info.reserve(m_buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
+	for (const auto& buffer_input_info : m_buffer_inputs_info)
+	{
+		vec<vk::WriteDescriptorSet> writes;
 
-		vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo {
+		for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
+		{
+			buffers_info.push_back({
+			    *(m_buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_buffer()),
+			    m_buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size() * i,
+			    m_buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size(),
+			});
+
+			for (u32 j = 0; j < buffer_input_info.count; ++j)
+			{
+				writes.push_back(vk::WriteDescriptorSet {
+				    m_sets[i],
+				    buffer_input_info.binding,
+				    j,
+				    1u,
+				    buffer_input_info.type,
+				    nullptr,
+				    &buffers_info.back(),
+				});
+			}
+		}
+		m_device->logical.updateDescriptorSets(writes.size(), writes.data(), 0u, nullptr);
+
+		// @todo should we wait idle?
+		m_device->logical.waitIdle();
+	}
+}
+
+void RenderGraph::write_passes_sets()
+{
+	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	{
+		const auto& pass_info = m_renderpasses_info[i];
+		auto& pass = m_renderpasses[i];
+
+		vec<vk::WriteDescriptorSet> set_writes;
+		set_writes.reserve(pass.buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
+
+		vec<vk::DescriptorBufferInfo> buffer_infos;
+		buffer_infos.reserve(pass.buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
+
+		for (const auto& buffer_input_info : pass_info.buffer_inputs_info)
+		{
+			for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
+			{
+				buffer_infos.push_back({
+				    *(pass.buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_buffer()),
+				    buffer_input_info.size * i,
+				    buffer_input_info.size,
+				});
+
+				for (u32 j = 0; j < buffer_input_info.count; ++j)
+				{
+					set_writes.push_back(vk::WriteDescriptorSet {
+					    pass.descriptor_sets[i],
+					    buffer_input_info.binding,
+					    j,
+					    1u,
+					    buffer_input_info.type,
+					    nullptr,
+					    &buffer_infos.back(),
+					});
+				}
+			}
+		}
+		for (const auto& texture_input_info : pass_info.texture_inputs_info)
+		{
+			BVK_LOG(
+			    LogLvl::eWarn,
+			    "{} - {}",
+			    BVK_MAX_FRAMES_IN_FLIGHT,
+			    pass.descriptor_sets.size()
+			);
+
+			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
+			{
+				for (u32 k = 0; k < texture_input_info.count; ++k)
+				{
+					set_writes.push_back(vk::WriteDescriptorSet {
+					    pass.descriptor_sets[j],
+					    texture_input_info.binding,
+					    k,
+					    1u,
+					    texture_input_info.type,
+					    &texture_input_info.default_texture->descriptor_info,
+					    nullptr,
+					});
+				}
+			}
+		}
+
+		m_device->logical.updateDescriptorSets(set_writes.size(), set_writes.data(), 0u, nullptr);
+
+		// @todo should we wait idle?
+		m_device->logical.waitIdle();
+	}
+}
+
+
+void RenderGraph::build_pass_cmd_buffer_begin_infos()
+{
+	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	{
+		auto& pass = m_renderpasses[i];
+
+		for (auto& attachment : pass.attachments)
+		{
+			if (attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
+			{
+				pass.color_attachments_format.push_back(m_device->surface_format.format);
+			}
+			else
+			{
+				pass.depth_attachment_format = m_device->depth_format;
+			}
+		}
+
+		pass.cmd_buffer_inheritance_rendering_info = {
 			{},
-			2ull,           // setLayoutCount
-			layouts.data(), // pSetLayouts
+			{},
+			(u32)pass.color_attachments_format.size(),
+			pass.color_attachments_format.data(),
+			pass.depth_attachment_format,
+			{},
+			m_sample_count,
+			{},
 		};
 
-		pass.pipelineLayout = m_Device->logical.createPipelineLayout(pipelineLayoutCreateInfo);
+		pass.cmd_buffer_inheritance_info = {
+			{},
+			{},
+			{},
+			{},
+			{},
+			{}, // :D
+			&pass.cmd_buffer_inheritance_rendering_info,
+		};
+
+		pass.cmd_buffer_begin_info = {
+			vk::CommandBufferUsageFlagBits::eRenderPassContinue,
+			&pass.cmd_buffer_inheritance_info,
+		};
 	}
 }
 
-void RenderGraph::WriteDescriptorSets()
+void RenderGraph::create_attachment_resource(
+    const Renderpass::CreateInfo::AttachmentInfo& attachment_info,
+    RenderGraph::AttachmentResourceContainer::Type attachment_type,
+    u32 recreate_resource_index
+)
 {
+	if (recreate_resource_index == UINT32_MAX)
 	{
-		std::vector<vk::DescriptorBufferInfo> bufferInfos;
-		bufferInfos.reserve(m_BufferInputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
-		for (const RenderPass::CreateInfo::BufferInputInfo info : m_BufferInputInfos)
-		{
-			std::vector<vk::WriteDescriptorSet> writes;
-
-			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-			{
-				bufferInfos.push_back({
-				    *(m_BufferInputs[HashStr(info.name.c_str())]->GetBuffer()),
-				    m_BufferInputs[HashStr(info.name.c_str())]->GetBlockSize() * i,
-				    m_BufferInputs[HashStr(info.name.c_str())]->GetBlockSize(),
-				});
-
-
-				for (uint32_t j = 0; j < info.count; j++)
-				{
-					writes.push_back(vk::WriteDescriptorSet {
-					    m_DescriptorSets[i], // dstSet
-					    info.binding,
-					    j,
-					    1u,
-					    info.type,
-					    nullptr,
-					    &bufferInfos.back(),
-					});
-				}
-			}
-
-			m_Device->logical.updateDescriptorSets(
-			    static_cast<uint32_t>(writes.size()),
-			    writes.data(),
-			    0u,
-			    nullptr);
-
-			m_Device->logical.waitIdle();
-		}
+		m_attachment_resources.push_back({});
 	}
 
 
-	uint32_t passIndex = 0u;
-	for (const RenderPass::CreateInfo& renderPassCreateInfo : m_RenderPassCreateInfos)
+	m_sample_count = attachment_info.samples;
+
+	// Set usage & askect masks
+	vk::ImageUsageFlags image_usage_mask;
+	vk::ImageAspectFlags image_aspect_mask;
+	if (attachment_info.format == m_device->surface_format.format)
 	{
-		RenderPass& pass = m_RenderPasses[passIndex++];
-
-		std::vector<vk::WriteDescriptorSet> writes;
-
-		std::vector<vk::DescriptorBufferInfo> bufferInfos;
-		bufferInfos.reserve(pass.bufferInputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
-		for (const RenderPass::CreateInfo::BufferInputInfo info : renderPassCreateInfo.bufferInputInfos)
-		{
-			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-			{
-				bufferInfos.push_back({
-				    *(pass.bufferInputs[HashStr(info.name.c_str())]->GetBuffer()),
-				    info.size * i,
-				    info.size,
-				});
-
-				for (uint32_t j = 0; j < info.count; j++)
-				{
-					writes.push_back(vk::WriteDescriptorSet {
-					    pass.descriptorSets[i], // dstSet
-					    info.binding,
-					    j,
-					    1u,
-					    info.type,
-					    nullptr,
-					    &bufferInfos.back(),
-					});
-				}
-			}
-		}
-		for (const RenderPass::CreateInfo::TextureInputInfo info : renderPassCreateInfo.textureInputInfos)
-		{
-			for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-			{
-				for (uint32_t j = 0; j < info.count; j++)
-				{
-					writes.push_back(vk::WriteDescriptorSet {
-					    pass.descriptorSets[i], // dstSet
-					    info.binding,
-					    j,
-					    1u,
-					    info.type,
-					    &info.defaultTexture->descriptorInfo,
-					    nullptr,
-					});
-				}
-			}
-		}
-
-		m_Device->logical.updateDescriptorSets(
-		    static_cast<uint32_t>(writes.size()),
-		    writes.data(),
-		    0u,
-		    nullptr);
-
-		m_Device->logical.waitIdle();
+		image_usage_mask = vk::ImageUsageFlagBits::eColorAttachment;
+		image_aspect_mask = vk::ImageAspectFlagBits::eColor;
 	}
-}
-
-void RenderGraph::CreateAttachmentResource(const RenderPass::CreateInfo::AttachmentInfo& info, RenderGraph::AttachmentResourceContainer::Type type, uint32_t recreateResourceIndex)
-{
-	m_SampleCount = info.samples;
-
-	vk::ImageUsageFlags usage;
-	vk::ImageAspectFlags aspectMask;
-	if (info.format == m_Device->surfaceFormat.format)
+	else if (attachment_info.format == m_device->depth_format)
 	{
-		usage      = vk::ImageUsageFlagBits::eColorAttachment;
-		aspectMask = vk::ImageAspectFlagBits::eColor;
+		image_usage_mask = vk::ImageUsageFlagBits::eDepthStencilAttachment,
+		image_aspect_mask = vk::ImageAspectFlagBits::eDepth;
 	}
-	else if (info.format == m_Device->depthFormat)
-	{
-		usage      = vk::ImageUsageFlagBits::eDepthStencilAttachment;
-		aspectMask = vk::ImageAspectFlagBits::eDepth;
-	}
-	else
-	{
-		BVK_ASSERT(true, "Unsupported render attachment format: {}", string_VkFormat(static_cast<VkFormat>(info.format)));
-	}
+	BVK_ASSERT(
+	    !(!!image_usage_mask && !!image_aspect_mask),
+	    "Unsupported render attachment format: {}",
+	    string_VkFormat(static_cast<VkFormat>(attachment_info.format))
+	);
 
-	// Determine image extent
-	vk::Extent3D extent;
-	switch (info.sizeType)
+	// Set image extent
+	vk::Extent3D image_extent;
+	switch (attachment_info.size_type)
 	{
-	case RenderPass::CreateInfo::SizeType::eSwapchainRelative:
-		extent = {
-			.width  = static_cast<uint32_t>(m_Device->framebufferExtent.width * info.size.x),
-			.height = static_cast<uint32_t>(m_Device->framebufferExtent.height * info.size.y),
-			.depth  = 1,
+	case Renderpass::CreateInfo::SizeType::eSwapchainRelative:
+	{
+		image_extent = {
+			.width = static_cast<u32>(m_device->framebuffer_extent.width * attachment_info.size.x),
+			.height =
+			    static_cast<u32>(m_device->framebuffer_extent.height * attachment_info.size.y),
+			.depth = 1,
 		};
 		break;
-	case RenderPass::CreateInfo::SizeType::eRelative:
-		BVK_ASSERT(true, "Unimplemented attachment size type: Relative");
-		break;
+	}
 
-	case RenderPass::CreateInfo::SizeType::eAbsolute:
-		extent = {
-			.width  = static_cast<uint32_t>(info.size.x),
-			.height = static_cast<uint32_t>(info.size.y),
-			.depth  = 1,
+	case Renderpass::CreateInfo::SizeType::eAbsolute:
+		image_extent = {
+			.width = static_cast<u32>(attachment_info.size.x),
+			.height = static_cast<u32>(attachment_info.size.y),
+			.depth = 1,
 		};
 		break;
 
-	default:
-		BVK_ASSERT(true, "Invalid attachment size type");
+	case Renderpass::CreateInfo::SizeType::eRelative:
+	default: BVK_ASSERT(true, "Invalid/Unsupported attachment size type");
 	};
 
-	AttachmentResourceContainer resourceContainer = {
-		.type        = type,
-		.imageFormat = info.format,
+	auto* resource_container = recreate_resource_index == UINT32_MAX ?
+	                             &m_attachment_resources.back() :
+	                             &m_attachment_resources[recreate_resource_index];
+	*resource_container = {
+		.type = attachment_type,
+		.image_format = attachment_info.format,
 
-		.extent           = extent,
-		.size             = info.size,
-		.sizeType         = info.sizeType,
-		.relativeSizeName = info.sizeRelativeName,
+		.extent = image_extent,
+		.size = attachment_info.size,
+		.size_type = attachment_info.size_type,
+		.relative_size_name = attachment_info.size_relative_name,
 
-		.sampleCount            = info.samples,
-		.transientMSResolveMode = vk::ResolveModeFlagBits::eNone,
-		.transientMSImage       = {},
-		.transientMSImageView   = {},
-		.lastWriteName          = info.name,
-		.cachedCreateInfo       = info,
+		.sample_count = attachment_info.samples,
+		.transient_ms_resolve_mode = vk::ResolveModeFlagBits::eNone,
+		.transient_ms_image = {},
+		.transient_ms_image_view = {},
+		.last_write_name = attachment_info.name,
+		.cached_renderpass_info = attachment_info,
 	};
 
-	switch (type)
+	switch (attachment_type)
 	{
 	case AttachmentResourceContainer::Type::ePerImage:
 	{
-		for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
+		for (u32 i = 0; i < m_swapchain_images.size(); ++i)
 		{
-			resourceContainer.resources.push_back(AttachmentResource {
-			    .srcAccessMask  = {},
-			    .srcImageLayout = vk::ImageLayout::eUndefined,
-			    .srcStageMask   = vk::PipelineStageFlagBits::eTopOfPipe,
-			    .image          = m_SwapchainImages[i],
-			    .imageView      = m_SwapchainImageViews[i],
+			resource_container->resources.push_back(AttachmentResource {
+			    .src_access_mask = {},
+			    .src_image_layout = vk::ImageLayout::eUndefined,
+			    .src_stage_mask = vk::PipelineStageFlagBits::eTopOfPipe,
+			    .image = m_swapchain_images[i],
+			    .image_view = m_swapchain_image_views[i],
 			});
 		}
 
-		if (recreateResourceIndex == UINT32_MAX)
+		if (recreate_resource_index == UINT32_MAX)
 		{
-			m_SwapchainResourceIndex = m_AttachmentResources.size();
+			m_swapchain_resource_index = m_attachment_resources.size() - 1;
 		}
 		break;
 	}
 	case AttachmentResourceContainer::Type::eSingle:
 	{
-		vk::ImageCreateInfo imageCreateInfo {
-			{},                 // flags
-			vk::ImageType::e2D, // imageType
-			info.format,        // format
-			extent,             // extent
-			1u,                 // mipLevels
-			1u,                 // arrayLayers
-
-			aspectMask & vk::ImageAspectFlagBits::eColor ? vk::SampleCountFlagBits::e1 : info.samples, // samples
-
-			vk::ImageTiling::eOptimal,   // tiling
-			usage,                       // usage
-			vk::SharingMode::eExclusive, // sharingMode
-			0u,                          // queueFamilyIndexCount
-			nullptr,                     // pQueueFamilyIndices
-			vk::ImageLayout::eUndefined, // initialLayout
+		vk::ImageCreateInfo image_info {
+			{},
+			vk::ImageType::e2D,
+			attachment_info.format,
+			resource_container->extent,
+			1u,
+			1u,
+			image_aspect_mask & vk::ImageAspectFlagBits::eColor ? vk::SampleCountFlagBits::e1 :
+			                                                      attachment_info.samples,
+			vk::ImageTiling::eOptimal,
+			image_usage_mask,
+			vk::SharingMode::eExclusive,
+			0u,
+			nullptr,
+			vk::ImageLayout::eUndefined,
 		};
 
-		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
-		AllocatedImage image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
+		vma::AllocationCreateInfo image_allocate_info(
+		    {},
+		    vma::MemoryUsage::eGpuOnly,
+		    vk::MemoryPropertyFlagBits::eDeviceLocal
+		);
 
-		std::string imageName = info.name + " Image";
-		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		AllocatedImage image = m_device->allocator.createImage(image_info, image_allocate_info);
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
-		    imageName.c_str(),
+		    fmt::format("{}_image (single)", attachment_info.name).c_str(),
 		});
 
-		vk::ImageViewCreateInfo imageViewCreateInfo {
-			{},                     // flags
-			image,                  // image
-			vk::ImageViewType::e2D, // viewType
-			info.format,            // format
-
-			/* components */
+		vk::ImageViewCreateInfo image_view_info {
+			{},
+			image,
+			vk::ImageViewType::e2D,
+			attachment_info.format,
 			vk::ComponentMapping {
-			    // Don't swizzle the colors around...
-			    vk::ComponentSwizzle::eIdentity, // r
-			    vk::ComponentSwizzle::eIdentity, // g
-			    vk::ComponentSwizzle::eIdentity, // b
-			    vk::ComponentSwizzle::eIdentity, // a
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
 			},
-
-			/* subresourceRange */
 			vk::ImageSubresourceRange {
-			    aspectMask, // aspectMask
-			    0u,         // baseMipLevel
-			    1u,         // levelCount
-			    0u,         // baseArrayLayer
-			    1u,         // layerCount
+			    image_aspect_mask,
+			    0u,
+			    1u,
+			    0u,
+			    1u,
 			},
 		};
-		vk::ImageView imageView   = m_Device->logical.createImageView(imageViewCreateInfo, nullptr);
-		std::string imageViewName = info.name + " ImageView";
-		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		vk::ImageView image_view = m_device->logical.createImageView(image_view_info, nullptr);
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
-		    (uint64_t)(VkImageView)imageView,
-		    imageViewName.c_str(),
+		    (uint64_t)(VkImageView)image_view,
+		    fmt::format("{}_image_view (single)", attachment_info.name).c_str(),
 		});
 
-		resourceContainer.resources.push_back(AttachmentResource {
-		    .srcAccessMask  = {},
-		    .srcImageLayout = vk::ImageLayout::eUndefined,
-		    .srcStageMask   = vk::PipelineStageFlagBits::eTopOfPipe,
-		    .image          = image,
-		    .imageView      = imageView,
+		resource_container->resources.push_back(AttachmentResource {
+		    .src_access_mask = {},
+		    .src_image_layout = vk::ImageLayout::eUndefined,
+		    .src_stage_mask = vk::PipelineStageFlagBits::eTopOfPipe,
+		    .image = image,
+		    .image_view = image_view,
 		});
 
 		break;
 	}
-	default:
-		BVK_ASSERT(true, "Invalid attachment resource type");
+	default: BVK_ASSERT(true, "Invalid attachment resource type");
 	}
 
-	if (static_cast<uint32_t>(info.samples) > 1 && aspectMask & vk::ImageAspectFlagBits::eColor)
+	if (static_cast<u32>(attachment_info.samples) > 1
+	    && image_aspect_mask & vk::ImageAspectFlagBits::eColor)
 	{
-		vk::ImageCreateInfo imageCreateInfo {
-			{},                        // flags
-			vk::ImageType::e2D,        // imageType
-			info.format,               // format
-			extent,                    // extent
-			1u,                        // mipLevels
-			1u,                        // arrayLayers
-			info.samples,              // samples
-			vk::ImageTiling::eOptimal, // tiling
+		vk::ImageCreateInfo image_create_info {
+			{},
+			vk::ImageType::e2D,
+			attachment_info.format,
+			resource_container->extent,
+			1u,
+			1u,
+			attachment_info.samples,
+			vk::ImageTiling::eOptimal,
 
-			usage | vk::ImageUsageFlagBits::eTransientAttachment, // usage
+			image_usage_mask | vk::ImageUsageFlagBits::eTransientAttachment,
 
-			vk::SharingMode::eExclusive, // sharingMode
-			0u,                          // queueFamilyIndexCount
-			nullptr,                     // pQueueFamilyIndices
-			vk::ImageLayout::eUndefined, // initialLayout
+			vk::SharingMode::eExclusive,
+			0u,
+			nullptr,
+			vk::ImageLayout::eUndefined,
 		};
 
-		vma::AllocationCreateInfo imageAllocInfo({}, vma::MemoryUsage::eGpuOnly, vk::MemoryPropertyFlagBits::eDeviceLocal);
+		vma::AllocationCreateInfo image_allocate_info(
+		    {},
+		    vma::MemoryUsage::eGpuOnly,
+		    vk::MemoryPropertyFlagBits::eDeviceLocal
+		);
 
-		AllocatedImage image = m_Device->allocator.createImage(imageCreateInfo, imageAllocInfo);
+		AllocatedImage image =
+		    m_device->allocator.createImage(image_create_info, image_allocate_info);
 
-		std::string imageName = info.name + " TransientMS Image";
-		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
-		    imageName.c_str(),
+		    fmt::format("{}_transient_ms_image", attachment_info.name).c_str(),
 		});
 
 
-		vk::ImageViewCreateInfo imageViewCreateInfo {
-			{},                     // flags
-			image,                  // image
-			vk::ImageViewType::e2D, // viewType
-			info.format,            // format
-
-			/* components */
+		vk::ImageViewCreateInfo image_view_info {
+			{},
+			image,
+			vk::ImageViewType::e2D,
+			attachment_info.format,
 			vk::ComponentMapping {
-			    // Don't swizzle the colors around...
-			    vk::ComponentSwizzle::eIdentity, // r
-			    vk::ComponentSwizzle::eIdentity, // g
-			    vk::ComponentSwizzle::eIdentity, // b
-			    vk::ComponentSwizzle::eIdentity, // a
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
 			},
-
-			/* subresourceRange */
 			vk::ImageSubresourceRange {
-			    aspectMask, // aspectMask
-			    0u,         // baseMipLevel
-			    1u,         // levelCount
-			    0u,         // baseArrayLayer
-			    1u,         // layerCount
+			    image_aspect_mask,
+			    0u,
+			    1u,
+			    0u,
+			    1u,
 			},
 		};
-		vk::ImageView imageView   = m_Device->logical.createImageView(imageViewCreateInfo, nullptr);
-		std::string imageViewName = info.name + " TransientMS ImageView";
-		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		vk::ImageView image_view = m_device->logical.createImageView(image_view_info, nullptr);
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
-		    (uint64_t)(VkImageView)imageView,
-		    imageViewName.c_str(),
+		    (uint64_t)(VkImageView)image_view,
+		    fmt::format("{}_transient_ms_image_view", attachment_info.name).c_str(),
 		});
 
-		resourceContainer.transientMSImage       = image;
-		resourceContainer.transientMSImageView   = imageView;
-		resourceContainer.transientMSResolveMode = vk::ResolveModeFlagBits::eAverage;
-	}
-
-	if (recreateResourceIndex != UINT32_MAX)
-	{
-		m_AttachmentResources[recreateResourceIndex] = resourceContainer;
-	}
-	else
-	{
-		m_AttachmentResources.push_back(resourceContainer);
+		resource_container->transient_ms_image = image;
+		resource_container->transient_ms_image_view = image_view;
+		resource_container->transient_ms_resolve_mode = vk::ResolveModeFlagBits::eAverage;
 	}
 }
 
-void RenderGraph::OnSwapchainInvalidated(std::vector<vk::Image> swapchainImages, std::vector<vk::ImageView> swapchainImageViews)
+void RenderGraph::on_swapchain_invalidated(
+    vec<vk::Image> swapchain_images,
+    vec<vk::ImageView> swapchain_image_views
+)
 {
-	m_SwapchainImages     = swapchainImages;
-	m_SwapchainImageViews = swapchainImageViews;
+	m_swapchain_images = swapchain_images;
+	m_swapchain_image_views = swapchain_image_views;
 
-	uint32_t i = 0;
-	for (AttachmentResourceContainer& resourceContainer : m_AttachmentResources)
+	for (u32 i = 0; i < m_attachment_resources.size(); ++i)
 	{
-		if (resourceContainer.sizeType == RenderPass::CreateInfo::SizeType::eSwapchainRelative)
+		auto& resource_container = m_attachment_resources[i];
+		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
 		{
-			//  Destroy image resources if it's not from swapchain
-			if (resourceContainer.type != AttachmentResourceContainer::Type::ePerImage)
+			// Destroy image resources if it's not from swapchain
+			if (resource_container.type != AttachmentResourceContainer::Type::ePerImage)
 			{
-				for (AttachmentResource& resource : resourceContainer.resources)
+				for (AttachmentResource& resource : resource_container.resources)
 				{
-					m_Device->logical.destroyImageView(resource.imageView);
-					m_Device->allocator.destroyImage(resource.image, resource.image);
+					m_device->logical.destroyImageView(resource.image_view);
+					m_device->allocator.destroyImage(resource.image, resource.image);
 				}
 			}
-			resourceContainer.resources.clear();
+			resource_container.resources.clear();
 
-			m_Device->logical.destroyImageView(resourceContainer.transientMSImageView);
-			m_Device->allocator.destroyImage(resourceContainer.transientMSImage, resourceContainer.transientMSImage);
+			m_device->logical.destroyImageView(resource_container.transient_ms_image_view);
+			m_device->allocator.destroyImage(
+			    resource_container.transient_ms_image,
+			    resource_container.transient_ms_image
+			);
 
-			resourceContainer.transientMSImage     = {};
-			resourceContainer.transientMSImageView = VK_NULL_HANDLE;
+			resource_container.transient_ms_image = {};
+			resource_container.transient_ms_image_view = VK_NULL_HANDLE;
 
-			CreateAttachmentResource(resourceContainer.cachedCreateInfo, resourceContainer.type, i);
+			create_attachment_resource(
+			    resource_container.cached_renderpass_info,
+			    resource_container.type,
+			    i
+			);
 		}
-
-		i++;
 	}
 }
 
-void RenderGraph::BeginFrame(RenderContext context)
+void RenderGraph::begin_frame(u32 frame_index, void* user_pointer)
 {
-	m_OnBeginFrame(context);
+	m_on_begin_frame(m_device, this, frame_index, user_pointer);
 
-	for (RenderPass& pass : m_RenderPasses)
+	for (u32 i = 0; i < m_renderpasses.size(); ++i)
 	{
-		pass.onBeginFrame(context);
+		m_renderpasses[i]
+		    .on_begin_frame(m_device, this, &m_renderpasses[i], frame_index, user_pointer);
 	}
 }
 
-void RenderGraph::EndFrame(RenderContext context)
+// @todo: Setup render barriers
+// @todo: Multi-threaded recording
+void RenderGraph::end_frame(
+    vk::CommandBuffer primary_cmd,
+    u32 frame_index,
+    u32 image_index,
+    void* user_pointer
+)
 {
-	m_OnUpdate(context);
-	// @todo: Setup render barriers
-	const auto primaryCmd = context.cmd;
+	const u32 thread_index = 0;
 
-	for (uint32_t i = 0; i < m_RenderPasses.size(); i++)
+	// Update graph
 	{
-		context.pass = &m_RenderPasses[i];
-		context.pass->onUpdate(context);
+		m_device->graphics_queue.beginDebugUtilsLabelEXT(m_update_debug_label);
+		m_on_update(m_device, this, frame_index, user_pointer);
+		m_device->graphics_queue.endDebugUtilsLabelEXT();
 	}
 
-
-	primaryCmd.begin(vk::CommandBufferBeginInfo {});
-
-
-	size_t i = 0;
-	for (RenderPass& pass : m_RenderPasses)
+	// Update passes
+	for (u32 i = 0; i < m_renderpasses.size(); ++i)
 	{
-		vk::CommandBuffer passCmd = m_SecondaryCommandBuffers[(context.frameIndex * m_RenderPasses.size()) + i];
+		auto& pass = m_renderpasses[i];
 
-		std::vector<vk::Format> colorAttachmentFormats = {};
-		vk::Format depthAttachmentFormat               = {};
-		for (RenderPass::Attachment attachment : pass.attachments)
-		{
-			if (attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
-			{
-				colorAttachmentFormats.push_back(m_Device->surfaceFormat.format);
-			}
-			else
-			{
-				depthAttachmentFormat = m_Device->depthFormat;
-			}
-		}
-
-		vk::CommandBufferInheritanceRenderingInfo inheritanceRenderingInfo {
-			{},
-			{},
-			(uint32_t)colorAttachmentFormats.size(),
-			colorAttachmentFormats.data(),
-			depthAttachmentFormat,
-			{},
-			m_SampleCount,
-			{}
-		};
-
-		vk::CommandBufferInheritanceInfo inheritanceInfo {
-			{},
-			{},
-			{},
-			{},
-			{},
-			{},
-
-			&inheritanceRenderingInfo,
-		};
-		passCmd.begin(vk::CommandBufferBeginInfo {
-		    vk::CommandBufferUsageFlagBits::eRenderPassContinue,
-		    &inheritanceInfo,
-		});
-
-		passCmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                           m_PipelineLayout,
-		                           0u, 1ul, &m_DescriptorSets[context.frameIndex], 0ul, {});
-		if (!pass.descriptorSets.empty())
-		{
-			passCmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			                           pass.pipelineLayout,
-			                           1ul, 1u, &pass.descriptorSets[context.frameIndex], 0ul, {});
-		}
-		context.cmd = passCmd;
-		pass.onRender(context);
-		passCmd.end();
-
-		i++;
+		m_device->graphics_queue.beginDebugUtilsLabelEXT(pass.update_debug_label);
+		pass.on_update(m_device, this, &m_renderpasses[i], frame_index, user_pointer);
+		m_device->graphics_queue.endDebugUtilsLabelEXT(); // pass.update_debug_label
 	}
 
-	i = 0;
-	for (RenderPass& pass : m_RenderPasses)
+	// Render passes (record their rendering cmds to secondary cmd buffers)
+	primary_cmd.begin(vk::CommandBufferBeginInfo {});
+	for (u32 i = 0; i < m_renderpasses.size(); ++i)
 	{
-		primaryCmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
-		    pass.name.c_str(),
-		    { 1.0, 1.0, 0.8, 1.0 },
-		}));
+		auto pass_cmd = m_secondary_cmd_buffers[(frame_index * m_renderpasses.size()) + i];
+		record_pass_cmds(pass_cmd, frame_index, image_index, i, user_pointer);
+	}
 
-		std::vector<vk::RenderingAttachmentInfo> renderingColorAttachmentInfos;
-		vk::RenderingAttachmentInfo renderingDepthAttachmentInfo;
-		for (RenderPass::Attachment attachment : pass.attachments)
+	for (u32 i = 0; i < m_renderpasses.size(); ++i)
+	{
+		auto& pass = m_renderpasses[i];
+
+		auto pass_rendering_info = apply_pass_barriers(primary_cmd, frame_index, image_index, i);
+
+		primary_cmd.beginDebugUtilsLabelEXT(pass.render_debug_label);
+
+		primary_cmd.beginRendering(pass_rendering_info.rendering_info);
+		primary_cmd.executeCommands(
+		    m_secondary_cmd_buffers
+		        [i + m_renderpasses.size() * (thread_index + m_device->num_threads * frame_index)]
+		);
+		primary_cmd.endRendering();
+
+		primary_cmd.endDebugUtilsLabelEXT(); // pass.render_debug_label
+	}
+
+	apply_backbuffer_barrier(primary_cmd, frame_index, image_index);
+}
+
+void RenderGraph::record_pass_cmds(
+    vk::CommandBuffer cmd,
+    u32 frame_index,
+    u32 image_index,
+    u32 pass_index,
+    void* user_pointer
+)
+{
+	Renderpass& pass = m_renderpasses[pass_index];
+	cmd.begin(pass.cmd_buffer_begin_info);
+
+	// Graph descriptor set (set = 0)
+	cmd.bindDescriptorSets(
+	    vk::PipelineBindPoint::eGraphics,
+	    m_pipeline_layout,
+	    0u,
+	    1u,
+	    &m_sets[frame_index],
+	    0u,
+	    {}
+	);
+
+	// Pass descriptor set (set = 1)
+	if (!pass.descriptor_sets.empty())
+	{
+		cmd.bindDescriptorSets(
+		    vk::PipelineBindPoint::eGraphics,
+		    pass.pipeline_layout,
+		    1u,
+		    1u,
+		    &pass.descriptor_sets[frame_index],
+		    0u,
+		    {}
+		);
+	}
+
+	pass.on_render(
+	    m_device,
+	    this,
+	    &m_renderpasses[pass_index],
+	    cmd,
+	    frame_index,
+	    image_index,
+	    user_pointer
+	);
+
+	cmd.end();
+}
+
+RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
+    vk::CommandBuffer cmd,
+    u32 frame_index,
+    u32 image_index,
+    u32 pass_index
+)
+{
+	auto& pass = m_renderpasses[pass_index];
+	cmd.beginDebugUtilsLabelEXT(pass.barrier_debug_label);
+
+	PassRenderingInfo pass_rendering_info = {};
+	for (auto& attachment : pass.attachments)
+	{
+		auto& resource_container = m_attachment_resources[attachment.resource_index];
+
+		auto& resource = resource_container.get_resource(image_index, frame_index);
+
+		vk::ImageMemoryBarrier image_barrier {
+			resource.src_access_mask,
+			attachment.access_mask,
+			resource.src_image_layout,
+			attachment.layout,
+			m_device->graphics_queue_index,
+			m_device->graphics_queue_index,
+			resource.image,
+			attachment.subresource_range,
+			nullptr,
+		};
+
+		if ((resource.src_access_mask != attachment.access_mask
+		     || resource.src_image_layout != attachment.layout
+		     || resource.src_stage_mask != attachment.stage_mask)
+		    && attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 		{
-			AttachmentResourceContainer& resourceContainer = m_AttachmentResources[attachment.resourceIndex];
+			cmd.pipelineBarrier(
+			    resource.src_stage_mask,
+			    attachment.stage_mask,
+			    {},
+			    {},
+			    {},
+			    image_barrier
+			);
 
-			AttachmentResource& resource = resourceContainer.GetResource(context.imageIndex, context.frameIndex);
+			resource.src_access_mask = attachment.access_mask;
+			resource.src_image_layout = attachment.layout;
+			resource.src_stage_mask = attachment.stage_mask;
+		}
 
-			vk::ImageMemoryBarrier imageBarrier = {
-				resource.srcAccessMask,       // srcAccessMask
-				attachment.accessMask,        // dstAccessMask
-				resource.srcImageLayout,      // oldLayout
-				attachment.layout,            // newLayout
-				m_Device->graphicsQueueIndex, // srcQueueFamilyIndex
-				m_Device->graphicsQueueIndex, // dstQueueFamilyIndex
-				resource.image,               // image
-				attachment.subresourceRange,  // subresourceRange
-				nullptr,                      // pNext
+
+		vk::RenderingAttachmentInfo rendering_attachment_info {};
+		// Multi-sampled image
+		if (static_cast<u32>(resource_container.sample_count) > 1
+		    && attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
+		{
+			rendering_attachment_info = {
+				resource_container.transient_ms_image_view,
+				attachment.layout,
+				resource_container.transient_ms_resolve_mode,
+				resource.image_view,
+				attachment.layout,
+				attachment.load_op,
+				attachment.store_op,
+				attachment.clear_value,
 			};
-
-			if ((resource.srcAccessMask != attachment.accessMask ||
-			     resource.srcImageLayout != attachment.layout ||
-			     resource.srcStageMask != attachment.stageMask) &&
-			    attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
-			{
-				primaryCmd.pipelineBarrier(resource.srcStageMask,
-				                           attachment.stageMask,
-				                           {},
-				                           {},
-				                           {},
-				                           imageBarrier);
-
-				resource.srcAccessMask  = attachment.accessMask;
-				resource.srcImageLayout = attachment.layout;
-				resource.srcStageMask   = attachment.stageMask;
-			}
-
-
-			vk::RenderingAttachmentInfo renderingAttachmentInfo {};
-			// Multi-sampled image
-			if (static_cast<uint32_t>(resourceContainer.sampleCount) > 1 && attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eColor)
-			{
-				renderingAttachmentInfo = {
-					resourceContainer.transientMSImageView,
-					attachment.layout,
-
-					resourceContainer.transientMSResolveMode,
-					resource.imageView,
-					attachment.layout,
-
-					attachment.loadOp,
-					attachment.storeOp,
-
-					attachment.clearValue,
-				};
-			}
-			// Single-sampled image
-			else
-			{
-				renderingAttachmentInfo = {
-					resource.imageView,
-					attachment.layout,
-
-					vk::ResolveModeFlagBits::eNone,
-					{},
-					{},
-
-					attachment.loadOp,
-					attachment.storeOp,
-
-					attachment.clearValue,
-				};
-			}
-
-			if (attachment.subresourceRange.aspectMask & vk::ImageAspectFlagBits::eDepth)
-			{
-				renderingDepthAttachmentInfo = renderingAttachmentInfo;
-			}
-			else
-			{
-				renderingColorAttachmentInfos.push_back(renderingAttachmentInfo);
-			}
+		}
+		// Single-sampled image
+		else
+		{
+			rendering_attachment_info = {
+				resource.image_view,
+				attachment.layout,
+				vk::ResolveModeFlagBits::eNone,
+				{},
+				{}, // :D
+				attachment.load_op,
+				attachment.store_op,
+				attachment.clear_value,
+			};
 		}
 
-
-		vk::RenderingInfo renderingInfo {
-			vk::RenderingFlagBits::eContentsSecondaryCommandBuffers, // flags
-			vk::Rect2D {
-			    { 0, 0 },
-			    m_Device->framebufferExtent,
-			},
-			1u,
-			{},
-			static_cast<uint32_t>(renderingColorAttachmentInfos.size()),
-			renderingColorAttachmentInfos.data(),
-			renderingDepthAttachmentInfo.imageView ? &renderingDepthAttachmentInfo : nullptr,
-			{},
-		};
-
-		primaryCmd.beginRendering(renderingInfo);
-
-
-		primaryCmd.beginDebugUtilsLabelEXT(vk::DebugUtilsLabelEXT({
-		    (pass.name + " render action").c_str(),
-		    { 1.0, 1.0, 0.2, 1.0 },
-		}));
-
-		const uint32_t threadIndex = 0; // <- @todo
-		primaryCmd.executeCommands(m_SecondaryCommandBuffers[i + m_RenderPasses.size() * (threadIndex + m_Device->numThreads * context.frameIndex)]);
-
-		primaryCmd.endRendering();
-
-		primaryCmd.endDebugUtilsLabelEXT();
-		primaryCmd.endDebugUtilsLabelEXT();
-		i++;
+		if (attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eDepth)
+		{
+			pass_rendering_info.depth_attachment_info = rendering_attachment_info;
+		}
+		else
+		{
+			pass_rendering_info.color_attachments_info.push_back(rendering_attachment_info);
+		}
 	}
 
-	AttachmentResource& backbufferResource = m_AttachmentResources[m_SwapchainResourceIndex].GetResource(context.imageIndex, context.frameIndex);
-
-	// Transition color image to present optimal
-	vk::ImageMemoryBarrier imageMemoryBarrier = {
-		backbufferResource.srcAccessMask,  // srcAccessMask
-		{},                                // dstAccessMask
-		backbufferResource.srcImageLayout, // oldLayout
-		vk::ImageLayout::ePresentSrcKHR,   // newLayout
-		{},
-		{},
-		backbufferResource.image, // image
-
-		/* subresourceRange */
-		vk::ImageSubresourceRange {
-		    vk::ImageAspectFlagBits::eColor,
-		    0u,
-		    1u,
-		    0u,
-		    1u,
+	pass_rendering_info.rendering_info = vk::RenderingInfo {
+		vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
+		vk::Rect2D {
+		    { 0, 0 },
+		    m_device->framebuffer_extent,
 		},
+		1u,
+		{},
+		static_cast<u32>(pass_rendering_info.color_attachments_info.size()),
+		pass_rendering_info.color_attachments_info.data(),
+		pass_rendering_info.depth_attachment_info.imageView ?
+		    &pass_rendering_info.depth_attachment_info :
+		    nullptr,
+		{},
 	};
 
-	primaryCmd.pipelineBarrier(
-	    backbufferResource.srcStageMask,
+	cmd.endDebugUtilsLabelEXT(); // pass.barrier_debug_label
+	return pass_rendering_info;
+}
+
+void RenderGraph::apply_backbuffer_barrier(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
+{
+	vk::DebugUtilsLabelEXT a;
+	cmd.beginDebugUtilsLabelEXT(m_backbuffer_barrier_debug_label);
+	auto& backbuffer_resource =
+	    m_attachment_resources[m_swapchain_resource_index].get_resource(image_index, frame_index);
+
+	cmd.pipelineBarrier(
+	    backbuffer_resource.src_stage_mask,
 	    vk::PipelineStageFlagBits::eBottomOfPipe,
 	    {},
 	    {},
 	    {},
-	    imageMemoryBarrier);
+	    vk::ImageMemoryBarrier {
+	        backbuffer_resource.src_access_mask,
+	        {},
+	        backbuffer_resource.src_image_layout,
+	        vk::ImageLayout::ePresentSrcKHR,
+	        {},
+	        {},
+	        backbuffer_resource.image,
+	        vk::ImageSubresourceRange {
+	            vk::ImageAspectFlagBits::eColor,
+	            0u,
+	            1u,
+	            0u,
+	            1u,
+	        },
+	    }
 
-	backbufferResource.srcStageMask   = vk::PipelineStageFlagBits::eTopOfPipe;
-	backbufferResource.srcImageLayout = vk::ImageLayout::eUndefined;
-	backbufferResource.srcAccessMask  = {};
+	);
+
+	backbuffer_resource.src_stage_mask = vk::PipelineStageFlagBits::eTopOfPipe;
+	backbuffer_resource.src_image_layout = vk::ImageLayout::eUndefined;
+	backbuffer_resource.src_access_mask = {};
+
+	cmd.endDebugUtilsLabelEXT();
 }
 
 } // namespace BINDLESSVK_NAMESPACE

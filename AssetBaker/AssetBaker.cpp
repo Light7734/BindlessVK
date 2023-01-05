@@ -6,11 +6,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#define ASSERT(x, ...)    \
-	if (!(x))             \
-	{                     \
-		log(__VA_ARGS__); \
-		return -1;        \
+#define ASSERT(x, ...) \
+	if (!(x))            \
+	{                    \
+		log(__VA_ARGS__);  \
+		return -1;         \
 	}
 
 
@@ -21,11 +21,20 @@ void log(Args&&... args)
 	std::cout << '\n';
 }
 
-bool ConvertImage(const std::filesystem::path& input, const std::filesystem::path& output)
+bool convert_image(
+  const std::filesystem::path& input,
+  const std::filesystem::path& output
+)
 {
 	int width, height, channels;
 
-	stbi_uc* pixels = stbi_load(input.string().c_str(), &width, &height, &channels, 4);
+	stbi_uc* pixels = stbi_load(
+	  input.string().c_str(),
+	  &width,
+	  &height,
+	  &channels,
+	  4
+	);
 
 	if (!pixels)
 		return false;
@@ -33,19 +42,19 @@ bool ConvertImage(const std::filesystem::path& input, const std::filesystem::pat
 	Assets::TextureInfo texInfo {
 		.size       = static_cast<size_t>(width * height * 4),
 		.format     = Assets::TextureFormat::RGBA8,
-		.pixelsSize = {
+		.pixel_size = {
 		    static_cast<uint32_t>(width),
 		    static_cast<uint32_t>(height),
 		    0ul,
 		},
-		.originalFile = input.string(),
+		.original_file = input.string(),
 	};
 
-	Assets::AssetFile file = Assets::PackTexture(&texInfo, pixels);
+	Assets::AssetFile file = Assets::pack_texture(&texInfo, pixels);
 
 	stbi_image_free(pixels);
 
-	Assets::SaveBinaryFile(output.string().c_str(), file);
+	Assets::save_binary_file(output.string().c_str(), file);
 
 	return true;
 }
@@ -54,7 +63,10 @@ int main(int argc, char* argv[])
 {
 	std::ios_base::sync_with_stdio(false);
 
-	ASSERT(argc == 3, "Argc MUST be 3, 1: execution-path(implicit), 2: input-directory, 3: output-directory");
+	ASSERT(
+	  argc == 3,
+	  "Argc MUST be 3, 1: execution-path(implicit), 2: input-directory, 3: output-directory"
+	);
 
 	for (auto& p : std::filesystem::directory_iterator(argv[1]))
 	{
@@ -64,7 +76,7 @@ int main(int argc, char* argv[])
 
 			auto newp = p.path();
 			newp.replace_extension(".asset_texture");
-			ConvertImage(p.path(), newp);
+			convert_image(p.path(), newp);
 		}
 		else if (p.path().extension() == ".obj")
 		{

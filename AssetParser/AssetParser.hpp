@@ -27,7 +27,7 @@ enum class CompressionMode : uint32_t
 	LZ4HC,
 };
 
-bool SaveBinaryFile(const char* path, const AssetFile& inFile);
-bool LoadBinaryFile(const char* path, AssetFile& outFile);
+bool save_binary_file(const char* path, const AssetFile& in_file);
+bool load_binary_file(const char* path, AssetFile& out_file);
 
 } // namespace Assets

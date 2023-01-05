@@ -19,102 +19,109 @@ struct Texture
 		eCubeMap
 	};
 
-	struct CreateInfoGLTF
-	{
-		struct tinygltf::Image* image;
-		vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-	};
-
-	/// @todo: Implement loading textures from glb files
-	struct CreateInfoGLB
-	{
-	};
-
-	/// @todo: Implement loading textures from ktx files
-	struct CreateInfoKTX
-	{
-		const std::string& name;
-		const std::string& uri;
-		Type type;
-
-		vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-	};
-
-	struct CreateInfoBuffer
-	{
-		const std::string& name;
-		uint8_t* pixels;
-		int width;
-		int height;
-		vk::DeviceSize size;
-		Type type;
-
-		vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-	};
-
-
-	vk::DescriptorImageInfo descriptorInfo;
+	vk::DescriptorImageInfo descriptor_info;
 
 	uint32_t width;
 	uint32_t height;
 	vk::Format format;
 	uint32_t channels;
-	uint32_t mipLevels;
+	uint32_t mip_levels;
 	vk::DeviceSize size;
 
 	vk::Sampler sampler;
-	vk::ImageView imageView;
+	vk::ImageView image_view;
 	vk::ImageLayout layout;
 
 	AllocatedImage image;
 };
 
-struct TextureCube
-{
-};
-
-
 class TextureSystem
 {
 public:
-	struct CreateInfo
-	{
-		Device* device;
-	};
-
-public:
 	TextureSystem() = default;
-	void Init(const TextureSystem::CreateInfo& info);
 
-	void Reset();
+	/** Initializes the texture system
+	 * @param device the bindlessvk device
+	 */
+	void init(Device* device);
 
-	Texture* CreateFromBuffer(const Texture::CreateInfoBuffer& info);
+	/** Destroys the texture system */
+	void reset();
 
-	Texture* CreateFromGLTF(const Texture::CreateInfoGLTF& info);
+	/** Creates a texture from buffer data
+	 * @param name name of the texture
+	 * @param pixels pixel-data buffer of at least @p size bytes
+	 * @param width  horizontal size of the texture
+	 * @param height vertical size of the texture
+	 * @param size   size of pixel-data buffer,
+	 * should be (width * height * bytes per pixel)
+	 * @param type   type of the texture (eg. 2d, cubemap)
+	 * @param layout final layout of the created texture
+	 */
+	Texture* create_from_buffer(
+	  const std::string& name,
+	  uint8_t* pixels,
+	  int width,
+	  int height,
+	  vk::DeviceSize size,
+	  Texture::Type type,
+	  vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	);
 
-	Texture* CreateFromKTX(const Texture::CreateInfoKTX& info);
+	/** Creates a texture from a tinygltf image
+	 * @param image  a tinygltf::Image image
+	 * @param layout final layout of the created texture
+	 *
+	 * @note name of the texture will be @p image->uri
+	 */
+	Texture* create_from_gltf(
+	  struct tinygltf::Image* image,
+	  vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	);
 
-	Texture* CreateFromGLB(const Texture::CreateInfoGLB& info)
+	/** Creates a texture from a ktx(khronos texture) file
+	 * @param name   name of the texture
+	 * @param uri    path to the .ktx file
+	 * @param type   type of the texture (eg. 2d, cubemap)
+	 * @param layout final layout of the created texture
+	 */
+	Texture* create_from_ktx(
+	  const std::string& name,
+	  const std::string& uri,
+	  Texture::Type type,
+	  vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	);
+
+	//** @return texture named @p name */
+	inline Texture* get_texture(const char* name)
 	{
-		BVK_LOG(LogLvl::eError, "NO IMPLEMENT! {}");
-		return {};
-	}
-
-	inline Texture* GetTexture(const char* name)
-	{
-		return &m_Textures[HashStr(name)];
+		return &m_textures[HashStr(name)];
 	}
 
 private:
-	void BlitImage(vk::CommandBuffer cmd, AllocatedImage image, uint32_t mipIndex, int32_t& mipWidth, int32_t& mipHeight);
+	void blit_iamge(
+	  vk::CommandBuffer cmd,
+	  AllocatedImage image,
+	  uint32_t mip_index,
+	  int32_t& mip_width,
+	  int32_t& mip_height
+	);
 
-	void TransitionLayout(Texture& texture, vk::CommandBuffer cmdBuffer, uint32_t baseMipLevel, uint32_t levelCount, uint32_t layerCount, vk::ImageLayout oldLayout, vk::ImageLayout newLayout);
-	void CopyBufferToImage(Texture& texture, vk::CommandBuffer cmdBuffer);
+	void transition_layout(
+	  Texture& texture,
+	  vk::CommandBuffer cmd_buffer,
+	  uint32_t base_mip_level,
+	  uint32_t level_count,
+	  uint32_t layer_count,
+	  vk::ImageLayout old_layout,
+	  vk::ImageLayout new_layout
+	);
+
+	void copy_buffer_to_image(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
-	Device* m_Device = {};
-
-	std::unordered_map<uint64_t, Texture> m_Textures = {};
+	Device* m_device                                 = {};
+	std::unordered_map<uint64_t, Texture> m_textures = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -2,15 +2,18 @@
 
 #include <spirv_reflect.h>
 
-static_assert(SPV_REFLECT_RESULT_SUCCESS == 0, "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't");
+static_assert(
+  SPV_REFLECT_RESULT_SUCCESS == 0,
+  "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't"
+);
 
 namespace BINDLESSVK_NAMESPACE {
 
-void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
+void MaterialSystem::init(Device* device)
 {
-	m_Device = info.device;
+	m_device = device;
 
-	std::vector<vk::DescriptorPoolSize> poolSizes = {
+	std::vector<vk::DescriptorPoolSize> pool_sizes = {
 		{ vk::DescriptorType::eSampler, 1000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 1000 },
 		{ vk::DescriptorType::eSampledImage, 1000 },
@@ -25,67 +28,75 @@ void MaterialSystem::Init(const MaterialSystem::CreateInfo& info)
 	};
 	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
-	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
+	vk::DescriptorPoolCreateInfo descriptor_pool_create_info {
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-		100,                                     // maxSets
-		static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
-		poolSizes.data(),                        // pPoolSizes
+		100,                                      // maxSets
+		static_cast<uint32_t>(pool_sizes.size()), // poolSizeCount
+		pool_sizes.data(),                        // pPoolSizes
 	};
 
-	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+	m_descriptor_pool = m_device->logical.createDescriptorPool(
+	  descriptor_pool_create_info,
+	  nullptr
+	);
 
-	const vk::Extent2D& extent = m_Device->framebufferExtent;
+	const vk::Extent2D& extent = m_device->framebuffer_extent;
 }
 
-void MaterialSystem::Reset()
+void MaterialSystem::reset()
 {
-	DestroyAllMaterials();
+	destroy_all_materials();
 
-	m_Device->logical.destroyDescriptorPool(m_DescriptorPool);
+	m_device->logical.destroyDescriptorPool(m_descriptor_pool);
 
-	for (auto& [key, val] : m_ShaderEffects)
+	for (auto& [key, val] : m_shader_effects)
 	{
-		m_Device->logical.destroyDescriptorSetLayout(val.setsLayout[0]);
-		m_Device->logical.destroyDescriptorSetLayout(val.setsLayout[1]);
-		m_Device->logical.destroyPipelineLayout(val.pipelineLayout);
+		m_device->logical.destroyDescriptorSetLayout(val.sets_layout[0]);
+		m_device->logical.destroyDescriptorSetLayout(val.sets_layout[1]);
+		m_device->logical.destroyPipelineLayout(val.pipeline_layout);
 
-		static_assert(ShaderEffect().setsLayout.size() == 2, "Sets layout has been resized");
+		static_assert(
+		  ShaderEffect().sets_layout.size() == 2,
+		  "Sets layout has been resized"
+		);
 	}
 
-	for (auto& [key, val] : m_Shaders)
+	for (auto& [key, val] : m_shaders)
 	{
-		m_Device->logical.destroyShaderModule(val.module);
+		m_device->logical.destroyShaderModule(val.module);
 	}
 
 
-	m_ShaderEffects.clear();
-	m_Shaders.clear();
+	m_shader_effects.clear();
+	m_shaders.clear();
 }
 
-void MaterialSystem::DestroyAllMaterials()
+void MaterialSystem::destroy_all_materials()
 {
-	for (auto& [key, val] : m_ShaderPasses)
+	for (auto& [key, val] : m_shader_passes)
 	{
-		m_Device->logical.destroyPipeline(val.pipeline);
+		m_device->logical.destroyPipeline(val.pipeline);
 	}
 
-	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
+	m_device->logical.resetDescriptorPool(m_descriptor_pool);
 
-	m_ShaderPasses.clear();
-	m_Materials.clear();
+	m_shader_passes.clear();
+	m_materials.clear();
 }
 
-void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
+void MaterialSystem::load_shader(
+  const char* name,
+  const char* path,
+  vk::ShaderStageFlagBits stage
+)
 {
-	std::string test(info.name);
-	std::ifstream stream(info.path, std::ios::ate);
-	test = std::string(info.name);
+	std::ifstream stream(path, std::ios::ate);
 
-	const size_t fileSize = stream.tellg();
-	std::vector<uint32_t> code(fileSize / sizeof(uint32_t));
+	const size_t file_size = stream.tellg();
+	std::vector<uint32_t> code(file_size / sizeof(uint32_t));
 
 	stream.seekg(0);
-	stream.read((char*)code.data(), fileSize);
+	stream.read((char*)code.data(), file_size);
 	stream.close();
 
 	vk::ShaderModuleCreateInfo createInfo {
@@ -94,190 +105,259 @@ void MaterialSystem::LoadShader(const Shader::CreateInfo& info)
 		code.data(),                    // code
 	};
 
-	test                          = std::string(info.name);
-	m_Shaders[HashStr(info.name)] = {
-		m_Device->logical.createShaderModule(createInfo), // module
-		info.stage,                                       // stage
+	m_shaders[HashStr(name)] = {
+		m_device->logical.createShaderModule(createInfo), // module
+		stage,                                            // stage
 		code,                                             // code
 	};
 }
 
-void MaterialSystem::CreateShaderEffect(const ShaderEffect::CreateInfo& info)
+void MaterialSystem::create_shader_effect(
+  const char* name,
+  std::vector<Shader*> shaders
+)
 {
-	std::array<std::vector<vk::DescriptorSetLayoutBinding>, 2> setBindings;
+	std::array<std::vector<vk::DescriptorSetLayoutBinding>, 2> set_bindings;
 
-	for (const auto& shaderStage : info.shaders)
+	for (const auto& shader_stage : shaders)
 	{
-		SpvReflectShaderModule spvModule;
+		SpvReflectShaderModule spv_module;
 
-		BVK_ASSERT(spvReflectCreateShaderModule(shaderStage->code.size() * sizeof(uint32_t), shaderStage->code.data(), &spvModule), "spvReflectCreateShaderModule failed");
+		BVK_ASSERT(
+		  spvReflectCreateShaderModule(
+		    shader_stage->code.size() * sizeof(uint32_t),
+		    shader_stage->code.data(),
+		    &spv_module
+		  ),
+		  "spvReflectCreateShaderModule failed"
+		);
 
-		uint32_t descriptorSetsCount = 0ul;
-		BVK_ASSERT(spvReflectEnumerateDescriptorSets(&spvModule, &descriptorSetsCount, nullptr), "spvReflectEnumerateDescriptorSets failed");
+		uint32_t descriptor_sets_count = 0ul;
+		BVK_ASSERT(
+		  spvReflectEnumerateDescriptorSets(
+		    &spv_module,
+		    &descriptor_sets_count,
+		    nullptr
+		  ),
+		  "spvReflectEnumerateDescriptorSets failed"
+		);
 
-		std::vector<SpvReflectDescriptorSet*> descriptorSets(descriptorSetsCount);
-		BVK_ASSERT(spvReflectEnumerateDescriptorSets(&spvModule, &descriptorSetsCount, descriptorSets.data()), "spvReflectEnumerateDescriptorSets failed");
+		std::vector<SpvReflectDescriptorSet*> descriptor_sets(descriptor_sets_count
+		);
 
-		for (const auto& spvSet : descriptorSets)
+		BVK_ASSERT(
+		  spvReflectEnumerateDescriptorSets(
+		    &spv_module,
+		    &descriptor_sets_count,
+		    descriptor_sets.data()
+		  ),
+		  "spvReflectEnumerateDescriptorSets failed"
+		);
+
+		for (const auto& spv_set : descriptor_sets)
 		{
-			for (uint32_t i_binding = 0ull; i_binding < spvSet->binding_count; i_binding++)
+			for (uint32_t i_binding = 0ull; i_binding < spv_set->binding_count;
+			     i_binding++)
 			{
-				const auto& spvBinding = *(spvSet->bindings[i_binding]);
-				if (setBindings[spvSet->set].size() < spvBinding.binding + 1)
+				const auto& spv_binding = *(spv_set->bindings[i_binding]);
+				if (set_bindings[spv_set->set].size() < spv_binding.binding + 1)
 				{
-					setBindings[spvSet->set].resize(spvBinding.binding + 1);
+					set_bindings[spv_set->set].resize(spv_binding.binding + 1);
 				}
 
-				setBindings[spvBinding.set][spvBinding.binding].binding        = spvBinding.binding;
-				setBindings[spvBinding.set][spvBinding.binding].descriptorType = static_cast<vk::DescriptorType>(spvBinding.descriptor_type);
-				setBindings[spvBinding.set][spvBinding.binding].stageFlags     = shaderStage->stage;
+				set_bindings[spv_binding.set][spv_binding.binding].binding = spv_binding
+				                                                               .binding;
 
-				setBindings[spvBinding.set][spvBinding.binding].descriptorCount = 1u;
-				for (uint32_t i_dim = 0; i_dim < spvBinding.array.dims_count; i_dim++)
+				set_bindings[spv_binding.set][spv_binding.binding].descriptorType
+				  = static_cast<vk::DescriptorType>(spv_binding.descriptor_type);
+
+				set_bindings[spv_binding.set][spv_binding.binding].stageFlags
+				  = shader_stage->stage;
+
+				set_bindings[spv_binding.set][spv_binding.binding].descriptorCount = 1u;
+				for (uint32_t i_dim = 0; i_dim < spv_binding.array.dims_count; i_dim++)
 				{
-					setBindings[spvBinding.set][spvBinding.binding].descriptorCount *= spvBinding.array.dims[i_dim];
+					set_bindings[spv_binding.set][spv_binding.binding].descriptorCount
+					  *= spv_binding.array.dims[i_dim];
 				}
 			}
 		}
 	}
 
-	std::array<vk::DescriptorSetLayout, 2ull> setsLayout;
+	std::array<vk::DescriptorSetLayout, 2ull> sets_layout;
 	uint32_t index = 0ull;
-	for (const auto& set : setBindings)
+	for (const auto& set : set_bindings)
 	{
-		vk::DescriptorSetLayoutCreateInfo setLayoutCreateInfo {
+		vk::DescriptorSetLayoutCreateInfo set_layout_info {
 			{},                                // flags
 			static_cast<uint32_t>(set.size()), // bindingCount
 			set.data(),                        // pBindings
 		};
-		setsLayout[index++] = m_Device->logical.createDescriptorSetLayout(setLayoutCreateInfo);
+		sets_layout[index++] = m_device->logical.createDescriptorSetLayout(
+		  set_layout_info
+		);
 	}
-	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
-		{},                                       // flags
-		static_cast<uint32_t>(setsLayout.size()), // setLayoutCount
-		setsLayout.data(),                        // pSetLayouts
+	vk::PipelineLayoutCreateInfo pipeline_layout_info = {
+		{},                                        // flags
+		static_cast<uint32_t>(sets_layout.size()), // setLayoutCount
+		sets_layout.data(),                        // pSetLayouts
 	};
 
 
-	m_ShaderEffects[HashStr(info.name)] = {
-		info.shaders,                                                     // shaders
-		m_Device->logical.createPipelineLayout(pipelineLayoutCreateInfo), // piplineLayout
-		setsLayout                                                        // setsLayout
+	m_shader_effects[HashStr(name)] = {
+		shaders, // shaders
+		m_device->logical.createPipelineLayout(pipeline_layout_info
+		),          // piplineLayout
+		sets_layout // setsLayout
 	};
 }
 
-void MaterialSystem::CreateShaderPass(const ShaderPass::CreateInfo& info)
+void MaterialSystem::create_shader_pass(
+  const char* name,
+  ShaderEffect* effect,
+  vk::Format color_attachment_format,
+  vk::Format depth_attachment_format,
+  PipelineConfiguration pipeline_configuration
+)
 {
-	if (m_ShaderPasses.contains(HashStr(info.name)))
+	if (m_shader_passes.contains(HashStr(name)))
 	{
-		BVK_LOG(LogLvl::eWarn, "Recreating shader pass: {}", info.name);
-		m_Device->logical.destroyPipeline(m_ShaderPasses[HashStr(info.name)].pipeline);
+		BVK_LOG(LogLvl::eWarn, "Recreating shader pass: {}", name);
+		m_device->logical.destroyPipeline(m_shader_passes[HashStr(name)].pipeline);
 	}
 
-	std::vector<vk::PipelineShaderStageCreateInfo> stages(info.effect->shaders.size());
+	std::vector<vk::PipelineShaderStageCreateInfo> stages(effect->shaders.size());
 
 	uint32_t index = 0;
-	for (const auto& shader : info.effect->shaders)
+	for (const auto& shader : effect->shaders)
 	{
 		stages[index++] = {
-			{}, //flags
+			{}, // flags
 			shader->stage,
 			shader->module,
 			"main",
 		};
 	}
 
-	vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
-		{},                          //  viewMask
-		1u,                          // colorAttachmentCount
-		&info.colorAttachmentFormat, // pColorAttachmentFormats
-		info.depthAttachmentFormat,  // depthAttachmentFormat
-		{},                          // stencilAttachmentFormat
+	vk::PipelineRenderingCreateInfo pipeline_rendering_info {
+		{},                       //  viewMask
+		1u,                       // colorAttachmentCount
+		&color_attachment_format, // pColorAttachmentFormats
+		depth_attachment_format,  // depthAttachmentFormat
+		{},                       // stencilAttachmentFormat
 	};
 
-	vk::GraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
+	vk::GraphicsPipelineCreateInfo graphics_pipeline_info {
 		{}, // flags
 		static_cast<uint32_t>(stages.size()),
 		stages.data(),
-		&info.pipelineConfiguration.vertexInputState,
-		&info.pipelineConfiguration.inputAssemblyState,
-		&info.pipelineConfiguration.tessellationState,
-		&info.pipelineConfiguration.viewportState,
-		&info.pipelineConfiguration.rasterizationState,
-		&info.pipelineConfiguration.multisampleState,
-		&info.pipelineConfiguration.depthStencilState,
-		&info.pipelineConfiguration.colorBlendState,
-		&info.pipelineConfiguration.dynamicState,
-		info.effect->pipelineLayout,
+		&pipeline_configuration.vertex_input_state,
+		&pipeline_configuration.input_assembly_state,
+		&pipeline_configuration.tesselation_state,
+		&pipeline_configuration.viewport_state,
+		&pipeline_configuration.rasterization_state,
+		&pipeline_configuration.multisample_state,
+		&pipeline_configuration.depth_stencil_state,
+		&pipeline_configuration.color_blend_state,
+		&pipeline_configuration.dynamic_state,
+		effect->pipeline_layout,
 		{}, // renderPass
 		{}, // subpass
 		{}, // basePipelineHandle
 		{}, // basePipelineIndex
-		&pipelineRenderingCreateInfo,
+		&pipeline_rendering_info,
 	};
 
-	auto pipeline = m_Device->logical.createGraphicsPipeline({}, graphicsPipelineCreateInfo);
+	auto pipeline = m_device->logical.createGraphicsPipeline(
+	  {},
+	  graphics_pipeline_info
+	);
 	BVK_ASSERT(pipeline.result);
 
-	m_ShaderPasses[HashStr(info.name)] = {
-		info.effect,
+	m_shader_passes[HashStr(name)] = {
+		effect,
 		pipeline.value,
 	};
 }
 
-void MaterialSystem::CreatePipelineConfiguration(const PipelineConfiguration::CreateInfo& info)
+void MaterialSystem::create_pipeline_configuration(
+  const char* name,
+  vk::PipelineVertexInputStateCreateInfo vertex_input_state,
+  vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
+  vk::PipelineTessellationStateCreateInfo tessellation_state,
+  vk::PipelineViewportStateCreateInfo viewport_state,
+  vk::PipelineRasterizationStateCreateInfo rasterization_state,
+  vk::PipelineMultisampleStateCreateInfo multisample_state,
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
+  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
+  vk::PipelineColorBlendStateCreateInfo color_blend_state,
+  std::vector<vk::DynamicState> dynamic_states
+)
 {
-	PipelineConfiguration& configuration = m_PipelineConfigurations[HashStr(info.name)];
+	PipelineConfiguration& configuration = m_pipeline_configurations[HashStr(name
+	)];
 
 
 	configuration = PipelineConfiguration {
-		.vertexInputState   = info.vertexInputState,
-		.inputAssemblyState = info.inputAssemblyState,
-		.tessellationState  = info.tessellationState,
-		.viewportState      = info.viewportState,
-		.rasterizationState = info.rasterizationState,
-		.multisampleState   = info.multisampleState,
-		.depthStencilState  = info.depthStencilState,
+		.vertex_input_state   = vertex_input_state,
+		.input_assembly_state = input_assembly_state,
+		.tesselation_state    = tessellation_state,
+		.viewport_state       = viewport_state,
+		.rasterization_state  = rasterization_state,
+		.multisample_state    = multisample_state,
+		.depth_stencil_state  = depth_stencil_state,
 
-		.colorBlendAttachments = info.colorBlendAttachments,
-		.colorBlendState       = info.colorBlendState,
+		.color_blend_attachments = color_blend_attachments,
+		.color_blend_state       = color_blend_state,
 
-		.dynamicStates = info.dynamicStates,
+		.dynamic_states = dynamic_states,
 	};
 
-	configuration.dynamicState = {
+	configuration.dynamic_state = {
 		{},
-		static_cast<uint32_t>(configuration.dynamicStates.size()),
-		configuration.dynamicStates.data(),
+		static_cast<uint32_t>(configuration.dynamic_states.size()),
+		configuration.dynamic_states.data(),
 	};
 
-	configuration.colorBlendState.attachmentCount = configuration.colorBlendAttachments.size();
-	configuration.colorBlendState.pAttachments    = configuration.colorBlendAttachments.data();
+	configuration.color_blend_state.attachmentCount = configuration
+	                                                    .color_blend_attachments
+	                                                    .size();
+	configuration.color_blend_state.pAttachments = configuration
+	                                                 .color_blend_attachments
+	                                                 .data();
 }
 
-void MaterialSystem::CreateMaterial(const Material::CreateInfo& info)
+void MaterialSystem::create_material(
+  const char* name,
+  ShaderPass* shader_pass,
+  MaterialParameters parameters,
+  std::vector<class Texture*> textures
+)
 {
-	vk::DescriptorSetAllocateInfo allocateInfo {
-		m_DescriptorPool, // descriptorPool
-		1ull,             // descriptorSetCount
-		&info.shaderPass->effect->setsLayout.back(),
+	vk::DescriptorSetAllocateInfo allocate_info {
+		m_descriptor_pool, // descriptorPool
+		1ull,              // descriptorSetCount
+		&shader_pass->effect->sets_layout.back(),
 	};
 
-	if (m_Materials.contains(HashStr(info.name)))
+	if (m_materials.contains(HashStr(name)))
 	{
-		m_Device->logical.freeDescriptorSets(m_DescriptorPool, m_Materials[HashStr(info.name)].descriptorSet);
-		BVK_LOG(LogLvl::eWarn, "Recreating material: {}", info.name);
+		m_device->logical.freeDescriptorSets(
+		  m_descriptor_pool,
+		  m_materials[HashStr(name)].descriptor_set
+		);
+		BVK_LOG(LogLvl::eWarn, "Recreating material: {}", name);
 	}
 
 	vk::DescriptorSet set;
-	BVK_ASSERT(m_Device->logical.allocateDescriptorSets(&allocateInfo, &set));
+	BVK_ASSERT(m_device->logical.allocateDescriptorSets(&allocate_info, &set));
 
-	m_Materials[HashStr(info.name)] = {
-		.shaderPass    = info.shaderPass,
-		.parameters    = info.parameters,
-		.descriptorSet = set,
-		.textures      = info.textures,
-		.sortKey       = static_cast<uint32_t>(HashStr(info.name)),
+	m_materials[HashStr(name)] = {
+		.shader_pass    = shader_pass,
+		.parameters     = parameters,
+		.descriptor_set = set,
+		.textures       = textures,
+		.sort_key       = static_cast<uint32_t>(HashStr(name)),
 	};
 
 	// @todo Bind textures

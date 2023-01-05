@@ -21,461 +21,495 @@ class DevelopmentExampleApplication: public Application
 public:
 	DevelopmentExampleApplication()
 	{
-		LoadShaders();
-		LoadShaderEffects();
+		load_shaders();
+		load_shader_effects();
 
-		LoadPipelineConfigurations();
-		LoadShaderPasses();
+		load_pipeline_configuration();
+		load_shader_passes();
 
-		LoadMaterials();
+		load_materials();
 
-		LoadModels();
-		LoadEntities();
-		CreateRenderGraph();
+		load_models();
+		load_entities();
+		create_render_graph();
 	}
 
 	~DevelopmentExampleApplication()
 	{
 	}
 
-	virtual void OnTick(double deltaTime) override
+	virtual void on_tick(double deltaTime) override
 	{
-		m_Renderer.BeginFrame(&m_Scene);
+		m_renderer.begin_frame(&m_scene);
 
-		if (m_Renderer.IsSwapchainInvalidated())
-		{
-			m_DeviceSystem.UpdateSurfaceInfo();
-			m_Renderer.OnSwapchainInvalidated();
-			m_CameraController.OnWindowResize(m_Window.GetFramebufferSize().width,
-			                                  m_Window.GetFramebufferSize().height);
+		if (m_renderer.is_swapchain_invalidated()) {
+			m_device_system.update_surface_info();
+			m_renderer.on_swapchain_invalidated();
+			m_camera_controller.on_window_resize(
+			  m_window.get_framebuffer_size().width,
+			  m_window.get_framebuffer_size().height
+			);
 
-			LoadMaterials();
+			load_materials();
 		}
 
 		ImGui::ShowDemoWindow();
-		CVar::DrawImguiEditor();
+		CVar::draw_imgui_editor();
 
-		m_CameraController.Update();
-
-		m_Renderer.EndFrame(&m_Scene);
+		m_camera_controller.update();
+		m_renderer.end_frame(&m_scene);
 	}
 
-	virtual void OnSwapchainRecreate() override
+	virtual void on_swapchain_recreate() override
 	{
 		ASSERT(false, "Swapchain recreation not supported");
 	}
 
 private:
-	void LoadShaders()
+	void load_shaders()
 	{
 		const char* const DIRECTORY          = "Shaders/";
 		const char* const VERTEX_EXTENSION   = ".spv_vs";
 		const char* const FRAGMENT_EXTENSION = ".spv_fs";
 
-		for (auto& shader : std::filesystem::directory_iterator(DIRECTORY))
-		{
+		for (auto& shader : std::filesystem::directory_iterator(DIRECTORY)) {
 			std::string path(shader.path().c_str());
 			std::string extension(shader.path().extension().c_str());
 			std::string name(shader.path().filename().replace_extension().c_str());
 
-			if (strcmp(extension.c_str(), VERTEX_EXTENSION) &&
-			    strcmp(extension.c_str(), FRAGMENT_EXTENSION))
-			{
+			if (strcmp(extension.c_str(), VERTEX_EXTENSION) && strcmp(extension.c_str(), FRAGMENT_EXTENSION)) {
 				continue;
 			}
 
-			m_MaterialSystem.LoadShader({
-			    name.c_str(),
-			    path.c_str(),
-			    !strcmp(extension.c_str(), VERTEX_EXTENSION) ? vk::ShaderStageFlagBits::eVertex : vk::ShaderStageFlagBits::eFragment,
-			});
+			m_material_system.load_shader(
+			  name.c_str(),
+			  path.c_str(),
+			  !strcmp(extension.c_str(), VERTEX_EXTENSION) ? vk::ShaderStageFlagBits::eVertex :
+			                                                 vk::ShaderStageFlagBits::eFragment
+			);
 		}
 	}
 
-	void LoadShaderEffects()
+	void load_shader_effects()
 	{
 		// @TODO: Load from files instead of hard-coding
-		m_MaterialSystem.CreateShaderEffect({
-		    "opaque_mesh",
-		    {
-		        m_MaterialSystem.GetShader("defaultVertex"),
-		        m_MaterialSystem.GetShader("defaultFragment"),
-		    },
-		});
+		m_material_system.create_shader_effect(
+		  "opaque_mesh",
+		  {
+		    m_material_system.get_shader("defaultVertex"),
+		    m_material_system.get_shader("defaultFragment"),
+		  }
+		);
 
-		m_MaterialSystem.CreateShaderEffect({
-		    "skybox",
-		    {
-		        m_MaterialSystem.GetShader("skybox_vertex"),
-		        m_MaterialSystem.GetShader("skybox_fragment"),
-		    },
-		});
+		m_material_system.create_shader_effect(
+		  "skybox",
+		  {
+		    m_material_system.get_shader("skybox_vertex"),
+		    m_material_system.get_shader("skybox_fragment"),
+		  }
+		);
 	}
 
-	void LoadPipelineConfigurations()
+	void load_pipeline_configuration()
 	{
-		bvk::Device* device = m_DeviceSystem.GetDevice();
+		bvk::Device* device = m_device_system.get_device();
 
-		m_MaterialSystem.CreatePipelineConfiguration({
-		    .name               = "opaque_mesh",
-		    .vertexInputState   = bvk::VertexTypes::Model::GetVertexInputState(),
-		    .inputAssemblyState = {
-		        {}, // flags
-		        vk::PrimitiveTopology::eTriangleList,
-		        VK_FALSE,
-		    },
-		    .tessellationState = {},
-		    .viewportState     = {
-		            {}, // flags
-		            1u, // viewportCount
-		            {}, // pViewports
-		            1u, // scissorCount
-		            {}, // pScissors
-            },
-		    .rasterizationState = {
-		        {},                          // flags
-		        VK_FALSE,                    // depthClampEnable
-		        VK_FALSE,                    // rasterizerdiscardEnable
-		        vk::PolygonMode::eFill,      // polygonMode
-		        vk::CullModeFlagBits::eBack, // cullMode
-		        vk::FrontFace::eClockwise,   // frontFace
-		        VK_FALSE,                    // depthBiasEnable
-		        0.0f,                        // depthBiasConstantFactor
-		        0.0f,                        // depthBiasClamp
-		        0.0f,                        // depthBiasSlopeFactor
-		        1.0f,                        // lineWidth
-		    },
-		    .multisampleState = {
-		        {},
-		        device->maxDepthColorSamples,
-		        VK_FALSE,
-		        {},
-		        VK_FALSE,
-		        VK_FALSE,
-		    },
-		    .depthStencilState = {
-		        {},
-		        VK_TRUE,              // depthTestEnable
-		        VK_TRUE,              // depthWriteEnable
-		        vk::CompareOp::eLess, // depthCompareOp
-		        VK_FALSE,             // depthBoundsTestEnable
-		        VK_FALSE,             // stencilTestEnable
-		        {},                   // front
-		        {},                   // back
-		        0.0f,                 // minDepthBounds
-		        1.0,                  // maxDepthBounds
-		    },
-		    .colorBlendAttachments = {
-		        {
-		            VK_FALSE,                           // blendEnable
-		            vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
-		            vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-		            vk::BlendOp::eAdd,                  // colorBlendOp
-		            vk::BlendFactor::eOne,              // srcAlphaBlendFactor
-		            vk::BlendFactor::eZero,             // dstAlphaBlendFactor
-		            vk::BlendOp::eAdd,                  // alphaBlendOp
+		m_material_system.create_pipeline_configuration(
+		  "opaque_mesh",
+		  bvk::VertexTypes::Model::get_vertex_input_state(),
+		  vk::PipelineInputAssemblyStateCreateInfo {
+		    {},
+		    vk::PrimitiveTopology::eTriangleList,
+		    VK_FALSE,
+		  },
+		  vk::PipelineTessellationStateCreateInfo {},
+		  vk::PipelineViewportStateCreateInfo {
+		    {},
+		    1u,
+		    {},
+		    1u,
+		    {},
+		  },
+		  vk::PipelineRasterizationStateCreateInfo {
+		    {},
+		    VK_FALSE,
+		    VK_FALSE,
+		    vk::PolygonMode::eFill,
+		    vk::CullModeFlagBits::eBack,
+		    vk::FrontFace::eClockwise,
+		    VK_FALSE,
+		    0.0f,
+		    0.0f,
+		    0.0f,
+		    1.0f,
+		  },
+		  vk::PipelineMultisampleStateCreateInfo {
+		    {},
+		    device->max_samples,
+		    VK_FALSE,
+		    {},
+		    VK_FALSE,
+		    VK_FALSE,
+		  },
+		  vk::PipelineDepthStencilStateCreateInfo {
+		    {},
+		    VK_TRUE,
+		    VK_TRUE,
+		    vk::CompareOp::eLess,
+		    VK_FALSE,
+		    VK_FALSE,
+		    {},
+		    {},
+		    0.0f,
+		    1.0,
+		  },
+		  std::vector<vk::PipelineColorBlendAttachmentState> {
+		    { VK_FALSE,
+		      vk::BlendFactor::eSrcAlpha,
+		      vk::BlendFactor::eOneMinusSrcAlpha,
+		      vk::BlendOp::eAdd,
+		      vk::BlendFactor::eOne,
+		      vk::BlendFactor::eZero,
+		      vk::BlendOp::eAdd,
+		      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+		        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA },
+		  },
+		  vk::PipelineColorBlendStateCreateInfo {},
+		  std::vector<vk::DynamicState> {
+		    vk::DynamicState::eViewport,
+		    vk::DynamicState::eScissor,
+		  }
+		);
 
-		            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA // colorWriteMask
-		        },
-		    },
-		    .colorBlendState = {},
-		    .dynamicStates   = {
-		          vk::DynamicState::eViewport,
-		          vk::DynamicState::eScissor,
-            },
-		});
+		m_material_system.create_pipeline_configuration(
+		  "skybox",
+		  bvk::VertexTypes::Model::get_vertex_input_state(),
+		  vk::PipelineInputAssemblyStateCreateInfo {
+		    {},
+		    vk::PrimitiveTopology::eTriangleList,
+		    VK_FALSE,
+		  },
+		  vk::PipelineTessellationStateCreateInfo {},
+		  vk::PipelineViewportStateCreateInfo {
+		    {},
+		    1u,
+		    {},
+		    1u,
+		    {},
+		  },
+		  vk::PipelineRasterizationStateCreateInfo {
+		    {},
+		    VK_FALSE,
+		    VK_FALSE,
+		    vk::PolygonMode::eFill,
+		    vk::CullModeFlagBits::eBack,
+		    vk::FrontFace::eCounterClockwise,
+		    VK_FALSE,
+		    0.0f,
+		    0.0f,
+		    0.0f,
+		    1.0f,
+		  },
+		  vk::PipelineMultisampleStateCreateInfo {
+		    {},
+		    device->max_samples,
+		    VK_FALSE,
+		    {},
+		    VK_FALSE,
+		    VK_FALSE,
+		  },
+		  vk::PipelineDepthStencilStateCreateInfo {
+		    {},
+		    VK_TRUE,
+		    VK_TRUE,
+		    vk::CompareOp::eLessOrEqual,
+		    VK_FALSE,
+		    VK_FALSE,
+		    {},
+		    {},
+		    0.0f,
+		    1.0,
+		  },
+		  std::vector<vk::PipelineColorBlendAttachmentState> {
+		    {
+		      VK_FALSE,
+		      vk::BlendFactor::eSrcAlpha,
+		      vk::BlendFactor::eOneMinusSrcAlpha,
+		      vk::BlendOp::eAdd,
+		      vk::BlendFactor::eOne,
+		      vk::BlendFactor::eZero,
+		      vk::BlendOp::eAdd,
 
-		m_MaterialSystem.CreatePipelineConfiguration({
-		    .name               = "skybox",
-		    .vertexInputState   = bvk::VertexTypes::Model::GetVertexInputState(),
-		    .inputAssemblyState = {
-		        {},
-		        vk::PrimitiveTopology::eTriangleList,
-		        VK_FALSE,
+		      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+		        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA // colorWriteMask
 		    },
-		    .tessellationState = {},
-		    .viewportState     = {
-		            {}, // flags
-		            1u, // viewportCount
-		            {}, // pViewports
-		            1u, // scissorCount
-		            {}, // pScissors
-            },
-		    .rasterizationState = {
-		        {},
-		        VK_FALSE,
-		        VK_FALSE,
-		        vk::PolygonMode::eFill,
-		        vk::CullModeFlagBits::eBack,
-		        vk::FrontFace::eCounterClockwise,
-		        VK_FALSE,
-		        0.0f,
-		        0.0f,
-		        0.0f,
-		        1.0f,
-		    },
-		    .multisampleState = {
-		        {},
-		        device->maxDepthColorSamples,
-		        VK_FALSE,
-		        {},
-		        VK_FALSE,
-		        VK_FALSE,
-		    },
-		    .depthStencilState = {
-		        {},
-		        VK_TRUE,                     // depthTestEnable
-		        VK_TRUE,                     // depthWriteEnable
-		        vk::CompareOp::eLessOrEqual, // depthCompareOp
-		        VK_FALSE,                    // depthBoundsTestEnable
-		        VK_FALSE,                    // stencilTestEnable
-		        {},                          // front
-		        {},                          // back
-		        0.0f,                        // minDepthBounds
-		        1.0,                         // maxDepthBounds
-		    },
-		    .colorBlendAttachments = {
-		        {
-		            VK_FALSE,                           // blendEnable
-		            vk::BlendFactor::eSrcAlpha,         // srcColorBlendFactor
-		            vk::BlendFactor::eOneMinusSrcAlpha, // dstColorBlendFactor
-		            vk::BlendOp::eAdd,                  // colorBlendOp
-		            vk::BlendFactor::eOne,              // srcAlphaBlendFactor
-		            vk::BlendFactor::eZero,             // dstAlphaBlendFactor
-		            vk::BlendOp::eAdd,                  // alphaBlendOp
-
-		            vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA // colorWriteMask
-		        },
-		    },
-		    .colorBlendState = {},
-		    .dynamicStates   = {
-		          vk::DynamicState::eViewport,
-		          vk::DynamicState::eScissor,
-            },
-		});
+		  },
+		  vk::PipelineColorBlendStateCreateInfo {},
+		  std::vector<vk::DynamicState> {
+		    vk::DynamicState::eViewport,
+		    vk::DynamicState::eScissor,
+		  }
+		);
 	}
 
-	void LoadShaderPasses()
+	void load_shader_passes()
 	{
-		bvk::Device* device = m_DeviceSystem.GetDevice();
+		bvk::Device* device = m_device_system.get_device();
 
 		// create shader passes
-		m_MaterialSystem.CreateShaderPass({
-		    .name   = "opaque_mesh",
-		    .effect = m_MaterialSystem.GetShaderEffect("opaque_mesh"),
+		m_material_system.create_shader_pass(
+		  "opaque_mesh",
+		  m_material_system.get_shader_effect("opaque_mesh"),
+		  device->surface_format.format,
+		  device->depth_format,
+		  m_material_system.get_pipeline_configuration("opaque_mesh")
+		);
 
-		    .colorAttachmentFormat = device->surfaceFormat.format,
-		    .depthAttachmentFormat = device->depthFormat,
-
-		    .pipelineConfiguration = m_MaterialSystem.GetPipelineConfiguration("opaque_mesh"),
-		});
-
-		m_MaterialSystem.CreateShaderPass({
-		    .name   = "skybox",
-		    .effect = m_MaterialSystem.GetShaderEffect("skybox"),
-
-		    .colorAttachmentFormat = device->surfaceFormat.format,
-		    .depthAttachmentFormat = device->depthFormat,
-
-		    .pipelineConfiguration = m_MaterialSystem.GetPipelineConfiguration("skybox"),
-		});
+		m_material_system.create_shader_pass(
+		  "skybox",
+		  m_material_system.get_shader_effect("skybox"),
+		  device->surface_format.format,
+		  device->depth_format,
+		  m_material_system.get_pipeline_configuration("skybox")
+		);
 	}
 
-	void LoadMaterials()
+	// @todo: Load from files instead of hard-coding
+	void load_materials()
 	{
-		// @TODO: Load from files instead of hard-coding
-		m_MaterialSystem.CreateMaterial({
-		    .name       = "opaque_mesh",
-		    .shaderPass = m_MaterialSystem.GetShaderPass("opaque_mesh"),
-		    .parameters = {},
-		    .textures   = {},
-		});
+		m_material_system
+		  .create_material("opaque_mesh", m_material_system.get_shader_pass("opaque_mesh"), {}, {});
 
-		m_MaterialSystem.CreateMaterial({
-		    .name       = "skybox",
-		    .shaderPass = m_MaterialSystem.GetShaderPass("skybox"),
-		    .parameters = {},
-		    .textures   = {},
-		});
+		m_material_system
+		  .create_material("skybox", m_material_system.get_shader_pass("skybox"), {}, {});
 	}
 
-	void LoadModels()
+	// @todo: Load from files instead of hard-coding
+	void load_models()
 	{
-		// @TODO: Load from files instead of hard-coding
-		m_ModelSystem.LoadModel({
-		    m_TextureSystem,
-		    "flight_helmet",
-		    "Assets/FlightHelmet/FlightHelmet.gltf",
-		});
-
-		m_ModelSystem.LoadModel({
-		    m_TextureSystem,
-		    "skybox",
-		    "Assets/Cube/Cube.gltf",
-		});
+		m_model_system
+		  .load_model(m_texture_system, "flight_helmet", "Assets/FlightHelmet/FlightHelmet.gltf");
+		m_model_system.load_model(m_texture_system, "skybox", "Assets/Cube/Cube.gltf");
 	}
 
-	void LoadEntities()
+	// @todo: Load from files instead of hard-coding
+	void load_entities()
 	{
-		// @TODO: Load from files instead of hard-coding
+		Entity testModel = m_scene.create();
 
-		Entity testModel = m_Scene.create();
-
-		m_Scene.emplace<TransformComponent>(testModel,
-		                                    glm::vec3(0.0f),          // Translation
-		                                    glm::vec3(1.0f),          // Scale
-		                                    glm::vec3(0.0f, 0.0, 0.0) // Rotation
+		m_scene.emplace<TransformComponent>(
+		  testModel,
+		  glm::vec3(0.0f),
+		  glm::vec3(1.0f),
+		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		m_Scene.emplace<StaticMeshRendererComponent>(
-		    testModel,
-		    m_MaterialSystem.GetMaterial("opaque_mesh"), // Material
-		    m_ModelSystem.GetModel("flight_helmet")      // Mesh
+		m_scene.emplace<StaticMeshRendererComponent>(
+		  testModel,
+		  m_material_system.get_material("opaque_mesh"),
+		  m_model_system.get_model("flight_helmet")
 		);
 
-		Entity skybox = m_Scene.create();
-		m_Scene.emplace<TransformComponent>(skybox,
-		                                    glm::vec3(0.0f),          // Translation
-		                                    glm::vec3(1.0f),          // Scale
-		                                    glm::vec3(0.0f, 0.0, 0.0) // Rotation
+		Entity skybox = m_scene.create();
+		m_scene.emplace<TransformComponent>(
+		  skybox,
+		  glm::vec3(0.0f),
+		  glm::vec3(1.0f),
+		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		m_Scene.emplace<StaticMeshRendererComponent>(
-		    skybox,
-		    m_MaterialSystem.GetMaterial("skybox"), // Material
-		    m_ModelSystem.GetModel("skybox")        // Mesh
+		m_scene.emplace<StaticMeshRendererComponent>(
+		  skybox,
+		  m_material_system.get_material("skybox"),
+		  m_model_system.get_model("skybox")
 		);
 
-		Entity light = m_Scene.create();
-		m_Scene.emplace<TransformComponent>(
-		    light, glm::vec3(2.0f, 2.0f, 1.0f), // Translation
-		    glm::vec3(1.0f),                    // Scale
-		    glm::vec3(0.0f, 0.0, 0.0)           // Rotation
+		Entity light = m_scene.create();
+		m_scene.emplace<TransformComponent>(
+		  light,
+		  glm::vec3(2.0f, 2.0f, 1.0f),
+		  glm::vec3(1.0f),
+		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		Entity camera = m_Scene.create();
-		m_Scene.emplace<TransformComponent>(camera, glm::vec3(6.0, 7.0, 2.5),
-		                                    glm::vec3(1.0),
-		                                    glm::vec3(0.0f, 0.0, 0.0));
-		m_Scene.emplace<CameraComponent>(camera, 45.0f, 5.0, 1.0, 0.001f, 100.0f,
-		                                 225.0, 0.0, glm::vec3(0.0f, 0.0f, -1.0f),
-		                                 glm::vec3(0.0f, -1.0f, 0.0f), 10.0f);
+		Entity camera = m_scene.create();
+		m_scene.emplace<TransformComponent>(
+		  camera,
+		  glm::vec3(6.0, 7.0, 2.5),
+		  glm::vec3(1.0),
+		  glm::vec3(0.0f, 0.0, 0.0)
+		);
 
-		m_Scene.emplace<LightComponent>(light, 12);
+		m_scene.emplace<CameraComponent>(
+		  camera,
+		  45.0f,
+		  5.0,
+		  1.0,
+		  0.001f,
+		  100.0f,
+		  225.0,
+		  0.0,
+		  glm::vec3(0.0f, 0.0f, -1.0f),
+		  glm::vec3(0.0f, -1.0f, 0.0f),
+		  10.0f
+		);
+
+		m_scene.emplace<LightComponent>(light, 12);
 	}
 
-	void CreateRenderGraph()
+	void create_render_graph()
 	{
-		bvk::Device* device                       = m_DeviceSystem.GetDevice();
-		const vk::Format colorFormat              = device->surfaceFormat.format;
-		const vk::Format deppthFormat             = device->depthFormat;
-		const vk::SampleCountFlagBits sampleCount = device->maxDepthColorSamples;
+		auto* device            = m_device_system.get_device();
+		const auto color_format = device->surface_format.format;
+		const auto depth_format = device->depth_format;
+		const auto sample_count = device->max_samples;
 
-		bvk::Texture* defaultTexture     = m_TextureSystem.GetTexture("default");
-		bvk::Texture* defaultTextureCube = m_TextureSystem.GetTexture("default_cube");
+		auto* default_texture      = m_texture_system.get_texture("default");
+		auto* default_texture_cube = m_texture_system.get_texture("default_cube");
 
-		bvk::RenderPass::CreateInfo forwardPassCreateInfo {
-			.name         = "forwardpass",
-			.onUpdate     = &ForwardPassUpdate,
-			.onRender     = &ForwardPassRender,
-			.onBeginFrame = [](const bvk::RenderContext& context) {},
+		const std::array<float, 4> update_color  = { 1.0, 0.8, 0.8, 1.0 };
+		const std::array<float, 4> barrier_color = { 0.8, 1.0, 0.8, 1.0 };
+		const std::array<float, 4> render_color  = { 0.8, 0.8, 1.0, 1.0 };
 
-			.colorAttachmentInfos = {
-			    bvk::RenderPass::CreateInfo::AttachmentInfo {
-			        .name = "forwardpass",
-			        .size = { 1.0, 1.0 },
-			        .sizeType =
-			            bvk::RenderPass::CreateInfo::SizeType::eSwapchainRelative,
-			        .format  = colorFormat,
-			        .samples = sampleCount,
-			        .clearValue =
-			            vk::ClearValue {
-			                vk::ClearColorValue {
-			                    std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
-			            },
-			    },
+		bvk::Renderpass::CreateInfo forward_pass_info {
+                 "forwardpass",
+                     nullptr,
+                 &forward_pass_update,
+                 &forward_pass_render,
+                 {
+                    bvk::Renderpass::CreateInfo::AttachmentInfo {
+                        .name = "forwardpass",
+                        .size = { 1.0, 1.0 },
+                        .size_type =
+                            bvk::Renderpass::CreateInfo::SizeType::eSwapchainRelative,
+                        .format  = color_format,
+                        .samples = sample_count,
+                        .clear_value =
+                            vk::ClearValue{
+                                vk::ClearColorValue {
+                                    std::array<float, 4>({ 0.3f, 0.5f, 0.8f, 1.0f }) },
+                            },
+                    },
+                },
+
+                bvk::Renderpass::CreateInfo::AttachmentInfo {
+                    .name       = "forward_depth",
+                    .size       = { 1.0, 1.0 },
+                    .size_type   = bvk::Renderpass::CreateInfo::SizeType::eSwapchainRelative,
+                    .format     = depth_format,
+                    .samples    = sample_count,
+                    .clear_value = vk::ClearValue {
+                        vk::ClearDepthStencilValue { 1.0, 0 },
+                    },
+                },
+
+                 {
+                    bvk::Renderpass::CreateInfo::TextureInputInfo {
+                        .name           = "texture_2ds",
+                        .binding        = 0,
+                        .count          = 32,
+                        .type           = vk::DescriptorType::eCombinedImageSampler,
+                        .stage_mask      = vk::ShaderStageFlagBits::eFragment,
+                        .default_texture = default_texture,
+                    },
+                    bvk::Renderpass::CreateInfo::TextureInputInfo {
+                        .name           = "texture_cubes",
+                        .binding        = 1,
+                        .count          = 8u,
+                        .type           = vk::DescriptorType::eCombinedImageSampler,
+                        .stage_mask      = vk::ShaderStageFlagBits::eFragment,
+                        .default_texture =default_texture_cube,
+                    },
+                },
+                {},
+                {},
+               vk::DebugUtilsLabelEXT({
+                        "forwardpass_update",
+                        update_color,
+                }),
+
+               vk::DebugUtilsLabelEXT({
+                        "forwardpass_barrier",
+                        barrier_color,
+                }),
+               vk::DebugUtilsLabelEXT({
+                        "forwardpass_render",
+                        render_color,
+                }),
+            };
+
+		bvk::Renderpass::CreateInfo ui_pass_info {
+			"uipass",
+			&user_interface_pass_begin_frame,
+			&user_interface_pass_update,
+			&user_interface_pass_render,
+			{
+			  bvk::Renderpass::CreateInfo::AttachmentInfo {
+			    .name      = "backbuffer",
+			    .size      = { 1.0, 1.0 },
+			    .size_type = bvk::Renderpass::CreateInfo::SizeType::eSwapchainRelative,
+			    .format    = color_format,
+			    .samples   = sample_count,
+			    .input     = "forwardpass",
+			  },
 			},
+			{},
+			{},
+			{},
+			{},
+			vk::DebugUtilsLabelEXT({
+			  "uipass_update",
+			  update_color,
+			}),
 
-			.depthStencilAttachmentInfo = bvk::RenderPass::CreateInfo::AttachmentInfo {
-			    .name       = "forward_depth",
-			    .size       = { 1.0, 1.0 },
-			    .sizeType   = bvk::RenderPass::CreateInfo::SizeType::eSwapchainRelative,
-			    .format     = deppthFormat,
-			    .samples    = sampleCount,
-			    .clearValue = vk::ClearValue {
-			        vk::ClearDepthStencilValue { 1.0, 0 },
-			    },
-			},
-
-			.textureInputInfos = {
-			    bvk::RenderPass::CreateInfo::TextureInputInfo {
-			        .name           = "texture_2ds",
-			        .binding        = 0,
-			        .count          = 32,
-			        .type           = vk::DescriptorType::eCombinedImageSampler,
-			        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-			        .defaultTexture = defaultTexture,
-			    },
-			    bvk::RenderPass::CreateInfo::TextureInputInfo {
-			        .name           = "texture_cubes",
-			        .binding        = 1,
-			        .count          = 8u,
-			        .type           = vk::DescriptorType::eCombinedImageSampler,
-			        .stageMask      = vk::ShaderStageFlagBits::eFragment,
-			        .defaultTexture = defaultTextureCube,
-			    },
-			},
+			vk::DebugUtilsLabelEXT({
+			  "uipass_barrier",
+			  barrier_color,
+			}),
+			vk::DebugUtilsLabelEXT({
+			  "uipass_render",
+			  render_color,
+			}),
 		};
 
-		bvk::RenderPass::CreateInfo uiPassCreateInfo {
-			.name         = "ui",
-			.onUpdate     = &UserInterfacePassUpdate,
-			.onRender     = &UserInterfacePassRender,
-			.onBeginFrame = &UserInterfacePassBeginFrame,
+		m_renderer.build_render_graph(
+		  "backbuffer",
+		  {
+		    bvk::Renderpass::CreateInfo::BufferInputInfo {
+		      .name       = "frame_data",
+		      .binding    = 0,
+		      .count      = 1,
+		      .type       = vk::DescriptorType::eUniformBuffer,
+		      .stage_mask = vk::ShaderStageFlagBits::eVertex,
 
-			.colorAttachmentInfos = {
-			    bvk::RenderPass::CreateInfo::AttachmentInfo {
-			        .name = "backbuffer",
-			        .size = { 1.0, 1.0 },
-			        .sizeType =
-			            bvk::RenderPass::CreateInfo::SizeType::eSwapchainRelative,
-			        .format  = colorFormat,
-			        .samples = sampleCount,
-			        .input   = "forwardpass",
-			    },
-			},
-		};
-
-		m_Renderer.BuildRenderGraph({
-		    .backbufferName = "backbuffer",
-		    .bufferInputs   = {
-		          bvk::RenderPass::CreateInfo::BufferInputInfo {
-		              .name      = "frame_data",
-		              .binding   = 0,
-		              .count     = 1,
-		              .type      = vk::DescriptorType::eUniformBuffer,
-		              .stageMask = vk::ShaderStageFlagBits::eVertex,
-
-		              .size        = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
-		              .initialData = nullptr,
-                },
-		          bvk::RenderPass::CreateInfo::BufferInputInfo {
-		              .name      = "scene_data",
-		              .binding   = 1,
-		              .count     = 1,
-		              .type      = vk::DescriptorType::eUniformBuffer,
-		              .stageMask = vk::ShaderStageFlagBits::eVertex,
-
-		              .size        = sizeof(glm::vec4),
-		              .initialData = nullptr,
-                },
-            },
-		    .renderPasses = {
-		        forwardPassCreateInfo,
-		        uiPassCreateInfo,
+		      .size         = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+		      .initial_data = nullptr,
 		    },
-		    .onUpdate     = &RenderGraphUpdate,
-		    .onBeginFrame = [](const bvk::RenderContext& context) {},
-		});
+		    bvk::Renderpass::CreateInfo::BufferInputInfo {
+		      .name       = "scene_data",
+		      .binding    = 1,
+		      .count      = 1,
+		      .type       = vk::DescriptorType::eUniformBuffer,
+		      .stage_mask = vk::ShaderStageFlagBits::eVertex,
+
+		      .size         = sizeof(glm::vec4),
+		      .initial_data = nullptr,
+		    },
+		  },
+		  {
+		    forward_pass_info,
+		    ui_pass_info,
+		  },
+		  &render_graph_update,
+		  nullptr,
+		  vk::DebugUtilsLabelEXT({
+		    "graph_update",
+		    update_color,
+		  }),
+		  vk::DebugUtilsLabelEXT({
+		    "backbuffer_present_barrier",
+		    barrier_color,
+		  })
+		);
 	}
 };

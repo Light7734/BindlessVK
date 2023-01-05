@@ -7,58 +7,73 @@ namespace Assets {
 
 using namespace nlohmann;
 
-TextureInfo ReadTextureInfo(AssetFile* file)
+TextureInfo read_texture_info(AssetFile* file)
 {
-	json textureMetaData = json::parse(file->json);
+	json texture_meta_data = json::parse(file->json);
 
 	return TextureInfo {
-		.size            = textureMetaData["bufferSize"],
-		.compressionMode = textureMetaData["compression"],
-		.format          = textureMetaData["format"],
-		.pixelsSize      = {
-		         textureMetaData["width"],
-		         textureMetaData["height"],
+		.size            = texture_meta_data["bufferSize"],
+		.compression_mode = texture_meta_data["compression"],
+		.format          = texture_meta_data["format"],
+		.pixel_size      = {
+		         texture_meta_data["width"],
+		         texture_meta_data["height"],
 		         0,
         },
-		.originalFile = textureMetaData["originalFile"],
+		.original_file = texture_meta_data["originalFile"],
 	};
 }
 
-void UnpackTexture(TextureInfo* info, const void* sourceBuffer, size_t sourceSize, void* destination)
+void unpack_texture(
+  TextureInfo* info,
+  const void* source_buffer,
+  size_t source_size,
+  void* destination
+)
 {
-	if (info->compressionMode == CompressionMode::LZ4)
+	if (info->compression_mode == CompressionMode::LZ4)
 	{
-		LZ4_decompress_safe((const char*)sourceBuffer, (char*)destination, sourceSize, info->size);
+		LZ4_decompress_safe(
+		  (const char*)source_buffer,
+		  (char*)destination,
+		  source_size,
+		  info->size
+		);
 	}
 	else
 	{
-		memcpy(destination, sourceBuffer, sourceSize);
+		memcpy(destination, source_buffer, source_size);
 	}
 }
 
-AssetFile PackTexture(TextureInfo* info, void* pixelData)
+AssetFile pack_texture(TextureInfo* info, void* pixel_data)
 {
-	json textureMetadata;
-	textureMetadata["format"]       = info->format;
-	textureMetadata["width"]        = info->pixelsSize[0];
-	textureMetadata["height"]       = info->pixelsSize[1];
-	textureMetadata["bufferSize"]   = info->size;
-	textureMetadata["originalFile"] = info->originalFile;
-	textureMetadata["compression"]  = CompressionMode::LZ4;
+	json metadata;
+	metadata["format"]       = info->format;
+	metadata["width"]        = info->pixel_size[0];
+	metadata["height"]       = info->pixel_size[1];
+	metadata["bufferSize"]   = info->size;
+	metadata["originalFile"] = info->original_file;
+	metadata["compression"]  = CompressionMode::LZ4;
 
 	AssetFile file;
 	file.type    = AssetFile::Type::Texture;
 	file.version = 1u;
 
-	const int compressStaging = LZ4_compressBound(info->size);
-	file.blob.resize(compressStaging);
-	const int compressedSize = LZ4_compress_default((const char*)pixelData, (char*)file.blob.data(), info->size, compressStaging);
-	file.blob.resize(compressedSize);
+	const int compress_staging = LZ4_compressBound(info->size);
+	file.blob.resize(compress_staging);
+	const int compression_size = LZ4_compress_default(
+	  (const char*)pixel_data,
+	  (char*)file.blob.data(),
+	  info->size,
+	  compress_staging
+	);
+	file.blob.resize(compression_size);
 
 
-	textureMetadata["compression"] = CompressionMode::LZ4;
+	metadata["compression"] = CompressionMode::LZ4;
 
-	file.json = textureMetadata.dump();
+	file.json = metadata.dump();
 
 	return file;
 }

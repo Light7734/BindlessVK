@@ -27,6 +27,7 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/tinygltf/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/fmt/include
 )
 
 target_link_libraries(
@@ -37,6 +38,7 @@ target_link_libraries(
     PRIVATE tinygltf
     PRIVATE spirv-reflect-static
     PRIVATE spdlog
+    PRIVATE fmt
 )
 
 target_precompile_headers(

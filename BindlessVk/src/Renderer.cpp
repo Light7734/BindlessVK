@@ -2,92 +2,89 @@
 
 #include "BindlessVk/Types.hpp"
 
+#include <fmt/format.h>
+
 namespace BINDLESSVK_NAMESPACE {
 
-void Renderer::Reset()
+void Renderer::reset()
 {
-	if (!m_Device)
+	if (!m_device)
 	{
 		return;
 	}
 
-	DestroySwapchainResources();
+	destroy_swapchain_resources();
 
-	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		m_Device->logical.destroyFence(m_RenderFences[i], nullptr);
-		m_Device->logical.destroySemaphore(m_RenderSemaphores[i], nullptr);
-		m_Device->logical.destroySemaphore(m_PresentSemaphores[i], nullptr);
+		m_device->logical.destroyFence(m_render_fences[i]);
+		m_device->logical.destroySemaphore(m_render_semaphores[i]);
+		m_device->logical.destroySemaphore(m_present_semaphores[i]);
 	}
 
-	m_RenderGraph.Reset();
-	m_Device->logical.resetDescriptorPool(m_DescriptorPool);
-	m_Device->logical.destroyDescriptorPool(m_DescriptorPool, nullptr);
+	m_render_graph.reset();
+	m_device->logical.resetDescriptorPool(m_descriptor_pool);
+	m_device->logical.destroyDescriptorPool(m_descriptor_pool);
 
-	m_Device->logical.destroySwapchainKHR(m_Swapchain);
+	m_device->logical.destroySwapchainKHR(m_swapchain);
 }
 
-void Renderer::Init(const Renderer::CreateInfo& info)
+void Renderer::init(Device* device)
 {
-	m_Device = info.device;
+	m_device = device;
 
-	CreateSyncObjects();
-	CreateDescriptorPools();
-	CreateCmdBuffers();
-
-	// Recreates swapchain resources
-	OnSwapchainInvalidated();
+	create_sync_objects();
+	create_descriptor_pools();
+	create_cmd_buffers();
+	on_swapchain_invalidated();
 }
 
-void Renderer::OnSwapchainInvalidated()
+void Renderer::on_swapchain_invalidated()
 {
-	DestroySwapchainResources();
+	destroy_swapchain_resources();
 
-	CreateSwapchain();
+	create_swapchain();
 
-	m_RenderGraph.OnSwapchainInvalidated(m_SwapchainImages, m_SwapchainImageViews);
+	m_render_graph.on_swapchain_invalidated(m_swapchain_images, m_swapchain_image_views);
 
-	m_SwapchainInvalidated = false;
-	m_Device->logical.waitIdle();
+	m_is_swapchain_invalid = false;
+	m_device->logical.waitIdle();
 }
 
-void Renderer::DestroySwapchainResources()
+void Renderer::destroy_swapchain_resources()
 {
-	if (!m_Swapchain)
+	if (!m_swapchain)
 	{
 		return;
 	}
 
-	m_Device->logical.waitIdle();
+	m_device->logical.waitIdle();
 
-	for (const auto& imageView : m_SwapchainImageViews)
+	for (const auto& imageView : m_swapchain_image_views)
 	{
-		m_Device->logical.destroyImageView(imageView);
+		m_device->logical.destroyImageView(imageView);
 	}
 
-	m_SwapchainImageViews.clear();
-	m_SwapchainImages.clear();
+	m_swapchain_image_views.clear();
+	m_swapchain_images.clear();
 };
 
-void Renderer::CreateSyncObjects()
+void Renderer::create_sync_objects()
 {
-	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		vk::SemaphoreCreateInfo semaphoreCreateInfo {};
+		m_render_fences[i] = m_device->logical.createFence({
+		    vk::FenceCreateFlagBits::eSignaled,
+		});
 
-		vk::FenceCreateInfo fenceCreateInfo {
-			vk::FenceCreateFlagBits::eSignaled, // flags
-		};
-
-		m_RenderFences[i]      = m_Device->logical.createFence(fenceCreateInfo, nullptr);
-		m_RenderSemaphores[i]  = m_Device->logical.createSemaphore(semaphoreCreateInfo, nullptr);
-		m_PresentSemaphores[i] = m_Device->logical.createSemaphore(semaphoreCreateInfo, nullptr);
+		m_render_semaphores[i] = m_device->logical.createSemaphore({});
+		m_present_semaphores[i] = m_device->logical.createSemaphore({});
 	}
 }
 
-void Renderer::CreateDescriptorPools()
+void Renderer::create_descriptor_pools()
 {
-	std::vector<vk::DescriptorPoolSize> poolSizes = {
+	std::vector<vk::DescriptorPoolSize> pool_sizes = {
 		{ vk::DescriptorType::eSampler, 8000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 8000 },
 		{ vk::DescriptorType::eSampledImage, 8000 },
@@ -100,240 +97,242 @@ void Renderer::CreateDescriptorPools()
 		{ vk::DescriptorType::eStorageBufferDynamic, 8000 },
 		{ vk::DescriptorType::eInputAttachment, 8000 }
 	};
-	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
-	vk::DescriptorPoolCreateInfo descriptorPoolCreateInfo {
-		vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind |
-		    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, // flags
-
-		100,                                     // maxSets
-		static_cast<uint32_t>(poolSizes.size()), // poolSizeCount
-		poolSizes.data(),                        // pPoolSizes
-	};
-
-	m_DescriptorPool = m_Device->logical.createDescriptorPool(descriptorPoolCreateInfo, nullptr);
+	m_descriptor_pool = m_device->logical.createDescriptorPool({
+	    vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind
+	        | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+	    100,
+	    pool_sizes,
+	});
 }
 
-void Renderer::CreateSwapchain()
+void Renderer::create_swapchain()
 {
-	const uint32_t minImage = m_Device->surfaceCapabilities.minImageCount;
-	const uint32_t maxImage = m_Device->surfaceCapabilities.maxImageCount;
+	const u32 min_image = m_device->surface_capabilities.minImageCount;
+	const u32 max_image = m_device->surface_capabilities.maxImageCount;
 
-	uint32_t imageCount = maxImage >= DESIRED_SWAPCHAIN_IMAGES && minImage <= DESIRED_SWAPCHAIN_IMAGES ? DESIRED_SWAPCHAIN_IMAGES :
-	                      maxImage == 0ul && minImage <= DESIRED_SWAPCHAIN_IMAGES                      ? DESIRED_SWAPCHAIN_IMAGES :
-	                      minImage <= 2ul && maxImage >= 2ul                                           ? 2ul :
-	                      minImage == 0ul && maxImage >= 2ul                                           ? 2ul :
-	                                                                                                     minImage;
+	u32 image_count;
+
+	if ((max_image == 0ul || max_image >= DESIRED_SWAPCHAIN_IMAGES)
+	    && min_image <= DESIRED_SWAPCHAIN_IMAGES)
+	{
+		image_count = DESIRED_SWAPCHAIN_IMAGES;
+	}
+	else if (min_image <= 2ul && max_image >= 2ul)
+	{
+		image_count = 2ul;
+	}
+	else if (min_image == 0ul && max_image >= 2ul)
+	{
+		image_count = 2ul;
+	}
+	else
+	{
+		image_count = min_image;
+	}
+
 	// Create swapchain
-	bool sameQueueIndex           = m_Device->graphicsQueueIndex == m_Device->presentQueueIndex;
-	vk::SwapchainKHR oldSwapchain = m_Swapchain;
+	bool same_queue_index = m_device->graphics_queue_index == m_device->present_queue_index;
 
-	vk::SwapchainCreateInfoKHR swapchainCreateInfo {
-		{},                                                                          // flags
-		m_Device->surface,                                                           // surface
-		imageCount,                                                                  // minImageCount
-		m_Device->surfaceFormat.format,                                              // imageFormat
-		m_Device->surfaceFormat.colorSpace,                                          // imageColorSpace
-		m_Device->framebufferExtent,                                                 // imageExtent
-		1u,                                                                          // imageArrayLayers
-		vk::ImageUsageFlagBits::eColorAttachment,                                    // imageUsage
-		sameQueueIndex ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent, // imageSharingMode
-		sameQueueIndex ? 0u : 2u,                                                    // queueFamilyIndexCount
-		sameQueueIndex ? nullptr : &m_Device->graphicsQueueIndex,                    // pQueueFamilyIndices
-		m_Device->surfaceCapabilities.currentTransform,                              // preTransform
-		vk::CompositeAlphaFlagBitsKHR::eOpaque,                                      // compositeAlpha -> No alpha-blending between multiple windows
-		m_Device->presentMode,                                                       // presentMode
-		VK_TRUE,                                                                     // clipped -> Don't render the obsecured pixels
-		oldSwapchain,                                                                // oldSwapchain
+	vk::SwapchainKHR old_swapchain = m_swapchain;
+
+	vk::SwapchainCreateInfoKHR swapchain_info {
+		{},
+		m_device->surface,
+		image_count,
+		m_device->surface_format.format,
+		m_device->surface_format.colorSpace,
+		m_device->framebuffer_extent,
+		1u,
+		vk::ImageUsageFlagBits::eColorAttachment,
+		same_queue_index ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent,
+		same_queue_index ? 0u : 2u,
+		same_queue_index ? nullptr : &m_device->graphics_queue_index,
+		m_device->surface_capabilities.currentTransform,
+		vk::CompositeAlphaFlagBitsKHR::eOpaque,
+		m_device->present_mode,
+		VK_TRUE,
+		old_swapchain,
 	};
 
-	m_Swapchain = m_Device->logical.createSwapchainKHR(swapchainCreateInfo, nullptr);
-	m_Device->logical.destroySwapchainKHR(oldSwapchain);
+	m_swapchain = m_device->logical.createSwapchainKHR(swapchain_info, nullptr);
+	m_device->logical.destroySwapchainKHR(old_swapchain);
 
-	m_SwapchainImages = m_Device->logical.getSwapchainImagesKHR(m_Swapchain);
+	m_swapchain_images = m_device->logical.getSwapchainImagesKHR(m_swapchain);
 
-	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
+	for (u32 i = 0; i < m_swapchain_images.size(); i++)
 	{
-		vk::ImageViewCreateInfo imageViewCreateInfo {
-			{},                             // flags
-			m_SwapchainImages[i],           // image
-			vk::ImageViewType::e2D,         // viewType
-			m_Device->surfaceFormat.format, // format
-
-			/* components */
-			vk::ComponentMapping {
-			    // Don't swizzle the colors around...
-			    vk::ComponentSwizzle::eIdentity, // r
-			    vk::ComponentSwizzle::eIdentity, // g
-			    vk::ComponentSwizzle::eIdentity, // b
-			    vk::ComponentSwizzle::eIdentity, // a
-			},
-
-			/* subresourceRange */
-			vk::ImageSubresourceRange {
-			    vk::ImageAspectFlagBits::eColor, // Image will be used as color
-			                                     // target // aspectMask
-			    0,                               // No mipmaipping // baseMipLevel
-			    1,                               // No levels // levelCount
-			    0,                               // No nothin... // baseArrayLayer
-			    1,                               // layerCount
-			},
-		};
-
-		m_SwapchainImageViews.push_back(m_Device->logical.createImageView(imageViewCreateInfo, nullptr));
+		m_swapchain_image_views.push_back(m_device->logical.createImageView({
+		    {},
+		    m_swapchain_images[i],
+		    vk::ImageViewType::e2D,
+		    m_device->surface_format.format,
+		    vk::ComponentMapping {
+		        vk::ComponentSwizzle::eIdentity,
+		        vk::ComponentSwizzle::eIdentity,
+		        vk::ComponentSwizzle::eIdentity,
+		        vk::ComponentSwizzle::eIdentity,
+		    },
+		    vk::ImageSubresourceRange {
+		        vk::ImageAspectFlagBits::eColor,
+		        0,
+		        1,
+		        0,
+		        1,
+		    },
+		}));
 	}
 
 
-	for (uint32_t i = 0; i < m_SwapchainImages.size(); i++)
+	for (u32 i = 0; i < m_swapchain_images.size(); i++)
 	{
-		std::string imageName("swap_chain Image #" + std::to_string(i));
-		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
-		    (uint64_t)(VkImage)m_SwapchainImages[i],
-		    imageName.c_str(),
+		    (u64)(VkImage)m_swapchain_images[i],
+		    fmt::format("swap_chain_image_{}", i).c_str(),
 		});
 
-		std::string viewName("swap_chain ImageView #" + std::to_string(i));
-		m_Device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
-		    (uint64_t)(VkImageView)m_SwapchainImageViews[i],
-		    viewName.c_str(),
+		    (u64)(VkImageView)m_swapchain_image_views[i],
+		    fmt::format("swapchain_image_view_{}", i).c_str(),
 		});
 	}
 }
 
-void Renderer::CreateCmdBuffers()
+void Renderer::create_cmd_buffers()
 {
-	m_CommandBuffers.resize(BVK_MAX_FRAMES_IN_FLIGHT);
+	m_command_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT);
 
-	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		vk::CommandBufferAllocateInfo cmdBufferAllocInfo {
-			m_Device->GetCmdPool(i),          // commandPool
-			vk::CommandBufferLevel::ePrimary, // level
-			1u,                               // commandBufferCount
-		};
-
-		m_CommandBuffers[i] = m_Device->logical.allocateCommandBuffers(cmdBufferAllocInfo)[0];
+		m_command_buffers[i] = m_device->logical.allocateCommandBuffers({
+		    m_device->get_cmd_pool(i),
+		    vk::CommandBufferLevel::ePrimary,
+		    1u,
+		})[0];
 	}
 }
 
-void Renderer::BuildRenderGraph(RenderGraph::BuildInfo buildInfo)
+void Renderer::build_render_graph(
+    std::string backbuffer_name,
+    std::vector<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
+    std::vector<Renderpass::CreateInfo> renderpasses,
+    void (*on_update)(Device*, RenderGraph*, u32, void*),
+    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
+    vk::DebugUtilsLabelEXT graph_update_debug_label,
+    vk::DebugUtilsLabelEXT graph_backbuffer_barrier_debug_label
+)
 {
-	m_RenderGraph.Init({
-	    .device              = m_Device,
-	    .descriptorPool      = m_DescriptorPool,
-	    .swapchainImages     = m_SwapchainImages,
-	    .swapchainImageViews = m_SwapchainImageViews,
-	});
-
-	m_RenderGraph.Build(buildInfo);
+	m_render_graph.init(m_device, m_descriptor_pool, m_swapchain_images, m_swapchain_image_views);
+	m_render_graph.build(
+	    backbuffer_name,
+	    buffer_inputs,
+	    renderpasses,
+	    on_update,
+	    on_begin_frame,
+	    graph_update_debug_label,
+	    graph_backbuffer_barrier_debug_label
+	);
 }
 
-void Renderer::BeginFrame(void* userPointer)
+void Renderer::begin_frame(void* userPointer)
 {
-	m_RenderGraph.BeginFrame({
-	    .graph       = &m_RenderGraph,
-	    .pass        = nullptr,
-	    .userPointer = userPointer,
-
-	    .device = m_Device,
-	    .cmd    = {},
-
-	    .imageIndex = {},
-	    .frameIndex = m_CurrentFrame,
-	});
+	m_render_graph.begin_frame(m_current_frame, userPointer);
 }
 
-void Renderer::EndFrame(void* userPointer)
+void Renderer::end_frame(void* userPointer)
 {
-	if (m_SwapchainInvalidated)
-		return;
-
-	BVK_ASSERT(m_Device->logical.waitForFences(1u, &m_RenderFences[m_CurrentFrame], VK_TRUE, UINT64_MAX));
-	BVK_ASSERT(m_Device->logical.resetFences(1u, &m_RenderFences[m_CurrentFrame]));
-
-	uint32_t imageIndex;
-	vk::Result result = m_Device->logical.acquireNextImageKHR(m_Swapchain, UINT64_MAX, m_RenderSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &imageIndex);
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
+	if (m_is_swapchain_invalid)
 	{
-		m_Device->logical.waitIdle();
-		m_SwapchainInvalidated = true;
+		return;
+	}
+
+	// Wait for frame's fence
+	auto render_fence = m_render_fences[m_current_frame];
+	BVK_ASSERT(m_device->logical.waitForFences(render_fence, VK_TRUE, UINT64_MAX));
+	m_device->logical.resetFences(render_fence);
+
+
+	// Aquire next swapchain image
+	auto render_semaphore = m_render_semaphores[m_current_frame];
+	auto [result, image_index] =
+	    m_device->logical
+	        .acquireNextImageKHR(m_swapchain, UINT64_MAX, render_semaphore, VK_NULL_HANDLE);
+
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR
+	    || m_is_swapchain_invalid) [[unlikely]]
+	{
+		m_device->logical.waitIdle();
+		m_is_swapchain_invalid = true;
 		return;
 	}
 	else
 	{
-		BVK_ASSERT(result != vk::Result::eSuccess, "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or VK_SUBOPTIMAL_KHR");
+		BVK_ASSERT(
+		    result != vk::Result::eSuccess,
+		    "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or "
+		    "VK_SUBOPTIMAL_KHR"
+		);
 	}
 
-	static uint32_t counter = 0u;
+	// Draw scene
+	auto cmd = m_command_buffers[m_current_frame];
+	m_device->logical.resetCommandPool(m_device->get_cmd_pool(m_current_frame));
+	m_render_graph.end_frame(cmd, m_current_frame, image_index, userPointer);
 
-	m_Device->logical.resetCommandPool(m_Device->GetCmdPool(m_CurrentFrame));
-	auto cmd = m_CommandBuffers[m_CurrentFrame];
+	// Submit & present
+	auto present_semaphore = m_present_semaphores[m_current_frame];
+	submit_queue(render_semaphore, present_semaphore, render_fence, cmd);
+	present_frame(m_present_semaphores[m_current_frame], image_index);
 
-	m_RenderGraph.EndFrame({
-	    .graph       = &m_RenderGraph,
-	    .pass        = nullptr,
-	    .userPointer = userPointer,
-
-	    .device = m_Device,
-	    .cmd    = cmd,
-
-	    .imageIndex = imageIndex,
-	    .frameIndex = m_CurrentFrame,
-	});
-
-	counter++;
-
-	SubmitQueue(m_RenderSemaphores[m_CurrentFrame], m_PresentSemaphores[m_CurrentFrame], m_RenderFences[m_CurrentFrame], cmd);
-	PresentFrame(m_PresentSemaphores[m_CurrentFrame], imageIndex);
-
-	m_CurrentFrame = (m_CurrentFrame + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
+	// ++
+	m_current_frame = (m_current_frame + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::SubmitQueue(vk::Semaphore waitSemaphore, vk::Semaphore signalSemaphore, vk::Fence signalFence, vk::CommandBuffer cmd)
+void Renderer::submit_queue(
+    vk::Semaphore wait_semaphore,
+    vk::Semaphore signal_semaphore,
+    vk::Fence signal_fence,
+    vk::CommandBuffer cmd
+)
 {
 	cmd.end();
 
-	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	vk::SubmitInfo submitInfo {
-		1u,               // waitSemaphoreCount
-		&waitSemaphore,   // pWaitSemaphores
-		&waitStage,       // pWaitDstStageMask
-		1u,               // commandBufferCount
-		&cmd,             // pCommandBuffers
-		1u,               // signalSemaphoreCount
-		&signalSemaphore, // pSignalSemaphores
-	};
-
-	BVK_ASSERT(m_Device->graphicsQueue.submit(1u, &submitInfo, signalFence));
+	vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	m_device->graphics_queue.submit(
+	    vk::SubmitInfo {
+	        wait_semaphore,
+	        wait_stage,
+	        cmd,
+	        signal_semaphore,
+	    },
+	    signal_fence
+	);
 }
 
-void Renderer::PresentFrame(vk::Semaphore waitSemaphore, uint32_t imageIndex)
+void Renderer::present_frame(vk::Semaphore wait_semaphore, u32 image_index)
 {
-	vk::PresentInfoKHR presentInfo {
-		1u,             // waitSemaphoreCount
-		&waitSemaphore, // pWaitSemaphores
-		1u,             // swapchainCount
-		&m_Swapchain,   // pSwapchains
-		&imageIndex,    // pImageIndices
-		nullptr         // pResults
-	};
-
 	try
 	{
-		vk::Result result = m_Device->presentQueue.presentKHR(presentInfo);
-		if (result == vk::Result::eSuboptimalKHR || m_SwapchainInvalidated)
+		vk::Result result = m_device->present_queue.presentKHR({
+		    wait_semaphore,
+		    m_swapchain,
+		    image_index,
+		});
+
+		if (result == vk::Result::eSuboptimalKHR || m_is_swapchain_invalid)
 		{
-			m_Device->logical.waitIdle();
-			m_SwapchainInvalidated = true;
+			m_device->logical.waitIdle();
+			m_is_swapchain_invalid = true;
 			return;
 		}
 	}
-	catch (vk::OutOfDateKHRError err) // OutOfDateKHR is not considered a success value and throws an error (presentKHR)
+	// OutOfDateKHR is not considered a success value and throws an error (presentKHR)
+	catch (vk::OutOfDateKHRError err)
 	{
-		m_Device->logical.waitIdle();
-		m_SwapchainInvalidated = true;
+		m_device->logical.waitIdle();
+		m_is_swapchain_invalid = true;
 		return;
 	}
 }

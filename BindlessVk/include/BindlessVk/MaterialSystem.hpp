@@ -10,93 +10,53 @@ namespace BINDLESSVK_NAMESPACE {
 
 struct PipelineConfiguration
 {
-	struct CreateInfo
-	{
-		const char* name;
+	vk::PipelineVertexInputStateCreateInfo vertex_input_state;
+	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state;
+	vk::PipelineTessellationStateCreateInfo tesselation_state;
+	vk::PipelineViewportStateCreateInfo viewport_state;
+	vk::PipelineRasterizationStateCreateInfo rasterization_state;
+	vk::PipelineMultisampleStateCreateInfo multisample_state;
+	vk::PipelineDepthStencilStateCreateInfo depth_stencil_state;
 
-		vk::PipelineVertexInputStateCreateInfo vertexInputState;
-		vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState;
-		vk::PipelineTessellationStateCreateInfo tessellationState;
-		vk::PipelineViewportStateCreateInfo viewportState;
-		vk::PipelineRasterizationStateCreateInfo rasterizationState;
-		vk::PipelineMultisampleStateCreateInfo multisampleState;
-		vk::PipelineDepthStencilStateCreateInfo depthStencilState;
+	std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
+	vk::PipelineColorBlendStateCreateInfo color_blend_state;
 
-		std::vector<vk::PipelineColorBlendAttachmentState> colorBlendAttachments;
-		vk::PipelineColorBlendStateCreateInfo colorBlendState;
-
-		std::vector<vk::DynamicState> dynamicStates;
-	};
-
-	vk::PipelineVertexInputStateCreateInfo vertexInputState;
-	vk::PipelineInputAssemblyStateCreateInfo inputAssemblyState;
-	vk::PipelineTessellationStateCreateInfo tessellationState;
-	vk::PipelineViewportStateCreateInfo viewportState;
-	vk::PipelineRasterizationStateCreateInfo rasterizationState;
-	vk::PipelineMultisampleStateCreateInfo multisampleState;
-	vk::PipelineDepthStencilStateCreateInfo depthStencilState;
-
-	std::vector<vk::PipelineColorBlendAttachmentState> colorBlendAttachments;
-	vk::PipelineColorBlendStateCreateInfo colorBlendState;
-
-	std::vector<vk::DynamicState> dynamicStates;
-	vk::PipelineDynamicStateCreateInfo dynamicState;
+	std::vector<vk::DynamicState> dynamic_states;
+	vk::PipelineDynamicStateCreateInfo dynamic_state;
 };
 
 /// @todo
 struct MaterialParameters
 {
-	glm::vec4 baseColorFactor;
-	glm::vec4 emissiveFactor;
-	glm::vec4 diffuseFactor;
-	glm::vec4 specularFactor;
-	float metallicFactor;
-	float roughnessFactor;
+	glm::vec4 base_color_factor;
+	glm::vec4 emissive_factor;
+	glm::vec4 diffuse_factor;
+	glm::vec4 specular_factor;
+	float metallic_factor;
+	float roughness_factor;
 };
 
-/// @brief A vulkan shader module & it's code, for building ShaderEffects
+/** @brief A vulkan shader module & it's code, for building ShaderEffects */
 struct Shader
 {
-	struct CreateInfo
-	{
-		const char* name;
-		const char* path;
-		vk::ShaderStageFlagBits stage;
-	};
-
 	vk::ShaderModule module;
 	vk::ShaderStageFlagBits stage;
 	std::vector<uint32_t> code;
 };
 
-/// @brief Shaders and pipeline layout for creating ShaderPasses
-/// usually a pair of vertex and fragment <Shader>s
+/** @brief Shaders and pipeline layout for creating ShaderPasses
+ * usually a pair of vertex and fragment shaders
+ */
 struct ShaderEffect
 {
-	struct CreateInfo
-	{
-		const char* name;
-		std::vector<Shader*> shaders;
-	};
-
 	std::vector<Shader*> shaders;
-
-	vk::PipelineLayout pipelineLayout;
-	std::array<vk::DescriptorSetLayout, 2> setsLayout;
+	vk::PipelineLayout pipeline_layout;
+	std::array<vk::DescriptorSetLayout, 2> sets_layout;
 };
 
 /// @brief Full shader & pipeline state needed for creating a master material
 struct ShaderPass
 {
-	struct CreateInfo
-	{
-		const char* name;
-		ShaderEffect* effect;
-		vk::Format colorAttachmentFormat;
-		vk::Format depthAttachmentFormat;
-		PipelineConfiguration pipelineConfiguration;
-	};
-
 	ShaderEffect* effect;
 	vk::Pipeline pipeline;
 };
@@ -104,68 +64,153 @@ struct ShaderPass
 /// @brief Graphics state needed to render an object during a renderpass
 struct Material
 {
-	struct CreateInfo
-	{
-		const char* name;
-		ShaderPass* shaderPass;
-		MaterialParameters parameters;
-		std::vector<class Texture*> textures;
-	};
-
-	ShaderPass* shaderPass;
+	ShaderPass* shader_pass;
 	MaterialParameters parameters;
-
-	vk::DescriptorSet descriptorSet;
+	vk::DescriptorSet descriptor_set;
 	std::vector<class Texture*> textures;
-
-	uint32_t sortKey;
+	uint32_t sort_key;
 };
 
+/** @brief System for loading/destroying materials
+ * @todo: complete docs
+ * @todo: refactor code
+ */
 class MaterialSystem
 {
 public:
-	struct CreateInfo
-	{
-		Device* device;
-	};
-
-public:
 	MaterialSystem() = default;
 
-	void Init(const MaterialSystem::CreateInfo& info);
+	/** @return shader named @p name */
+	inline Shader* get_shader(const char* name)
+	{
+		return &m_shaders[HashStr(name)];
+	}
 
-	void Reset();
+	/** @return shader effect named @p name */
+	inline ShaderEffect* get_shader_effect(const char* name)
+	{
+		return &m_shader_effects[HashStr(name)];
+	}
 
-	void DestroyAllMaterials();
+	/** @return shader pass named @p name */
+	inline ShaderPass* get_shader_pass(const char* name)
+	{
+		return &m_shader_passes[HashStr(name)];
+	}
 
-	inline Shader* GetShader(const char* name) { return &m_Shaders[HashStr(name)]; }
-	inline ShaderEffect* GetShaderEffect(const char* name) { return &m_ShaderEffects[HashStr(name)]; }
-	inline ShaderPass* GetShaderPass(const char* name) { return &m_ShaderPasses[HashStr(name)]; }
-	inline Material* GetMaterial(const char* name) { return &m_Materials[HashStr(name)]; }
+	/** @return material named @p name */
+	inline Material* get_material(const char* name)
+	{
+		return &m_materials[HashStr(name)];
+	}
 
-	inline const PipelineConfiguration& GetPipelineConfiguration(const char* name) const { return m_PipelineConfigurations.at(HashStr(name)); }
+	/** @return pipeline configuration named @p name */
+	inline const PipelineConfiguration& get_pipeline_configuration( // Nvr-gnna-gv-u-up
+	  const char* name
+	) const
+	{
+		return m_pipeline_configurations.at(HashStr(name));
+	}
 
-	void LoadShader(const Shader::CreateInfo& info);
+	/** Initializes the material system
+	 * @param device the bindlessvk device
+	 */
+	void init(Device* device);
 
-	void CreatePipelineConfiguration(const PipelineConfiguration::CreateInfo& info);
+	/** Destroys the material system */
+	void reset();
 
-	void CreateShaderEffect(const ShaderEffect::CreateInfo& info);
+	/** Destroys all pipelines and resets the descriptor pool  */
+	void destroy_all_materials();
 
-	void CreateShaderPass(const ShaderPass::CreateInfo& info);
+	/** Loads compiled shader named @p name from @p path
+	 * @param name name of the shader
+	 * @param path path to the compiled shader
+	 * @param stage shader stage (eg. vertex)
+	 */
+	void load_shader(
+	  const char* name,
+	  const char* path,
+	  vk::ShaderStageFlagBits stage
+	);
 
-	void CreateMaterial(const Material::CreateInfo& info);
+	/** Caches pipeline states for future pipeline creation (used in shader pass)
+	 * @param name name of the pipeline configuration
+	 * @param vertex_input_state vulkan pipeline's vertex input state
+	 * @param input_assembly_state vulkan pipeline's input assembly state
+	 * @param viewport_state vulkan pipeline's viewport state
+	 * @param rasterization_state vulkan pipeilne's rasterization state
+	 * @param multisample_state vulkan pipeline's multi-sample state
+	 * @param depth_stencil_state vulkan pipeline's depth-stencil state
+	 * @param color_blend_attachments vulkan pipeline's color-blend attachments
+	 * @param color_blend_state vulkan pipeline's color blend state
+	 * @param dynamic_states vulkan dynamic pipeline's states, usually viewports &
+	 * scissors
+	 */
+	void create_pipeline_configuration(
+	  const char* name,
+	  vk::PipelineVertexInputStateCreateInfo vertex_input_state,
+	  vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
+	  vk::PipelineTessellationStateCreateInfo tessellation_state,
+	  vk::PipelineViewportStateCreateInfo viewport_state,
+	  vk::PipelineRasterizationStateCreateInfo rasterization_state,
+	  vk::PipelineMultisampleStateCreateInfo multisample_state,
+	  vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
+	  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
+	  vk::PipelineColorBlendStateCreateInfo color_blend_state,
+	  std::vector<vk::DynamicState> dynamic_states
+	);
+
+	/** Creates shader effect named @p name
+	 * @param name name of the shader effect
+	 * @param shaders shader programs making up the effect
+	 */
+	void create_shader_effect(const char* name, std::vector<Shader*> shaders);
+
+	/** Creates shader pass named @p name, vulkan graphics pipeline is created
+	 * here
+	 * @param name name of the shader pass
+	 * @param effect shader effect of the pass
+	 * @param color_attachment_format format of the color attachment of shader
+	 * pass
+	 * @param depth_attachment_format format of the depth attachment of shader
+	 * pass
+	 * @param pipeline_configuration vulkan pipeline states
+	 */
+	void create_shader_pass(
+	  const char* name,
+	  ShaderEffect* effect,
+	  vk::Format color_attachment_format,
+	  vk::Format depth_attachment_format,
+	  PipelineConfiguration pipeline_configuration
+	);
+
+	/** Creates material named @p name shader_pass
+	 * @param name name of the material
+	 * @param shader_pass the shader pass used in the material
+	 * @param parameters inital material parameters
+	 * @param textures textures used in the material
+	 */
+	void create_material(
+	  const char* name,
+	  ShaderPass* shader_pass,
+	  MaterialParameters parameters,
+	  std::vector<class Texture*> textures
+	);
+
 
 private:
-	Device* m_Device;
-	vk::DescriptorPool m_DescriptorPool = {};
+	Device* m_device;
+	vk::DescriptorPool m_descriptor_pool = {};
 
-	std::unordered_map<uint64_t, Shader> m_Shaders             = {};
-	std::unordered_map<uint64_t, ShaderEffect> m_ShaderEffects = {};
-	std::unordered_map<uint64_t, ShaderPass> m_ShaderPasses    = {};
+	std::unordered_map<uint64_t, Shader> m_shaders              = {};
+	std::unordered_map<uint64_t, ShaderEffect> m_shader_effects = {};
+	std::unordered_map<uint64_t, ShaderPass> m_shader_passes    = {};
 
-	std::unordered_map<uint64_t, PipelineConfiguration> m_PipelineConfigurations = {};
+	std::unordered_map<uint64_t, PipelineConfiguration>
+	  m_pipeline_configurations = {};
 
-	std::unordered_map<uint64_t, Material> m_Materials = {};
+	std::unordered_map<uint64_t, Material> m_materials = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

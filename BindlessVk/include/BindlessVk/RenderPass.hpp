@@ -8,7 +8,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-struct RenderPass
+struct Renderpass
 {
 	struct CreateInfo
 	{
@@ -26,14 +26,14 @@ struct RenderPass
 		{
 			std::string name;
 			glm::vec2 size;
-			SizeType sizeType;
+			SizeType size_type;
 			vk::Format format;
 			vk::SampleCountFlagBits samples;
 
 			std::string input;
-			std::string sizeRelativeName;
+			std::string size_relative_name;
 
-			vk::ClearValue clearValue;
+			vk::ClearValue clear_value;
 		};
 
 		struct TextureInputInfo
@@ -42,9 +42,9 @@ struct RenderPass
 			uint32_t binding;
 			uint32_t count;
 			vk::DescriptorType type;
-			vk::ShaderStageFlagBits stageMask;
+			vk::ShaderStageFlagBits stage_mask;
 
-			class Texture* defaultTexture;
+			class Texture* default_texture;
 		};
 
 		struct BufferInputInfo
@@ -53,57 +53,83 @@ struct RenderPass
 			uint32_t binding;
 			uint32_t count;
 			vk::DescriptorType type;
-			vk::ShaderStageFlagBits stageMask;
+			vk::ShaderStageFlagBits stage_mask;
 
 			size_t size;
-			void* initialData;
+			void* initial_data;
 		};
 
 		std::string name;
 
-		std::function<void(const RenderContext& context)> onUpdate;
-		std::function<void(const RenderContext& context)> onRender;
-		std::function<void(const RenderContext& context)> onBeginFrame;
+		void (*on_begin_frame)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
+		void (*on_update)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
 
-		std::vector<CreateInfo::AttachmentInfo> colorAttachmentInfos;
-		CreateInfo::AttachmentInfo depthStencilAttachmentInfo;
+		void (*on_render
+		)(Device*,
+		  class RenderGraph*,
+		  Renderpass*,
+		  vk::CommandBuffer cmd,
+		  uint32_t,
+		  uint32_t,
+		  void*);
 
-		std::vector<CreateInfo::TextureInputInfo> textureInputInfos;
-		std::vector<CreateInfo::BufferInputInfo> bufferInputInfos;
+		vec<CreateInfo::AttachmentInfo> color_attachments_info;
+		CreateInfo::AttachmentInfo depth_stencil_attachment_info;
 
-		void* userPointer;
+		vec<CreateInfo::TextureInputInfo> texture_inputs_info;
+		vec<CreateInfo::BufferInputInfo> buffer_inputs_info;
+
+		void* user_pointer;
+
+		vk::DebugUtilsLabelEXT update_debug_label;
+		vk::DebugUtilsLabelEXT barrier_debug_label;
+		vk::DebugUtilsLabelEXT render_debug_label;
 	};
 
 	struct Attachment
 	{
-		vk::PipelineStageFlags stageMask;
-		vk::AccessFlags accessMask;
+		vk::PipelineStageFlags stage_mask;
+		vk::AccessFlags access_mask;
 		vk::ImageLayout layout;
-		vk::ImageSubresourceRange subresourceRange;
+		vk::ImageSubresourceRange subresource_range;
 
-		vk::AttachmentLoadOp loadOp;
-		vk::AttachmentStoreOp storeOp;
+		vk::AttachmentLoadOp load_op;
+		vk::AttachmentStoreOp store_op;
 
-		uint32_t resourceIndex;
+		uint32_t resource_index;
 
-		vk::ClearValue clearValue;
+		vk::ClearValue clear_value;
 	};
 
 	std::string name;
 
-	std::vector<Attachment> attachments;
+	vec<Attachment> attachments;
 
-	std::unordered_map<uint64_t, class Buffer*> bufferInputs;
+	std::unordered_map<uint64_t, class Buffer*> buffer_inputs;
 
-	std::vector<vk::DescriptorSet> descriptorSets;
-	vk::DescriptorSetLayout descriptorSetLayout;
-	vk::PipelineLayout pipelineLayout;
+	vec<vk::DescriptorSet> descriptor_sets;
+	vk::DescriptorSetLayout descriptor_set_layout;
+	vk::PipelineLayout pipeline_layout;
 
-	std::function<void(const RenderContext& context)> onRender;
-	std::function<void(const RenderContext& context)> onUpdate;
-	std::function<void(const RenderContext& context)> onBeginFrame;
+	void (*on_begin_frame)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
+	void (*on_update)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
 
-	void* userPointer;
+	void (*on_render
+	)(Device*, class RenderGraph*, Renderpass*, vk::CommandBuffer cmd, uint32_t, uint32_t, void*);
+
+
+	vec<vk::Format> color_attachments_format;
+	vk::Format depth_attachment_format;
+
+	vk::CommandBufferInheritanceRenderingInfo cmd_buffer_inheritance_rendering_info;
+	vk::CommandBufferInheritanceInfo cmd_buffer_inheritance_info;
+	vk::CommandBufferBeginInfo cmd_buffer_begin_info;
+
+	void* user_pointer;
+
+	vk::DebugUtilsLabelEXT update_debug_label;
+	vk::DebugUtilsLabelEXT barrier_debug_label;
+	vk::DebugUtilsLabelEXT render_debug_label;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

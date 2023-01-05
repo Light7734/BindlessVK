@@ -2,11 +2,11 @@
 # Core
 Language: Cpp
 Standard: Cpp11
-ColumnLimit: '0' # No limit
+ColumnLimit: '100' # No limit
 
 # Bin pack
-BinPackArguments: 'true'
-BinPackParameters: 'true'
+BinPackArguments: 'false'
+BinPackParameters: 'false'
 
 # Includes
 SortIncludes: 'true'
@@ -42,7 +42,7 @@ BreakBeforeBraces: Custom
 BraceWrapping:
     AfterCaseLabel: true
     AfterClass: true
-    AfterControlStatement: true
+    AfterControlStatement: false
     AfterEnum: true
     AfterFunction: true
     AfterNamespace: false
@@ -59,15 +59,15 @@ BraceWrapping:
 
 # Indentation
 UseTab: ForIndentation
-TabWidth: '4'
-IndentWidth: '4'
-ContinuationIndentWidth: '4'
-ConstructorInitializerIndentWidth: '4'
+TabWidth: '2'
+IndentWidth: '2'
+ContinuationIndentWidth: '2'
+ConstructorInitializerIndentWidth: '2'
 IndentCaseLabels: 'false'
 IndentWrappedFunctionNames: 'true'
 IndentPPDirectives: BeforeHash
 NamespaceIndentation: None
-AccessModifierOffset: '-4'
+AccessModifierOffset: '-2'
 
 # Space
 SpaceAfterCStyleCast: 'false'
@@ -90,8 +90,8 @@ SpacesInSquareBrackets: 'false'
 # Alignment 
 PointerAlignment: Left
 DerivePointerAlignment: 'false'
-AlignAfterOpenBracket: Align
 AlignEscapedNewlines: Left
+AlignAfterOpenBracket: BlockIndent
 AlignConsecutiveDeclarations: 'false'
 AlignConsecutiveAssignments: 'true'
 AlignConsecutiveMacros: 'true'
@@ -100,7 +100,7 @@ AlignTrailingComments: 'true'
 
 # Single Line 
 AllowShortCaseLabelsOnASingleLine: 'true'
-AllowShortFunctionsOnASingleLine: Inline
+AllowShortFunctionsOnASingleLine: 'false'
 AllowShortLambdasOnASingleLine: Inline
 AllowAllArgumentsOnNextLine: 'false'
 AllowShortLoopsOnASingleLine: 'false'
@@ -112,19 +112,19 @@ AllowShortIfStatementsOnASingleLine: Never
 AlwaysBreakAfterReturnType: None
 AlwaysBreakBeforeMultilineStrings: 'false'
 AlwaysBreakTemplateDeclarations: 'Yes'
-BreakBeforeBinaryOperators: None
+BreakBeforeBinaryOperators: All
 BreakBeforeTernaryOperators: 'false'
 BreakInheritanceList: BeforeComma
 BreakStringLiterals: 'false'
 
 # Penalties
-PenaltyBreakAssignment: '0'
+PenaltyBreakAssignment: '99999'
 PenaltyBreakBeforeFirstCallParameter: '0'
 PenaltyBreakComment: '0'
 PenaltyBreakFirstLessLess: '0'
 PenaltyBreakString: '0'
 PenaltyBreakTemplateDeclaration: '0'
-PenaltyExcessCharacter: '0'
+PenaltyExcessCharacter: '999999999'
 PenaltyReturnTypeOnItsOwnLine: '999999999' # Nope
 
 # Constructor Initializers
@@ -133,7 +133,7 @@ AllowAllConstructorInitializersOnNextLine: 'false'
 BreakConstructorInitializers: BeforeComma
 
 # Comments
-ReflowComments: 'false'
+ReflowComments: 'true'
 CommentPragmas: '^ TODO@:'
 FixNamespaceComments: 'true'
 
@@ -142,3 +142,8 @@ Cpp11BracedListStyle: 'false'
 SortUsingDeclarations: 'true'
 KeepEmptyLinesAtTheStartOfBlocks: 'false'
 MaxEmptyLinesToKeep: '2'
+
+
+ExperimentalAutoDetectBinPacking: false
+AllowAllParametersOfDeclarationOnNextLine: false
+

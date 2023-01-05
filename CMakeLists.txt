@@ -18,7 +18,6 @@ add_subdirectory(Vendor/)
 add_subdirectory(AssetBaker/)
 add_subdirectory(AssetParser/)
 add_subdirectory(BindlessVk/)
-add_subdirectory(Framework/)
 add_subdirectory(Examples/)
 
 set(CMAKE_BUILD_TYPE DEBUG)

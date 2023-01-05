@@ -9,6 +9,7 @@ add_subdirectory(./nlohmann/)
 add_subdirectory(./spirv-reflect/)
 add_subdirectory(./spdlog)
 add_subdirectory(./tinygltf)
+add_subdirectory(./fmt)
 
 # Configuration files
 configure_file(${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h ${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h)

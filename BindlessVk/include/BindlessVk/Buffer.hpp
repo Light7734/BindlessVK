@@ -8,80 +8,90 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-struct BufferCreateInfo
-{
-	const char* name;
-
-	Device* device;
-	vk::BufferUsageFlags usage;
-
-	vk::DeviceSize minBlockSize;
-	uint32_t blockCount;
-
-	const void* initialData = {};
-};
-
 class Buffer
 {
 public:
-	Buffer(BufferCreateInfo& info);
+	Buffer(
+	  const char* name,
+	  Device* device,
+	  vk::BufferUsageFlags usage,
+	  vk::DeviceSize min_block_size,
+	  uint32_t block_count,
+	  const void* initial_data = {}
+	);
+
 	~Buffer();
 
-	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
-
-	inline vk::DescriptorBufferInfo* GetDescriptorInfo()
+	inline vk::Buffer* get_buffer()
 	{
-		return &m_DescriptorInfo;
+		return &m_buffer.buffer;
 	}
 
-	inline vk::DeviceSize GetBlockSize() const
+	inline vk::DescriptorBufferInfo* get_descriptor_info()
 	{
-		return m_BlockSize;
+		return &m_descriptor_info;
 	}
 
-	inline vk::DeviceSize GetWholeSize() const
+	inline vk::DeviceSize get_block_size() const
 	{
-		return m_WholeSize;
+		return m_block_size;
 	}
 
-	inline vk::DeviceSize GetValidBlockSize() const
+	inline vk::DeviceSize get_whole_size() const
 	{
-		return m_MinBlockSize;
+		return m_whole_size;
 	}
 
-	void* MapBlock(uint32_t blockIndex);
+	inline vk::DeviceSize get_valid_block_size() const
+	{
+		return m_min_block_size;
+	}
 
-	void Unmap();
+	void* map_block(uint32_t block_index);
+
+	void unmap();
 
 private:
-	Device* m_Device = {};
+	Device* m_device = {};
 
-	vk::DescriptorBufferInfo m_DescriptorInfo = {};
+	vk::DescriptorBufferInfo m_descriptor_info = {};
 
-	AllocatedBuffer m_Buffer = {};
+	AllocatedBuffer m_buffer = {};
 
-	uint32_t m_BlockCount = {};
+	uint32_t m_block_count = {};
 
-	vk::DeviceSize m_BlockSize    = {};
-	vk::DeviceSize m_WholeSize    = {};
-	vk::DeviceSize m_MinBlockSize = {};
+	vk::DeviceSize m_block_size     = {};
+	vk::DeviceSize m_whole_size     = {};
+	vk::DeviceSize m_min_block_size = {};
 };
 
 // @todo: Merge 2 buffer classes into 1
 class StagingBuffer
 {
 public:
+	StagingBuffer(
+	  const char* name,
+	  Device* device,
+	  vk::BufferUsageFlags usage,
+	  vk::DeviceSize min_block_size,
+	  uint32_t block_count,
+	  const void* initial_data = {}
+	);
+
 	StagingBuffer() = default;
-	StagingBuffer(const BufferCreateInfo& createInfo);
+
 	~StagingBuffer();
 
-	inline vk::Buffer* GetBuffer() { return &m_Buffer.buffer; }
+	inline vk::Buffer* get_buffer()
+	{
+		return &m_buffer.buffer;
+	}
 
 private:
-	Device* m_Device = {};
+	Device* m_device = {};
 
-	AllocatedBuffer m_Buffer        = {};
-	AllocatedBuffer m_StagingBuffer = {};
+	AllocatedBuffer m_buffer         = {};
+	AllocatedBuffer m_staging_buffer = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

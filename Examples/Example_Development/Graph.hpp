@@ -17,28 +17,36 @@ struct CameraData
 // @todo:
 struct SceneData
 {
-	glm::vec4 lightPos;
+	glm::vec4 light_pos;
 };
 
-inline void RenderGraphUpdate(const bvk::RenderContext& context)
+inline void render_graph_update(
+  bvk::Device* device,
+  bvk::RenderGraph* render_graph,
+  uint32_t frame_index,
+  void* user_pointer
+)
 {
-	Scene* scene = (Scene*)context.userPointer;
+	Scene* scene = (Scene*)user_pointer;
 
-	scene->group(entt::get<TransformComponent, CameraComponent>).each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-		*(CameraData*)context.graph->MapDescriptorBuffer("frame_data", context.frameIndex) = {
-			.projection = cameraComp.GetProjection(),
-			.view       = cameraComp.GetView(transformComp.translation),
-			.viewPos    = glm::vec4(transformComp.translation, 1.0f),
-		};
-		context.graph->UnMapDescriptorBuffer("frame_data");
-	});
+	scene->group(entt::get<TransformComponent, CameraComponent>)
+	  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
+		  *(CameraData*)render_graph->map_descriptor_buffer("frame_data", frame_index) = {
+			  .projection = cameraComp.GetProjection(),
+			  .view       = cameraComp.GetView(transformComp.translation),
+			  .viewPos    = glm::vec4(transformComp.translation, 1.0f),
+		  };
+		  render_graph->unmap_descriptor_buffer("frame_data");
+	  });
 
-	scene->group(entt::get<TransformComponent, LightComponent>).each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
-		SceneData* sceneData = (SceneData*)context.graph->MapDescriptorBuffer("scene_data", context.frameIndex);
+	scene->group(entt::get<TransformComponent, LightComponent>)
+	  .each([&](TransformComponent& trasnformComp, LightComponent& lightComp) {
+		  SceneData* sceneData = (SceneData*)
+		                           render_graph->map_descriptor_buffer("scene_data", frame_index);
 
-		sceneData[0] = {
-			.lightPos = glm::vec4(trasnformComp.translation, 1.0f),
-		};
-		context.graph->UnMapDescriptorBuffer("scene_data");
-	});
+		  sceneData[0] = {
+			  .light_pos = glm::vec4(trasnformComp.translation, 1.0f),
+		  };
+		  render_graph->unmap_descriptor_buffer("scene_data");
+	  });
 }

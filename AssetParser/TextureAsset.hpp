@@ -13,16 +13,21 @@ enum class TextureFormat
 struct TextureInfo
 {
 	size_t size;
-	CompressionMode compressionMode;
+	CompressionMode compression_mode;
 	TextureFormat format;
-	uint32_t pixelsSize[3];
-	std::string originalFile;
+	uint32_t pixel_size[3];
+	std::string original_file;
 };
 
-TextureInfo ReadTextureInfo(AssetFile* file);
+TextureInfo read_texture_info(AssetFile* file);
 
-void UnpackTexture(TextureInfo* info, const void* sourceBuffer, size_t sourceSize, void* destination);
+void unpack_texture(
+  TextureInfo* info,
+  const void* source_buffer,
+  size_t source_size,
+  void* destination
+);
 
-AssetFile PackTexture(TextureInfo* info, void* pixelData);
+AssetFile pack_texture(TextureInfo* info, void* pixel_data);
 
 } // namespace Assets
