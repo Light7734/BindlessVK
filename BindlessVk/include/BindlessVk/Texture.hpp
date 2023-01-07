@@ -59,13 +59,13 @@ public:
 	 * @param layout final layout of the created texture
 	 */
 	Texture* create_from_buffer(
-	  const std::string& name,
-	  uint8_t* pixels,
-	  int width,
-	  int height,
-	  vk::DeviceSize size,
-	  Texture::Type type,
-	  vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    const std::string& name,
+	    uint8_t* pixels,
+	    int width,
+	    int height,
+	    vk::DeviceSize size,
+	    Texture::Type type,
+	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
 	);
 
 	/** Creates a texture from a tinygltf image
@@ -75,8 +75,8 @@ public:
 	 * @note name of the texture will be @p image->uri
 	 */
 	Texture* create_from_gltf(
-	  struct tinygltf::Image* image,
-	  vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    struct tinygltf::Image* image,
+	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
 	);
 
 	/** Creates a texture from a ktx(khronos texture) file
@@ -86,42 +86,42 @@ public:
 	 * @param layout final layout of the created texture
 	 */
 	Texture* create_from_ktx(
-	  const std::string& name,
-	  const std::string& uri,
-	  Texture::Type type,
-	  vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    const std::string& name,
+	    const std::string& uri,
+	    Texture::Type type,
+	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
 	);
 
 	//** @return texture named @p name */
 	inline Texture* get_texture(const char* name)
 	{
-		return &m_textures[HashStr(name)];
+		return &textures[HashStr(name)];
 	}
 
 private:
 	void blit_iamge(
-	  vk::CommandBuffer cmd,
-	  AllocatedImage image,
-	  uint32_t mip_index,
-	  int32_t& mip_width,
-	  int32_t& mip_height
+	    vk::CommandBuffer cmd,
+	    AllocatedImage image,
+	    uint32_t mip_index,
+	    int32_t& mip_width,
+	    int32_t& mip_height
 	);
 
 	void transition_layout(
-	  Texture& texture,
-	  vk::CommandBuffer cmd_buffer,
-	  uint32_t base_mip_level,
-	  uint32_t level_count,
-	  uint32_t layer_count,
-	  vk::ImageLayout old_layout,
-	  vk::ImageLayout new_layout
+	    Texture& texture,
+	    vk::CommandBuffer cmd_buffer,
+	    uint32_t base_mip_level,
+	    uint32_t level_count,
+	    uint32_t layer_count,
+	    vk::ImageLayout old_layout,
+	    vk::ImageLayout new_layout
 	);
 
 	void copy_buffer_to_image(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
-	Device* m_device                                 = {};
-	std::unordered_map<uint64_t, Texture> m_textures = {};
+	Device* device = {};
+	std::unordered_map<uint64_t, Texture> textures = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

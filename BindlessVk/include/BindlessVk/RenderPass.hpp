@@ -63,7 +63,6 @@ struct Renderpass
 
 		void (*on_begin_frame)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
 		void (*on_update)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
-
 		void (*on_render
 		)(Device*,
 		  class RenderGraph*,

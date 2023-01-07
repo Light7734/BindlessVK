@@ -22,57 +22,57 @@ public:
 public:
 	CameraController() = default;
 
-	CameraController(Scene* scene, Window* window): m_window(window), m_scene(scene)
+	CameraController(Scene* scene, Window* window): window(window), scene(scene)
 	{
 	}
 
 	void update()
 	{
-		double deltaTime = m_delta_timer.elapsed_time();
-		m_delta_timer.reset();
+		double delta_time = delta_timer.elapsed_time();
+		delta_timer.reset();
 
 		// Keyboard input ; Move Around
 		{
-			const float delta_y = glfwGetKey(m_window->get_glfw_handle(), GLFW_KEY_W) ? +1.0f :
-			                      glfwGetKey(m_window->get_glfw_handle(), GLFW_KEY_S) ? -1.0f :
-			                                                                            0.0f;
+			const float delta_y = glfwGetKey(window->get_glfw_handle(), GLFW_KEY_W) ? +1.0f :
+			                      glfwGetKey(window->get_glfw_handle(), GLFW_KEY_S) ? -1.0f :
+			                                                                          0.0f;
 
-			const float delta_x = glfwGetKey(m_window->get_glfw_handle(), GLFW_KEY_D) ? +1.0f :
-			                      glfwGetKey(m_window->get_glfw_handle(), GLFW_KEY_A) ? -1.0f :
-			                                                                            0.0f;
+			const float delta_x = glfwGetKey(window->get_glfw_handle(), GLFW_KEY_D) ? +1.0f :
+			                      glfwGetKey(window->get_glfw_handle(), GLFW_KEY_A) ? -1.0f :
+			                                                                          0.0f;
 
-			move(deltaTime, delta_x, delta_y);
+			move(delta_time, delta_x, delta_y);
 		}
 
 		// Mouse input ; Look around
 		{
 			double mouse_x, mouse_y;
-			glfwGetCursorPos(m_window->get_glfw_handle(), &mouse_x, &mouse_y);
+			glfwGetCursorPos(window->get_glfw_handle(), &mouse_x, &mouse_y);
 
-			if (glfwGetInputMode(m_window->get_glfw_handle(), GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
-				m_last_mouse_x = mouse_x;
-				m_last_mouse_y = mouse_y;
+			if (glfwGetInputMode(window->get_glfw_handle(), GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
+				last_mouse_x = mouse_x;
+				last_mouse_y = mouse_y;
 				return;
 			}
 
-			if (m_last_mouse_x == std::numeric_limits<double>::max()) {
-				m_last_mouse_x = mouse_x;
-				m_last_mouse_y = mouse_y;
+			if (last_mouse_x == std::numeric_limits<double>::max()) {
+				last_mouse_x = mouse_x;
+				last_mouse_y = mouse_y;
 				return;
 			}
 
-			const double delta_x = mouse_x - m_last_mouse_x;
-			const double delta_y = mouse_y - m_last_mouse_y;
+			const double delta_x = mouse_x - last_mouse_x;
+			const double delta_y = mouse_y - last_mouse_y;
 			look(delta_x, delta_y);
 
-			m_last_mouse_x = mouse_x;
-			m_last_mouse_y = mouse_y;
+			last_mouse_x = mouse_x;
+			last_mouse_y = mouse_y;
 		}
 	}
 
 	void on_window_resize(int width, int height)
 	{
-		m_scene->group(entt::get<TransformComponent, CameraComponent>)
+		scene->group(entt::get<TransformComponent, CameraComponent>)
 		  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
 			  cameraComp.width        = width;
 			  cameraComp.aspect_ratio = width / (float)height;
@@ -82,7 +82,7 @@ public:
 private:
 	void move(float delta_time, float delta_x, float delta_y)
 	{
-		m_scene->group(entt::get<TransformComponent, CameraComponent>)
+		scene->group(entt::get<TransformComponent, CameraComponent>)
 		  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
 			  if (delta_x == 0.0 && delta_y == 0.0f) {
 				  return;
@@ -99,7 +99,7 @@ private:
 
 	void look(double delta_x, double delta_y)
 	{
-		m_scene->group(entt::get<TransformComponent, CameraComponent>)
+		scene->group(entt::get<TransformComponent, CameraComponent>)
 		  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
 			  delta_x *= 0.1;
 			  delta_y *= -0.1;
@@ -118,10 +118,10 @@ private:
 	}
 
 private:
-	Window* m_window      = {};
-	Scene* m_scene        = {};
-	double m_last_mouse_x = std::numeric_limits<double>::max();
-	double m_last_mouse_y = std::numeric_limits<double>::max();
+	Window* window      = {};
+	Scene* scene        = {};
+	double last_mouse_x = std::numeric_limits<double>::max();
+	double last_mouse_y = std::numeric_limits<double>::max();
 
-	Timer m_delta_timer = {};
+	Timer delta_timer = {};
 };

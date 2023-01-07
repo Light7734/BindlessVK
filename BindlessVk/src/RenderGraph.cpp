@@ -12,7 +12,7 @@ RenderGraph::RenderGraph()
 
 void RenderGraph::reset()
 {
-	for (auto& resource_container : m_attachment_resources)
+	for (auto& resource_container : attachment_resources)
 	{
 		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
 		{
@@ -21,15 +21,15 @@ void RenderGraph::reset()
 			{
 				for (auto& resource : resource_container.resources)
 				{
-					m_device->logical.destroyImageView(resource.image_view);
-					m_device->allocator.destroyImage(resource.image, resource.image);
+					device->logical.destroyImageView(resource.image_view);
+					device->allocator.destroyImage(resource.image, resource.image);
 				}
 			}
 			resource_container.resources.clear();
 
-			m_device->logical.destroyImageView(resource_container.transient_ms_image_view);
+			device->logical.destroyImageView(resource_container.transient_ms_image_view);
 
-			m_device->allocator.destroyImage(
+			device->allocator.destroyImage(
 			    resource_container.transient_ms_image,
 			    resource_container.transient_ms_image
 			);
@@ -39,20 +39,20 @@ void RenderGraph::reset()
 		}
 	}
 
-	for (const auto& descriptor_set : m_sets)
+	for (const auto& descriptor_set : sets)
 	{
-		m_device->logical.freeDescriptorSets(m_descriptor_pool, descriptor_set);
+		device->logical.freeDescriptorSets(descriptor_pool, descriptor_set);
 	}
 
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		for (u32 j = 0; j < m_device->num_threads; ++j)
+		for (u32 j = 0; j < device->num_threads; ++j)
 		{
-			vk::CommandPool pool = m_device->get_cmd_pool(i, j);
+			vk::CommandPool pool = device->get_cmd_pool(i, j);
 
-			for (u32 k = 0; k < m_renderpasses.size(); ++k)
+			for (u32 k = 0; k < renderpasses.size(); ++k)
 			{
-				m_device->logical.freeCommandBuffers(pool, get_cmd(k, i, j));
+				device->logical.freeCommandBuffers(pool, get_cmd(k, i, j));
 			}
 		}
 	}
@@ -60,26 +60,26 @@ void RenderGraph::reset()
 	// for (vk::CommandBuffer command_buffer : m_secondary_cmd_buffers) {
 	// }
 
-	for (auto& [key, val] : m_buffer_inputs)
+	for (auto& [key, val] : buffer_inputs)
 	{
 		delete val;
 	}
 
-	m_device->logical.destroyPipelineLayout(m_pipeline_layout);
-	m_device->logical.destroyDescriptorSetLayout(m_descriptor_set_layout);
+	device->logical.destroyPipelineLayout(pipeline_layout);
+	device->logical.destroyDescriptorSetLayout(descriptor_set_layout);
 
-	for (auto& pass : m_renderpasses)
+	for (auto& pass : renderpasses)
 	{
 		for (auto& [key, val] : pass.buffer_inputs)
 		{
 			delete val;
 		}
 
-		m_device->logical.destroyDescriptorSetLayout(pass.descriptor_set_layout);
-		m_device->logical.destroyPipelineLayout(pass.pipeline_layout);
+		device->logical.destroyDescriptorSetLayout(pass.descriptor_set_layout);
+		device->logical.destroyPipelineLayout(pass.pipeline_layout);
 		for (auto descriptor_set : pass.descriptor_sets)
 		{
-			m_device->logical.freeDescriptorSets(m_descriptor_pool, descriptor_set);
+			device->logical.freeDescriptorSets(descriptor_pool, descriptor_set);
 		}
 	}
 }
@@ -91,58 +91,55 @@ void RenderGraph::init(
     vec<vk::ImageView> swapchain_image_views
 )
 {
-	m_device = device;
-	m_descriptor_pool = descriptor_pool;
-	m_swapchain_images = swapchain_images;
-	m_swapchain_image_views = swapchain_image_views;
+	this->device = device;
+	this->descriptor_pool = descriptor_pool;
+	this->swapchain_images = swapchain_images;
+	this->swapchain_image_views = swapchain_image_views;
 }
 
 void RenderGraph::build(
     std::string backbuffer_name,
-
     vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
-
     vec<Renderpass::CreateInfo> renderpasses,
-
     void (*on_update)(Device*, RenderGraph*, u32, void*),
     void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
-
     vk::DebugUtilsLabelEXT update_debug_label,
     vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label
 )
 {
 	// Assign graph members
-	m_renderpasses_info = renderpasses;
-	m_buffer_inputs_info = buffer_inputs;
-	m_on_update = on_update ? on_update : [](Device*, RenderGraph*, u32, void*) {
+	this->renderpasses_info = renderpasses;
+	buffer_inputs_info = buffer_inputs;
+	this->on_update = on_update ? on_update : [](Device*, RenderGraph*, u32, void*) {
 	};
 
-	m_on_begin_frame = on_begin_frame ? on_begin_frame : [](Device*, RenderGraph*, u32, void*) {
+	this->on_begin_frame = on_begin_frame ? on_begin_frame : [](Device*, RenderGraph*, u32, void*) {
 	};
 
+	swapchain_attachment_names.push_back(backbuffer_name);
 
-	m_swapchain_attachment_names.push_back(backbuffer_name);
-
-	m_update_debug_label = update_debug_label;
-	m_backbuffer_barrier_debug_label = backbuffer_barrier_debug_label;
+	this->update_debug_label = update_debug_label;
+	this->backbuffer_barrier_debug_label = backbuffer_barrier_debug_label;
 
 	// Assign passes' members
-	m_renderpasses.resize(m_renderpasses_info.size(), Renderpass {});
-	for (u32 i = m_renderpasses_info.size(); i-- > 0;)
+	this->renderpasses.resize(renderpasses_info.size(), Renderpass {});
+	for (u32 i = renderpasses_info.size(); i-- > 0;)
 	{
-		auto& pass = m_renderpasses[i];
-		auto& pass_info = m_renderpasses_info[i];
+		auto& pass = this->renderpasses[i];
+		auto& pass_info = this->renderpasses_info[i];
+		BVK_LOG(LogLvl::eTrace, "{} on begin frame {}", pass.name, !!pass.on_begin_frame);
 
 		pass.name = pass_info.name;
+		BVK_LOG(LogLvl::eTrace, "{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame);
 
 		pass.on_begin_frame = pass_info.on_begin_frame ?
 		                          pass_info.on_begin_frame :
-		                          [](Device*, class RenderGraph*, Renderpass*, uint32_t, void*) {
+		                          [](Device*, class RenderGraph*, Renderpass*, u32, void*) {
 		                          };
 
 		pass.on_update = pass_info.on_update ?
 		                     pass_info.on_update :
-		                     [](Device*, class RenderGraph*, Renderpass*, uint32_t, void*) {
+		                     [](Device*, class RenderGraph*, Renderpass*, u32, void*) {
 		                     };
 
 		pass.on_render = pass_info.on_render ? pass_info.on_render :
@@ -150,26 +147,27 @@ void RenderGraph::build(
 		                                          class RenderGraph*,
 		                                          Renderpass*,
 		                                          vk::CommandBuffer cmd,
-		                                          uint32_t,
-		                                          uint32_t,
+		                                          u32,
+		                                          u32,
 		                                          void*) {
 		                                       };
+
 
 		pass.update_debug_label = pass_info.update_debug_label;
 		pass.barrier_debug_label = pass_info.barrier_debug_label;
 		pass.render_debug_label = pass_info.render_debug_label;
 
-		for (const auto& attachment_info : m_renderpasses_info[i].color_attachments_info)
+		for (const auto& attachment_info : this->renderpasses_info[i].color_attachments_info)
 		{
 			auto it = std::find(
-			    m_swapchain_attachment_names.begin(),
-			    m_swapchain_attachment_names.end(),
+			    swapchain_attachment_names.begin(),
+			    swapchain_attachment_names.end(),
 			    attachment_info.name
 			);
 
-			if (it != m_swapchain_attachment_names.end())
+			if (it != swapchain_attachment_names.end())
 			{
-				m_swapchain_attachment_names.push_back(attachment_info.input);
+				swapchain_attachment_names.push_back(attachment_info.input);
 			}
 		}
 	}
@@ -192,28 +190,27 @@ void RenderGraph::build(
 
 	write_graph_sets();
 	write_passes_sets();
-
 	build_pass_cmd_buffer_begin_infos();
 }
 
 void RenderGraph::create_cmd_buffers()
 {
-	u32 num_pass = m_renderpasses_info.size();
-	m_secondary_cmd_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT * m_device->num_threads * num_pass);
+	u32 num_pass = renderpasses_info.size();
+	secondary_cmd_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT * device->num_threads * num_pass);
 
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		for (u32 j = 0; j < m_device->num_threads; ++j)
+		for (u32 j = 0; j < device->num_threads; ++j)
 		{
 			vk::CommandBufferAllocateInfo cmdBufferallocInfo {
-				m_device->get_cmd_pool(i, j),
+				device->get_cmd_pool(i, j),
 				vk::CommandBufferLevel::eSecondary,
 				num_pass,
 			};
 
-			BVK_ASSERT(m_device->logical.allocateCommandBuffers(
+			BVK_ASSERT(device->logical.allocateCommandBuffers(
 			    &cmdBufferallocInfo,
-			    &m_secondary_cmd_buffers[num_pass * (j + (m_device->num_threads * i))]
+			    &secondary_cmd_buffers[num_pass * (j + (device->num_threads * i))]
 			));
 		}
 	}
@@ -232,10 +229,10 @@ void RenderGraph::reorder_passes()
 
 void RenderGraph::build_attachment_resources()
 {
-	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = m_renderpasses[i];
-		const auto& pass_info = m_renderpasses_info[i];
+		auto& pass = renderpasses[i];
+		const auto& pass_info = renderpasses_info[i];
 
 		for (u32 j = 0; j < pass_info.color_attachments_info.size(); ++j)
 		{
@@ -246,14 +243,14 @@ void RenderGraph::build_attachment_resources()
 			{
 				// Read/writes to a backbuffer resource?
 				auto it = std::find(
-				    m_swapchain_attachment_names.begin(),
-				    m_swapchain_attachment_names.end(),
+				    swapchain_attachment_names.begin(),
+				    swapchain_attachment_names.end(),
 				    color_attachment_info.input
 				);
 
 				create_attachment_resource(
 				    color_attachment_info,
-				    it != m_swapchain_attachment_names.end() ?
+				    it != swapchain_attachment_names.end() ?
 				        AttachmentResourceContainer::Type::ePerImage :
 				        AttachmentResourceContainer::Type::eSingle,
 				    UINT32_MAX
@@ -266,16 +263,16 @@ void RenderGraph::build_attachment_resources()
 				    { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 },
 				    vk::AttachmentLoadOp::eClear,
 				    vk::AttachmentStoreOp::eStore,
-				    static_cast<u32>(m_attachment_resources.size() - 1),
+				    static_cast<u32>(attachment_resources.size() - 1),
 				    color_attachment_info.clear_value,
 				});
 			}
 			// Read-Write ; use existing resource
 			else
 			{
-				for (u32 k = 0; k < m_attachment_resources.size(); ++k)
+				for (u32 k = 0; k < attachment_resources.size(); ++k)
 				{
-					auto& resource_container = m_attachment_resources[k];
+					auto& resource_container = attachment_resources[k];
 					if (resource_container.last_write_name != color_attachment_info.input)
 						continue;
 
@@ -316,8 +313,8 @@ void RenderGraph::build_attachment_resources()
 		if (depth_stencil_attachment_info.input == "")
 		{
 			auto it = std::find(
-			    m_swapchain_attachment_names.begin(),
-			    m_swapchain_attachment_names.end(),
+			    swapchain_attachment_names.begin(),
+			    swapchain_attachment_names.end(),
 			    depth_stencil_attachment_info.input
 			);
 
@@ -342,16 +339,16 @@ void RenderGraph::build_attachment_resources()
 			    },
 			    vk::AttachmentLoadOp::eClear,
 			    vk::AttachmentStoreOp::eStore,
-			    static_cast<u32>(m_attachment_resources.size() - 1u),
+			    static_cast<u32>(attachment_resources.size() - 1u),
 			    depth_stencil_attachment_info.clear_value,
 			});
 		}
 		// Read-Write ; use existing resource
 		else
 		{
-			for (u32 k = 0; k < m_attachment_resources.size(); ++k)
+			for (u32 k = 0; k < attachment_resources.size(); ++k)
 			{
-				auto& resource_container = m_attachment_resources[k];
+				auto& resource_container = attachment_resources[k];
 				if (resource_container.last_write_name == depth_stencil_attachment_info.input)
 					continue;
 
@@ -396,13 +393,13 @@ void RenderGraph::build_passes_texture_inputs()
 
 void RenderGraph::build_graph_buffer_inputs()
 {
-	for (auto& buffer_input_info : m_buffer_inputs_info)
+	for (auto& buffer_input_info : buffer_inputs_info)
 	{
-		m_buffer_inputs.emplace(
+		buffer_inputs.emplace(
 		    HashStr(buffer_input_info.name.c_str()),
 		    new Buffer(
 		        buffer_input_info.name.c_str(),
-		        m_device,
+		        device,
 		        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
 		            vk::BufferUsageFlagBits::eUniformBuffer :
 		            vk::BufferUsageFlagBits::eStorageBuffer,
@@ -415,10 +412,10 @@ void RenderGraph::build_graph_buffer_inputs()
 
 void RenderGraph::build_passes_buffer_inputs()
 {
-	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = m_renderpasses[i];
-		const auto& pass_info = m_renderpasses_info[i];
+		auto& pass = renderpasses[i];
+		const auto& pass_info = renderpasses_info[i];
 
 		for (auto& buffer_input_info : pass_info.buffer_inputs_info)
 		{
@@ -426,7 +423,7 @@ void RenderGraph::build_passes_buffer_inputs()
 			    HashStr(buffer_input_info.name.c_str()),
 			    new Buffer(
 			        buffer_input_info.name.c_str(),
-			        m_device,
+			        device,
 			        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
 			            vk::BufferUsageFlagBits::eUniformBuffer :
 			            vk::BufferUsageFlagBits::eStorageBuffer,
@@ -442,7 +439,7 @@ void RenderGraph::build_graph_sets()
 {
 	// Create set & pipeline layout
 	vec<vk::DescriptorSetLayoutBinding> bindings;
-	for (const auto& buffer_input_info : m_buffer_inputs_info)
+	for (const auto& buffer_input_info : buffer_inputs_info)
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding {
 		    buffer_input_info.binding,
@@ -451,25 +448,25 @@ void RenderGraph::build_graph_sets()
 		    buffer_input_info.stage_mask,
 		});
 	}
-	m_descriptor_set_layout = m_device->logical.createDescriptorSetLayout({
+	descriptor_set_layout = device->logical.createDescriptorSetLayout({
 	    {},
 	    static_cast<u32>(bindings.size()),
 	    bindings.data(),
 	});
-	m_pipeline_layout = m_device->logical.createPipelineLayout({ {}, 1, &m_descriptor_set_layout });
+	pipeline_layout = device->logical.createPipelineLayout({ {}, 1, &descriptor_set_layout });
 
 	// Allocate sets
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		m_sets.push_back(m_device->logical.allocateDescriptorSets({
-		    m_descriptor_pool,
+		sets.push_back(device->logical.allocateDescriptorSets({
+		    descriptor_pool,
 		    1,
-		    &m_descriptor_set_layout,
+		    &descriptor_set_layout,
 		})[0]);
 
-		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eDescriptorSet,
-		    (uint64_t)(VkDescriptorSet)m_sets.back(),
+		    (uint64_t)(VkDescriptorSet)sets.back(),
 		    fmt::format("render_graph_descriptor_set_{}", i).c_str(),
 		});
 	}
@@ -477,10 +474,10 @@ void RenderGraph::build_graph_sets()
 
 void RenderGraph::build_passes_sets()
 {
-	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		Renderpass& pass = m_renderpasses[i];
-		const auto& pass_info = m_renderpasses_info[i];
+		auto& pass = renderpasses[i];
+		const auto& pass_info = renderpasses_info[i];
 
 		// Create set & pipeline layout
 		vec<vk::DescriptorSetLayoutBinding> bindings;
@@ -502,29 +499,29 @@ void RenderGraph::build_passes_sets()
 			    texture_input_info.stage_mask,
 			});
 		}
-		pass.descriptor_set_layout = m_device->logical.createDescriptorSetLayout(
+		pass.descriptor_set_layout = device->logical.createDescriptorSetLayout(
 		    { {}, static_cast<u32>(bindings.size()), bindings.data() }
 		);
 		arr<vk::DescriptorSetLayout, 2> layouts {
-			m_descriptor_set_layout,
+			descriptor_set_layout,
 			pass.descriptor_set_layout,
 		};
-		pass.pipeline_layout = m_device->logical.createPipelineLayout({ {}, 2ull, layouts.data() });
+		pass.pipeline_layout = device->logical.createPipelineLayout({ {}, 2ull, layouts.data() });
 
 		// Allocate descriptor sets
 		if (!pass_info.buffer_inputs_info.empty() || !pass_info.texture_inputs_info.empty())
 		{
 			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
 			{
-				auto set = m_device->logical.allocateDescriptorSets({
-				    m_descriptor_pool,
+				auto set = device->logical.allocateDescriptorSets({
+				    descriptor_pool,
 				    1u,
 				    &pass.descriptor_set_layout,
 				})[0];
 
 				pass.descriptor_sets.push_back(set);
 
-				m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+				device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 				    vk::ObjectType::eDescriptorSet,
 				    (uint64_t)(VkDescriptorSet)pass.descriptor_sets.back(),
 				    fmt::format("{}_descriptor_set_{}", pass.name, i).c_str(),
@@ -537,23 +534,23 @@ void RenderGraph::build_passes_sets()
 void RenderGraph::write_graph_sets()
 {
 	vec<vk::DescriptorBufferInfo> buffers_info;
-	buffers_info.reserve(m_buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
-	for (const auto& buffer_input_info : m_buffer_inputs_info)
+	buffers_info.reserve(buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
+	for (const auto& buffer_input_info : buffer_inputs_info)
 	{
 		vec<vk::WriteDescriptorSet> writes;
 
 		for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 		{
 			buffers_info.push_back({
-			    *(m_buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_buffer()),
-			    m_buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size() * i,
-			    m_buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size(),
+			    *(buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_buffer()),
+			    buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size() * i,
+			    buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size(),
 			});
 
 			for (u32 j = 0; j < buffer_input_info.count; ++j)
 			{
 				writes.push_back(vk::WriteDescriptorSet {
-				    m_sets[i],
+				    sets[i],
 				    buffer_input_info.binding,
 				    j,
 				    1u,
@@ -563,19 +560,19 @@ void RenderGraph::write_graph_sets()
 				});
 			}
 		}
-		m_device->logical.updateDescriptorSets(writes.size(), writes.data(), 0u, nullptr);
+		device->logical.updateDescriptorSets(writes.size(), writes.data(), 0u, nullptr);
 
 		// @todo should we wait idle?
-		m_device->logical.waitIdle();
+		device->logical.waitIdle();
 	}
 }
 
 void RenderGraph::write_passes_sets()
 {
-	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		const auto& pass_info = m_renderpasses_info[i];
-		auto& pass = m_renderpasses[i];
+		const auto& pass_info = renderpasses_info[i];
+		auto& pass = renderpasses[i];
 
 		vec<vk::WriteDescriptorSet> set_writes;
 		set_writes.reserve(pass.buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
@@ -633,29 +630,29 @@ void RenderGraph::write_passes_sets()
 			}
 		}
 
-		m_device->logical.updateDescriptorSets(set_writes.size(), set_writes.data(), 0u, nullptr);
+		device->logical.updateDescriptorSets(set_writes.size(), set_writes.data(), 0u, nullptr);
 
 		// @todo should we wait idle?
-		m_device->logical.waitIdle();
+		device->logical.waitIdle();
 	}
 }
 
 
 void RenderGraph::build_pass_cmd_buffer_begin_infos()
 {
-	for (u32 i = 0; i < m_renderpasses_info.size(); ++i)
+	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = m_renderpasses[i];
+		auto& pass = renderpasses[i];
 
 		for (auto& attachment : pass.attachments)
 		{
 			if (attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				pass.color_attachments_format.push_back(m_device->surface_format.format);
+				pass.color_attachments_format.push_back(device->surface_format.format);
 			}
 			else
 			{
-				pass.depth_attachment_format = m_device->depth_format;
+				pass.depth_attachment_format = device->depth_format;
 			}
 		}
 
@@ -666,7 +663,7 @@ void RenderGraph::build_pass_cmd_buffer_begin_infos()
 			pass.color_attachments_format.data(),
 			pass.depth_attachment_format,
 			{},
-			m_sample_count,
+			sample_count,
 			{},
 		};
 
@@ -695,21 +692,21 @@ void RenderGraph::create_attachment_resource(
 {
 	if (recreate_resource_index == UINT32_MAX)
 	{
-		m_attachment_resources.push_back({});
+		attachment_resources.push_back({});
 	}
 
 
-	m_sample_count = attachment_info.samples;
+	sample_count = attachment_info.samples;
 
 	// Set usage & askect masks
 	vk::ImageUsageFlags image_usage_mask;
 	vk::ImageAspectFlags image_aspect_mask;
-	if (attachment_info.format == m_device->surface_format.format)
+	if (attachment_info.format == device->surface_format.format)
 	{
 		image_usage_mask = vk::ImageUsageFlagBits::eColorAttachment;
 		image_aspect_mask = vk::ImageAspectFlagBits::eColor;
 	}
-	else if (attachment_info.format == m_device->depth_format)
+	else if (attachment_info.format == device->depth_format)
 	{
 		image_usage_mask = vk::ImageUsageFlagBits::eDepthStencilAttachment,
 		image_aspect_mask = vk::ImageAspectFlagBits::eDepth;
@@ -727,9 +724,8 @@ void RenderGraph::create_attachment_resource(
 	case Renderpass::CreateInfo::SizeType::eSwapchainRelative:
 	{
 		image_extent = {
-			.width = static_cast<u32>(m_device->framebuffer_extent.width * attachment_info.size.x),
-			.height =
-			    static_cast<u32>(m_device->framebuffer_extent.height * attachment_info.size.y),
+			.width = static_cast<u32>(device->framebuffer_extent.width * attachment_info.size.x),
+			.height = static_cast<u32>(device->framebuffer_extent.height * attachment_info.size.y),
 			.depth = 1,
 		};
 		break;
@@ -748,8 +744,8 @@ void RenderGraph::create_attachment_resource(
 	};
 
 	auto* resource_container = recreate_resource_index == UINT32_MAX ?
-	                             &m_attachment_resources.back() :
-	                             &m_attachment_resources[recreate_resource_index];
+	                             &attachment_resources.back() :
+	                             &attachment_resources[recreate_resource_index];
 	*resource_container = {
 		.type = attachment_type,
 		.image_format = attachment_info.format,
@@ -771,20 +767,20 @@ void RenderGraph::create_attachment_resource(
 	{
 	case AttachmentResourceContainer::Type::ePerImage:
 	{
-		for (u32 i = 0; i < m_swapchain_images.size(); ++i)
+		for (u32 i = 0; i < swapchain_images.size(); ++i)
 		{
 			resource_container->resources.push_back(AttachmentResource {
 			    .src_access_mask = {},
 			    .src_image_layout = vk::ImageLayout::eUndefined,
 			    .src_stage_mask = vk::PipelineStageFlagBits::eTopOfPipe,
-			    .image = m_swapchain_images[i],
-			    .image_view = m_swapchain_image_views[i],
+			    .image = swapchain_images[i],
+			    .image_view = swapchain_image_views[i],
 			});
 		}
 
 		if (recreate_resource_index == UINT32_MAX)
 		{
-			m_swapchain_resource_index = m_attachment_resources.size() - 1;
+			swapchain_resource_index = attachment_resources.size() - 1;
 		}
 		break;
 	}
@@ -813,8 +809,8 @@ void RenderGraph::create_attachment_resource(
 		    vk::MemoryPropertyFlagBits::eDeviceLocal
 		);
 
-		AllocatedImage image = m_device->allocator.createImage(image_info, image_allocate_info);
-		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		AllocatedImage image = device->allocator.createImage(image_info, image_allocate_info);
+		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
 		    fmt::format("{}_image (single)", attachment_info.name).c_str(),
@@ -839,8 +835,8 @@ void RenderGraph::create_attachment_resource(
 			    1u,
 			},
 		};
-		vk::ImageView image_view = m_device->logical.createImageView(image_view_info, nullptr);
-		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		vk::ImageView image_view = device->logical.createImageView(image_view_info, nullptr);
+		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)image_view,
 		    fmt::format("{}_image_view (single)", attachment_info.name).c_str(),
@@ -887,9 +883,9 @@ void RenderGraph::create_attachment_resource(
 		);
 
 		AllocatedImage image =
-		    m_device->allocator.createImage(image_create_info, image_allocate_info);
+		    device->allocator.createImage(image_create_info, image_allocate_info);
 
-		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
 		    fmt::format("{}_transient_ms_image", attachment_info.name).c_str(),
@@ -915,8 +911,8 @@ void RenderGraph::create_attachment_resource(
 			    1u,
 			},
 		};
-		vk::ImageView image_view = m_device->logical.createImageView(image_view_info, nullptr);
-		m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		vk::ImageView image_view = device->logical.createImageView(image_view_info, nullptr);
+		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)image_view,
 		    fmt::format("{}_transient_ms_image_view", attachment_info.name).c_str(),
@@ -933,12 +929,12 @@ void RenderGraph::on_swapchain_invalidated(
     vec<vk::ImageView> swapchain_image_views
 )
 {
-	m_swapchain_images = swapchain_images;
-	m_swapchain_image_views = swapchain_image_views;
+	swapchain_images = swapchain_images;
+	swapchain_image_views = swapchain_image_views;
 
-	for (u32 i = 0; i < m_attachment_resources.size(); ++i)
+	for (u32 i = 0; i < attachment_resources.size(); ++i)
 	{
-		auto& resource_container = m_attachment_resources[i];
+		auto& resource_container = attachment_resources[i];
 		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
 		{
 			// Destroy image resources if it's not from swapchain
@@ -946,14 +942,14 @@ void RenderGraph::on_swapchain_invalidated(
 			{
 				for (AttachmentResource& resource : resource_container.resources)
 				{
-					m_device->logical.destroyImageView(resource.image_view);
-					m_device->allocator.destroyImage(resource.image, resource.image);
+					device->logical.destroyImageView(resource.image_view);
+					device->allocator.destroyImage(resource.image, resource.image);
 				}
 			}
 			resource_container.resources.clear();
 
-			m_device->logical.destroyImageView(resource_container.transient_ms_image_view);
-			m_device->allocator.destroyImage(
+			device->logical.destroyImageView(resource_container.transient_ms_image_view);
+			device->allocator.destroyImage(
 			    resource_container.transient_ms_image,
 			    resource_container.transient_ms_image
 			);
@@ -972,12 +968,11 @@ void RenderGraph::on_swapchain_invalidated(
 
 void RenderGraph::begin_frame(u32 frame_index, void* user_pointer)
 {
-	m_on_begin_frame(m_device, this, frame_index, user_pointer);
+	on_begin_frame(device, this, frame_index, user_pointer);
 
-	for (u32 i = 0; i < m_renderpasses.size(); ++i)
+	for (u32 i = 0; i < renderpasses.size(); ++i)
 	{
-		m_renderpasses[i]
-		    .on_begin_frame(m_device, this, &m_renderpasses[i], frame_index, user_pointer);
+		renderpasses[i].on_begin_frame(device, this, &renderpasses[i], frame_index, user_pointer);
 	}
 }
 
@@ -994,32 +989,32 @@ void RenderGraph::end_frame(
 
 	// Update graph
 	{
-		m_device->graphics_queue.beginDebugUtilsLabelEXT(m_update_debug_label);
-		m_on_update(m_device, this, frame_index, user_pointer);
-		m_device->graphics_queue.endDebugUtilsLabelEXT();
+		device->graphics_queue.beginDebugUtilsLabelEXT(update_debug_label);
+		on_update(device, this, frame_index, user_pointer);
+		device->graphics_queue.endDebugUtilsLabelEXT();
 	}
 
 	// Update passes
-	for (u32 i = 0; i < m_renderpasses.size(); ++i)
+	for (u32 i = 0; i < renderpasses.size(); ++i)
 	{
-		auto& pass = m_renderpasses[i];
+		auto& pass = renderpasses[i];
 
-		m_device->graphics_queue.beginDebugUtilsLabelEXT(pass.update_debug_label);
-		pass.on_update(m_device, this, &m_renderpasses[i], frame_index, user_pointer);
-		m_device->graphics_queue.endDebugUtilsLabelEXT(); // pass.update_debug_label
+		device->graphics_queue.beginDebugUtilsLabelEXT(pass.update_debug_label);
+		pass.on_update(device, this, &renderpasses[i], frame_index, user_pointer);
+		device->graphics_queue.endDebugUtilsLabelEXT(); // pass.update_debug_label
 	}
 
 	// Render passes (record their rendering cmds to secondary cmd buffers)
 	primary_cmd.begin(vk::CommandBufferBeginInfo {});
-	for (u32 i = 0; i < m_renderpasses.size(); ++i)
+	for (u32 i = 0; i < renderpasses.size(); ++i)
 	{
-		auto pass_cmd = m_secondary_cmd_buffers[(frame_index * m_renderpasses.size()) + i];
+		auto pass_cmd = secondary_cmd_buffers[(frame_index * renderpasses.size()) + i];
 		record_pass_cmds(pass_cmd, frame_index, image_index, i, user_pointer);
 	}
 
-	for (u32 i = 0; i < m_renderpasses.size(); ++i)
+	for (u32 i = 0; i < renderpasses.size(); ++i)
 	{
-		auto& pass = m_renderpasses[i];
+		auto& pass = renderpasses[i];
 
 		auto pass_rendering_info = apply_pass_barriers(primary_cmd, frame_index, image_index, i);
 
@@ -1027,8 +1022,8 @@ void RenderGraph::end_frame(
 
 		primary_cmd.beginRendering(pass_rendering_info.rendering_info);
 		primary_cmd.executeCommands(
-		    m_secondary_cmd_buffers
-		        [i + m_renderpasses.size() * (thread_index + m_device->num_threads * frame_index)]
+		    secondary_cmd_buffers
+		        [i + renderpasses.size() * (thread_index + device->num_threads * frame_index)]
 		);
 		primary_cmd.endRendering();
 
@@ -1046,16 +1041,16 @@ void RenderGraph::record_pass_cmds(
     void* user_pointer
 )
 {
-	Renderpass& pass = m_renderpasses[pass_index];
+	auto& pass = renderpasses[pass_index];
 	cmd.begin(pass.cmd_buffer_begin_info);
 
 	// Graph descriptor set (set = 0)
 	cmd.bindDescriptorSets(
 	    vk::PipelineBindPoint::eGraphics,
-	    m_pipeline_layout,
+	    pipeline_layout,
 	    0u,
 	    1u,
-	    &m_sets[frame_index],
+	    &sets[frame_index],
 	    0u,
 	    {}
 	);
@@ -1075,9 +1070,9 @@ void RenderGraph::record_pass_cmds(
 	}
 
 	pass.on_render(
-	    m_device,
+	    device,
 	    this,
-	    &m_renderpasses[pass_index],
+	    &renderpasses[pass_index],
 	    cmd,
 	    frame_index,
 	    image_index,
@@ -1094,26 +1089,20 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
     u32 pass_index
 )
 {
-	auto& pass = m_renderpasses[pass_index];
+	auto& pass = renderpasses[pass_index];
 	cmd.beginDebugUtilsLabelEXT(pass.barrier_debug_label);
 
 	PassRenderingInfo pass_rendering_info = {};
 	for (auto& attachment : pass.attachments)
 	{
-		auto& resource_container = m_attachment_resources[attachment.resource_index];
+		auto& resource_container = attachment_resources[attachment.resource_index];
 
 		auto& resource = resource_container.get_resource(image_index, frame_index);
 
 		vk::ImageMemoryBarrier image_barrier {
-			resource.src_access_mask,
-			attachment.access_mask,
-			resource.src_image_layout,
-			attachment.layout,
-			m_device->graphics_queue_index,
-			m_device->graphics_queue_index,
-			resource.image,
-			attachment.subresource_range,
-			nullptr,
+			resource.src_access_mask, attachment.access_mask,       resource.src_image_layout,
+			attachment.layout,        device->graphics_queue_index, device->graphics_queue_index,
+			resource.image,           attachment.subresource_range, nullptr,
 		};
 
 		if ((resource.src_access_mask != attachment.access_mask
@@ -1181,7 +1170,7 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 		vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
 		vk::Rect2D {
 		    { 0, 0 },
-		    m_device->framebuffer_extent,
+		    device->framebuffer_extent,
 		},
 		1u,
 		{},
@@ -1200,9 +1189,9 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 void RenderGraph::apply_backbuffer_barrier(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
 {
 	vk::DebugUtilsLabelEXT a;
-	cmd.beginDebugUtilsLabelEXT(m_backbuffer_barrier_debug_label);
+	cmd.beginDebugUtilsLabelEXT(backbuffer_barrier_debug_label);
 	auto& backbuffer_resource =
-	    m_attachment_resources[m_swapchain_resource_index].get_resource(image_index, frame_index);
+	    attachment_resources[swapchain_resource_index].get_resource(image_index, frame_index);
 
 	cmd.pipelineBarrier(
 	    backbuffer_resource.src_stage_mask,

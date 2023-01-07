@@ -28,21 +28,21 @@ public:
 	virtual void on_swapchain_recreate()    = 0;
 
 public:
-	Window m_window;
-	Scene m_scene;
+	Window window;
+	Scene scene;
 
-	bvk::DeviceSystem m_device_system;
-	bvk::Renderer m_renderer;
-	bvk::TextureSystem m_texture_system;
-	bvk::MaterialSystem m_material_system;
-	bvk::ModelSystem m_model_system;
+	bvk::DeviceSystem device_system;
+	bvk::Renderer renderer;
+	bvk::TextureSystem texture_system;
+	bvk::MaterialSystem material_system;
+	bvk::ModelSystem model_system;
 
-	CameraController m_camera_controller;
+	CameraController camera_controller;
 
-	std::vector<const char*> m_instance_extensions = {};
-	std::vector<const char*> m_device_extensions   = {};
+	std::vector<const char*> instance_extensions = {};
+	std::vector<const char*> device_extensions   = {};
 
 protected:
-	uint64_t m_messenger_warn_count = {};
-	uint64_t m_messenger_err_count  = {};
+	uint64_t messenger_warn_count = {};
+	uint64_t messenger_err_count  = {};
 };

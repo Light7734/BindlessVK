@@ -11,12 +11,12 @@ namespace BINDLESSVK_NAMESPACE {
 
 void ModelSystem::init(Device* device)
 {
-	m_device = device;
+	this->device = device;
 }
 
 void ModelSystem::reset()
 {
-	for (auto& [key, val] : m_models)
+	for (auto& [key, val] : models)
 	{
 		delete val.vertex_buffer;
 		delete val.index_buffer;
@@ -32,7 +32,7 @@ void ModelSystem::load_model(TextureSystem& texture_system, const char* name, co
 	std::vector<Model::Vertex> vertices;
 	std::vector<uint32_t> indices;
 
-	Model& model = m_models[HashStr(name)];
+	Model& model = models[HashStr(name)];
 
 	BVK_ASSERT(
 	    !gltf_context.LoadASCIIFromFile(&input, &err, &warn, gltf_path),
@@ -68,21 +68,21 @@ void ModelSystem::load_model(TextureSystem& texture_system, const char* name, co
 		);
 
 		model.material_parameters.push_back({
-		    .albedo_factor        = glm::vec4(1.0),
+		    .albedo_factor = glm::vec4(1.0),
 		    .albedo_texture_index = material.values["baseColorTexture"].TextureIndex(),
 		});
 	}
 
 	model.vertex_buffer = new StagingBuffer(
 	    name,
-	    m_device,
+	    device,
 	    vk::BufferUsageFlagBits::eVertexBuffer,
 	    vertices.size() * sizeof(Model::Vertex),
 	    1u,
 	    vertices.data()
 	);
 
-	m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 	    vk::ObjectType::eBuffer,
 	    (uint64_t)(VkBuffer)(*model.vertex_buffer->get_buffer()),
 	    fmt::format("{}_model_vb", name).c_str(),
@@ -90,14 +90,14 @@ void ModelSystem::load_model(TextureSystem& texture_system, const char* name, co
 
 	model.index_buffer = new StagingBuffer(
 	    name,
-	    m_device,
+	    device,
 	    vk::BufferUsageFlagBits::eIndexBuffer,
 	    indices.size() * sizeof(uint32_t),
 	    1u,
 	    indices.data()
 	);
 
-	m_device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 	    vk::ObjectType::eBuffer,
 	    (uint64_t)(VkBuffer)(*model.index_buffer->get_buffer()),
 	    fmt::format("{}_model_ib", name).c_str(),
@@ -162,17 +162,17 @@ void ModelSystem::load_node(
 
 		for (const tinygltf::Primitive& primitive : mesh.primitives)
 		{
-			uint32_t first_index  = static_cast<uint32_t>(indices->size());
+			uint32_t first_index = static_cast<uint32_t>(indices->size());
 			uint32_t vertex_start = static_cast<uint32_t>(vertices->size());
-			uint32_t index_count  = 0ul;
+			uint32_t index_count = 0ul;
 
 			// Vertices
 			{
-				const float* position_buffer   = nullptr;
-				const float* normal_buffer     = nullptr;
-				const float* tangent_buffer    = nullptr;
+				const float* position_buffer = nullptr;
+				const float* normal_buffer = nullptr;
+				const float* tangent_buffer = nullptr;
 				const float* tex_coords_buffer = nullptr;
-				size_t vertex_count            = 0ul;
+				size_t vertex_count = 0ul;
 
 				if (primitive.attributes.find("POSITION") != primitive.attributes.end())
 				{
@@ -202,34 +202,34 @@ void ModelSystem::load_node(
 					const tinygltf::Accessor& accessor =
 					    input.accessors[primitive.attributes.find("TANGENT")->second];
 					const tinygltf::BufferView& view = input.bufferViews[accessor.bufferView];
-					tangent_buffer                   = reinterpret_cast<const float*>(
-                        &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
-                    );
+					tangent_buffer = reinterpret_cast<const float*>(
+					    &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
+					);
 				}
 				if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
 				{
 					const tinygltf::Accessor& accessor =
 					    input.accessors[primitive.attributes.find("TEXCOORD_0")->second];
 					const tinygltf::BufferView& view = input.bufferViews[accessor.bufferView];
-					tex_coords_buffer                = reinterpret_cast<const float*>(
-                        &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
-                    );
+					tex_coords_buffer = reinterpret_cast<const float*>(
+					    &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
+					);
 				}
 
 				for (size_t v = 0; v < vertex_count; ++v)
 				{
 					vertices->push_back({
 					    .position = glm::vec4(glm::make_vec3(&position_buffer[v * 3]), 1.0f),
-					    .normal   = glm::normalize(glm::vec3(
-                            normal_buffer ? glm::make_vec3(&normal_buffer[v * 3]) : glm::vec3(0.0f)
-                        )),
-					    .tangent  = glm::normalize(glm::vec3(
-                            tangent_buffer ? glm::make_vec3(&tangent_buffer[v * 3]) :
+					    .normal = glm::normalize(glm::vec3(
+					        normal_buffer ? glm::make_vec3(&normal_buffer[v * 3]) : glm::vec3(0.0f)
+					    )),
+					    .tangent = glm::normalize(glm::vec3(
+					        tangent_buffer ? glm::make_vec3(&tangent_buffer[v * 3]) :
 					                         glm::vec3(0.0f)
-                        )),
-					    .uv       = tex_coords_buffer ? glm::make_vec2(&tex_coords_buffer[v * 2]) :
-					                                    glm::vec3(0.0f),
-					    .color    = glm::vec3(1.0),
+					    )),
+					    .uv = tex_coords_buffer ? glm::make_vec2(&tex_coords_buffer[v * 2]) :
+					                              glm::vec3(0.0f),
+					    .color = glm::vec3(1.0),
 					});
 				}
 			}
@@ -283,8 +283,8 @@ void ModelSystem::load_node(
 			}
 
 			node->mesh.push_back({
-			    .first_index    = first_index,
-			    .index_count    = index_count,
+			    .first_index = first_index,
+			    .index_count = index_count,
 			    .material_index = primitive.material,
 			});
 		}

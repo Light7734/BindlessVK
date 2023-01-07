@@ -27,51 +27,49 @@ struct Model
 	glm::vec2 uv;
 	glm::vec3 color;
 
-	static constexpr std::array<vk::VertexInputBindingDescription, 1>
-	  get_bindings()
+	static constexpr std::array<vk::VertexInputBindingDescription, 1> get_bindings()
 	{
 		return {
 			vk::VertexInputBindingDescription {
-			  0u,                                                // binding
-			  static_cast<uint32_t>(sizeof(VertexTypes::Model)), // stride
-			  vk::VertexInputRate::eVertex,                      // inputRate
+			    0u,                                                // binding
+			    static_cast<uint32_t>(sizeof(VertexTypes::Model)), // stride
+			    vk::VertexInputRate::eVertex,                      // inputRate
 			},
 		};
 	}
 
-	static constexpr std::array<vk::VertexInputAttributeDescription, 5>
-	  get_attributes()
+	static constexpr std::array<vk::VertexInputAttributeDescription, 5> get_attributes()
 	{
 		return {
 			vk::VertexInputAttributeDescription {
-			  0u,                                     // location
-			  0u,                                     // binding
-			  vk::Format::eR32G32B32Sfloat,           // format
-			  offsetof(VertexTypes::Model, position), // offset
+			    0u,                                     // location
+			    0u,                                     // binding
+			    vk::Format::eR32G32B32Sfloat,           // format
+			    offsetof(VertexTypes::Model, position), // offset
 			},
 			vk::VertexInputAttributeDescription {
-			  1u,                                   // location
-			  0u,                                   // binding
-			  vk::Format::eR32G32B32Sfloat,         // format
-			  offsetof(VertexTypes::Model, normal), // offset
+			    1u,                                   // location
+			    0u,                                   // binding
+			    vk::Format::eR32G32B32Sfloat,         // format
+			    offsetof(VertexTypes::Model, normal), // offset
 			},
 			vk::VertexInputAttributeDescription {
-			  2u,                                    // location
-			  0u,                                    // binding
-			  vk::Format::eR32G32B32Sfloat,          // format
-			  offsetof(VertexTypes::Model, tangent), // offset
+			    2u,                                    // location
+			    0u,                                    // binding
+			    vk::Format::eR32G32B32Sfloat,          // format
+			    offsetof(VertexTypes::Model, tangent), // offset
 			},
 			vk::VertexInputAttributeDescription {
-			  3u,                               // location
-			  0u,                               // binding
-			  vk::Format::eR32G32Sfloat,        // format
-			  offsetof(VertexTypes::Model, uv), // offset
+			    3u,                               // location
+			    0u,                               // binding
+			    vk::Format::eR32G32Sfloat,        // format
+			    offsetof(VertexTypes::Model, uv), // offset
 			},
 			vk::VertexInputAttributeDescription {
-			  4u,                                  // location
-			  0u,                                  // binding
-			  vk::Format::eR32G32B32Sfloat,        // format
-			  offsetof(VertexTypes::Model, color), // offset
+			    4u,                                  // location
+			    0u,                                  // binding
+			    vk::Format::eR32G32B32Sfloat,        // format
+			    offsetof(VertexTypes::Model, color), // offset
 			},
 
 
@@ -81,7 +79,7 @@ struct Model
 
 	static vk::PipelineVertexInputStateCreateInfo get_vertex_input_state()
 	{
-		static const auto bindings   = get_bindings();
+		static const auto bindings = get_bindings();
 		static const auto attributes = get_attributes();
 
 		return vk::PipelineVertexInputStateCreateInfo {
@@ -133,8 +131,8 @@ public:
 
 	struct MaterialParameters
 	{
-		glm::vec3 albedo_factor   = glm::vec4(1.0f);
-		glm::vec3 diffuse_factor  = glm::vec4(1.0f);
+		glm::vec3 albedo_factor = glm::vec4(1.0f);
+		glm::vec3 diffuse_factor = glm::vec4(1.0f);
 		glm::vec3 specular_factor = glm::vec4(1.0f);
 
 		int32_t albedo_texture_index;
@@ -174,32 +172,28 @@ public:
 	 * @param gltf_path path to the gltf model file
 	 * @todo tidy this mess of passing texture system around??
 	 */
-	void load_model(
-	  TextureSystem& texture_system,
-	  const char* name,
-	  const char* gltf_path
-	);
+	void load_model(TextureSystem& texture_system, const char* name, const char* gltf_path);
 
 	/** @return the model named @p name */
 	inline Model* get_model(const char* name)
 	{
-		return &m_models[HashStr(name)];
+		return &models[HashStr(name)];
 	}
 
 private:
 	void load_node(
-	  struct tinygltf::Model& input,
-	  Model& model,
-	  const tinygltf::Node& input_node,
-	  Model::Node* parent,
-	  std::vector<Model::Vertex>* vertices,
-	  std::vector<uint32_t>* indices
+	    struct tinygltf::Model& input,
+	    Model& model,
+	    const tinygltf::Node& input_node,
+	    Model::Node* parent,
+	    std::vector<Model::Vertex>* vertices,
+	    std::vector<uint32_t>* indices
 	);
 
 private:
-	Device* m_device;
-	vk::CommandPool m_command_pool;
-	std::unordered_map<uint64_t, Model> m_models;
+	Device* device;
+	vk::CommandPool command_pool;
+	std::unordered_map<uint64_t, Model> models;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

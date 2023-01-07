@@ -3,14 +3,12 @@
 
 int main(int argc, char* argv[])
 {
-	try
-	{
+	try {
 		DevelopmentExampleApplication application;
 
 		Timer delta_timer;
-		while (!application.m_window.should_close())
-		{
-			application.m_window.poll_events();
+		while (!application.window.should_close()) {
+			application.window.poll_events();
 
 			application.on_tick(delta_timer.elapsed_time());
 			delta_timer.reset();
@@ -18,8 +16,7 @@ int main(int argc, char* argv[])
 			// @todo: Handle swapchain invalidation
 		}
 	}
-	catch (bvk::BindlessVkException bvkException)
-	{
+	catch (bvk::BindlessVkException bvkException) {
 		return 1;
 	}
 	return 0;

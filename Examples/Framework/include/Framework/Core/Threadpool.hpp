@@ -26,44 +26,42 @@ public:
 	void start()
 	{
 		const uint32_t num_threads = std::thread::hardware_concurrency();
-		for (uint32_t i = 0; i < num_threads; i++)
-		{
-			m_threads.at(i) = std::thread(&ThreadPool::thread_loop, this, i);
+		for (uint32_t i = 0; i < num_threads; i++) {
+			threads.at(i) = std::thread(&ThreadPool::thread_loop, this, i);
 		}
 	}
 
 	void queue_job(const JobFunc& job)
 	{
 		{
-			std::unique_lock<std::mutex> lock(m_queue_mutex);
-			m_Jobs.push(job);
+			std::unique_lock<std::mutex> lock(queue_mutex);
+			jobs.push(job);
 		}
 
-		m_mutex_condition.notify_one();
+		mutex_condition.notify_one();
 	}
 
 	void stop()
 	{
 		{
-			std::unique_lock<std::mutex> lock(m_queue_mutex);
-			m_should_terminate = true;
+			std::unique_lock<std::mutex> lock(queue_mutex);
+			should_terminate = true;
 		}
 
-		m_mutex_condition.notify_all();
-		for (std::thread& activeThread : m_threads)
-		{
+		mutex_condition.notify_all();
+		for (std::thread& activeThread : threads) {
 			activeThread.join();
 		}
 
-		m_threads.clear();
+		threads.clear();
 	}
 
 	bool busy()
 	{
 		bool busy;
 		{
-			std::unique_lock<std::mutex> lock(m_queue_mutex);
-			busy = m_Jobs.empty();
+			std::unique_lock<std::mutex> lock(queue_mutex);
+			busy = jobs.empty();
 		}
 
 		return busy;
@@ -71,28 +69,24 @@ public:
 
 	inline size_t get_num_threads() const
 	{
-		return m_threads.size();
+		return threads.size();
 	}
 
 private:
 	void thread_loop(uint32_t index)
 	{
-		while (true)
-		{
+		while (true) {
 			JobFunc job;
 			{
-				std::unique_lock<std::mutex> lock(m_queue_mutex);
-				m_mutex_condition.wait(lock, [this]() {
-					return !m_Jobs.empty() || m_should_terminate;
-				});
+				std::unique_lock<std::mutex> lock(queue_mutex);
+				mutex_condition.wait(lock, [this]() { return !jobs.empty() || should_terminate; });
 
-				if (m_should_terminate)
-				{
+				if (should_terminate) {
 					return;
 				}
 
-				job = m_Jobs.front();
-				m_Jobs.pop();
+				job = jobs.front();
+				jobs.pop();
 			}
 
 			job({ index });
@@ -101,10 +95,10 @@ private:
 
 
 private:
-	std::mutex m_queue_mutex                  = {};
-	std::condition_variable m_mutex_condition = {};
-	std::vector<std::thread> m_threads        = {};
-	std::queue<JobFunc> m_Jobs                = {};
+	std::mutex queue_mutex                  = {};
+	std::condition_variable mutex_condition = {};
+	std::vector<std::thread> threads        = {};
+	std::queue<JobFunc> jobs                = {};
 
-	bool m_should_terminate = false;
+	bool should_terminate = false;
 };

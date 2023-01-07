@@ -109,7 +109,7 @@ public:
 	/** @return the bindlessvk device */
 	inline Device* get_device()
 	{
-		return &m_device;
+		return &device;
 	}
 
 	/** Initializes the device system
@@ -171,10 +171,10 @@ private:
 	void create_command_pools();
 
 private:
-	Device m_device = {};
+	Device device = {};
 
-	vk::DynamicLoader m_dynamic_loader;
-	vk::DebugUtilsMessengerEXT m_debug_util_messenger = {};
+	vk::DynamicLoader dynamic_loader;
+	vk::DebugUtilsMessengerEXT debug_util_messenger = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

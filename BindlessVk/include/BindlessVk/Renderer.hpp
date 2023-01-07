@@ -34,19 +34,19 @@ public:
 	/** @return descriptor pool  */
 	inline vk::DescriptorPool get_descriptor_pool() const
 	{
-		return m_descriptor_pool;
+		return descriptor_pool;
 	}
 
 	/** @return swapchain image count  */
 	inline u32 get_image_count() const
 	{
-		return m_swapchain_images.size();
+		return swapchain_images.size();
 	}
 
 	/** @return wether or not swapchain is invalidated  */
 	inline bool is_swapchain_invalidated() const
 	{
-		return m_is_swapchain_invalid;
+		return is_swapchain_invalid;
 	}
 
 private:
@@ -66,28 +66,28 @@ private:
 	void present_frame(vk::Semaphore wait_semaphore, uint32_t image_index);
 
 private:
-	Device* m_device = {};
-	RenderGraph m_render_graph = {};
+	Device* device = {};
+	RenderGraph render_graph = {};
 
 	// Sync objects
-	arr<vk::Fence, BVK_MAX_FRAMES_IN_FLIGHT> m_render_fences = {};
-	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> m_render_semaphores = {};
-	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> m_present_semaphores = {};
+	arr<vk::Fence, BVK_MAX_FRAMES_IN_FLIGHT> render_fences = {};
+	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> render_semaphores = {};
+	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> present_semaphores = {};
 
-	bool m_is_swapchain_invalid = false;
+	bool is_swapchain_invalid = false;
 
 	// Swapchain
-	vk::SwapchainKHR m_swapchain = {};
+	vk::SwapchainKHR swapchain = {};
 
-	vec<vk::Image> m_swapchain_images {};
-	vec<vk::ImageView> m_swapchain_image_views = {};
+	vec<vk::Image> swapchain_images {};
+	vec<vk::ImageView> swapchain_image_views = {};
 
 	// Pools
-	vk::DescriptorPool m_descriptor_pool = {};
+	vk::DescriptorPool descriptor_pool = {};
 
-	vec<vk::CommandBuffer> m_command_buffers = {};
+	vec<vk::CommandBuffer> cmd_buffers = {};
 
-	u32 m_current_frame = 0ul;
+	u32 current_frame = 0ul;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -154,9 +154,9 @@ private:
 		CVarVal default_value;
 	};
 
-	std::map<std::string, CVarEntry> m_vars;
+	std::map<std::string, CVarEntry> vars;
 
-	static CVar s_instance;
+	static CVar instance;
 };
 
 class AutoCVar

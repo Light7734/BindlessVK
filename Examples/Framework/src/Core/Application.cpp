@@ -5,11 +5,7 @@
 #include <imgui.h>
 
 // @todo: refactor this out
-static void initialize_imgui(
-  bvk::Device* device,
-  bvk::Renderer& renderer,
-  Window& window
-)
+static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Window& window)
 {
 	ImGui::CreateContext();
 
@@ -25,19 +21,14 @@ static void initialize_imgui(
 		.ColorAttachmentFormat = static_cast<VkFormat>(device->surface_format.format),
 		.MinImageCount         = BVK_MAX_FRAMES_IN_FLIGHT,
 		.ImageCount            = BVK_MAX_FRAMES_IN_FLIGHT,
-		.MSAASamples = static_cast<VkSampleCountFlagBits>(device->max_samples),
+		.MSAASamples           = static_cast<VkSampleCountFlagBits>(device->max_samples),
 	};
-	std::pair userData = std::make_pair(
-	  device->get_vk_instance_proc_addr_func,
-	  device->instance
-	);
+	std::pair userData = std::make_pair(device->get_vk_instance_proc_addr_func, device->instance);
 
 	ASSERT(
 	  ImGui_ImplVulkan_LoadFunctions(
 	    [](const char* func, void* data) {
-		    auto [vkGetProcAddr, instance] = *(std::pair<
-		                                       PFN_vkGetInstanceProcAddr,
-		                                       vk::Instance>*)data;
+		    auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
 		    return vkGetProcAddr(instance, func);
 	    },
 	    (void*)&userData
@@ -47,9 +38,7 @@ static void initialize_imgui(
 
 	ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
 
-	device->immediate_submit([](vk::CommandBuffer cmd) {
-		ImGui_ImplVulkan_CreateFontsTexture(cmd);
-	});
+	device->immediate_submit([](vk::CommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(cmd); });
 
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
@@ -62,15 +51,15 @@ static void destroy_imgui()
 }
 
 Application::Application()
-    : m_instance_extensions {
+    : instance_extensions {
 	    VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
     }
-    , m_device_extensions {
+    , device_extensions {
 	    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 	    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
     }
 {
-	m_window.init(
+	window.init(
 	  WindowSpecs {
 	    .title  = "BindlessVk",
 	    .width  = 1920u,
@@ -82,22 +71,22 @@ Application::Application()
 	  }
 	);
 
-	std::vector<const char*> required_surface_extensions = m_window.get_required_extensions();
+	std::vector<const char*> required_surface_extensions = window.get_required_extensions();
 
-	m_instance_extensions.insert(
-	  m_instance_extensions.end(),
+	instance_extensions.insert(
+	  instance_extensions.end(),
 	  required_surface_extensions.begin(),
 	  required_surface_extensions.end()
 	);
 
 
-	m_device_system.init(
+	device_system.init(
 	  { "VK_LAYER_KHRONOS_validation" },
-	  m_instance_extensions,
-	  m_device_extensions,
+	  instance_extensions,
+	  device_extensions,
 
-	  [&](vk::Instance instance) { return m_window.create_surface(instance); },
-	  [&]() { return m_window.get_framebuffer_size(); },
+	  [&](vk::Instance instance) { return window.create_surface(instance); },
+	  [&]() { return window.get_framebuffer_size(); },
 
 	  true,
 	  vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
@@ -113,12 +102,12 @@ Application::Application()
 	  this
 	);
 
-	bvk::Device* device = m_device_system.get_device();
+	bvk::Device* device = device_system.get_device();
 
-	m_texture_system.init({ device });
+	texture_system.init(device);
 
 	uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
-	m_texture_system.create_from_buffer(
+	texture_system.create_from_buffer(
 	  "default",
 	  defaultTexturePixelData,
 	  1,
@@ -127,37 +116,37 @@ Application::Application()
 	  bvk::Texture::Type::e2D
 	);
 
-	m_texture_system.create_from_ktx(
+	texture_system.create_from_ktx(
 	  "default_cube",
 	  "Assets/cubemap_yokohama_rgba.ktx",
 	  bvk::Texture::Type::eCubeMap
 	);
 
-	m_renderer.init(device);
+	renderer.init(device);
 
-	m_material_system.init(device);
+	material_system.init(device);
 
 	// @todo: refactor out getting a command pool from renderer
-	m_model_system.init(device);
+	model_system.init(device);
 
 
-	initialize_imgui(device, m_renderer, m_window);
+	initialize_imgui(device, renderer, window);
 
 
-	m_camera_controller = CameraController(&m_scene, &m_window);
+	camera_controller = CameraController(&scene, &window);
 }
 
 
 Application::~Application()
 {
-	m_device_system.get_device()->logical.waitIdle();
+	device_system.get_device()->logical.waitIdle();
 	destroy_imgui();
 
-	m_renderer.reset();
-	m_texture_system.reset();
-	m_material_system.reset();
-	m_model_system.reset();
-	m_device_system.reset();
+	renderer.reset();
+	texture_system.reset();
+	material_system.reset();
+	model_system.reset();
+	device_system.reset();
 }
 
 VkBool32 Application::vulkan_debug_message_callback(
@@ -172,11 +161,9 @@ VkBool32 Application::vulkan_debug_message_callback(
 	std::string type = message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ?
 	                     "GENERAL" :
 	                   message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
-	                       && message_types
-	                            == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ?
+	                       && message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ?
 	                     "VALIDATION | PERFORMANCE" :
-	                   message_types
-	                       == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ?
+	                   message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ?
 	                     "VALIDATION" :
 	                     "PERFORMANCE";
 
@@ -186,31 +173,27 @@ VkBool32 Application::vulkan_debug_message_callback(
 
 	// Remove beginning sections ( we'll log them ourselves )
 	auto pos = message.find_last_of("|");
-	if (pos != std::string::npos)
-	{
+	if (pos != std::string::npos) {
 		message = message.substr(pos + 2);
 	}
 
 	// Separate url section of message
 	pos = message.find_last_of("(");
-	if (pos != std::string::npos)
-	{
+	if (pos != std::string::npos) {
 		url     = message.substr(pos + 1, message.length() - (pos + 2));
 		message = message.substr(0, pos);
 	}
 
 	// Separate the "Vulkan spec states:" section of the message
 	pos = message.find("The Vulkan spec states:");
-	if (pos != std::string::npos)
-	{
+	if (pos != std::string::npos) {
 		size_t len          = std::strlen("The Vulkan spec states: ");
 		vulkanSpecStatement = message.substr(pos + len, message.length() - pos - len);
 		message             = message.substr(0, pos);
 	}
 
-	if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-	{
-		application->m_messenger_err_count++;
+	if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+		application->messenger_err_count++;
 
 		LOG(err, "[ __VULKAN_MESSAGE_CALLBACK__ ]");
 		LOG(err, "    Type -> {} - {}", type, callback_data->pMessageIdName);
@@ -218,11 +201,9 @@ VkBool32 Application::vulkan_debug_message_callback(
 		LOG(err, "    Msg  -> {}", message);
 		LOG(err, "    Spec -> {}", vulkanSpecStatement);
 
-		if (callback_data->objectCount)
-		{
+		if (callback_data->objectCount) {
 			LOG(err, "    {} OBJECTS:", callback_data->objectCount);
-			for (uint32_t object = 0; object < callback_data->objectCount; object++)
-			{
+			for (uint32_t object = 0; object < callback_data->objectCount; object++) {
 				LOG(
 				  err,
 				  "            [{}] {} -> Addr: {}, Name: {}",
@@ -237,11 +218,9 @@ VkBool32 Application::vulkan_debug_message_callback(
 			}
 		}
 
-		if (callback_data->cmdBufLabelCount)
-		{
+		if (callback_data->cmdBufLabelCount) {
 			LOG(err, "    {} COMMAND BUFFER LABELS:", callback_data->cmdBufLabelCount);
-			for (uint32_t label = 0; label < callback_data->cmdBufLabelCount; label++)
-			{
+			for (uint32_t label = 0; label < callback_data->cmdBufLabelCount; label++) {
 				LOG(
 				  err,
 				  "            [{}]-> {} ({}, {}, {}, {})",
@@ -257,36 +236,15 @@ VkBool32 Application::vulkan_debug_message_callback(
 
 		LOG(err, "");
 	}
-	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-	{
-		application->m_messenger_warn_count++;
-		LOG(
-		  warn,
-		  "{} - {}-> {}",
-		  type,
-		  callback_data->pMessageIdName,
-		  callback_data->pMessage
-		);
+	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+		application->messenger_warn_count++;
+		LOG(warn, "{} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
 	}
-	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT)
-	{
-		LOG(
-		  info,
-		  "{} - {}-> {}",
-		  type,
-		  callback_data->pMessageIdName,
-		  callback_data->pMessage
-		);
+	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+		LOG(info, "{} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
 	}
-	else
-	{
-		LOG(
-		  trace,
-		  "{} - {}-> {}",
-		  type,
-		  callback_data->pMessageIdName,
-		  callback_data->pMessage
-		);
+	else {
+		LOG(trace, "{} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
 	}
 
 

@@ -40,14 +40,14 @@ public:
 
 	virtual void on_tick(double deltaTime) override
 	{
-		m_renderer.begin_frame(&m_scene);
+		renderer.begin_frame(&scene);
 
-		if (m_renderer.is_swapchain_invalidated()) {
-			m_device_system.update_surface_info();
-			m_renderer.on_swapchain_invalidated();
-			m_camera_controller.on_window_resize(
-			  m_window.get_framebuffer_size().width,
-			  m_window.get_framebuffer_size().height
+		if (renderer.is_swapchain_invalidated()) {
+			device_system.update_surface_info();
+			renderer.on_swapchain_invalidated();
+			camera_controller.on_window_resize(
+			  window.get_framebuffer_size().width,
+			  window.get_framebuffer_size().height
 			);
 
 			load_materials();
@@ -56,8 +56,8 @@ public:
 		ImGui::ShowDemoWindow();
 		CVar::draw_imgui_editor();
 
-		m_camera_controller.update();
-		m_renderer.end_frame(&m_scene);
+		camera_controller.update();
+		renderer.end_frame(&scene);
 	}
 
 	virtual void on_swapchain_recreate() override
@@ -81,7 +81,7 @@ private:
 				continue;
 			}
 
-			m_material_system.load_shader(
+			material_system.load_shader(
 			  name.c_str(),
 			  path.c_str(),
 			  !strcmp(extension.c_str(), VERTEX_EXTENSION) ? vk::ShaderStageFlagBits::eVertex :
@@ -93,28 +93,28 @@ private:
 	void load_shader_effects()
 	{
 		// @TODO: Load from files instead of hard-coding
-		m_material_system.create_shader_effect(
+		material_system.create_shader_effect(
 		  "opaque_mesh",
 		  {
-		    m_material_system.get_shader("defaultVertex"),
-		    m_material_system.get_shader("defaultFragment"),
+		    material_system.get_shader("defaultVertex"),
+		    material_system.get_shader("defaultFragment"),
 		  }
 		);
 
-		m_material_system.create_shader_effect(
+		material_system.create_shader_effect(
 		  "skybox",
 		  {
-		    m_material_system.get_shader("skybox_vertex"),
-		    m_material_system.get_shader("skybox_fragment"),
+		    material_system.get_shader("skybox_vertex"),
+		    material_system.get_shader("skybox_fragment"),
 		  }
 		);
 	}
 
 	void load_pipeline_configuration()
 	{
-		bvk::Device* device = m_device_system.get_device();
+		bvk::Device* device = device_system.get_device();
 
-		m_material_system.create_pipeline_configuration(
+		material_system.create_pipeline_configuration(
 		  "opaque_mesh",
 		  bvk::VertexTypes::Model::get_vertex_input_state(),
 		  vk::PipelineInputAssemblyStateCreateInfo {
@@ -181,7 +181,7 @@ private:
 		  }
 		);
 
-		m_material_system.create_pipeline_configuration(
+		material_system.create_pipeline_configuration(
 		  "skybox",
 		  bvk::VertexTypes::Model::get_vertex_input_state(),
 		  vk::PipelineInputAssemblyStateCreateInfo {
@@ -254,93 +254,93 @@ private:
 
 	void load_shader_passes()
 	{
-		bvk::Device* device = m_device_system.get_device();
+		bvk::Device* device = device_system.get_device();
 
 		// create shader passes
-		m_material_system.create_shader_pass(
+		material_system.create_shader_pass(
 		  "opaque_mesh",
-		  m_material_system.get_shader_effect("opaque_mesh"),
+		  material_system.get_shader_effect("opaque_mesh"),
 		  device->surface_format.format,
 		  device->depth_format,
-		  m_material_system.get_pipeline_configuration("opaque_mesh")
+		  material_system.get_pipeline_configuration("opaque_mesh")
 		);
 
-		m_material_system.create_shader_pass(
+		material_system.create_shader_pass(
 		  "skybox",
-		  m_material_system.get_shader_effect("skybox"),
+		  material_system.get_shader_effect("skybox"),
 		  device->surface_format.format,
 		  device->depth_format,
-		  m_material_system.get_pipeline_configuration("skybox")
+		  material_system.get_pipeline_configuration("skybox")
 		);
 	}
 
 	// @todo: Load from files instead of hard-coding
 	void load_materials()
 	{
-		m_material_system
-		  .create_material("opaque_mesh", m_material_system.get_shader_pass("opaque_mesh"), {}, {});
+		material_system
 
-		m_material_system
-		  .create_material("skybox", m_material_system.get_shader_pass("skybox"), {}, {});
+		  .create_material("opaque_mesh", material_system.get_shader_pass("opaque_mesh"), {}, {});
+
+		material_system.create_material("skybox", material_system.get_shader_pass("skybox"), {}, {});
 	}
 
 	// @todo: Load from files instead of hard-coding
 	void load_models()
 	{
-		m_model_system
-		  .load_model(m_texture_system, "flight_helmet", "Assets/FlightHelmet/FlightHelmet.gltf");
-		m_model_system.load_model(m_texture_system, "skybox", "Assets/Cube/Cube.gltf");
+		model_system
+		  .load_model(texture_system, "flight_helmet", "Assets/FlightHelmet/FlightHelmet.gltf");
+		model_system.load_model(texture_system, "skybox", "Assets/Cube/Cube.gltf");
 	}
 
 	// @todo: Load from files instead of hard-coding
 	void load_entities()
 	{
-		Entity testModel = m_scene.create();
+		Entity testModel = scene.create();
 
-		m_scene.emplace<TransformComponent>(
+		scene.emplace<TransformComponent>(
 		  testModel,
 		  glm::vec3(0.0f),
 		  glm::vec3(1.0f),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		m_scene.emplace<StaticMeshRendererComponent>(
+		scene.emplace<StaticMeshRendererComponent>(
 		  testModel,
-		  m_material_system.get_material("opaque_mesh"),
-		  m_model_system.get_model("flight_helmet")
+		  material_system.get_material("opaque_mesh"),
+		  model_system.get_model("flight_helmet")
 		);
 
-		Entity skybox = m_scene.create();
-		m_scene.emplace<TransformComponent>(
+		Entity skybox = scene.create();
+		scene.emplace<TransformComponent>(
 		  skybox,
 		  glm::vec3(0.0f),
 		  glm::vec3(1.0f),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		m_scene.emplace<StaticMeshRendererComponent>(
+		scene.emplace<StaticMeshRendererComponent>(
 		  skybox,
-		  m_material_system.get_material("skybox"),
-		  m_model_system.get_model("skybox")
+		  material_system.get_material("skybox"),
+		  model_system.get_model("skybox")
 		);
 
-		Entity light = m_scene.create();
-		m_scene.emplace<TransformComponent>(
+		Entity light = scene.create();
+		scene.emplace<TransformComponent>(
 		  light,
 		  glm::vec3(2.0f, 2.0f, 1.0f),
 		  glm::vec3(1.0f),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		Entity camera = m_scene.create();
-		m_scene.emplace<TransformComponent>(
+		Entity camera = scene.create();
+		scene.emplace<TransformComponent>(
 		  camera,
 		  glm::vec3(6.0, 7.0, 2.5),
 		  glm::vec3(1.0),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		m_scene.emplace<CameraComponent>(
+		scene.emplace<CameraComponent>(
 		  camera,
 		  45.0f,
 		  5.0,
@@ -354,18 +354,18 @@ private:
 		  10.0f
 		);
 
-		m_scene.emplace<LightComponent>(light, 12);
+		scene.emplace<LightComponent>(light, 12);
 	}
 
 	void create_render_graph()
 	{
-		auto* device            = m_device_system.get_device();
+		auto* device            = device_system.get_device();
 		const auto color_format = device->surface_format.format;
 		const auto depth_format = device->depth_format;
 		const auto sample_count = device->max_samples;
 
-		auto* default_texture      = m_texture_system.get_texture("default");
-		auto* default_texture_cube = m_texture_system.get_texture("default_cube");
+		auto* default_texture      = texture_system.get_texture("default");
+		auto* default_texture_cube = texture_system.get_texture("default_cube");
 
 		const std::array<float, 4> update_color  = { 1.0, 0.8, 0.8, 1.0 };
 		const std::array<float, 4> barrier_color = { 0.8, 1.0, 0.8, 1.0 };
@@ -373,7 +373,7 @@ private:
 
 		bvk::Renderpass::CreateInfo forward_pass_info {
                  "forwardpass",
-                     nullptr,
+                     {},
                  &forward_pass_update,
                  &forward_pass_render,
                  {
@@ -472,7 +472,7 @@ private:
 			}),
 		};
 
-		m_renderer.build_render_graph(
+		renderer.build_render_graph(
 		  "backbuffer",
 		  {
 		    bvk::Renderpass::CreateInfo::BufferInputInfo {

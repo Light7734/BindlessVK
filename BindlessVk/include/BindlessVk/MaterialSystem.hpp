@@ -83,33 +83,33 @@ public:
 	/** @return shader named @p name */
 	inline Shader* get_shader(const char* name)
 	{
-		return &m_shaders[HashStr(name)];
+		return &shaders[HashStr(name)];
 	}
 
 	/** @return shader effect named @p name */
 	inline ShaderEffect* get_shader_effect(const char* name)
 	{
-		return &m_shader_effects[HashStr(name)];
+		return &shader_effects[HashStr(name)];
 	}
 
 	/** @return shader pass named @p name */
 	inline ShaderPass* get_shader_pass(const char* name)
 	{
-		return &m_shader_passes[HashStr(name)];
+		return &shader_passes[HashStr(name)];
 	}
 
 	/** @return material named @p name */
 	inline Material* get_material(const char* name)
 	{
-		return &m_materials[HashStr(name)];
+		return &materials[HashStr(name)];
 	}
 
 	/** @return pipeline configuration named @p name */
 	inline const PipelineConfiguration& get_pipeline_configuration( // Nvr-gnna-gv-u-up
-	  const char* name
+	    const char* name
 	) const
 	{
-		return m_pipeline_configurations.at(HashStr(name));
+		return pipline_configurations.at(HashStr(name));
 	}
 
 	/** Initializes the material system
@@ -128,11 +128,7 @@ public:
 	 * @param path path to the compiled shader
 	 * @param stage shader stage (eg. vertex)
 	 */
-	void load_shader(
-	  const char* name,
-	  const char* path,
-	  vk::ShaderStageFlagBits stage
-	);
+	void load_shader(const char* name, const char* path, vk::ShaderStageFlagBits stage);
 
 	/** Caches pipeline states for future pipeline creation (used in shader pass)
 	 * @param name name of the pipeline configuration
@@ -148,17 +144,17 @@ public:
 	 * scissors
 	 */
 	void create_pipeline_configuration(
-	  const char* name,
-	  vk::PipelineVertexInputStateCreateInfo vertex_input_state,
-	  vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
-	  vk::PipelineTessellationStateCreateInfo tessellation_state,
-	  vk::PipelineViewportStateCreateInfo viewport_state,
-	  vk::PipelineRasterizationStateCreateInfo rasterization_state,
-	  vk::PipelineMultisampleStateCreateInfo multisample_state,
-	  vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
-	  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
-	  vk::PipelineColorBlendStateCreateInfo color_blend_state,
-	  std::vector<vk::DynamicState> dynamic_states
+	    const char* name,
+	    vk::PipelineVertexInputStateCreateInfo vertex_input_state,
+	    vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
+	    vk::PipelineTessellationStateCreateInfo tessellation_state,
+	    vk::PipelineViewportStateCreateInfo viewport_state,
+	    vk::PipelineRasterizationStateCreateInfo rasterization_state,
+	    vk::PipelineMultisampleStateCreateInfo multisample_state,
+	    vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
+	    std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
+	    vk::PipelineColorBlendStateCreateInfo color_blend_state,
+	    std::vector<vk::DynamicState> dynamic_states
 	);
 
 	/** Creates shader effect named @p name
@@ -178,11 +174,11 @@ public:
 	 * @param pipeline_configuration vulkan pipeline states
 	 */
 	void create_shader_pass(
-	  const char* name,
-	  ShaderEffect* effect,
-	  vk::Format color_attachment_format,
-	  vk::Format depth_attachment_format,
-	  PipelineConfiguration pipeline_configuration
+	    const char* name,
+	    ShaderEffect* effect,
+	    vk::Format color_attachment_format,
+	    vk::Format depth_attachment_format,
+	    PipelineConfiguration pipeline_configuration
 	);
 
 	/** Creates material named @p name shader_pass
@@ -192,25 +188,23 @@ public:
 	 * @param textures textures used in the material
 	 */
 	void create_material(
-	  const char* name,
-	  ShaderPass* shader_pass,
-	  MaterialParameters parameters,
-	  std::vector<class Texture*> textures
+	    const char* name,
+	    ShaderPass* shader_pass,
+	    MaterialParameters parameters,
+	    std::vector<class Texture*> textures
 	);
 
-
 private:
-	Device* m_device;
-	vk::DescriptorPool m_descriptor_pool = {};
+	Device* device;
+	vk::DescriptorPool descriptor_pool = {};
 
-	std::unordered_map<uint64_t, Shader> m_shaders              = {};
-	std::unordered_map<uint64_t, ShaderEffect> m_shader_effects = {};
-	std::unordered_map<uint64_t, ShaderPass> m_shader_passes    = {};
+	std::unordered_map<u64, Shader> shaders = {};
+	std::unordered_map<u64, ShaderEffect> shader_effects = {};
+	std::unordered_map<u64, ShaderPass> shader_passes = {};
 
-	std::unordered_map<uint64_t, PipelineConfiguration>
-	  m_pipeline_configurations = {};
+	std::unordered_map<u64, PipelineConfiguration> pipline_configurations = {};
 
-	std::unordered_map<uint64_t, Material> m_materials = {};
+	std::unordered_map<u64, Material> materials = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -30,8 +30,8 @@ public:
 	void init(
 	    Device* device,
 	    vk::DescriptorPool descriptor_pool,
-	    std::vector<vk::Image> swapchain_images,
-	    std::vector<vk::ImageView> swapchain_image_views
+	    vec<vk::Image> swapchain_images,
+	    vec<vk::ImageView> swapchain_image_views
 	);
 
 	/** Destroys the render graph
@@ -56,8 +56,8 @@ public:
 	 */
 	void build(
 	    std::string backbuffer_name,
-	    std::vector<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
-	    std::vector<Renderpass::CreateInfo> renderpasses,
+	    vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
+	    vec<Renderpass::CreateInfo> renderpasses,
 	    void (*on_update)(Device*, RenderGraph*, u32, void*),
 	    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
 	    vk::DebugUtilsLabelEXT update_debug_label,
@@ -69,8 +69,8 @@ public:
 	 * @param swapchain_image_views newly created (valid) swapchain image views
 	 */
 	void on_swapchain_invalidated(
-	    std::vector<vk::Image> swapchain_images,
-	    std::vector<vk::ImageView> swapchain_iamge_views
+	    vec<vk::Image> swapchain_images,
+	    vec<vk::ImageView> swapchain_iamge_views
 	);
 
 	/** Calls on_begin frame functions of the graph & passes
@@ -87,21 +87,21 @@ public:
 
 	inline void* map_descriptor_buffer(const char* name, u32 frame_index)
 	{
-		return m_buffer_inputs[HashStr(name)]->map_block(frame_index);
+		return buffer_inputs[HashStr(name)]->map_block(frame_index);
 	}
 
 	inline void unmap_descriptor_buffer(const char* name)
 	{
-		m_buffer_inputs[HashStr(name)]->unmap();
+		buffer_inputs[HashStr(name)]->unmap();
 	}
 
 private:
 	inline vk::CommandBuffer get_cmd(u32 pass_index, u32 frame_index, u32 thread_index) const
 	{
-		const u32 numPass = m_renderpasses.size();
-		const u32 numThreads = m_device->num_threads;
+		const u32 numPass = renderpasses.size();
+		const u32 numThreads = device->num_threads;
 
-		return m_secondary_cmd_buffers
+		return secondary_cmd_buffers
 		    [pass_index + (numPass * (thread_index + (numThreads * frame_index)))];
 	}
 
@@ -157,12 +157,12 @@ private:
 private:
 	struct ImageAttachment
 	{
-		std::vector<AllocatedImage> image;
-		std::vector<vk::ImageView> image_views;
+		vec<AllocatedImage> image;
+		vec<vk::ImageView> image_views;
 
 		// Transinet multi-sampled
-		std::vector<AllocatedImage> transient_ms_image;
-		std::vector<vk::ImageView> transient_ms_image_view;
+		vec<AllocatedImage> transient_ms_image;
+		vec<vk::ImageView> transient_ms_image_view;
 	};
 
 	struct AttachmentResource
@@ -201,7 +201,7 @@ private:
 		// Required for aliasing Read-Modify-Write attachments
 		std::string last_write_name;
 
-		std::vector<AttachmentResource> resources;
+		vec<AttachmentResource> resources;
 
 		Renderpass::CreateInfo::AttachmentInfo cached_renderpass_info;
 
@@ -221,38 +221,38 @@ private:
 
 
 private:
-	Device* m_device = {};
+	Device* device = {};
 
-	vk::DescriptorPool m_descriptor_pool = {};
-	std::vector<Renderpass> m_renderpasses = {};
+	vk::DescriptorPool descriptor_pool = {};
+	vec<Renderpass> renderpasses = {};
 
-	vk::PipelineLayout m_pipeline_layout = {};
-	vk::DescriptorSetLayout m_descriptor_set_layout = {};
-	std::vector<vk::DescriptorSet> m_sets = {};
+	vk::PipelineLayout pipeline_layout = {};
+	vk::DescriptorSetLayout descriptor_set_layout = {};
+	vec<vk::DescriptorSet> sets = {};
 
-	void (*m_on_update)(Device*, RenderGraph*, u32, void*);
-	void (*m_on_begin_frame)(Device*, RenderGraph*, u32, void*);
+	void (*on_update)(Device*, RenderGraph*, u32, void*);
+	void (*on_begin_frame)(Device*, RenderGraph*, u32, void*);
 
-	std::vector<AttachmentResourceContainer> m_attachment_resources = {};
+	vec<AttachmentResourceContainer> attachment_resources = {};
 
-	std::unordered_map<uint64_t, Buffer*> m_buffer_inputs = {};
+	std::unordered_map<uint64_t, Buffer*> buffer_inputs = {};
 
-	std::vector<vk::Image> m_swapchain_images = {};
-	std::vector<vk::ImageView> m_swapchain_image_views = {};
+	vec<vk::Image> swapchain_images = {};
+	vec<vk::ImageView> swapchain_image_views = {};
 
-	std::vector<std::string> m_swapchain_attachment_names = {};
-	std::string m_swapchain_resource_names = {};
-	u32 m_swapchain_resource_index = {};
+	vec<std::string> swapchain_attachment_names = {};
+	std::string swapchain_resource_names = {};
+	u32 swapchain_resource_index = {};
 
-	std::vector<Renderpass::CreateInfo> m_renderpasses_info = {};
-	std::vector<Renderpass::CreateInfo::BufferInputInfo> m_buffer_inputs_info = {};
+	vec<Renderpass::CreateInfo> renderpasses_info = {};
+	vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs_info = {};
 
-	std::vector<vk::CommandBuffer> m_secondary_cmd_buffers = {};
+	vec<vk::CommandBuffer> secondary_cmd_buffers = {};
 
-	vk::SampleCountFlagBits m_sample_count = {};
+	vk::SampleCountFlagBits sample_count = {};
 
-	vk::DebugUtilsLabelEXT m_update_debug_label;
-	vk::DebugUtilsLabelEXT m_backbuffer_barrier_debug_label;
+	vk::DebugUtilsLabelEXT update_debug_label;
+	vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label;
 };
 
 } // namespace BINDLESSVK_NAMESPACE
