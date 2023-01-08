@@ -271,16 +271,16 @@ Texture* TextureSystem::create_from_buffer(
 }
 
 Texture* TextureSystem::create_from_gltf(
-    struct tinygltf::Image* image,
+    const tinygltf::Image& image,
     vk::ImageLayout layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
 )
 {
 	return create_from_buffer(
-	    image->uri,
-	    &image->image[0],
-	    image->width,
-	    image->height,
-	    image->image.size(),
+	    image.uri,
+	    &const_cast<tinygltf::Image&>(image).image[0],
+	    image.width,
+	    image.height,
+	    image.image.size(),
 	    Texture::Type::e2D,
 	    layout
 	);

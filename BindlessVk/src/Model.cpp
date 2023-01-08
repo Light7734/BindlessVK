@@ -9,9 +9,10 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-void ModelSystem::init(Device* device)
+void ModelSystem::init(Device* device, TextureSystem* texture_system)
 {
 	this->device = device;
+	this->texture_system = texture_system;
 }
 
 void ModelSystem::reset()
@@ -23,21 +24,31 @@ void ModelSystem::reset()
 	}
 }
 
-void ModelSystem::load_model(TextureSystem& texture_system, const char* name, const char* gltf_path)
+void ModelSystem::load_gltf(const char* name, const char* gltf_path)
 {
-	tinygltf::Model input;
-	tinygltf::TinyGLTF gltf_context;
-	std::string err, warn;
-
-	std::vector<Model::Vertex> vertices;
-	std::vector<uint32_t> indices;
-
+	tinygltf::Model gltf_model = load_gltf_file(gltf_path);
 	Model& model = models[HashStr(name)];
 
+	load_mesh(gltf_model, model);
+
+	load_textures(gltf_model, model);
+
+	load_material_parameters(gltf_model, model);
+
+	create_model_gpu_buffers(name, model);
+	free_staging_data();
+}
+
+tinygltf::Model ModelSystem::load_gltf_file(const char* gltf_path)
+{
+	tinygltf::TinyGLTF gltf_context;
+	tinygltf::Model gltf_model;
+
+	std::string err, warn;
+
 	BVK_ASSERT(
-	    !gltf_context.LoadASCIIFromFile(&input, &err, &warn, gltf_path),
-	    "Failed to load gltf file: {}@{}\nerr: {}",
-	    name,
+	    !gltf_context.LoadASCIIFromFile(&gltf_model, &err, &warn, gltf_path),
+	    "Failed to load gltf file: {}\nerr: {}",
 	    gltf_path,
 	    err
 	);
@@ -47,20 +58,278 @@ void ModelSystem::load_model(TextureSystem& texture_system, const char* name, co
 		BVK_LOG(LogLvl::eWarn, warn);
 	}
 
-	// load nodes
-	for (size_t node_index : input.scenes[0].nodes)
+	return gltf_model;
+}
+
+void ModelSystem::load_textures(const tinygltf::Model& gltf_model, Model& model)
+{
+	for (auto& gltf_image : gltf_model.images)
 	{
-		load_node(input, model, input.nodes[node_index], nullptr, &vertices, &indices);
+		model.textures.push_back(texture_system->create_from_gltf(gltf_image));
+	}
+}
+
+void ModelSystem::load_mesh(const tinygltf::Model& gltf_model, Model& model)
+{
+	for (auto node_index : gltf_model.scenes[0].nodes)
+	{
+		auto* node = load_node(gltf_model, gltf_model.nodes[node_index], model, nullptr);
+		model.nodes.push_back(node);
+	}
+}
+
+Model::Node* ModelSystem::load_node(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Node& gltf_node,
+    Model& model,
+    Model::Node* parent_node
+)
+{
+	auto* node = new Model::Node(parent_node);
+	set_initial_node_transform(gltf_node, node);
+
+	if (node_has_any_children(gltf_node))
+	{
+		for (auto child_index : gltf_node.children)
+		{
+			load_node(gltf_model, gltf_model.nodes[child_index], model, node);
+		}
 	}
 
-	// load textures
-	for (tinygltf::Image& image : input.images)
+	if (node_has_any_mesh(gltf_node))
 	{
-		model.textures.push_back(texture_system.create_from_gltf(&image));
+		load_mesh_primitives(gltf_model, gltf_model.meshes[gltf_node.mesh], node);
 	}
 
-	// load material parameters
-	for (tinygltf::Material& material : input.materials)
+	return node;
+}
+
+void ModelSystem::load_mesh_primitives(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Mesh& gltf_mesh,
+    Model::Node* node
+)
+{
+	for (const auto& primitive : gltf_mesh.primitives)
+	{
+		u32 first_index = static_cast<u32>(staging_index_buffer.size());
+		u32 index_count = load_mesh_primitive_indices(gltf_model, primitive);
+
+		load_mesh_primitive_vertices(gltf_model, primitive);
+
+		node->mesh.push_back({
+		    .first_index = first_index,
+		    .index_count = index_count,
+		    .material_index = primitive.material,
+		});
+	}
+}
+
+void ModelSystem::load_mesh_primitive_vertices(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	const auto* position_buffer = get_mesh_primitive_position_buffer(gltf_model, gltf_primitive);
+	const auto* normal_buffer = get_mesh_primitive_normal_buffer(gltf_model, gltf_primitive);
+	const auto* tangent_buffer = get_mesh_primitive_tangent_buffer(gltf_model, gltf_primitive);
+	const auto* uv_buffer = get_mesh_primitive_uv_buffer(gltf_model, gltf_primitive);
+	auto vertex_count = get_mesh_primitive_vertex_count(gltf_model, gltf_primitive);
+
+	for (auto v = 0; v < vertex_count; ++v)
+	{
+		staging_vertex_buffer.push_back({
+		    glm::vec4(glm::make_vec3(&position_buffer[v * 3]), 1.0f),
+
+		    glm::normalize(
+		        glm::vec3(normal_buffer ? glm::make_vec3(&normal_buffer[v * 3]) : glm::vec3(0.0f))
+		    ),
+
+		    glm::normalize(
+		        glm::vec3(tangent_buffer ? glm::make_vec3(&tangent_buffer[v * 3]) : glm::vec3(0.0f))
+		    ),
+
+		    uv_buffer ? glm::make_vec2(&uv_buffer[v * 2]) : glm::vec3(0.0f),
+
+		    glm::vec3(1.0),
+		});
+	}
+}
+
+u32 ModelSystem::load_mesh_primitive_indices(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	u32 vertex_start = static_cast<u32>(staging_vertex_buffer.size());
+
+	const auto& accessor = gltf_model.accessors[gltf_primitive.indices];
+	const auto& buffer_view = gltf_model.bufferViews[accessor.bufferView];
+	const auto& buffer = gltf_model.buffers[buffer_view.buffer];
+
+	switch (accessor.componentType)
+	{
+	case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:
+	{
+		const u32* buf =
+		    reinterpret_cast<const u32*>(&buffer.data[accessor.byteOffset + buffer_view.byteOffset]
+		    );
+		for (size_t index = 0; index < accessor.count; index++)
+		{
+			staging_index_buffer.push_back(buf[index] + vertex_start);
+		}
+		break;
+	}
+	case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:
+	{
+		const uint16_t* buf = reinterpret_cast<const uint16_t*>(
+		    &buffer.data[accessor.byteOffset + buffer_view.byteOffset]
+		);
+		for (size_t index = 0; index < accessor.count; index++)
+		{
+			staging_index_buffer.push_back(buf[index] + vertex_start);
+		}
+		break;
+	}
+	case TINYGLTF_PARAMETER_TYPE_BYTE:
+	{
+		const uint8_t* buf = reinterpret_cast<const uint8_t*>(
+		    &buffer.data[accessor.byteOffset + buffer_view.byteOffset]
+		);
+		for (size_t index = 0; index < accessor.count; index++)
+		{
+			staging_index_buffer.push_back(buf[index] + vertex_start);
+		}
+		break;
+	}
+	}
+
+	return static_cast<u32>(accessor.count);
+}
+
+
+const float* ModelSystem::get_mesh_primitive_position_buffer(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	if (gltf_primitive.attributes.find("POSITION") == gltf_primitive.attributes.end())
+	{
+		return nullptr;
+	}
+
+	const auto& accessor = gltf_model.accessors[gltf_primitive.attributes.find("POSITION")->second];
+	const auto& view = gltf_model.bufferViews[accessor.bufferView];
+	return reinterpret_cast<const float*>(
+	    &(gltf_model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
+	);
+}
+
+const float* ModelSystem::get_mesh_primitive_normal_buffer(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	if (gltf_primitive.attributes.find("NORMAL") == gltf_primitive.attributes.end())
+	{
+		return nullptr;
+	}
+
+	const auto& accessor = gltf_model.accessors[gltf_primitive.attributes.find("NORMAL")->second];
+	const auto& view = gltf_model.bufferViews[accessor.bufferView];
+	return reinterpret_cast<const float*>(
+	    &(gltf_model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
+	);
+}
+
+
+const float* ModelSystem::get_mesh_primitive_tangent_buffer(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	if (gltf_primitive.attributes.find("TANGENT") == gltf_primitive.attributes.end())
+	{
+		return nullptr;
+	}
+
+	const auto& accessor = gltf_model.accessors[gltf_primitive.attributes.find("TANGENT")->second];
+	const auto& view = gltf_model.bufferViews[accessor.bufferView];
+	return reinterpret_cast<const float*>(
+	    &(gltf_model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
+	);
+}
+
+const float* ModelSystem::get_mesh_primitive_uv_buffer(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	if (gltf_primitive.attributes.find("TEXCOORD_0") == gltf_primitive.attributes.end())
+	{
+		return nullptr;
+	}
+
+	const auto& accessor =
+	    gltf_model.accessors[gltf_primitive.attributes.find("TEXCOORD_0")->second];
+	const auto& view = gltf_model.bufferViews[accessor.bufferView];
+	return reinterpret_cast<const float*>(
+	    &(gltf_model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
+	);
+}
+
+size_t ModelSystem::get_mesh_primitive_vertex_count(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	if (gltf_primitive.attributes.find("POSITION") == gltf_primitive.attributes.end())
+	{
+		return 0u;
+	}
+
+	const auto& accessor = gltf_model.accessors[gltf_primitive.attributes.find("POSITION")->second];
+	return accessor.count;
+}
+
+void ModelSystem::set_initial_node_transform(const tinygltf::Node& gltf_node, Model::Node* node)
+{
+	if (gltf_node.translation.size() == 3)
+	{
+		node->transform = glm::translate(
+		    node->transform,
+		    glm::vec3(glm::make_vec3(gltf_node.translation.data()))
+		);
+	}
+	if (gltf_node.rotation.size() == 4)
+	{
+		glm::quat q = glm::make_quat(gltf_node.rotation.data());
+		node->transform *= glm::mat4(q);
+	}
+	if (gltf_node.scale.size() == 3)
+	{
+		node->transform =
+		    glm::scale(node->transform, glm::vec3(glm::make_vec3(gltf_node.scale.data())));
+	}
+	if (gltf_node.matrix.size() == 16)
+	{
+		node->transform = glm::make_mat4x4(gltf_node.matrix.data());
+	};
+}
+
+bool ModelSystem::node_has_any_children(const tinygltf::Node& gltf_node)
+{
+	return gltf_node.children.size() > 1;
+}
+
+bool ModelSystem::node_has_any_mesh(const tinygltf::Node& gltf_node)
+{
+	return gltf_node.mesh > -1;
+}
+
+void ModelSystem::load_material_parameters(const tinygltf::Model& gltf_model, Model& model)
+{
+	for (auto& material : gltf_model.materials)
 	{
 		BVK_ASSERT(
 		    material.values.find("baseColorTexture") == material.values.end(),
@@ -69,225 +338,37 @@ void ModelSystem::load_model(TextureSystem& texture_system, const char* name, co
 
 		model.material_parameters.push_back({
 		    .albedo_factor = glm::vec4(1.0),
-		    .albedo_texture_index = material.values["baseColorTexture"].TextureIndex(),
+		    .albedo_texture_index = material.values.at("baseColorTexture").TextureIndex(),
 		});
 	}
+}
 
+void ModelSystem::create_model_gpu_buffers(const char* name, Model& model)
+{
 	model.vertex_buffer = new StagingBuffer(
-	    name,
+	    fmt::format("{}_model_vb", name).c_str(),
 	    device,
 	    vk::BufferUsageFlagBits::eVertexBuffer,
-	    vertices.size() * sizeof(Model::Vertex),
+	    staging_vertex_buffer.size() * sizeof(Model::Vertex),
 	    1u,
-	    vertices.data()
+	    staging_vertex_buffer.data()
 	);
-
-	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-	    vk::ObjectType::eBuffer,
-	    (uint64_t)(VkBuffer)(*model.vertex_buffer->get_buffer()),
-	    fmt::format("{}_model_vb", name).c_str(),
-	});
 
 	model.index_buffer = new StagingBuffer(
-	    name,
+	    fmt::format("{}_model_ib", name).c_str(),
 	    device,
 	    vk::BufferUsageFlagBits::eIndexBuffer,
-	    indices.size() * sizeof(uint32_t),
+	    staging_index_buffer.size() * sizeof(u32),
 	    1u,
-	    indices.data()
+	    staging_index_buffer.data()
 	);
-
-	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-	    vk::ObjectType::eBuffer,
-	    (uint64_t)(VkBuffer)(*model.index_buffer->get_buffer()),
-	    fmt::format("{}_model_ib", name).c_str(),
-	});
 }
 
-void ModelSystem::load_node(
-    tinygltf::Model& input,
-    Model& model,
-    const tinygltf::Node& input_node,
-    Model::Node* parent,
-    std::vector<Model::Vertex>* vertices,
-    std::vector<uint32_t>* indices
-)
+void ModelSystem::free_staging_data()
 {
-	Model::Node* node = new Model::Node {};
-
-	if (parent)
-	{
-		parent->children.push_back(node);
-	}
-	else
-	{
-		model.nodes.push_back(node);
-	}
-
-	node->parent = parent;
-
-	if (input_node.translation.size() == 3)
-	{
-		node->transform = glm::translate(
-		    node->transform,
-		    glm::vec3(glm::make_vec3(input_node.translation.data()))
-		);
-	}
-	if (input_node.rotation.size() == 4)
-	{
-		glm::quat q = glm::make_quat(input_node.rotation.data());
-		node->transform *= glm::mat4(q);
-	}
-	if (input_node.scale.size() == 3)
-	{
-		node->transform =
-		    glm::scale(node->transform, glm::vec3(glm::make_vec3(input_node.scale.data())));
-	}
-	if (input_node.matrix.size() == 16)
-	{
-		node->transform = glm::make_mat4x4(input_node.matrix.data());
-	};
-
-	if (input_node.children.size() > 0)
-	{
-		for (int32_t childIndex : input_node.children)
-		{
-			load_node(input, model, input.nodes[childIndex], node, vertices, indices);
-		}
-	}
-
-	if (input_node.mesh > -1)
-	{
-		tinygltf::Mesh mesh = input.meshes[input_node.mesh];
-
-		for (const tinygltf::Primitive& primitive : mesh.primitives)
-		{
-			uint32_t first_index = static_cast<uint32_t>(indices->size());
-			uint32_t vertex_start = static_cast<uint32_t>(vertices->size());
-			uint32_t index_count = 0ul;
-
-			// Vertices
-			{
-				const float* position_buffer = nullptr;
-				const float* normal_buffer = nullptr;
-				const float* tangent_buffer = nullptr;
-				const float* tex_coords_buffer = nullptr;
-				size_t vertex_count = 0ul;
-
-				if (primitive.attributes.find("POSITION") != primitive.attributes.end())
-				{
-					const tinygltf::Accessor& accessor =
-					    input.accessors[primitive.attributes.find("POSITION")->second];
-					const tinygltf::BufferView& view = input.bufferViews[accessor.bufferView];
-
-					position_buffer = reinterpret_cast<const float*>(
-					    &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
-					);
-					vertex_count = accessor.count;
-				}
-
-				if (primitive.attributes.find("NORMAL") != primitive.attributes.end())
-				{
-					const tinygltf::Accessor& accessor =
-					    input.accessors[primitive.attributes.find("NORMAL")->second];
-					const tinygltf::BufferView& view = input.bufferViews[accessor.bufferView];
-
-					normal_buffer = reinterpret_cast<const float*>(
-					    &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
-					);
-				}
-
-				if (primitive.attributes.find("TANGENT") != primitive.attributes.end())
-				{
-					const tinygltf::Accessor& accessor =
-					    input.accessors[primitive.attributes.find("TANGENT")->second];
-					const tinygltf::BufferView& view = input.bufferViews[accessor.bufferView];
-					tangent_buffer = reinterpret_cast<const float*>(
-					    &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
-					);
-				}
-				if (primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end())
-				{
-					const tinygltf::Accessor& accessor =
-					    input.accessors[primitive.attributes.find("TEXCOORD_0")->second];
-					const tinygltf::BufferView& view = input.bufferViews[accessor.bufferView];
-					tex_coords_buffer = reinterpret_cast<const float*>(
-					    &(input.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
-					);
-				}
-
-				for (size_t v = 0; v < vertex_count; ++v)
-				{
-					vertices->push_back({
-					    .position = glm::vec4(glm::make_vec3(&position_buffer[v * 3]), 1.0f),
-					    .normal = glm::normalize(glm::vec3(
-					        normal_buffer ? glm::make_vec3(&normal_buffer[v * 3]) : glm::vec3(0.0f)
-					    )),
-					    .tangent = glm::normalize(glm::vec3(
-					        tangent_buffer ? glm::make_vec3(&tangent_buffer[v * 3]) :
-					                         glm::vec3(0.0f)
-					    )),
-					    .uv = tex_coords_buffer ? glm::make_vec2(&tex_coords_buffer[v * 2]) :
-					                              glm::vec3(0.0f),
-					    .color = glm::vec3(1.0),
-					});
-				}
-			}
-
-			// Indices
-			{
-				const tinygltf::Accessor& accessor = input.accessors[primitive.indices];
-
-				const tinygltf::BufferView& buffer_view = input.bufferViews[accessor.bufferView];
-
-				const tinygltf::Buffer& buffer = input.buffers[buffer_view.buffer];
-
-				index_count += static_cast<uint32_t>(accessor.count);
-
-				switch (accessor.componentType)
-				{
-				case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:
-				{
-					const uint32_t* buf = reinterpret_cast<const uint32_t*>(
-					    &buffer.data[accessor.byteOffset + buffer_view.byteOffset]
-					);
-					for (size_t index = 0; index < accessor.count; index++)
-					{
-						indices->push_back(buf[index] + vertex_start);
-					}
-					break;
-				}
-				case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:
-				{
-					const uint16_t* buf = reinterpret_cast<const uint16_t*>(
-					    &buffer.data[accessor.byteOffset + buffer_view.byteOffset]
-					);
-					for (size_t index = 0; index < accessor.count; index++)
-					{
-						indices->push_back(buf[index] + vertex_start);
-					}
-					break;
-				}
-				case TINYGLTF_PARAMETER_TYPE_BYTE:
-				{
-					const uint8_t* buf = reinterpret_cast<const uint8_t*>(
-					    &buffer.data[accessor.byteOffset + buffer_view.byteOffset]
-					);
-					for (size_t index = 0; index < accessor.count; index++)
-					{
-						indices->push_back(buf[index] + vertex_start);
-					}
-					break;
-				}
-				}
-			}
-
-			node->mesh.push_back({
-			    .first_index = first_index,
-			    .index_count = index_count,
-			    .material_index = primitive.material,
-			});
-		}
-	}
+	staging_vertex_buffer.clear();
+	staging_index_buffer.clear();
 }
+
+
 } // namespace BINDLESSVK_NAMESPACE

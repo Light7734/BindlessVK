@@ -127,11 +127,9 @@ Application::Application()
 	material_system.init(device);
 
 	// @todo: refactor out getting a command pool from renderer
-	model_system.init(device);
-
+	model_system.init(device, &texture_system);
 
 	initialize_imgui(device, renderer, window);
-
 
 	camera_controller = CameraController(&scene, &window);
 }

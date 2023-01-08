@@ -40,6 +40,7 @@ public:
 	{
 		return std::get<bool>(m_value);
 	}
+
 	inline operator bool*()
 	{
 		return std::get_if<bool>(&m_value);
@@ -49,6 +50,7 @@ public:
 	{
 		return std::get<float>(m_value);
 	}
+
 	inline operator float*()
 	{
 		return std::get_if<float>(&m_value);
@@ -58,6 +60,7 @@ public:
 	{
 		return std::get<int>(m_value);
 	}
+
 	inline operator int*()
 	{
 		return std::get_if<int>(&m_value);
@@ -67,6 +70,7 @@ public:
 	{
 		return std::get<std::string>(m_value);
 	}
+
 	inline operator std::string*()
 	{
 		return std::get_if<std::string>(&m_value);

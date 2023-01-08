@@ -75,7 +75,7 @@ public:
 	 * @note name of the texture will be @p image->uri
 	 */
 	Texture* create_from_gltf(
-	    struct tinygltf::Image* image,
+	    const tinygltf::Image& image,
 	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
 	);
 

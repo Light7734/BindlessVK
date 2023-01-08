@@ -287,9 +287,8 @@ private:
 	// @todo: Load from files instead of hard-coding
 	void load_models()
 	{
-		model_system
-		  .load_model(texture_system, "flight_helmet", "Assets/FlightHelmet/FlightHelmet.gltf");
-		model_system.load_model(texture_system, "skybox", "Assets/Cube/Cube.gltf");
+		model_system.load_gltf("flight_helmet", "Assets/FlightHelmet/FlightHelmet.gltf");
+		model_system.load_gltf("skybox", "Assets/Cube/Cube.gltf");
 	}
 
 	// @todo: Load from files instead of hard-coding

@@ -718,30 +718,7 @@ void RenderGraph::create_attachment_resource(
 	);
 
 	// Set image extent
-	vk::Extent3D image_extent;
-	switch (attachment_info.size_type)
-	{
-	case Renderpass::CreateInfo::SizeType::eSwapchainRelative:
-	{
-		image_extent = {
-			.width = static_cast<u32>(device->framebuffer_extent.width * attachment_info.size.x),
-			.height = static_cast<u32>(device->framebuffer_extent.height * attachment_info.size.y),
-			.depth = 1,
-		};
-		break;
-	}
-
-	case Renderpass::CreateInfo::SizeType::eAbsolute:
-		image_extent = {
-			.width = static_cast<u32>(attachment_info.size.x),
-			.height = static_cast<u32>(attachment_info.size.y),
-			.depth = 1,
-		};
-		break;
-
-	case Renderpass::CreateInfo::SizeType::eRelative:
-	default: BVK_ASSERT(true, "Invalid/Unsupported attachment size type");
-	};
+	vk::Extent3D image_extent = calculate_attachment_image_extent(attachment_info);
 
 	auto* resource_container = recreate_resource_index == UINT32_MAX ?
 	                             &attachment_resources.back() :
@@ -1223,6 +1200,33 @@ void RenderGraph::apply_backbuffer_barrier(vk::CommandBuffer cmd, u32 frame_inde
 	backbuffer_resource.src_access_mask = {};
 
 	cmd.endDebugUtilsLabelEXT();
+}
+
+vk::Extent3D RenderGraph::calculate_attachment_image_extent(
+    const Renderpass::CreateInfo::AttachmentInfo& attachment_info
+)
+{
+	switch (attachment_info.size_type)
+	{
+	case Renderpass::CreateInfo::SizeType::eSwapchainRelative:
+	{
+		return {
+			static_cast<u32>(device->framebuffer_extent.width * attachment_info.size.x),
+			static_cast<u32>(device->framebuffer_extent.height * attachment_info.size.y),
+			1,
+		};
+	}
+
+	case Renderpass::CreateInfo::SizeType::eAbsolute:
+		return {
+			static_cast<u32>(attachment_info.size.x),
+			static_cast<u32>(attachment_info.size.y),
+			1,
+		};
+
+	case Renderpass::CreateInfo::SizeType::eRelative:
+	default: BVK_ASSERT(true, "Invalid/Unsupported attachment size type");
+	};
 }
 
 } // namespace BINDLESSVK_NAMESPACE

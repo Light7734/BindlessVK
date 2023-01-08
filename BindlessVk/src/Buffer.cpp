@@ -59,6 +59,13 @@ Buffer::Buffer(
 		0u,            // offset
 		VK_WHOLE_SIZE, // range
 	};
+
+
+	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    vk::ObjectType::eBuffer,
+	    (u64)(VkBuffer)(buffer.buffer),
+	    name,
+	});
 }
 
 Buffer::~Buffer()
@@ -135,6 +142,12 @@ StagingBuffer::StagingBuffer(
 			});
 		}
 	}
+
+	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    vk::ObjectType::eBuffer,
+	    (u64)(VkBuffer)(buffer.buffer),
+	    name,
+	});
 }
 
 StagingBuffer::~StagingBuffer()

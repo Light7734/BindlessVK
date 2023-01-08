@@ -130,6 +130,10 @@ private:
 
 	void build_pass_cmd_buffer_begin_infos();
 
+	vk::Extent3D calculate_attachment_image_extent(
+	    const Renderpass::CreateInfo::AttachmentInfo& attachment_info
+	);
+
 	void record_pass_cmds(
 	    vk::CommandBuffer cmd,
 	    u32 frame_index,

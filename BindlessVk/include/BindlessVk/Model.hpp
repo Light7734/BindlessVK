@@ -13,6 +13,8 @@
 namespace tinygltf {
 struct Node;
 struct Model;
+struct Mesh;
+struct Primitive;
 } // namespace tinygltf
 
 namespace BINDLESSVK_NAMESPACE {
@@ -116,6 +118,10 @@ public:
 
 	struct Node
 	{
+		Node(Node* parent): parent(parent)
+		{
+		}
+
 		~Node()
 		{
 			for (auto* node : children)
@@ -161,7 +167,7 @@ public:
 	/** Initializes the model system
 	 * @param device the bindlessvk device
 	 */
-	void init(Device* device);
+	void init(Device* device, TextureSystem* texture_system);
 
 	/** Destroys the model system */
 	void reset();
@@ -172,7 +178,7 @@ public:
 	 * @param gltf_path path to the gltf model file
 	 * @todo tidy this mess of passing texture system around??
 	 */
-	void load_model(TextureSystem& texture_system, const char* name, const char* gltf_path);
+	void load_gltf(const char* name, const char* gltf_path);
 
 	/** @return the model named @p name */
 	inline Model* get_model(const char* name)
@@ -181,19 +187,78 @@ public:
 	}
 
 private:
-	void load_node(
-	    struct tinygltf::Model& input,
+	tinygltf::Model load_gltf_file(const char* gltf_path);
+	void load_mesh(const tinygltf::Model& gltf_model, Model& model);
+	void load_textures(const tinygltf::Model& gltf_model, Model& model);
+	void load_material_parameters(const tinygltf::Model& gltf_model, Model& model);
+	void create_model_gpu_buffers(const char* name, Model& model);
+
+	Model::Node* load_node(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Node& gltf_node,
 	    Model& model,
-	    const tinygltf::Node& input_node,
-	    Model::Node* parent,
-	    std::vector<Model::Vertex>* vertices,
-	    std::vector<uint32_t>* indices
+	    Model::Node* parent_node
 	);
+
+	void load_mesh_primitives(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Mesh& gltf_mesh,
+	    Model::Node* node
+	);
+
+	void load_mesh_primitive_vertices(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	u32 load_mesh_primitive_indices(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	const float* get_mesh_primitive_position_buffer(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	const float* get_mesh_primitive_normal_buffer(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	const float* get_mesh_primitive_tangent_buffer(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	const float* get_mesh_primitive_uv_buffer(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	size_t get_mesh_primitive_vertex_count(
+	    const tinygltf::Model& gltf_model,
+	    const tinygltf::Primitive& gltf_primitive
+	);
+
+	void set_initial_node_transform(const tinygltf::Node& gltf_node, Model::Node* node);
+
+	void free_staging_data();
+
+	bool node_has_any_children(const tinygltf::Node& gltf_node);
+	bool node_has_any_mesh(const tinygltf::Node& gltf_node);
+
 
 private:
 	Device* device;
+
+	TextureSystem* texture_system;
+
 	vk::CommandPool command_pool;
 	std::unordered_map<uint64_t, Model> models;
+
+	std::vector<Model::Vertex> staging_vertex_buffer;
+	std::vector<uint32_t> staging_index_buffer;
 };
 
 } // namespace BINDLESSVK_NAMESPACE
