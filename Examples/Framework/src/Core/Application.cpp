@@ -127,7 +127,7 @@ Application::Application()
 	material_system.init(device);
 
 	// @todo: refactor out getting a command pool from renderer
-	model_system.init(device, &texture_system);
+	model_loader.init(device, &texture_system);
 
 	initialize_imgui(device, renderer, window);
 
@@ -143,7 +143,14 @@ Application::~Application()
 	renderer.reset();
 	texture_system.reset();
 	material_system.reset();
-	model_system.reset();
+
+	for (auto& [key, val] : models) {
+		delete val.vertex_buffer;
+		delete val.index_buffer;
+	}
+
+	models.clear();
+
 	device_system.reset();
 }
 

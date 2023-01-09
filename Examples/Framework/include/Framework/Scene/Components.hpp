@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/MaterialSystem.hpp"
-#include "BindlessVk/Model.hpp"
+#include "BindlessVk/ModelLoader.hpp"
 #include "Framework/Core/Common.hpp"
 
 #include <glm/glm.hpp>

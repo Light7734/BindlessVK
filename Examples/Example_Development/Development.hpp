@@ -116,7 +116,7 @@ private:
 
 		material_system.create_pipeline_configuration(
 		  "opaque_mesh",
-		  bvk::VertexTypes::Model::get_vertex_input_state(),
+		  bvk::Model::Vertex::get_vertex_input_state(),
 		  vk::PipelineInputAssemblyStateCreateInfo {
 		    {},
 		    vk::PrimitiveTopology::eTriangleList,
@@ -183,7 +183,7 @@ private:
 
 		material_system.create_pipeline_configuration(
 		  "skybox",
-		  bvk::VertexTypes::Model::get_vertex_input_state(),
+		  bvk::Model::Vertex::get_vertex_input_state(),
 		  vk::PipelineInputAssemblyStateCreateInfo {
 		    {},
 		    vk::PrimitiveTopology::eTriangleList,
@@ -287,8 +287,12 @@ private:
 	// @todo: Load from files instead of hard-coding
 	void load_models()
 	{
-		model_system.load_gltf("flight_helmet", "Assets/FlightHelmet/FlightHelmet.gltf");
-		model_system.load_gltf("skybox", "Assets/Cube/Cube.gltf");
+		models[bvk::HashStr("flight_helmet")] = model_loader.load_from_gltf(
+		  "flight_helmet",
+		  "Assets/FlightHelmet/FlightHelmet.gltf"
+		);
+
+		models[bvk::HashStr("skybox")] = model_loader.load_from_gltf("skybox", "Assets/Cube/Cube.gltf");
 	}
 
 	// @todo: Load from files instead of hard-coding
@@ -306,7 +310,7 @@ private:
 		scene.emplace<StaticMeshRendererComponent>(
 		  testModel,
 		  material_system.get_material("opaque_mesh"),
-		  model_system.get_model("flight_helmet")
+		  &models[bvk::HashStr("flight_helmet")]
 		);
 
 		Entity skybox = scene.create();
@@ -320,7 +324,7 @@ private:
 		scene.emplace<StaticMeshRendererComponent>(
 		  skybox,
 		  material_system.get_material("skybox"),
-		  model_system.get_model("skybox")
+		  &models[bvk::HashStr("skybox")]
 		);
 
 		Entity light = scene.create();

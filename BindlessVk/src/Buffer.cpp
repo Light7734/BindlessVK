@@ -1,7 +1,6 @@
 #include "BindlessVk/Buffer.hpp"
 
 #include "BindlessVk/BindlessVkConfig.hpp"
-#include "BindlessVk/Model.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -123,6 +122,8 @@ StagingBuffer::StagingBuffer(
 		if (initial_data)
 		{
 			// Copy starting data to staging buffer
+			// @todo make it possible to create a staging buffer, map initial data,
+			//          write to the mapped memory, then create the vk buffer, to avoid memcpy
 			memcpy(
 			    device->allocator.mapMemory(staging_buffer),
 			    initial_data,

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/MaterialSystem.hpp"
-#include "BindlessVk/Model.hpp"
+#include "BindlessVk/ModelLoader.hpp"
 #include "BindlessVk/Renderer.hpp"
 #include "BindlessVk/Texture.hpp"
 #include "Framework/Core/Common.hpp"
@@ -35,7 +35,9 @@ public:
 	bvk::Renderer renderer;
 	bvk::TextureSystem texture_system;
 	bvk::MaterialSystem material_system;
-	bvk::ModelSystem model_system;
+	bvk::ModelLoader model_loader;
+
+	std::unordered_map<uint64_t, bvk::Model> models;
 
 	CameraController camera_controller;
 

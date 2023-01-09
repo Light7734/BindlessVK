@@ -1,4 +1,4 @@
-#include "BindlessVk/Model.hpp"
+#include "BindlessVk/ModelLoader.hpp"
 
 #include "BindlessVk/Buffer.hpp"
 
@@ -9,37 +9,27 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-void ModelSystem::init(Device* device, TextureSystem* texture_system)
+void ModelLoader::init(Device* device, TextureSystem* texture_system)
 {
 	this->device = device;
 	this->texture_system = texture_system;
 }
 
-void ModelSystem::reset()
+Model ModelLoader::load_from_gltf(const char* name, const char* gltf_path)
 {
-	for (auto& [key, val] : models)
-	{
-		delete val.vertex_buffer;
-		delete val.index_buffer;
-	}
-}
-
-void ModelSystem::load_gltf(const char* name, const char* gltf_path)
-{
-	tinygltf::Model gltf_model = load_gltf_file(gltf_path);
-	Model& model = models[HashStr(name)];
-
-	load_mesh(gltf_model, model);
+	auto gltf_model = load_gltf_file(gltf_path);
+	auto model = Model { name };
 
 	load_textures(gltf_model, model);
-
 	load_material_parameters(gltf_model, model);
 
-	create_model_gpu_buffers(name, model);
-	free_staging_data();
+	auto mesh_data = load_mesh(gltf_model, model);
+	copy_mesh_data_to_gpu(model, mesh_data);
+
+	return model;
 }
 
-tinygltf::Model ModelSystem::load_gltf_file(const char* gltf_path)
+tinygltf::Model ModelLoader::load_gltf_file(const char* gltf_path)
 {
 	tinygltf::TinyGLTF gltf_context;
 	tinygltf::Model gltf_model;
@@ -61,7 +51,7 @@ tinygltf::Model ModelSystem::load_gltf_file(const char* gltf_path)
 	return gltf_model;
 }
 
-void ModelSystem::load_textures(const tinygltf::Model& gltf_model, Model& model)
+void ModelLoader::load_textures(const tinygltf::Model& gltf_model, Model& model)
 {
 	for (auto& gltf_image : gltf_model.images)
 	{
@@ -69,20 +59,41 @@ void ModelSystem::load_textures(const tinygltf::Model& gltf_model, Model& model)
 	}
 }
 
-void ModelSystem::load_mesh(const tinygltf::Model& gltf_model, Model& model)
+void ModelLoader::load_material_parameters(const tinygltf::Model& gltf_model, Model& model)
 {
-	for (auto node_index : gltf_model.scenes[0].nodes)
+	for (auto& material : gltf_model.materials)
 	{
-		auto* node = load_node(gltf_model, gltf_model.nodes[node_index], model, nullptr);
-		model.nodes.push_back(node);
+		BVK_ASSERT(
+		    material.values.find("baseColorTexture") == material.values.end(),
+		    "Material doesn't have required values"
+		);
+
+		model.material_parameters.push_back({
+		    .albedo_factor = glm::vec4(1.0),
+		    .albedo_texture_index = material.values.at("baseColorTexture").TextureIndex(),
+		});
 	}
 }
 
-Model::Node* ModelSystem::load_node(
+ModelLoader::MeshData ModelLoader::load_mesh(const tinygltf::Model& gltf_model, Model& model)
+{
+	MeshData mesh_data;
+
+	for (auto gltf_node_index : gltf_model.scenes[0].nodes)
+	{
+		const auto& gltf_node = gltf_model.nodes[gltf_node_index];
+		model.nodes.push_back(load_node(gltf_model, gltf_node, model, nullptr, mesh_data));
+	}
+
+	return mesh_data;
+}
+
+Model::Node* ModelLoader::load_node(
     const tinygltf::Model& gltf_model,
     const tinygltf::Node& gltf_node,
     Model& model,
-    Model::Node* parent_node
+    Model::Node* parent_node,
+    MeshData& out_mesh_data
 )
 {
 	auto* node = new Model::Node(parent_node);
@@ -90,55 +101,61 @@ Model::Node* ModelSystem::load_node(
 
 	if (node_has_any_children(gltf_node))
 	{
-		for (auto child_index : gltf_node.children)
+		for (auto gltf_node_index : gltf_node.children)
 		{
-			load_node(gltf_model, gltf_model.nodes[child_index], model, node);
+			const auto& child_gltf_node = gltf_model.nodes[gltf_node_index];
+			load_node(gltf_model, child_gltf_node, model, node, out_mesh_data);
 		}
 	}
 
 	if (node_has_any_mesh(gltf_node))
 	{
-		load_mesh_primitives(gltf_model, gltf_model.meshes[gltf_node.mesh], node);
+		const auto& gltf_mesh = gltf_model.meshes[gltf_node.mesh];
+		load_mesh_primitives(gltf_model, gltf_mesh, node, out_mesh_data);
 	}
 
 	return node;
 }
 
-void ModelSystem::load_mesh_primitives(
+void ModelLoader::load_mesh_primitives(
     const tinygltf::Model& gltf_model,
     const tinygltf::Mesh& gltf_mesh,
-    Model::Node* node
+    Model::Node* node,
+    MeshData& out_mesh_data
 )
 {
-	for (const auto& primitive : gltf_mesh.primitives)
+	for (const auto& gltf_primitive : gltf_mesh.primitives)
 	{
-		u32 first_index = static_cast<u32>(staging_index_buffer.size());
-		u32 index_count = load_mesh_primitive_indices(gltf_model, primitive);
+		auto first_index = out_mesh_data.index_buffer.size();
+		auto index_count = get_mesh_primitive_index_count(gltf_model, gltf_primitive);
 
-		load_mesh_primitive_vertices(gltf_model, primitive);
+		load_mesh_primitive_indices(gltf_model, gltf_primitive, out_mesh_data);
+		load_mesh_primitive_vertices(gltf_model, gltf_primitive, out_mesh_data);
 
 		node->mesh.push_back({
-		    .first_index = first_index,
-		    .index_count = index_count,
-		    .material_index = primitive.material,
+		    static_cast<u32>(first_index),
+		    index_count,
+		    gltf_primitive.material,
 		});
 	}
 }
 
-void ModelSystem::load_mesh_primitive_vertices(
+void ModelLoader::load_mesh_primitive_vertices(
     const tinygltf::Model& gltf_model,
-    const tinygltf::Primitive& gltf_primitive
+    const tinygltf::Primitive& gltf_primitive,
+    MeshData& out_mesh_data
 )
 {
 	const auto* position_buffer = get_mesh_primitive_position_buffer(gltf_model, gltf_primitive);
 	const auto* normal_buffer = get_mesh_primitive_normal_buffer(gltf_model, gltf_primitive);
 	const auto* tangent_buffer = get_mesh_primitive_tangent_buffer(gltf_model, gltf_primitive);
 	const auto* uv_buffer = get_mesh_primitive_uv_buffer(gltf_model, gltf_primitive);
+
 	auto vertex_count = get_mesh_primitive_vertex_count(gltf_model, gltf_primitive);
 
 	for (auto v = 0; v < vertex_count; ++v)
 	{
-		staging_vertex_buffer.push_back({
+		out_mesh_data.vertex_buffer.push_back({
 		    glm::vec4(glm::make_vec3(&position_buffer[v * 3]), 1.0f),
 
 		    glm::normalize(
@@ -156,12 +173,13 @@ void ModelSystem::load_mesh_primitive_vertices(
 	}
 }
 
-u32 ModelSystem::load_mesh_primitive_indices(
+u32 ModelLoader::load_mesh_primitive_indices(
     const tinygltf::Model& gltf_model,
-    const tinygltf::Primitive& gltf_primitive
+    const tinygltf::Primitive& gltf_primitive,
+    MeshData& out_mesh_data
 )
 {
-	u32 vertex_start = static_cast<u32>(staging_vertex_buffer.size());
+	u32 vertex_start = static_cast<u32>(out_mesh_data.vertex_buffer.size());
 
 	const auto& accessor = gltf_model.accessors[gltf_primitive.indices];
 	const auto& buffer_view = gltf_model.bufferViews[accessor.bufferView];
@@ -176,7 +194,7 @@ u32 ModelSystem::load_mesh_primitive_indices(
 		    );
 		for (size_t index = 0; index < accessor.count; index++)
 		{
-			staging_index_buffer.push_back(buf[index] + vertex_start);
+			out_mesh_data.index_buffer.push_back(buf[index] + vertex_start);
 		}
 		break;
 	}
@@ -187,7 +205,7 @@ u32 ModelSystem::load_mesh_primitive_indices(
 		);
 		for (size_t index = 0; index < accessor.count; index++)
 		{
-			staging_index_buffer.push_back(buf[index] + vertex_start);
+			out_mesh_data.index_buffer.push_back(buf[index] + vertex_start);
 		}
 		break;
 	}
@@ -198,7 +216,7 @@ u32 ModelSystem::load_mesh_primitive_indices(
 		);
 		for (size_t index = 0; index < accessor.count; index++)
 		{
-			staging_index_buffer.push_back(buf[index] + vertex_start);
+			out_mesh_data.index_buffer.push_back(buf[index] + vertex_start);
 		}
 		break;
 	}
@@ -208,7 +226,7 @@ u32 ModelSystem::load_mesh_primitive_indices(
 }
 
 
-const float* ModelSystem::get_mesh_primitive_position_buffer(
+const float* ModelLoader::get_mesh_primitive_position_buffer(
     const tinygltf::Model& gltf_model,
     const tinygltf::Primitive& gltf_primitive
 )
@@ -225,7 +243,7 @@ const float* ModelSystem::get_mesh_primitive_position_buffer(
 	);
 }
 
-const float* ModelSystem::get_mesh_primitive_normal_buffer(
+const float* ModelLoader::get_mesh_primitive_normal_buffer(
     const tinygltf::Model& gltf_model,
     const tinygltf::Primitive& gltf_primitive
 )
@@ -243,7 +261,7 @@ const float* ModelSystem::get_mesh_primitive_normal_buffer(
 }
 
 
-const float* ModelSystem::get_mesh_primitive_tangent_buffer(
+const float* ModelLoader::get_mesh_primitive_tangent_buffer(
     const tinygltf::Model& gltf_model,
     const tinygltf::Primitive& gltf_primitive
 )
@@ -260,7 +278,7 @@ const float* ModelSystem::get_mesh_primitive_tangent_buffer(
 	);
 }
 
-const float* ModelSystem::get_mesh_primitive_uv_buffer(
+const float* ModelLoader::get_mesh_primitive_uv_buffer(
     const tinygltf::Model& gltf_model,
     const tinygltf::Primitive& gltf_primitive
 )
@@ -278,7 +296,7 @@ const float* ModelSystem::get_mesh_primitive_uv_buffer(
 	);
 }
 
-size_t ModelSystem::get_mesh_primitive_vertex_count(
+size_t ModelLoader::get_mesh_primitive_vertex_count(
     const tinygltf::Model& gltf_model,
     const tinygltf::Primitive& gltf_primitive
 )
@@ -292,7 +310,15 @@ size_t ModelSystem::get_mesh_primitive_vertex_count(
 	return accessor.count;
 }
 
-void ModelSystem::set_initial_node_transform(const tinygltf::Node& gltf_node, Model::Node* node)
+u32 ModelLoader::get_mesh_primitive_index_count(
+    const tinygltf::Model& gltf_model,
+    const tinygltf::Primitive& gltf_primitive
+)
+{
+	return gltf_model.accessors[gltf_primitive.indices].count;
+}
+
+void ModelLoader::set_initial_node_transform(const tinygltf::Node& gltf_node, Model::Node* node)
 {
 	if (gltf_node.translation.size() == 3)
 	{
@@ -317,58 +343,38 @@ void ModelSystem::set_initial_node_transform(const tinygltf::Node& gltf_node, Mo
 	};
 }
 
-bool ModelSystem::node_has_any_children(const tinygltf::Node& gltf_node)
+bool ModelLoader::node_has_any_children(const tinygltf::Node& gltf_node)
 {
 	return gltf_node.children.size() > 1;
 }
 
-bool ModelSystem::node_has_any_mesh(const tinygltf::Node& gltf_node)
+bool ModelLoader::node_has_any_mesh(const tinygltf::Node& gltf_node)
 {
 	return gltf_node.mesh > -1;
 }
 
-void ModelSystem::load_material_parameters(const tinygltf::Model& gltf_model, Model& model)
-{
-	for (auto& material : gltf_model.materials)
-	{
-		BVK_ASSERT(
-		    material.values.find("baseColorTexture") == material.values.end(),
-		    "Material doesn't have required values"
-		);
-
-		model.material_parameters.push_back({
-		    .albedo_factor = glm::vec4(1.0),
-		    .albedo_texture_index = material.values.at("baseColorTexture").TextureIndex(),
-		});
-	}
-}
-
-void ModelSystem::create_model_gpu_buffers(const char* name, Model& model)
+void ModelLoader::copy_mesh_data_to_gpu(Model& model, MeshData& mesh_data)
 {
 	model.vertex_buffer = new StagingBuffer(
-	    fmt::format("{}_model_vb", name).c_str(),
+	    fmt::format("{}_model_vb", model.name).c_str(),
 	    device,
 	    vk::BufferUsageFlagBits::eVertexBuffer,
-	    staging_vertex_buffer.size() * sizeof(Model::Vertex),
+
+	    mesh_data.vertex_buffer.size() * sizeof(Model::Vertex),
 	    1u,
-	    staging_vertex_buffer.data()
+	    mesh_data.vertex_buffer.data()
 	);
 
 	model.index_buffer = new StagingBuffer(
-	    fmt::format("{}_model_ib", name).c_str(),
+	    fmt::format("{}_model_ib", model.name).c_str(),
 	    device,
 	    vk::BufferUsageFlagBits::eIndexBuffer,
-	    staging_index_buffer.size() * sizeof(u32),
+	    mesh_data.index_buffer.size() * sizeof(u32),
 	    1u,
-	    staging_index_buffer.data()
+	    mesh_data.index_buffer.data()
 	);
-}
 
-void ModelSystem::free_staging_data()
-{
-	staging_vertex_buffer.clear();
-	staging_index_buffer.clear();
+	device->logical.waitIdle();
 }
-
 
 } // namespace BINDLESSVK_NAMESPACE

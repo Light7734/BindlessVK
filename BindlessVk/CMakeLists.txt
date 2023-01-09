@@ -7,7 +7,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Common.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Device.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Model.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
