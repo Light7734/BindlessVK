@@ -127,13 +127,12 @@ Application::Application()
 	material_system.init(device);
 
 	// @todo: refactor out getting a command pool from renderer
-	model_loader.init(device, &texture_system);
+	bvk::ModelLoader model_loader = bvk::ModelLoader(device, &texture_system);
 
 	initialize_imgui(device, renderer, window);
 
 	camera_controller = CameraController(&scene, &window);
 }
-
 
 Application::~Application()
 {

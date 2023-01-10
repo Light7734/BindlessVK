@@ -287,12 +287,12 @@ private:
 	// @todo: Load from files instead of hard-coding
 	void load_models()
 	{
-		models[bvk::HashStr("flight_helmet")] = model_loader.load_from_gltf(
+		models[bvk::HashStr("flight_helmet")] = model_loader.load_from_gltf_ascii(
 		  "flight_helmet",
 		  "Assets/FlightHelmet/FlightHelmet.gltf"
 		);
 
-		models[bvk::HashStr("skybox")] = model_loader.load_from_gltf("skybox", "Assets/Cube/Cube.gltf");
+		models[bvk::HashStr("skybox")] = model_loader.load_from_gltf_ascii("skybox", "Assets/Cube/Cube.gltf");
 	}
 
 	// @todo: Load from files instead of hard-coding

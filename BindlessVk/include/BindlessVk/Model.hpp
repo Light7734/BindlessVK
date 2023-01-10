@@ -1,3 +1,5 @@
+#pragma once
+
 #include "BindlessVk/Common.hpp"
 
 #include <glm/glm.hpp>

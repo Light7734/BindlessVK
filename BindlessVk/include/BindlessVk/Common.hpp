@@ -27,17 +27,48 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+// primitve type aliases
+using u8 = uint8_t;
+using u16 = uint16_t;
+using u32 = uint32_t;
+using u64 = uint64_t;
+
+using i8 = int8_t;
+using i16 = int8_t;
+using i32 = int32_t;
+using i64 = int64_t;
+
+using f32 = float;
+using f64 = double;
+
+using usize = size_t;
+
+// c-style string alias
+using cstr = const char*;
+
+// standard type aliases
+using str = std::string;
+
+template<typename T>
+using vec = std::vector<T>;
+
+template<typename T, size_t N>
+using arr = std::array<T, N>;
+
+template<typename F>
+using fn = std::function<F>;
+
 //@note: If BVK_LOG is not overriden by the user
 // then values should reflect spdlog::level::level_enum
 enum class LogLvl
 {
-	eTrace    = 0,
-	eDebug    = 1,
-	eInfo     = 2,
-	eWarn     = 3,
-	eError    = 4,
+	eTrace = 0,
+	eDebug = 1,
+	eInfo = 2,
+	eWarn = 3,
+	eError = 4,
 	eCritical = 5,
-	eOff      = 6,
+	eOff = 6,
 
 	nCount,
 };
