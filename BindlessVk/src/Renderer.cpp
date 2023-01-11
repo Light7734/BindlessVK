@@ -6,7 +6,46 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-void Renderer::reset()
+Renderer::Renderer(Device* device)
+{
+	this->device = device;
+
+	create_sync_objects();
+	create_descriptor_pools();
+	create_cmd_buffers();
+	on_swapchain_invalidated();
+}
+
+Renderer::Renderer(Renderer&& other)
+{
+	swap(std::move(other));
+}
+
+Renderer& Renderer::operator=(Renderer&& rhs)
+{
+	swap(std::move(rhs));
+	return *this;
+}
+
+void Renderer::swap(Renderer&& other)
+{
+	this->device = other.device;
+	this->render_graph = other.render_graph;
+	this->render_fences = other.render_fences;
+	this->render_semaphores = other.render_semaphores;
+	this->present_semaphores = other.present_semaphores;
+	this->is_swapchain_invalid = other.is_swapchain_invalid;
+	this->swapchain = other.swapchain;
+	this->swapchain_images = other.swapchain_images;
+	this->swapchain_image_views = other.swapchain_image_views;
+	this->descriptor_pool = other.descriptor_pool;
+	this->cmd_buffers = other.cmd_buffers;
+	this->current_frame = other.current_frame;
+
+	other.device = {};
+}
+
+Renderer::~Renderer()
 {
 	if (!device)
 	{
@@ -27,16 +66,6 @@ void Renderer::reset()
 	device->logical.destroyDescriptorPool(descriptor_pool);
 
 	device->logical.destroySwapchainKHR(swapchain);
-}
-
-void Renderer::init(Device* device)
-{
-	this->device = device;
-
-	create_sync_objects();
-	create_descriptor_pools();
-	create_cmd_buffers();
-	on_swapchain_invalidated();
 }
 
 void Renderer::on_swapchain_invalidated()

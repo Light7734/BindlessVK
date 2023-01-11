@@ -6,9 +6,9 @@
 #include "BindlessVk/Texture.hpp"
 #include "Framework/Core/Common.hpp"
 #include "Framework/Core/Window.hpp"
+#include "Framework/Pools/StagingPool.hpp"
 #include "Framework/Scene/CameraController.hpp"
 #include "Framework/Scene/Scene.hpp"
-#include "Framework/StagingPool.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -39,6 +39,7 @@ public:
 	bvk::ModelLoader model_loader;
 
 	std::unordered_map<uint64_t, bvk::Model> models;
+	std::unordered_map<uint64_t, bvk::Texture> textures;
 
 	CameraController camera_controller;
 

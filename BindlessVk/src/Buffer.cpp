@@ -41,6 +41,7 @@ Buffer::Buffer(
 		VK_WHOLE_SIZE,
 	};
 
+	device->allocator.setAllocationName(buffer.allocation, debug_name);
 	device->set_object_name(buffer.buffer, debug_name);
 }
 

@@ -11,9 +11,16 @@ class Renderer
 public:
 	Renderer() = default;
 
-	void init(Device* device);
+	Renderer(Device* device);
 
-	void reset();
+	Renderer(Renderer&& other);
+	Renderer(const Renderer& rhs) = delete;
+
+	Renderer& operator=(Renderer&& rhs);
+	Renderer& operator=(const Renderer& rhs) = delete;
+
+
+	~Renderer();
 
 	void on_swapchain_invalidated();
 	void destroy_swapchain_resources();
@@ -50,6 +57,8 @@ public:
 	}
 
 private:
+	void swap(Renderer&& other);
+
 	void create_sync_objects();
 	void create_descriptor_pools();
 

@@ -3,6 +3,7 @@
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
+#include <utility>
 
 // @todo: refactor this out
 static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Window& window)
@@ -124,10 +125,9 @@ Application::Application()
 	  bvk::Texture::Type::eCubeMap
 	);
 
-	renderer.init(device);
-
 	material_system.init(device);
 
+	renderer     = bvk::Renderer(device);
 	model_loader = bvk::ModelLoader(device, &texture_system);
 
 	initialize_imgui(device, renderer, window);
@@ -140,7 +140,6 @@ Application::~Application()
 	device_system.get_device()->logical.waitIdle();
 	destroy_imgui();
 
-	renderer.reset();
 	texture_system.reset();
 	material_system.reset();
 

@@ -11,6 +11,10 @@ add_library(
 
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Utils/CVar.cpp
+
+    # Pools
+    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Pools/ThreadPool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Pools/StagingPool.cpp
 )
 
 set_target_properties(

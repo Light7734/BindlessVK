@@ -223,6 +223,7 @@ Texture* TextureSystem::create_from_buffer(
 
 			texture.image_view = device->logical.createImageView(image_view_info, nullptr);
 		}
+
 		/////////////////////////////////////////////////////////////////////////////////
 		// Create image samplers
 		{
