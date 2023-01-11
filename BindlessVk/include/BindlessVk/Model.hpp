@@ -126,8 +126,9 @@ public:
 	std::vector<class Texture*> textures;
 	std::vector<MaterialParameters> material_parameters;
 	std::vector<Node*> nodes;
-	class StagingBuffer* vertex_buffer;
-	class StagingBuffer* index_buffer;
+
+	class Buffer* vertex_buffer;
+	class Buffer* index_buffer;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

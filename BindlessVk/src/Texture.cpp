@@ -19,35 +19,34 @@ void TextureSystem::init(Device* device)
 	);
 
 	vk::CommandPoolCreateInfo commnad_pool_create_info {
-		vk::CommandPoolCreateFlagBits::eResetCommandBuffer, // flags
-		device->graphics_queue_index,                       // queueFamilyIndex
+		vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+		device->graphics_queue_index,
 	};
 }
 
 Texture* TextureSystem::create_from_buffer(
     const std::string& name,
-    uint8_t* pixels,
-    int width,
-    int height,
+    u8* pixels,
+    i32 width,
+    i32 height,
     vk::DeviceSize size,
     Texture::Type type,
     vk::ImageLayout layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
 )
 {
-	textures[HashStr(name.c_str())] = {
+	Texture& texture = textures[HashStr(name.c_str())];
+	texture = {
 		.descriptor_info = {},
-		.width = static_cast<uint32_t>(width),
-		.height = static_cast<uint32_t>(height),
+		.width = static_cast<u32>(width),
+		.height = static_cast<u32>(height),
 		.format = vk::Format::eR8G8B8A8Srgb,
-		.mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height))) + 1),
+		.mip_levels = static_cast<u32>(std::floor(std::log2(std::max(width, height))) + 1),
 		.size = size,
 		.sampler = {},
 		.image_view = {},
 		.layout = layout,
 		.image = {},
 	};
-
-	Texture& texture = textures[HashStr(name.c_str())];
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// Create the image and staging buffer
@@ -116,19 +115,17 @@ Texture* TextureSystem::create_from_buffer(
 			);
 
 			vk::BufferImageCopy bufferImageCopy {
-				0u, // bufferOffset
-				0u, // bufferRowLength
-				0u, // bufferImageHeight
-
-				/* imageSubresource */
+				0u,
+				0u,
+				0u,
 				vk::ImageSubresourceLayers {
-				    vk::ImageAspectFlagBits::eColor, // aspectMask
-				    0u,                              // mipLevel
-				    0u,                              // baseArrayLayer
-				    1u,                              // layerCount
+				    vk::ImageAspectFlagBits::eColor,
+				    0u,
+				    0u,
+				    1u,
 				},
-				vk::Offset3D { 0, 0, 0 },                           // imageOffset
-				vk::Extent3D { texture.width, texture.height, 1u }, // imageExtent
+				vk::Offset3D { 0, 0, 0 },
+				vk::Extent3D { texture.width, texture.height, 1u },
 			};
 
 			cmd.copyBufferToImage(
@@ -142,27 +139,27 @@ Texture* TextureSystem::create_from_buffer(
 			/////////////////////////////////////////////////////////////////////////////////
 			/// Create texture mipmaps
 			vk::ImageMemoryBarrier barrier {
-				{},                          // srcAccessmask
-				{},                          // dstAccessMask
-				vk::ImageLayout::eUndefined, // oldLayout
-				vk::ImageLayout::eUndefined, // newLayout
-				VK_QUEUE_FAMILY_IGNORED,     // srcQueueFamilyIndex
-				VK_QUEUE_FAMILY_IGNORED,     // dstQueueFamilyIndex
-				texture.image,               // image
+				{},
+				{},
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eUndefined,
+				VK_QUEUE_FAMILY_IGNORED,
+				VK_QUEUE_FAMILY_IGNORED,
+				texture.image,
 
 				vk::ImageSubresourceRange {
-				    vk::ImageAspectFlagBits::eColor, // aspectMask
-				    0u,                              // baseMipLevel
-				    1u,                              // levelCount
-				    0u,                              // baseArrayLayer
-				    1u,                              // layerCount
+				    vk::ImageAspectFlagBits::eColor,
+				    0u,
+				    1u,
+				    0u,
+				    1u,
 				},
 			};
 
-			int32_t mip_width = width;
-			int32_t mip_height = height;
+			i32 mip_width = width;
+			i32 mip_height = height;
 
-			for (uint32_t i = 1; i < texture.mip_levels; i++)
+			for (u32 i = 1; i < texture.mip_levels; i++)
 			{
 				transition_layout(
 				    texture,
@@ -205,27 +202,22 @@ Texture* TextureSystem::create_from_buffer(
 		// Create image views
 		{
 			vk::ImageViewCreateInfo image_view_info {
-				{},                        // flags
-				texture.image,             // image
-				vk::ImageViewType::e2D,    // viewType
-				vk::Format::eR8G8B8A8Srgb, // format
-
-				/* components */
+				{},
+				texture.image,
+				vk::ImageViewType::e2D,
+				vk::Format::eR8G8B8A8Srgb,
 				vk::ComponentMapping {
-				    // Don't swizzle the colors around...
-				    vk::ComponentSwizzle::eIdentity, // r
-				    vk::ComponentSwizzle::eIdentity, // g
-				    vk::ComponentSwizzle::eIdentity, // b
-				    vk::ComponentSwizzle::eIdentity, // a
+				    vk::ComponentSwizzle::eIdentity,
+				    vk::ComponentSwizzle::eIdentity,
+				    vk::ComponentSwizzle::eIdentity,
+				    vk::ComponentSwizzle::eIdentity,
 				},
-
-				/* subresourceRange */
 				vk::ImageSubresourceRange {
-				    vk::ImageAspectFlagBits::eColor, // aspectMask
-				    0u,                              // baseMipLevel
-				    texture.mip_levels,              // levelCount
-				    0u,                              // baseArrayLayer
-				    1u,                              // layerCount
+				    vk::ImageAspectFlagBits::eColor,
+				    0u,
+				    texture.mip_levels,
+				    0u,
+				    1u,
 				},
 			};
 
@@ -236,24 +228,21 @@ Texture* TextureSystem::create_from_buffer(
 		{
 			vk::SamplerCreateInfo sampler_info {
 				{},
-				vk::Filter::eLinear,             // magFilter
-				vk::Filter::eLinear,             // minFilter
-				vk::SamplerMipmapMode::eLinear,  // mipmapMode
-				vk::SamplerAddressMode::eRepeat, // addressModeU
-				vk::SamplerAddressMode::eRepeat, // addressModeV
-				vk::SamplerAddressMode::eRepeat, // addressModeW
-				0.0f,                            // mipLodBias
-
-				// #TODO ANISOTROPY
-				VK_FALSE, // anisotropyEnable
-				{},       // maxAnisotropy
-
-				VK_FALSE,                               // compareEnable
-				vk::CompareOp::eAlways,                 // compareOp
-				0.0f,                                   // minLod
-				static_cast<float>(texture.mip_levels), // maxLod
-				vk::BorderColor::eIntOpaqueBlack,       // borderColor
-				VK_FALSE,                               // unnormalizedCoordinates
+				vk::Filter::eLinear,
+				vk::Filter::eLinear,
+				vk::SamplerMipmapMode::eLinear,
+				vk::SamplerAddressMode::eRepeat,
+				vk::SamplerAddressMode::eRepeat,
+				vk::SamplerAddressMode::eRepeat,
+				0.0f,
+				VK_FALSE,
+				{},
+				VK_FALSE,
+				vk::CompareOp::eAlways,
+				0.0f,
+				static_cast<float>(texture.mip_levels),
+				vk::BorderColor::eIntOpaqueBlack,
+				VK_FALSE,
 			};
 
 			/// @todo Should we separate samplers and textures?
@@ -261,9 +250,9 @@ Texture* TextureSystem::create_from_buffer(
 		}
 
 		texture.descriptor_info = {
-			texture.sampler,                         // sampler
-			texture.image_view,                      // imageView
-			vk::ImageLayout::eShaderReadOnlyOptimal, // imageLayout
+			texture.sampler,
+			texture.image_view,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
 		};
 	}
 
@@ -315,15 +304,14 @@ Texture* TextureSystem::create_from_ktx(
 		.layout = layout,
 		.image = {},
 	};
-	uint8_t* data = ktxTexture_GetData(texture_ktx);
+	u8* data = ktxTexture_GetData(texture_ktx);
 	Texture& texture = textures[HashStr(name.c_str())];
 
-	// Create staging buffer
 	vk::BufferCreateInfo staging_buffer_info {
-		{},                                    // flags
-		texture.size,                          // size
-		vk::BufferUsageFlagBits::eTransferSrc, // usage
-		vk::SharingMode::eExclusive,           // sharingMode
+		{},
+		texture.size,
+		vk::BufferUsageFlagBits::eTransferSrc,
+		vk::SharingMode::eExclusive,
 	};
 
 	AllocatedBuffer staging_buffer;
@@ -346,9 +334,9 @@ Texture* TextureSystem::create_from_ktx(
 	    "Create From KTX Only supports cubemaps for the time being..."
 	)
 
-	for (uint32_t face = 0; face < 6; face++)
+	for (u32 face = 0; face < 6; face++)
 	{
-		for (uint32_t level = 0u; level < texture.mip_levels; level++)
+		for (u32 level = 0u; level < texture.mip_levels; level++)
 		{
 			size_t offset;
 			BVK_ASSERT(
@@ -357,52 +345,43 @@ Texture* TextureSystem::create_from_ktx(
 			);
 
 			bufferCopies.push_back({
-			    offset, // bufferOffset
-			    {},     // bufferRowLength
-			    {},     // bufferImageHeight
-
-			    /* imageSubresource */
-			    {
-			        vk::ImageAspectFlagBits::eColor, // aspectMask
-			        level,                           // mipLevel
-			        face,                            // baseArrayLayer
-			        1u,                              // layerCount
-			    },
-
-			    /* imageOffset */
+			    offset,
 			    {},
-
-			    /* imageExtent */
+			    {},
 			    {
-			        texture.width >> level,  // width
-			        texture.height >> level, // height
-			        1u,                      // depth
+			        vk::ImageAspectFlagBits::eColor,
+			        level,
+			        face,
+			        1u,
+			    },
+			    {},
+			    {
+			        texture.width >> level,
+			        texture.height >> level,
+			        1u,
 			    },
 			});
 		}
 	}
 
-	// Create vulkan image
 	vk::ImageCreateInfo image_create_info {
-		vk::ImageCreateFlagBits::eCubeCompatible, // flags
-		vk::ImageType::e2D,                       // imageType
-		texture.format,                           // format
-
-		/* extent */
+		vk::ImageCreateFlagBits::eCubeCompatible,
+		vk::ImageType::e2D,
+		texture.format,
 		vk::Extent3D {
-		    texture.width,  // width
-		    texture.height, // height
-		    1u,             // depth
+		    texture.width,
+		    texture.height,
+		    1u,
 		},
-		texture.mip_levels,                                                      // mipLevels
-		6u,                                                                      // arrayLayers
-		vk::SampleCountFlagBits::e1,                                             // samples
-		vk::ImageTiling::eOptimal,                                               // tiling
-		vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, // usage
-		vk::SharingMode::eExclusive,                                             // sharingMode
-		0u,                          // queueFamilyIndexCount
-		nullptr,                     // queueFamilyIndices
-		vk::ImageLayout::eUndefined, // initialLayout
+		texture.mip_levels,
+		6u,
+		vk::SampleCountFlagBits::e1,
+		vk::ImageTiling::eOptimal,
+		vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+		vk::SharingMode::eExclusive,
+		0u,
+		nullptr,
+		vk::ImageLayout::eUndefined,
 	};
 
 	vma::AllocationCreateInfo image_allocate_info(
@@ -428,7 +407,7 @@ Texture* TextureSystem::create_from_ktx(
 		    staging_buffer,
 		    texture.image,
 		    vk::ImageLayout::eTransferDstOptimal,
-		    static_cast<uint32_t>(bufferCopies.size()),
+		    static_cast<u32>(bufferCopies.size()),
 		    bufferCopies.data()
 		);
 
@@ -447,27 +426,24 @@ Texture* TextureSystem::create_from_ktx(
 	// Create image views
 	{
 		vk::ImageViewCreateInfo image_view_info {
-			{},                       // flags
-			texture.image,            // image
-			vk::ImageViewType::eCube, // viewType
-			texture.format,           // format
-
-			/* components */
+			{},
+			texture.image,
+			vk::ImageViewType::eCube,
+			texture.format,
 			vk::ComponentMapping {
-			    // Don't swizzle the colors around...
-			    vk::ComponentSwizzle::eIdentity, // r
-			    vk::ComponentSwizzle::eIdentity, // g
-			    vk::ComponentSwizzle::eIdentity, // b
-			    vk::ComponentSwizzle::eIdentity, // a
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
+			    vk::ComponentSwizzle::eIdentity,
 			},
 
 			/* subresourceRange */
 			vk::ImageSubresourceRange {
-			    vk::ImageAspectFlagBits::eColor, // aspectMask
-			    0u,                              // baseMipLevel
-			    texture.mip_levels,              // levelCount
-			    0u,                              // baseArrayLayer
-			    6u,                              // layerCount
+			    vk::ImageAspectFlagBits::eColor,
+			    0u,
+			    texture.mip_levels,
+			    0u,
+			    6u,
 			},
 		};
 
@@ -478,24 +454,22 @@ Texture* TextureSystem::create_from_ktx(
 	{
 		vk::SamplerCreateInfo samplerCreateInfo {
 			{},
-			vk::Filter::eLinear,                  // magFilter
-			vk::Filter::eLinear,                  // minFilter
-			vk::SamplerMipmapMode::eLinear,       // mipmapMode
-			vk::SamplerAddressMode::eClampToEdge, // addressModeU
-			vk::SamplerAddressMode::eClampToEdge, // addressModeV
-			vk::SamplerAddressMode::eClampToEdge, // addressModeW
-			0.0f,                                 // mipLodBias
-
+			vk::Filter::eLinear,
+			vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eLinear,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			0.0f,
 			// #TODO ANISOTROPY
-			VK_FALSE, // anisotropyEnable
-			{},       // maxAnisotropy
-
-			VK_FALSE,                               // compareEnable
-			vk::CompareOp::eNever,                  // compareOp
-			0.0f,                                   // minLod
-			static_cast<float>(texture.mip_levels), // maxLod
-			vk::BorderColor::eFloatOpaqueWhite,     // borderColor
-			VK_FALSE,                               // unnormalizedCoordinates
+			VK_FALSE,
+			{},
+			VK_FALSE,
+			vk::CompareOp::eNever,
+			0.0f,
+			static_cast<float>(texture.mip_levels),
+			vk::BorderColor::eFloatOpaqueWhite,
+			VK_FALSE,
 		};
 
 		/// @todo Should we separate samplers and textures?
@@ -503,9 +477,9 @@ Texture* TextureSystem::create_from_ktx(
 	}
 
 	texture.descriptor_info = {
-		texture.sampler,    // sampler
-		texture.image_view, // imageView
-		texture.layout,     // imageLayout
+		texture.sampler,
+		texture.image_view,
+		texture.layout,
 	};
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -519,32 +493,28 @@ Texture* TextureSystem::create_from_ktx(
 void TextureSystem::blit_iamge(
     vk::CommandBuffer cmd,
     AllocatedImage image,
-    uint32_t mip_index,
-    int32_t& mip_width,
-    int32_t& mip_height
+    u32 mip_index,
+    i32& mip_width,
+    i32& mip_height
 )
 {
 	vk::ImageBlit blit {
-		/* srcSubresource */
 		vk::ImageSubresourceLayers {
-		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    mip_index - 1u,                  // mipLevel
-		    0u,                              // baseArrayLayer
-		    1u,                              // layerCount
+		    vk::ImageAspectFlagBits::eColor,
+		    mip_index - 1u,
+		    0u,
+		    1u,
 		},
-		/* srcOffsets */
 		{
 		    vk::Offset3D { 0, 0, 0 },
 		    vk::Offset3D { mip_width, mip_height, 1 },
 		},
-		/* dstSubresource */
 		vk::ImageSubresourceLayers {
-		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    mip_index,                       // mipLevel
-		    0u,                              // baseArrayLayer
-		    1u,                              // layerCount
+		    vk::ImageAspectFlagBits::eColor,
+		    mip_index,
+		    0u,
+		    1u,
 		},
-		/* dstOffsets */
 		{
 		    vk::Offset3D { 0, 0, 0 },
 		    vk::Offset3D { mip_width > 1 ? mip_width / 2 : 1,
@@ -583,30 +553,28 @@ void TextureSystem::reset()
 void TextureSystem::transition_layout(
     Texture& texture,
     vk::CommandBuffer cmdBuffer,
-    uint32_t baseMipLevel,
-    uint32_t levelCount,
-    uint32_t layerCount,
+    u32 baseMipLevel,
+    u32 levelCount,
+    u32 layerCount,
     vk::ImageLayout oldLayout,
     vk::ImageLayout newLayout
 )
 {
 	// Memory barrier
 	vk::ImageMemoryBarrier imageMemBarrier {
-		{},                      // srcAccessMask
-		{},                      // dstAccessMask
-		oldLayout,               // oldLayout
-		newLayout,               // newLayout
-		VK_QUEUE_FAMILY_IGNORED, // srcQueueFamilyIndex
-		VK_QUEUE_FAMILY_IGNORED, // dstQueueFamilyIndex
-		texture.image,           // image
-
-		/* subresourceRange */
+		{},
+		{},
+		oldLayout,
+		newLayout,
+		VK_QUEUE_FAMILY_IGNORED,
+		VK_QUEUE_FAMILY_IGNORED,
+		texture.image,
 		vk::ImageSubresourceRange {
-		    vk::ImageAspectFlagBits::eColor, // aspectMask
-		    baseMipLevel,                    // baseMipLevel
-		    levelCount,                      // levelCount
-		    0u,                              // baseArrayLayer
-		    layerCount,                      // layerCount
+		    vk::ImageAspectFlagBits::eColor,
+		    baseMipLevel,
+		    levelCount,
+		    0u,
+		    layerCount,
 		},
 	};
 	/* Specify the source & destination stages and access masks... */
@@ -656,12 +624,11 @@ void TextureSystem::transition_layout(
 
 	else
 	{
-		/// @todo: Stringifier
 		BVK_LOG(
 		    LogLvl::eError,
 		    "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
-		    (int32_t)oldLayout,
-		    (int32_t)newLayout
+		    (i32)oldLayout,
+		    (i32)newLayout
 		);
 	}
 

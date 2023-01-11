@@ -8,6 +8,7 @@
 #include "Framework/Core/Window.hpp"
 #include "Framework/Scene/CameraController.hpp"
 #include "Framework/Scene/Scene.hpp"
+#include "Framework/StagingPool.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -43,6 +44,8 @@ public:
 
 	std::vector<const char*> instance_extensions = {};
 	std::vector<const char*> device_extensions   = {};
+
+	StagingPool staging_pool = {};
 
 protected:
 	uint64_t messenger_warn_count = {};

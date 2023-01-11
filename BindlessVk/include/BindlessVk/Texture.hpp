@@ -21,11 +21,11 @@ struct Texture
 
 	vk::DescriptorImageInfo descriptor_info;
 
-	uint32_t width;
-	uint32_t height;
+	u32 width;
+	u32 height;
 	vk::Format format;
-	uint32_t channels;
-	uint32_t mip_levels;
+	u32 channels;
+	u32 mip_levels;
 	vk::DeviceSize size;
 
 	vk::Sampler sampler;
@@ -60,9 +60,9 @@ public:
 	 */
 	Texture* create_from_buffer(
 	    const std::string& name,
-	    uint8_t* pixels,
-	    int width,
-	    int height,
+	    u8* pixels,
+	    i32 width,
+	    i32 height,
 	    vk::DeviceSize size,
 	    Texture::Type type,
 	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
@@ -102,17 +102,17 @@ private:
 	void blit_iamge(
 	    vk::CommandBuffer cmd,
 	    AllocatedImage image,
-	    uint32_t mip_index,
-	    int32_t& mip_width,
-	    int32_t& mip_height
+	    u32 mip_index,
+	    i32& mip_width,
+	    i32& mip_height
 	);
 
 	void transition_layout(
 	    Texture& texture,
 	    vk::CommandBuffer cmd_buffer,
-	    uint32_t base_mip_level,
-	    uint32_t level_count,
-	    uint32_t layer_count,
+	    u32 base_mip_level,
+	    u32 level_count,
+	    u32 layer_count,
 	    vk::ImageLayout old_layout,
 	    vk::ImageLayout new_layout
 	);
@@ -121,7 +121,7 @@ private:
 
 private:
 	Device* device = {};
-	std::unordered_map<uint64_t, Texture> textures = {};
+	std::unordered_map<u64, Texture> textures = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -289,10 +289,17 @@ private:
 	{
 		models[bvk::HashStr("flight_helmet")] = model_loader.load_from_gltf_ascii(
 		  "flight_helmet",
-		  "Assets/FlightHelmet/FlightHelmet.gltf"
+		  "Assets/FlightHelmet/FlightHelmet.gltf",
+		  staging_pool.get_by_index(0),
+		  staging_pool.get_by_index(1)
 		);
 
-		models[bvk::HashStr("skybox")] = model_loader.load_from_gltf_ascii("skybox", "Assets/Cube/Cube.gltf");
+		models[bvk::HashStr("skybox")] = model_loader.load_from_gltf_ascii(
+		  "skybox",
+		  "Assets/Cube/Cube.gltf",
+		  staging_pool.get_by_index(0),
+		  staging_pool.get_by_index(1)
+		);
 	}
 
 	// @todo: Load from files instead of hard-coding

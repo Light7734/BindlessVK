@@ -41,7 +41,12 @@ public:
 	 * @param name debug name attached to vulkan objects for debugging tools like renderdoc
 	 * @param gltf_path path to the gltf model file
 	 */
-	Model load_from_gltf_ascii(const char* debug_name, const char* file_path);
+	Model load_from_gltf_ascii(
+	    const char* debug_name,
+	    const char* file_path,
+	    Buffer* staging_vertex_buffer,
+	    Buffer* staging_index_buffer
+	);
 
 private:
 	Device* device;

@@ -403,6 +403,10 @@ void RenderGraph::build_graph_buffer_inputs()
 		        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
 		            vk::BufferUsageFlagBits::eUniformBuffer :
 		            vk::BufferUsageFlagBits::eStorageBuffer,
+		        vma::AllocationCreateInfo {
+		            vma::AllocationCreateFlagBits::eHostAccessRandom,
+		            vma::MemoryUsage::eAutoPreferDevice,
+		        },
 		        buffer_input_info.size,
 		        BVK_MAX_FRAMES_IN_FLIGHT
 		    )
@@ -427,6 +431,10 @@ void RenderGraph::build_passes_buffer_inputs()
 			        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
 			            vk::BufferUsageFlagBits::eUniformBuffer :
 			            vk::BufferUsageFlagBits::eStorageBuffer,
+			        vma::AllocationCreateInfo {
+			            vma::AllocationCreateFlagBits::eHostAccessRandom,
+			            vma::MemoryUsage::eAutoPreferDevice,
+			        },
 			        buffer_input_info.size,
 			        BVK_MAX_FRAMES_IN_FLIGHT
 			    )

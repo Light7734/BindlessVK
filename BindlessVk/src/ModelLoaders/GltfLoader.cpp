@@ -8,27 +8,36 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-GltfLoader::GltfLoader(Device* device, TextureSystem* texture_system)
+GltfLoader::GltfLoader(
+    Device* device,
+    TextureSystem* texture_system,
+    Buffer* staging_vertex_buffer,
+    Buffer* staging_index_buffer
+)
     : device(device)
     , texture_system(texture_system)
+    , staging_vertex_buffer(staging_vertex_buffer)
+    , staging_index_buffer(staging_index_buffer)
 {
 }
 
 Model GltfLoader::load_from_ascii(const char* debug_name, cstr file_path)
 {
-	parse_ascii_file(debug_name, file_path);
+	model = { debug_name };
+
+	load_gltf_model_from_ascii(file_path);
 
 	load_textures();
+
 	load_material_parameters();
 
-	// @todo: avoid copying by writing to mapped staging buffer
-	load_mesh();
-	copy_mesh_data_to_gpu();
+	load_mesh_data_to_staging_buffers();
+	write_mesh_data_to_gpu();
 
 	return model;
 }
 
-void GltfLoader::parse_ascii_file(const char* debug_name, cstr file_path)
+void GltfLoader::load_gltf_model_from_ascii(const char* file_path)
 {
 	tinygltf::TinyGLTF gltf_context;
 	std::string err, warn;
@@ -36,7 +45,7 @@ void GltfLoader::parse_ascii_file(const char* debug_name, cstr file_path)
 	BVK_ASSERT(
 	    !gltf_context.LoadASCIIFromFile(&gltf_model, &err, &warn, file_path),
 	    "Failed to load gltf file: \nname:{}\npath:{}\nerr: {}",
-	    debug_name,
+	    model.name,
 	    file_path,
 	    err
 	);
@@ -49,6 +58,8 @@ void GltfLoader::parse_ascii_file(const char* debug_name, cstr file_path)
 
 void GltfLoader::load_textures()
 {
+	model.textures.reserve(gltf_model.images.size());
+
 	for (auto& gltf_image : gltf_model.images)
 	{
 		model.textures.push_back(texture_system->create_from_gltf(gltf_image));
@@ -71,13 +82,22 @@ void GltfLoader::load_material_parameters()
 	}
 }
 
-void GltfLoader::load_mesh()
+void GltfLoader::load_mesh_data_to_staging_buffers()
 {
+	vertex_map = static_cast<Model::Vertex*>(staging_vertex_buffer->map_block(0));
+	index_map = static_cast<u32*>(staging_index_buffer->map_block(0));
+
 	for (auto gltf_node_index : gltf_model.scenes[0].nodes)
 	{
 		const auto& gltf_node = gltf_model.nodes[gltf_node_index];
 		model.nodes.push_back(load_node(gltf_node, nullptr));
 	}
+}
+
+void GltfLoader::write_mesh_data_to_gpu()
+{
+	write_vertex_buffer_to_gpu();
+	write_index_buffer_to_gpu();
 }
 
 Model::Node* GltfLoader::load_node(const tinygltf::Node& gltf_node, Model::Node* parent_node)
@@ -103,11 +123,63 @@ Model::Node* GltfLoader::load_node(const tinygltf::Node& gltf_node, Model::Node*
 	return node;
 }
 
+void GltfLoader::write_vertex_buffer_to_gpu()
+{
+	model.vertex_buffer = new Buffer(
+	    fmt::format("{}_model_vb", model.name).c_str(),
+	    device,
+	    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+	    vma::AllocationCreateInfo {
+	        {},
+	        vma::MemoryUsage::eAutoPreferDevice,
+	    },
+	    vertex_count * sizeof(Model::Vertex),
+	    1
+	);
+
+	staging_vertex_buffer->unmap();
+	model.vertex_buffer->write_buffer(
+	    *staging_vertex_buffer,
+	    {
+	        0u,
+	        0u,
+	        vertex_count * sizeof(Model::Vertex),
+	    }
+	);
+}
+
+void GltfLoader::write_index_buffer_to_gpu()
+{
+	model.index_buffer = new Buffer(
+	    fmt::format("{}_model_ib", model.name).c_str(),
+	    device,
+	    vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
+	    vma::AllocationCreateInfo {
+	        {},
+	        vma::MemoryUsage::eAutoPreferDevice,
+	    },
+	    index_count * sizeof(u32),
+	    1
+	);
+
+	staging_index_buffer->unmap();
+	model.index_buffer->write_buffer(
+	    *staging_index_buffer,
+	    {
+	        0u,
+	        0u,
+	        index_count * sizeof(u32),
+	    }
+	);
+
+	device->logical.waitIdle();
+}
+
 void GltfLoader::load_mesh_primitives(const tinygltf::Mesh& gltf_mesh, Model::Node* node)
 {
 	for (const auto& gltf_primitive : gltf_mesh.primitives)
 	{
-		auto first_index = mesh_data.index_buffer.size();
+		auto first_index = index_count;
 		auto index_count = get_primitive_index_count(gltf_primitive);
 
 		load_mesh_primitive_indices(gltf_primitive);
@@ -128,32 +200,32 @@ void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive& gltf_pr
 	const auto* tangent_buffer = get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
 	const auto* uv_buffer = get_primitive_attribute_buffer(gltf_primitive, "TEXCOORD_0");
 
-	auto vertex_count = get_primitive_vertex_count(gltf_primitive);
+	auto primitive_vertex_count = get_primitive_vertex_count(gltf_primitive);
 
-	for (auto v = 0; v < vertex_count; ++v)
+	for (auto v = 0; v < primitive_vertex_count; ++v)
 	{
-		mesh_data.vertex_buffer.push_back({
-		    glm::vec4(glm::make_vec3(&position_buffer[v * 3]), 1.0f),
+		vertex_map[vertex_count] = {
+			glm::vec4(glm::make_vec3(&position_buffer[v * 3]), 1.0f),
 
-		    glm::normalize(
-		        glm::vec3(normal_buffer ? glm::make_vec3(&normal_buffer[v * 3]) : glm::vec3(0.0f))
-		    ),
+			glm::normalize(
+			    glm::vec3(normal_buffer ? glm::make_vec3(&normal_buffer[v * 3]) : glm::vec3(0.0f))
+			),
 
-		    glm::normalize(
-		        glm::vec3(tangent_buffer ? glm::make_vec3(&tangent_buffer[v * 3]) : glm::vec3(0.0f))
-		    ),
+			glm::normalize(
+			    glm::vec3(tangent_buffer ? glm::make_vec3(&tangent_buffer[v * 3]) : glm::vec3(0.0f))
+			),
 
-		    uv_buffer ? glm::make_vec2(&uv_buffer[v * 2]) : glm::vec3(0.0f),
+			uv_buffer ? glm::make_vec2(&uv_buffer[v * 2]) : glm::vec3(0.0f),
 
-		    glm::vec3(1.0),
-		});
+			glm::vec3(1.0),
+		};
+
+		vertex_count++;
 	}
 }
 
 u32 GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive& gltf_primitive)
 {
-	u32 vertex_start = static_cast<u32>(mesh_data.vertex_buffer.size());
-
 	const auto& accessor = gltf_model.accessors[gltf_primitive.indices];
 	const auto& buffer_view = gltf_model.bufferViews[accessor.bufferView];
 	const auto& buffer = gltf_model.buffers[buffer_view.buffer];
@@ -167,7 +239,8 @@ u32 GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive& gltf_prim
 		    );
 		for (size_t index = 0; index < accessor.count; index++)
 		{
-			mesh_data.index_buffer.push_back(buf[index] + vertex_start);
+			index_map[index_count] = buf[index] + vertex_count;
+			index_count++;
 		}
 		break;
 	}
@@ -178,7 +251,8 @@ u32 GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive& gltf_prim
 		    );
 		for (usize index = 0; index < accessor.count; index++)
 		{
-			mesh_data.index_buffer.push_back(buf[index] + vertex_start);
+			index_map[index_count] = buf[index] + vertex_count;
+			index_count++;
 		}
 		break;
 	}
@@ -188,7 +262,8 @@ u32 GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive& gltf_prim
 		    reinterpret_cast<const u8*>(&buffer.data[accessor.byteOffset + buffer_view.byteOffset]);
 		for (usize index = 0; index < accessor.count; index++)
 		{
-			mesh_data.index_buffer.push_back(buf[index] + vertex_start);
+			index_map[index_count] = buf[index] + vertex_count;
+			index_count++;
 		}
 		break;
 	}
@@ -267,30 +342,5 @@ bool GltfLoader::node_has_any_mesh(const tinygltf::Node& gltf_node)
 {
 	return gltf_node.mesh > -1;
 }
-
-void GltfLoader::copy_mesh_data_to_gpu()
-{
-	model.vertex_buffer = new StagingBuffer(
-	    fmt::format("{}_model_vb", model.name).c_str(),
-	    device,
-	    vk::BufferUsageFlagBits::eVertexBuffer,
-
-	    mesh_data.vertex_buffer.size() * sizeof(Model::Vertex),
-	    1u,
-	    mesh_data.vertex_buffer.data()
-	);
-
-	model.index_buffer = new StagingBuffer(
-	    fmt::format("{}_model_ib", model.name).c_str(),
-	    device,
-	    vk::BufferUsageFlagBits::eIndexBuffer,
-	    mesh_data.index_buffer.size() * sizeof(u32),
-	    1u,
-	    mesh_data.index_buffer.data()
-	);
-
-	device->logical.waitIdle();
-}
-
 
 } // namespace BINDLESSVK_NAMESPACE

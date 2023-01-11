@@ -12,15 +12,22 @@ class Buffer
 {
 public:
 	Buffer(
-	    const char* name,
+	    const char* debug_name,
 	    Device* device,
-	    vk::BufferUsageFlags usage,
+	    vk::BufferUsageFlags buffer_usage,
+	    const vma::AllocationCreateInfo& vma_info,
 	    vk::DeviceSize min_block_size,
-	    uint32_t block_count,
-	    const void* initial_data = {}
+	    u32 block_count
 	);
 
 	~Buffer();
+
+	void write_data(const void* src_data, usize src_data_size, u32 block_index);
+	void write_buffer(const Buffer& src_buffer, const vk::BufferCopy& copy_info);
+
+	void* map_block(u32 block_index);
+
+	void unmap();
 
 	inline vk::Buffer* get_buffer()
 	{
@@ -32,66 +39,46 @@ public:
 		return &descriptor_info;
 	}
 
-	inline vk::DeviceSize get_block_size() const
-	{
-		return block_size;
-	}
-
 	inline vk::DeviceSize get_whole_size() const
 	{
 		return whole_size;
 	}
 
-	inline vk::DeviceSize get_valid_block_size() const
+	inline vk::DeviceSize get_block_size() const
 	{
-		return min_block_size;
+		return block_size;
 	}
 
-	void* map_block(uint32_t block_index);
+	inline vk::DeviceSize get_block_valid_size() const
+	{
+		return valid_block_size;
+	}
 
-	void unmap();
+	inline vk::DeviceSize get_block_padding_size() const
+	{
+		return block_size - valid_block_size;
+	}
+
+	inline u32 get_block_count() const
+	{
+		return block_count;
+	}
+
+private:
+	void calculate_block_size();
 
 private:
 	Device* device = {};
+
+	AllocatedBuffer buffer = {};
+
+	vk::DeviceSize whole_size = {};
+	vk::DeviceSize block_size = {};
+	vk::DeviceSize valid_block_size = {};
+
+	u32 block_count = {};
 
 	vk::DescriptorBufferInfo descriptor_info = {};
-
-	AllocatedBuffer buffer = {};
-
-	uint32_t block_count = {};
-
-	vk::DeviceSize block_size = {};
-	vk::DeviceSize whole_size = {};
-	vk::DeviceSize min_block_size = {};
-};
-
-// @todo: Merge 2 buffer classes into 1
-class StagingBuffer
-{
-public:
-	StagingBuffer(
-	    const char* name,
-	    Device* device,
-	    vk::BufferUsageFlags usage,
-	    vk::DeviceSize min_block_size,
-	    uint32_t block_count,
-	    const void* initial_data = {}
-	);
-
-	StagingBuffer() = default;
-
-	~StagingBuffer();
-
-	inline vk::Buffer* get_buffer()
-	{
-		return &buffer.buffer;
-	}
-
-private:
-	Device* device = {};
-
-	AllocatedBuffer buffer = {};
-	AllocatedBuffer staging_buffer = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common.hpp"
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/Model.hpp"
@@ -16,15 +17,13 @@ namespace BINDLESSVK_NAMESPACE {
  */
 class GltfLoader
 {
-private:
-	struct MeshData
-	{
-		std::vector<Model::Vertex> vertex_buffer;
-		std::vector<uint32_t> index_buffer;
-	};
-
 public:
-	GltfLoader(Device* device, TextureSystem* texture_system);
+	GltfLoader(
+	    Device* device,
+	    TextureSystem* texture_system,
+	    Buffer* staging_vertex_buffer,
+	    Buffer* staging_index_buffer
+	);
 	GltfLoader() = default;
 	~GltfLoader() = default;
 
@@ -32,15 +31,19 @@ public:
 	Model load_from_binary(const char* debug_name, const char* file_path) = delete;
 
 private:
-	void parse_ascii_file(const char* debug_name, const char* file_path);
-	void parse_binary_file(const char* debug_name, const char* file_path) = delete;
+	void load_gltf_model_from_ascii(const char* file_path);
+	void load_gltf_model_from_binary(const char* file_path) = delete;
 
 	void load_textures();
 	void load_material_parameters();
-	void load_mesh();
-	void copy_mesh_data_to_gpu();
+	void load_mesh_data_to_staging_buffers();
+
+	void write_mesh_data_to_gpu();
 
 	Model::Node* load_node(const tinygltf::Node& gltf_node, Model::Node* parent_node);
+
+	void write_vertex_buffer_to_gpu();
+	void write_index_buffer_to_gpu();
 
 	void load_mesh_primitives(const tinygltf::Mesh& gltf_mesh, Model::Node* node);
 
@@ -64,10 +67,17 @@ private:
 	Device* device = {};
 	TextureSystem* texture_system = {};
 
-	tinygltf::Model gltf_model;
-	Model model;
+	tinygltf::Model gltf_model = {};
+	Model model = {};
 
-	MeshData mesh_data;
+	Buffer* staging_vertex_buffer = {};
+	Buffer* staging_index_buffer = {};
+
+	Model::Vertex* vertex_map = {};
+	u32* index_map = {};
+
+	usize vertex_count = {};
+	usize index_count = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

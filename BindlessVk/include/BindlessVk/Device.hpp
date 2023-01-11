@@ -99,6 +99,16 @@ struct Device
 		logical.resetFences(immediate_fence);
 		logical.resetCommandPool(immediate_cmd_pool);
 	}
+
+	template<typename T>
+	void set_object_name(T object, const char* name)
+	{
+		logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    object.objectType,
+		    (u64)((typename T::NativeType)(object)),
+		    name,
+		});
+	}
 };
 
 class DeviceSystem

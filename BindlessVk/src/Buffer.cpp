@@ -5,66 +5,43 @@
 namespace BINDLESSVK_NAMESPACE {
 
 Buffer::Buffer(
-    const char* name,
+    const char* debug_name,
     Device* device,
-    vk::BufferUsageFlags usage,
-    vk::DeviceSize min_block_size,
-    uint32_t block_count,
-    const void* initial_data /* = {} */
+    vk::BufferUsageFlags buffer_usage,
+    const vma::AllocationCreateInfo& vma_info,
+    vk::DeviceSize desired_block_size,
+    u32 block_count
 )
     : device(device)
     , block_count(block_count)
-    , min_block_size(min_block_size)
+    , valid_block_size(desired_block_size)
 {
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create buffer and write the initial data to it(if any)
-	{
-		const vk::DeviceSize min_alignment =
-		    device->physical.getProperties().limits.minUniformBufferOffsetAlignment;
+	calculate_block_size();
 
-		// Round up minBlockSize to be the next multiple of
-		// minUniformBufferOffsetAlignment
-		block_size = (min_block_size + min_alignment - 1) & -min_alignment;
-		whole_size = block_size * block_count;
+	buffer = device->allocator.createBuffer(
+	    {
+	        {},
+	        whole_size,
+	        buffer_usage,
+	        vk::SharingMode::eExclusive,
+	    },
+	    vma_info
+	);
 
-		vk::BufferCreateInfo buffer_info {
-			{},                          // flags
-			whole_size,                  // size
-			usage,                       // usage
-			vk::SharingMode::eExclusive, // sharingMode
-		};
-
-		buffer = device->allocator.createBuffer(
-		    buffer_info,
-		    {
-		        {},
-		        vma::MemoryUsage::eCpuToGpu,
-		    }
-		);
-
-		if (initial_data)
-		{
-			memcpy(
-			    device->allocator.mapMemory(buffer),
-			    initial_data,
-			    static_cast<size_t>(whole_size)
-			);
-			device->allocator.unmapMemory(buffer);
-		}
-	}
+	BVK_LOG(
+	    LogLvl::eTrace,
+	    "{} created with {}",
+	    debug_name,
+	    (u32)device->allocator.getAllocationMemoryProperties(buffer.allocation)
+	);
 
 	descriptor_info = {
-		buffer,        // buffer
-		0u,            // offset
-		VK_WHOLE_SIZE, // range
+		buffer,
+		0u,
+		VK_WHOLE_SIZE,
 	};
 
-
-	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-	    vk::ObjectType::eBuffer,
-	    (u64)(VkBuffer)(buffer.buffer),
-	    name,
-	});
+	device->set_object_name(buffer.buffer, debug_name);
 }
 
 Buffer::~Buffer()
@@ -72,7 +49,29 @@ Buffer::~Buffer()
 	device->allocator.destroyBuffer(buffer, buffer);
 }
 
-void* Buffer::map_block(uint32_t block_index)
+void Buffer::write_data(const void* src_data, usize src_data_size, u32 block_index)
+{
+	memcpy(map_block(block_index), src_data, src_data_size);
+	unmap();
+}
+
+void Buffer::write_buffer(const Buffer& src_buffer, const vk::BufferCopy& src_copy)
+{
+	device->immediate_submit([&](vk::CommandBuffer cmd) {
+		cmd.copyBuffer(*const_cast<Buffer&>(src_buffer).get_buffer(), buffer, 1u, &src_copy);
+	});
+}
+
+void Buffer::calculate_block_size()
+{
+	const auto min_alignment = device->properties.limits.minUniformBufferOffsetAlignment;
+
+	// Round up minBlockSize to be the next multiple of minUniformBufferOffsetAlignment
+	block_size = (valid_block_size + min_alignment - 1) & -min_alignment;
+	whole_size = block_size * block_count;
+}
+
+void* Buffer::map_block(u32 block_index)
 {
 	return ((uint8_t*)device->allocator.mapMemory(buffer)) + (block_size * block_index);
 }
@@ -80,85 +79,6 @@ void* Buffer::map_block(uint32_t block_index)
 void Buffer::unmap()
 {
 	device->allocator.unmapMemory(buffer);
-}
-
-StagingBuffer::StagingBuffer(
-    const char* name,
-    Device* device,
-    vk::BufferUsageFlags usage,
-    vk::DeviceSize min_block_size,
-    uint32_t block_count,
-    const void* initial_data /* = {} */
-)
-    : device(device)
-{
-	// @todo: Merge 2 buffer classes into 1
-	BVK_ASSERT(
-	    block_count != 1,
-	    "Block count for staging buffers SHOULD be 1 (this will be fixed)"
-	);
-
-	/////////////////////////////////////////////////////////////////////////////////
-	// Create buffer & staging buffer, then write the initial data to it(if any)
-	{
-		vk::BufferCreateInfo buffer_info {
-			{},                                            // flags
-			min_block_size,                                // size
-			vk::BufferUsageFlagBits::eTransferDst | usage, // usage
-			vk::SharingMode::eExclusive,                   // sharingMode
-		};
-
-		vk::BufferCreateInfo staging_buffer_info {
-			{},                                    // flags
-			min_block_size,                        // size
-			vk::BufferUsageFlagBits::eTransferSrc, // usage
-			vk::SharingMode::eExclusive,           // sharingMode
-		};
-
-		buffer = device->allocator.createBuffer(buffer_info, { {}, vma::MemoryUsage::eGpuOnly });
-		staging_buffer =
-		    device->allocator.createBuffer(staging_buffer_info, { {}, vma::MemoryUsage::eCpuOnly });
-
-		if (initial_data)
-		{
-			// Copy starting data to staging buffer
-			// @todo make it possible to create a staging buffer, map initial data,
-			//          write to the mapped memory, then create the vk buffer, to avoid memcpy
-			memcpy(
-			    device->allocator.mapMemory(staging_buffer),
-			    initial_data,
-			    static_cast<size_t>(min_block_size)
-			);
-
-			device->allocator.unmapMemory(staging_buffer);
-
-			device->immediate_submit([&](vk::CommandBuffer cmd) {
-				vk::BufferCopy buffer_copy {
-					0u,             // srcOffset
-					0u,             // dstOffset
-					min_block_size, // size
-				};
-
-				cmd.copyBuffer(staging_buffer, buffer, 1u, &buffer_copy);
-			});
-		}
-	}
-
-	device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-	    vk::ObjectType::eBuffer,
-	    (u64)(VkBuffer)(buffer.buffer),
-	    name,
-	});
-}
-
-StagingBuffer::~StagingBuffer()
-{
-	device->logical.waitIdle();
-	if (buffer.buffer)
-	{
-		device->allocator.destroyBuffer(buffer, buffer);
-		device->allocator.destroyBuffer(staging_buffer, staging_buffer);
-	}
 }
 
 } // namespace BINDLESSVK_NAMESPACE

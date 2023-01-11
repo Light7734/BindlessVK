@@ -104,6 +104,8 @@ Application::Application()
 
 	bvk::Device* device = device_system.get_device();
 
+	staging_pool = StagingPool(2, (1024u * 1024u * 256u), device);
+
 	texture_system.init(device);
 
 	uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
@@ -126,8 +128,7 @@ Application::Application()
 
 	material_system.init(device);
 
-	// @todo: refactor out getting a command pool from renderer
-	bvk::ModelLoader model_loader = bvk::ModelLoader(device, &texture_system);
+	model_loader = bvk::ModelLoader(device, &texture_system);
 
 	initialize_imgui(device, renderer, window);
 
@@ -149,6 +150,8 @@ Application::~Application()
 	}
 
 	models.clear();
+
+	staging_pool.destroy_buffers();
 
 	device_system.reset();
 }
