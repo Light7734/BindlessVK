@@ -396,7 +396,7 @@ void RenderGraph::build_graph_buffer_inputs()
 	for (auto& buffer_input_info : buffer_inputs_info)
 	{
 		buffer_inputs.emplace(
-		    HashStr(buffer_input_info.name.c_str()),
+		    hash_str(buffer_input_info.name.c_str()),
 		    new Buffer(
 		        buffer_input_info.name.c_str(),
 		        device,
@@ -424,7 +424,7 @@ void RenderGraph::build_passes_buffer_inputs()
 		for (auto& buffer_input_info : pass_info.buffer_inputs_info)
 		{
 			pass.buffer_inputs.emplace(
-			    HashStr(buffer_input_info.name.c_str()),
+			    hash_str(buffer_input_info.name.c_str()),
 			    new Buffer(
 			        buffer_input_info.name.c_str(),
 			        device,
@@ -550,9 +550,9 @@ void RenderGraph::write_graph_sets()
 		for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 		{
 			buffers_info.push_back({
-			    *(buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_buffer()),
-			    buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size() * i,
-			    buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_block_size(),
+			    *(buffer_inputs[hash_str(buffer_input_info.name.c_str())]->get_buffer()),
+			    buffer_inputs[hash_str(buffer_input_info.name.c_str())]->get_block_size() * i,
+			    buffer_inputs[hash_str(buffer_input_info.name.c_str())]->get_block_size(),
 			});
 
 			for (u32 j = 0; j < buffer_input_info.count; ++j)
@@ -593,7 +593,7 @@ void RenderGraph::write_passes_sets()
 			for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 			{
 				buffer_infos.push_back({
-				    *(pass.buffer_inputs[HashStr(buffer_input_info.name.c_str())]->get_buffer()),
+				    *(pass.buffer_inputs[hash_str(buffer_input_info.name.c_str())]->get_buffer()),
 				    buffer_input_info.size * i,
 				    buffer_input_info.size,
 				});

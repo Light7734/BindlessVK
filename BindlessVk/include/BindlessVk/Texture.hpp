@@ -1,8 +1,7 @@
 #pragma once
 
-#include "BindlessVk/Common.hpp"
+#include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
-#include "BindlessVk/Types.hpp"
 
 namespace tinygltf {
 struct Image;
@@ -95,7 +94,7 @@ public:
 	//** @return texture named @p name */
 	inline Texture* get_texture(const char* name)
 	{
-		return &textures[HashStr(name)];
+		return &textures[hash_str(name)];
 	}
 
 private:

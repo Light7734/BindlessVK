@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Buffer.hpp"
-#include "BindlessVk/Common.hpp"
+#include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/Model.hpp"
 #include "BindlessVk/Texture.hpp"

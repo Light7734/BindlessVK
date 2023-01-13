@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BindlessVk/RenderPass.hpp"
-#include "BindlessVk/Types.hpp"
 #include "Framework/Scene/Scene.hpp"
 
 #include <backends/imgui_impl_glfw.h>

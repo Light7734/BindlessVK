@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BindlessVk/Common.hpp"
+#include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/RenderGraph.hpp"
 

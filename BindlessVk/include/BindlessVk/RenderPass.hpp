@@ -1,8 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Buffer.hpp"
-#include "BindlessVk/Common.hpp"
-#include "BindlessVk/Types.hpp"
+#include "BindlessVk/Common/Common.hpp"
 
 #include <glm/glm.hpp>
 

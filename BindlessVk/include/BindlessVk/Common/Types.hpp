@@ -1,13 +1,12 @@
 #pragma once
 
-#include "BindlessVk/Common.hpp"
+#include "BindlessVk/Common/Aliases.hpp"
+#include "BindlessVk/Common/VulkanIncludes.hpp"
 
 #include <vector>
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** @brief
- */
 struct AllocatedImage
 {
 	AllocatedImage() = default;
@@ -16,9 +15,9 @@ struct AllocatedImage
 	{
 	}
 
-	AllocatedImage(std::pair<vk::Image, vma::Allocation> pair)
-	    : image(pair.first)
-	    , allocation(pair.second)
+	AllocatedImage(pair<vk::Image, vma::Allocation> allocated_image)
+	    : image(allocated_image.first)
+	    , allocation(allocated_image.second)
 	{
 	}
 
@@ -44,9 +43,9 @@ struct AllocatedBuffer
 {
 	AllocatedBuffer() = default;
 
-	AllocatedBuffer(std::pair<vk::Buffer, vma::Allocation> pair)
-	    : buffer(pair.first)
-	    , allocation(pair.second)
+	AllocatedBuffer(pair<vk::Buffer, vma::Allocation> allocated_buffer)
+	    : buffer(allocated_buffer.first)
+	    , allocation(allocated_buffer.second)
 	{
 	}
 
@@ -54,6 +53,7 @@ struct AllocatedBuffer
 	{
 		return buffer;
 	}
+
 	inline operator vma::Allocation()
 	{
 		return allocation;

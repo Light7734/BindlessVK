@@ -3,6 +3,7 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
 #include "BindlessVk/Buffer.hpp"
+#include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/RenderPass.hpp"
 
@@ -87,12 +88,12 @@ public:
 
 	inline void* map_descriptor_buffer(const char* name, u32 frame_index)
 	{
-		return buffer_inputs[HashStr(name)]->map_block(frame_index);
+		return buffer_inputs[hash_str(name)]->map_block(frame_index);
 	}
 
 	inline void unmap_descriptor_buffer(const char* name)
 	{
-		buffer_inputs[HashStr(name)]->unmap();
+		buffer_inputs[hash_str(name)]->unmap();
 	}
 
 private:

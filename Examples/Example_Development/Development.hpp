@@ -287,14 +287,14 @@ private:
 	// @todo: Load from files instead of hard-coding
 	void load_models()
 	{
-		models[bvk::HashStr("flight_helmet")] = model_loader.load_from_gltf_ascii(
+		models[bvk::hash_str("flight_helmet")] = model_loader.load_from_gltf_ascii(
 		  "flight_helmet",
 		  "Assets/FlightHelmet/FlightHelmet.gltf",
 		  staging_pool.get_by_index(0),
 		  staging_pool.get_by_index(1)
 		);
 
-		models[bvk::HashStr("skybox")] = model_loader.load_from_gltf_ascii(
+		models[bvk::hash_str("skybox")] = model_loader.load_from_gltf_ascii(
 		  "skybox",
 		  "Assets/Cube/Cube.gltf",
 		  staging_pool.get_by_index(0),
@@ -317,7 +317,7 @@ private:
 		scene.emplace<StaticMeshRendererComponent>(
 		  testModel,
 		  material_system.get_material("opaque_mesh"),
-		  &models[bvk::HashStr("flight_helmet")]
+		  &models[bvk::hash_str("flight_helmet")]
 		);
 
 		Entity skybox = scene.create();
@@ -331,7 +331,7 @@ private:
 		scene.emplace<StaticMeshRendererComponent>(
 		  skybox,
 		  material_system.get_material("skybox"),
-		  &models[bvk::HashStr("skybox")]
+		  &models[bvk::hash_str("skybox")]
 		);
 
 		Entity light = scene.create();

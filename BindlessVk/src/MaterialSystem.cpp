@@ -95,7 +95,7 @@ void MaterialSystem::load_shader(const char* name, const char* path, vk::ShaderS
 		code.data(),                    // code
 	};
 
-	shaders[HashStr(name)] = {
+	shaders[hash_str(name)] = {
 		device->logical.createShaderModule(createInfo), // module
 		stage,                                          // stage
 		code,                                           // code
@@ -181,7 +181,7 @@ void MaterialSystem::create_shader_effect(const char* name, std::vector<Shader*>
 	};
 
 
-	shader_effects[HashStr(name)] = {
+	shader_effects[hash_str(name)] = {
 		shaders,                                                    // shaders
 		device->logical.createPipelineLayout(pipeline_layout_info), // piplineLayout
 		sets_layout                                                 // setsLayout
@@ -196,10 +196,10 @@ void MaterialSystem::create_shader_pass(
     PipelineConfiguration pipeline_configuration
 )
 {
-	if (shader_passes.contains(HashStr(name)))
+	if (shader_passes.contains(hash_str(name)))
 	{
 		BVK_LOG(LogLvl::eWarn, "Recreating shader pass: {}", name);
-		device->logical.destroyPipeline(shader_passes[HashStr(name)].pipeline);
+		device->logical.destroyPipeline(shader_passes[hash_str(name)].pipeline);
 	}
 
 	std::vector<vk::PipelineShaderStageCreateInfo> stages(effect->shaders.size());
@@ -247,7 +247,7 @@ void MaterialSystem::create_shader_pass(
 	auto pipeline = device->logical.createGraphicsPipeline({}, graphics_pipeline_info);
 	BVK_ASSERT(pipeline.result);
 
-	shader_passes[HashStr(name)] = {
+	shader_passes[hash_str(name)] = {
 		effect,
 		pipeline.value,
 	};
@@ -267,7 +267,7 @@ void MaterialSystem::create_pipeline_configuration(
     std::vector<vk::DynamicState> dynamic_states
 )
 {
-	PipelineConfiguration& configuration = pipline_configurations[HashStr(name)];
+	PipelineConfiguration& configuration = pipline_configurations[hash_str(name)];
 
 
 	configuration = PipelineConfiguration {
@@ -308,11 +308,11 @@ void MaterialSystem::create_material(
 		&shader_pass->effect->sets_layout.back(),
 	};
 
-	if (materials.contains(HashStr(name)))
+	if (materials.contains(hash_str(name)))
 	{
 		device->logical.freeDescriptorSets(
 		    descriptor_pool,
-		    materials[HashStr(name)].descriptor_set
+		    materials[hash_str(name)].descriptor_set
 		);
 		BVK_LOG(LogLvl::eWarn, "Recreating material: {}", name);
 	}
@@ -320,12 +320,12 @@ void MaterialSystem::create_material(
 	vk::DescriptorSet set;
 	BVK_ASSERT(device->logical.allocateDescriptorSets(&allocate_info, &set));
 
-	materials[HashStr(name)] = {
+	materials[hash_str(name)] = {
 		.shader_pass = shader_pass,
 		.parameters = parameters,
 		.descriptor_set = set,
 		.textures = textures,
-		.sort_key = static_cast<uint32_t>(HashStr(name)),
+		.sort_key = static_cast<uint32_t>(hash_str(name)),
 	};
 
 	// @todo Bind textures

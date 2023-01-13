@@ -1,7 +1,5 @@
 #include "BindlessVk/Renderer.hpp"
 
-#include "BindlessVk/Types.hpp"
-
 #include <fmt/format.h>
 
 namespace BINDLESSVK_NAMESPACE {

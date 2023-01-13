@@ -2,7 +2,6 @@
 
 #include "BindlessVk/RenderGraph.hpp"
 #include "BindlessVk/RenderPass.hpp"
-#include "BindlessVk/Types.hpp"
 #include "Framework/Core/Common.hpp"
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"

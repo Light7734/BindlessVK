@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "BindlessVk/Common.hpp"
+#include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
 
 #include <glm/glm.hpp>
@@ -83,25 +83,25 @@ public:
 	/** @return shader named @p name */
 	inline Shader* get_shader(const char* name)
 	{
-		return &shaders[HashStr(name)];
+		return &shaders[hash_str(name)];
 	}
 
 	/** @return shader effect named @p name */
 	inline ShaderEffect* get_shader_effect(const char* name)
 	{
-		return &shader_effects[HashStr(name)];
+		return &shader_effects[hash_str(name)];
 	}
 
 	/** @return shader pass named @p name */
 	inline ShaderPass* get_shader_pass(const char* name)
 	{
-		return &shader_passes[HashStr(name)];
+		return &shader_passes[hash_str(name)];
 	}
 
 	/** @return material named @p name */
 	inline Material* get_material(const char* name)
 	{
-		return &materials[HashStr(name)];
+		return &materials[hash_str(name)];
 	}
 
 	/** @return pipeline configuration named @p name */
@@ -109,7 +109,7 @@ public:
 	    const char* name
 	) const
 	{
-		return pipline_configurations.at(HashStr(name));
+		return pipline_configurations.at(hash_str(name));
 	}
 
 	/** Initializes the material system

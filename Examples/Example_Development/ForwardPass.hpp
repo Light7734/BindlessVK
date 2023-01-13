@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BindlessVk/RenderPass.hpp"
-#include "BindlessVk/Types.hpp"
 #include "Framework/Scene/Scene.hpp"
 
 using u32 = uint32_t;

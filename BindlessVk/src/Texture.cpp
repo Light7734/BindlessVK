@@ -34,7 +34,7 @@ Texture* TextureSystem::create_from_buffer(
     vk::ImageLayout layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
 )
 {
-	Texture& texture = textures[HashStr(name.c_str())];
+	Texture& texture = textures[hash_str(name.c_str())];
 	texture = {
 		.descriptor_info = {},
 		.width = static_cast<u32>(width),
@@ -257,7 +257,7 @@ Texture* TextureSystem::create_from_buffer(
 		};
 	}
 
-	return &textures[HashStr(name.c_str())];
+	return &textures[hash_str(name.c_str())];
 }
 
 Texture* TextureSystem::create_from_gltf(
@@ -293,7 +293,7 @@ Texture* TextureSystem::create_from_ktx(
 	    "Failed to load ktx file"
 	);
 
-	textures[HashStr(name.c_str())] = {
+	textures[hash_str(name.c_str())] = {
 		.descriptor_info = {},
 		.width = texture_ktx->baseWidth,
 		.height = texture_ktx->baseHeight,
@@ -306,7 +306,7 @@ Texture* TextureSystem::create_from_ktx(
 		.image = {},
 	};
 	u8* data = ktxTexture_GetData(texture_ktx);
-	Texture& texture = textures[HashStr(name.c_str())];
+	Texture& texture = textures[hash_str(name.c_str())];
 
 	vk::BufferCreateInfo staging_buffer_info {
 		{},
@@ -488,7 +488,7 @@ Texture* TextureSystem::create_from_ktx(
 	device->allocator.destroyBuffer(staging_buffer, staging_buffer);
 	ktxTexture_Destroy(texture_ktx);
 
-	return &textures[HashStr(name.c_str())];
+	return &textures[hash_str(name.c_str())];
 }
 
 void TextureSystem::blit_iamge(

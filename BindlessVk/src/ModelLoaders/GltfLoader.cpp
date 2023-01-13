@@ -21,7 +21,7 @@ GltfLoader::GltfLoader(
 {
 }
 
-Model GltfLoader::load_from_ascii(const char* debug_name, cstr file_path)
+Model GltfLoader::load_from_ascii(const char* debug_name, c_str file_path)
 {
 	model = { debug_name };
 
