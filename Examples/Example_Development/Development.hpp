@@ -62,7 +62,7 @@ public:
 
 	virtual void on_swapchain_recreate() override
 	{
-		ASSERT(false, "Swapchain recreation not supported");
+		assert_fail("Swapchain recreation not supported (yet)");
 	}
 
 private:

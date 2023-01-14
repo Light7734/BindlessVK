@@ -1,10 +1,30 @@
 #include "BindlessVk/Common/Aliases.hpp"
-#include "BindlessVk/Common/Types.hpp"
 
 #include <exception>
 #include <source_location>
 
 namespace BINDLESSVK_NAMESPACE {
+
+struct BindlessVkException: std::exception
+{
+	BindlessVkException(
+	    const str& what,
+	    const std::source_location location = std::source_location::current()
+	)
+	    : msg(what.c_str())
+	    , location(location)
+	{
+	}
+
+	virtual c_str what() const noexcept
+	{
+		return msg;
+	}
+
+	c_str msg;
+	c_str expr;
+	std::source_location location;
+};
 
 template<typename T>
 inline void assert_true(

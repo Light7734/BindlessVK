@@ -18,7 +18,8 @@ void DeviceSystem::init(
     PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
     void* debug_messenger_userptr,
     PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
+    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback,
+    fn<void(LogLvl, const str& message)> bindlessvk_debug_callback
 )
 {
 	device.layers = layers;
@@ -38,6 +39,8 @@ void DeviceSystem::init(
 	//
 	device.get_vk_instance_proc_addr_func =
 	    dynamic_loader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
+
+	device.debug_callback = bindlessvk_debug_callback;
 
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(device.get_vk_instance_proc_addr_func);
 

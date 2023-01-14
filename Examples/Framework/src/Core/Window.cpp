@@ -11,7 +11,7 @@ void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
 	glfwSetErrorCallback([](int code, const char* str) { LOG(critical, str); });
 
 	// Initialzie glfw
-	ASSERT(glfwInit(), "Failed to initalize glfw");
+	assert_true(glfwInit(), "Failed to initalize glfw");
 
 	// Hint glfw about the window
 	for (auto hint : hints) {
@@ -27,7 +27,7 @@ void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
 	  nullptr,
 	  nullptr
 	);
-	ASSERT(m_glfw_window_handle, "Failed to create glfw window");
+	assert_true(m_glfw_window_handle, "Failed to create glfw window");
 
 	// Setup callbacks & userpointer
 	glfwSetWindowUserPointer(m_glfw_window_handle, &m_specs);
@@ -72,7 +72,8 @@ vk::SurfaceKHR Window::create_surface(vk::Instance instance)
 	  &surface
 
 	);
-	ASSERT(result == VK_SUCCESS && surface, "Failed to create window surface");
+
+	assert_true(result == VK_SUCCESS && surface, "Failed to create window surface");
 	return surface;
 }
 

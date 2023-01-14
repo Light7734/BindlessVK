@@ -1,34 +1,18 @@
 #pragma once
 
-#include "BindlessVk/Common/Aliases.hpp"
-#include "BindlessVk/Common/VulkanIncludes.hpp"
+#define VULKAN_HPP_USE_REFLECT             1
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
-#include <source_location>
-#include <vector>
+#include "BindlessVk/Common/Aliases.hpp"
+
+#include <vk_mem_alloc.hpp>
+#include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 
 static_assert(VK_SUCCESS == false, "VK_SUCCESS was supposed to be 0 (false), but it isn't");
 
 namespace BINDLESSVK_NAMESPACE {
-struct BindlessVkException: std::exception
-{
-	BindlessVkException(
-	    const str& what,
-	    const std::source_location location = std::source_location::current()
-	)
-	    : msg(what.c_str())
-	    , location(location)
-	{
-	}
-
-	virtual c_str what() const noexcept
-	{
-		return msg;
-	}
-
-	c_str msg;
-	c_str expr;
-	std::source_location location;
-};
 
 struct AllocatedImage
 {

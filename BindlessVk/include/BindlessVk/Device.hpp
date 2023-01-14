@@ -156,7 +156,9 @@ public:
 	    void* debug_messenger_userptr,
 
 	    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
+	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback,
+
+	    fn<void(LogLvl, const str& message)> bindlessvk_debug_callback
 	);
 
 	/** Destroys the device system */

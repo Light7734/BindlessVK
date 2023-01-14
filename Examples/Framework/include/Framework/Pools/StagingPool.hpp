@@ -22,7 +22,7 @@ public:
 
 	inline bvk::Buffer* get_by_index(uint32_t index)
 	{
-		ASSERT(staging_buffers.size() > index);
+		assert_true(staging_buffers.size() > index);
 		return &staging_buffers[index];
 	}
 

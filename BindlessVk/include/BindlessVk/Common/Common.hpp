@@ -5,8 +5,7 @@
 
 #include "BindlessVk/Common/Aliases.hpp"
 #include "BindlessVk/Common/Assertions.hpp"
-#include "BindlessVk/Common/Types.hpp"
-#include "BindlessVk/Common/VulkanIncludes.hpp"
+#include "BindlessVk/Common/Vulkan.hpp"
 
 #include <exception>
 #include <fmt/format.h>
@@ -25,7 +24,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-enum class LogLvl
+enum class LogLvl : u8
 {
 	eTrace = 0,
 	eDebug = 1,

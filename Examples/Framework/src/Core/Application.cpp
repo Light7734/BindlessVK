@@ -52,7 +52,7 @@ static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Windo
 	};
 	std::pair userData = std::make_pair(device->get_vk_instance_proc_addr_func, device->instance);
 
-	ASSERT(
+	assert_true(
 	  ImGui_ImplVulkan_LoadFunctions(
 	    [](const char* func, void* data) {
 		    auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
@@ -106,6 +106,9 @@ Application::Application()
 	  required_surface_extensions.end()
 	);
 
+	auto fuck = [](bvk::LogLvl lvl, const str& msg) {
+		LOG(info, msg);
+	};
 
 	device_system.init(
 	  { "VK_LAYER_KHRONOS_validation" },
@@ -128,7 +131,8 @@ Application::Application()
 	  &vulkan_debug_message_callback,
 	  this,
 	  &vma_allocate_device_memory_callback,
-	  &vma_free_device_memory_callback
+	  &vma_free_device_memory_callback,
+	  fuck
 	);
 
 	bvk::Device* device = device_system.get_device();

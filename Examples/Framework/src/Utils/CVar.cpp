@@ -58,7 +58,7 @@ void CVar::draw_imgui_editor_impl()
 			ImGui::Checkbox(it.first.c_str(), static_cast<bool*>(it.second.current_value));
 			break;
 
-		default: ASSERT(false, "Unknown CVarEntry value type");
+		default: assert_fail("Unknown CVarEntry value type");
 		}
 	}
 	ImGui::End();

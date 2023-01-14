@@ -43,7 +43,7 @@ target_link_libraries(
     PRIVATE BindlessVk
     PRIVATE vulkan
     PRIVATE glfw
-    PRIVATE spdlog
+    PUBLIC spdlog
     PRIVATE imgui
 )
 
@@ -73,6 +73,7 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/BindlessVk/include
 
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spdlog/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
@@ -94,7 +95,6 @@ target_link_libraries(
     PRIVATE imgui
     PRIVATE tinygltf
     PRIVATE spirv-reflect-static
-    PRIVATE spdlog
 )
 
 target_precompile_headers(
