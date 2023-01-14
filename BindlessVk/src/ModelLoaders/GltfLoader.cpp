@@ -42,17 +42,19 @@ void GltfLoader::load_gltf_model_from_ascii(const char* file_path)
 	tinygltf::TinyGLTF gltf_context;
 	std::string err, warn;
 
-	BVK_ASSERT(
-	    !gltf_context.LoadASCIIFromFile(&gltf_model, &err, &warn, file_path),
-	    "Failed to load gltf file: \nname:{}\npath:{}\nerr: {}",
-	    model.name,
-	    file_path,
-	    err
+	assert_true(
+	    gltf_context.LoadASCIIFromFile(&gltf_model, &err, &warn, file_path),
+	    fmt::format(
+	        "Failed to load gltf file: \nname:{}\npath:{}\nerr: {}",
+	        model.name,
+	        file_path,
+	        err
+	    )
 	);
 
 	if (!warn.empty())
 	{
-		BVK_LOG(LogLvl::eWarn, warn);
+		device->debug_callback(LogLvl::eWarn, warn);
 	}
 }
 
@@ -70,7 +72,7 @@ void GltfLoader::load_material_parameters()
 {
 	for (auto& material : gltf_model.materials)
 	{
-		BVK_ASSERT(
+		assert_false(
 		    material.values.find("baseColorTexture") == material.values.end(),
 		    "Material doesn't have required values"
 		);

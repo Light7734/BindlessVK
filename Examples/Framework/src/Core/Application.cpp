@@ -5,6 +5,32 @@
 #include <imgui.h>
 #include <utility>
 
+/// Callback function called after successful vkAllocateMemory.
+void vma_allocate_device_memory_callback(
+  VmaAllocator VMA_NOT_NULL allocator,
+  uint32_t memory_type,
+  VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
+  VkDeviceSize size,
+  void* VMA_NULLABLE user_data
+)
+{
+	auto* device = reinterpret_cast<bvk::Device*>(user_data);
+	device->debug_callback(bvk::LogLvl::eTrace, fmt::format("[VMA]: Free device memory -> {}", size));
+}
+
+/// Callback function called before vkFreeMemory.
+void vma_free_device_memory_callback(
+  VmaAllocator VMA_NOT_NULL allocator,
+  uint32_t memory_type,
+  VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
+  VkDeviceSize size,
+  void* VMA_NULLABLE user_data
+)
+{
+	auto* device = reinterpret_cast<bvk::Device*>(user_data);
+	device->debug_callback(bvk::LogLvl::eTrace, fmt::format("[VMA]: Free device memory -> {}", size));
+}
+
 // @todo: refactor this out
 static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Window& window)
 {
@@ -100,7 +126,9 @@ Application::Application()
 	    | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
 
 	  &vulkan_debug_message_callback,
-	  this
+	  this,
+	  &vma_allocate_device_memory_callback,
+	  &vma_free_device_memory_callback
 	);
 
 	bvk::Device* device = device_system.get_device();

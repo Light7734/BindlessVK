@@ -127,10 +127,16 @@ void RenderGraph::build(
 	{
 		auto& pass = this->renderpasses[i];
 		auto& pass_info = this->renderpasses_info[i];
-		BVK_LOG(LogLvl::eTrace, "{} on begin frame {}", pass.name, !!pass.on_begin_frame);
+		device->debug_callback(
+		    LogLvl::eTrace,
+		    fmt::format("{} on begin frame {}", pass.name, !!pass.on_begin_frame)
+		);
 
 		pass.name = pass_info.name;
-		BVK_LOG(LogLvl::eTrace, "{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame);
+		device->debug_callback(
+		    LogLvl::eTrace,
+		    fmt::format("{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame)
+		);
 
 		pass.on_begin_frame = pass_info.on_begin_frame ?
 		                          pass_info.on_begin_frame :
@@ -208,7 +214,7 @@ void RenderGraph::create_cmd_buffers()
 				num_pass,
 			};
 
-			BVK_ASSERT(device->logical.allocateCommandBuffers(
+			assert_false(device->logical.allocateCommandBuffers(
 			    &cmdBufferallocInfo,
 			    &secondary_cmd_buffers[num_pass * (j + (device->num_threads * i))]
 			));
@@ -219,7 +225,7 @@ void RenderGraph::create_cmd_buffers()
 // @todo: Implement
 void RenderGraph::validate_graph()
 {
-	BVK_LOG(LogLvl::eWarn, "Unimplemented function call");
+	device->debug_callback(LogLvl::eWarn, fmt::format("Unimplemented function call"));
 }
 
 // @todo: Implement
@@ -276,9 +282,9 @@ void RenderGraph::build_attachment_resources()
 					if (resource_container.last_write_name != color_attachment_info.input)
 						continue;
 
-					BVK_ASSERT(
-					    resource_container.size != color_attachment_info.size
-					        || resource_container.size_type != color_attachment_info.size_type,
+					assert_true(
+					    resource_container.size == color_attachment_info.size
+					        && resource_container.size_type == color_attachment_info.size_type,
 					    "ReadWrite attachment with different size from input is currently not "
 					    "supported"
 					);
@@ -352,9 +358,9 @@ void RenderGraph::build_attachment_resources()
 				if (resource_container.last_write_name == depth_stencil_attachment_info.input)
 					continue;
 
-				BVK_ASSERT(
+				assert_true(
 				    resource_container.size != depth_stencil_attachment_info.size
-				        || resource_container.size_type != depth_stencil_attachment_info.size_type,
+				        && resource_container.size_type != depth_stencil_attachment_info.size_type,
 				    "ReadWrite attachment with different size from input is currently not "
 				    "supported"
 				);
@@ -614,11 +620,9 @@ void RenderGraph::write_passes_sets()
 		}
 		for (const auto& texture_input_info : pass_info.texture_inputs_info)
 		{
-			BVK_LOG(
+			device->debug_callback(
 			    LogLvl::eWarn,
-			    "{} - {}",
-			    BVK_MAX_FRAMES_IN_FLIGHT,
-			    pass.descriptor_sets.size()
+			    fmt::format("{} - {}", BVK_MAX_FRAMES_IN_FLIGHT, pass.descriptor_sets.size())
 			);
 
 			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
@@ -719,10 +723,12 @@ void RenderGraph::create_attachment_resource(
 		image_usage_mask = vk::ImageUsageFlagBits::eDepthStencilAttachment,
 		image_aspect_mask = vk::ImageAspectFlagBits::eDepth;
 	}
-	BVK_ASSERT(
-	    !(!!image_usage_mask && !!image_aspect_mask),
-	    "Unsupported render attachment format: {}",
-	    string_VkFormat(static_cast<VkFormat>(attachment_info.format))
+	assert_true(
+	    !!image_usage_mask && !!image_aspect_mask,
+	    fmt::format(
+	        "Unsupported render attachment format: {}",
+	        string_VkFormat(static_cast<VkFormat>(attachment_info.format))
+	    )
 	);
 
 	// Set image extent
@@ -837,7 +843,7 @@ void RenderGraph::create_attachment_resource(
 
 		break;
 	}
-	default: BVK_ASSERT(true, "Invalid attachment resource type");
+	default: assert_fail("Invalid attachment resource type");
 	}
 
 	if (static_cast<u32>(attachment_info.samples) > 1
@@ -1233,7 +1239,7 @@ vk::Extent3D RenderGraph::calculate_attachment_image_extent(
 		};
 
 	case Renderpass::CreateInfo::SizeType::eRelative:
-	default: BVK_ASSERT(true, "Invalid/Unsupported attachment size type");
+	default: assert_fail("Invalid/Unsupported attachment size type"); return {};
 	};
 }
 

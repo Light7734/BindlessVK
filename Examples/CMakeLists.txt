@@ -4,9 +4,11 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     Framework
 
+    # Common
+    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Common/Common.cpp
+
     # Core
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Application.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Common.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Window.cpp
 
     # Utils

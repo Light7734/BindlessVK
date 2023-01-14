@@ -16,7 +16,7 @@
 
 // Assertions
 #define ASSERT(x, ...)                                                \
-	if (!(x)) {                                                         \
+	if (!(x)) [[unlikely]] {                                            \
 		LOG(critical, "" __VA_ARGS__);                                    \
 		throw FrameworkException(#x, TKNIND(__FILE__), TKNIND(__LINE__)); \
 	}

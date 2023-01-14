@@ -1,7 +1,5 @@
 #include "Framework/Pools/StagingPool.hpp"
 
-#include "Framework/Core/Common.hpp"
-
 StagingPool::StagingPool(uint32_t count, size_t size, bvk::Device* device)
 {
 	staging_buffers.reserve(count);

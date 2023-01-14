@@ -1,7 +1,5 @@
 #include "BindlessVk/Buffer.hpp"
 
-#include "BindlessVk/BindlessVkConfig.hpp"
-
 namespace BINDLESSVK_NAMESPACE {
 
 Buffer::Buffer(
@@ -28,11 +26,13 @@ Buffer::Buffer(
 	    vma_info
 	);
 
-	BVK_LOG(
+	device->debug_callback(
 	    LogLvl::eTrace,
-	    "{} created with {}",
-	    debug_name,
-	    (u32)device->allocator.getAllocationMemoryProperties(buffer.allocation)
+	    fmt::format(
+	        "{} created with {}",
+	        debug_name,
+	        (u32)device->allocator.getAllocationMemoryProperties(buffer.allocation)
+	    )
 	);
 
 	descriptor_info = {

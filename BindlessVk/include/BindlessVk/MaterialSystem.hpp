@@ -198,13 +198,13 @@ private:
 	Device* device;
 	vk::DescriptorPool descriptor_pool = {};
 
-	std::unordered_map<u64, Shader> shaders = {};
-	std::unordered_map<u64, ShaderEffect> shader_effects = {};
-	std::unordered_map<u64, ShaderPass> shader_passes = {};
+	hash_map<u64, Shader> shaders = {};
+	hash_map<u64, ShaderEffect> shader_effects = {};
+	hash_map<u64, ShaderPass> shader_passes = {};
 
-	std::unordered_map<u64, PipelineConfiguration> pipline_configurations = {};
+	hash_map<u64, PipelineConfiguration> pipline_configurations = {};
 
-	std::unordered_map<u64, Material> materials = {};
+	hash_map<u64, Material> materials = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

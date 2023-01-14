@@ -3,8 +3,8 @@
 #include <spirv_reflect.h>
 
 static_assert(
-    SPV_REFLECT_RESULT_SUCCESS == 0,
-    "SPV_REFLECT_RESULT_SUCCESS was assumed to be 0, but it isn't"
+    SPV_REFLECT_RESULT_SUCCESS == false,
+    "SPV_REFLECT_RESULT_SUCCESS was suppoed to be 0 (false), but it isn't"
 );
 
 namespace BINDLESSVK_NAMESPACE {
@@ -13,26 +13,24 @@ void MaterialSystem::init(Device* device)
 {
 	this->device = device;
 
-	std::vector<vk::DescriptorPoolSize> pool_sizes = {
-		{ vk::DescriptorType::eSampler, 1000 },
-		{ vk::DescriptorType::eCombinedImageSampler, 1000 },
-		{ vk::DescriptorType::eSampledImage, 1000 },
-		{ vk::DescriptorType::eStorageImage, 1000 },
-		{ vk::DescriptorType::eUniformTexelBuffer, 1000 },
-		{ vk::DescriptorType::eStorageTexelBuffer, 1000 },
-		{ vk::DescriptorType::eUniformBuffer, 1000 },
-		{ vk::DescriptorType::eStorageBuffer, 1000 },
-		{ vk::DescriptorType::eUniformBufferDynamic, 1000 },
-		{ vk::DescriptorType::eStorageBufferDynamic, 1000 },
-		{ vk::DescriptorType::eInputAttachment, 1000 }
-	};
+	vec<vk::DescriptorPoolSize> pool_sizes = { { vk::DescriptorType::eSampler, 1000 },
+		                                       { vk::DescriptorType::eCombinedImageSampler, 1000 },
+		                                       { vk::DescriptorType::eSampledImage, 1000 },
+		                                       { vk::DescriptorType::eStorageImage, 1000 },
+		                                       { vk::DescriptorType::eUniformTexelBuffer, 1000 },
+		                                       { vk::DescriptorType::eStorageTexelBuffer, 1000 },
+		                                       { vk::DescriptorType::eUniformBuffer, 1000 },
+		                                       { vk::DescriptorType::eStorageBuffer, 1000 },
+		                                       { vk::DescriptorType::eUniformBufferDynamic, 1000 },
+		                                       { vk::DescriptorType::eStorageBufferDynamic, 1000 },
+		                                       { vk::DescriptorType::eInputAttachment, 1000 } };
 	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
 
 	vk::DescriptorPoolCreateInfo descriptor_pool_create_info {
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-		100,                                      // maxSets
-		static_cast<uint32_t>(pool_sizes.size()), // poolSizeCount
-		pool_sizes.data(),                        // pPoolSizes
+		100,
+		static_cast<uint32_t>(pool_sizes.size()),
+		pool_sizes.data(),
 	};
 
 	descriptor_pool = device->logical.createDescriptorPool(descriptor_pool_create_info, nullptr);
@@ -83,7 +81,7 @@ void MaterialSystem::load_shader(const char* name, const char* path, vk::ShaderS
 	std::ifstream stream(path, std::ios::ate);
 
 	const size_t file_size = stream.tellg();
-	std::vector<uint32_t> code(file_size / sizeof(uint32_t));
+	vec<uint32_t> code(file_size / sizeof(uint32_t));
 
 	stream.seekg(0);
 	stream.read((char*)code.data(), file_size);
@@ -102,32 +100,32 @@ void MaterialSystem::load_shader(const char* name, const char* path, vk::ShaderS
 	};
 }
 
-void MaterialSystem::create_shader_effect(const char* name, std::vector<Shader*> shaders)
+void MaterialSystem::create_shader_effect(const char* name, vec<Shader*> shaders)
 {
-	std::array<std::vector<vk::DescriptorSetLayoutBinding>, 2> set_bindings;
+	arr<vec<vk::DescriptorSetLayoutBinding>, 2> set_bindings;
 
 	for (const auto& shader_stage : shaders)
 	{
 		SpvReflectShaderModule spv_module;
-
-		BVK_ASSERT(
+		assert_false(
 		    spvReflectCreateShaderModule(
 		        shader_stage->code.size() * sizeof(uint32_t),
 		        shader_stage->code.data(),
 		        &spv_module
 		    ),
-		    "spvReflectCreateShaderModule failed"
+		    "spvReflectCreateShderModule failed"
 		);
 
 		uint32_t descriptor_sets_count = 0ul;
-		BVK_ASSERT(
+
+		assert_false(
 		    spvReflectEnumerateDescriptorSets(&spv_module, &descriptor_sets_count, nullptr),
 		    "spvReflectEnumerateDescriptorSets failed"
 		);
 
-		std::vector<SpvReflectDescriptorSet*> descriptor_sets(descriptor_sets_count);
+		vec<SpvReflectDescriptorSet*> descriptor_sets(descriptor_sets_count);
 
-		BVK_ASSERT(
+		assert_false(
 		    spvReflectEnumerateDescriptorSets(
 		        &spv_module,
 		        &descriptor_sets_count,
@@ -163,7 +161,7 @@ void MaterialSystem::create_shader_effect(const char* name, std::vector<Shader*>
 		}
 	}
 
-	std::array<vk::DescriptorSetLayout, 2ull> sets_layout;
+	arr<vk::DescriptorSetLayout, 2ull> sets_layout;
 	uint32_t index = 0ull;
 	for (const auto& set : set_bindings)
 	{
@@ -198,17 +196,17 @@ void MaterialSystem::create_shader_pass(
 {
 	if (shader_passes.contains(hash_str(name)))
 	{
-		BVK_LOG(LogLvl::eWarn, "Recreating shader pass: {}", name);
+		device->debug_callback(LogLvl::eWarn, fmt::format("Recreating shader pass: {}", name));
 		device->logical.destroyPipeline(shader_passes[hash_str(name)].pipeline);
 	}
 
-	std::vector<vk::PipelineShaderStageCreateInfo> stages(effect->shaders.size());
+	vec<vk::PipelineShaderStageCreateInfo> stages(effect->shaders.size());
 
 	uint32_t index = 0;
 	for (const auto& shader : effect->shaders)
 	{
 		stages[index++] = {
-			{}, // flags
+			{},
 			shader->stage,
 			shader->module,
 			"main",
@@ -216,15 +214,15 @@ void MaterialSystem::create_shader_pass(
 	}
 
 	vk::PipelineRenderingCreateInfo pipeline_rendering_info {
-		{},                       //  viewMask
-		1u,                       // colorAttachmentCount
-		&color_attachment_format, // pColorAttachmentFormats
-		depth_attachment_format,  // depthAttachmentFormat
-		{},                       // stencilAttachmentFormat
+		{},
+		1u,
+		&color_attachment_format,
+		depth_attachment_format, // :D
+		{},
 	};
 
 	vk::GraphicsPipelineCreateInfo graphics_pipeline_info {
-		{}, // flags
+		{},
 		static_cast<uint32_t>(stages.size()),
 		stages.data(),
 		&pipeline_configuration.vertex_input_state,
@@ -237,15 +235,15 @@ void MaterialSystem::create_shader_pass(
 		&pipeline_configuration.color_blend_state,
 		&pipeline_configuration.dynamic_state,
 		effect->pipeline_layout,
-		{}, // renderPass
-		{}, // subpass
-		{}, // basePipelineHandle
-		{}, // basePipelineIndex
+		{},
+		{},
+		{},
+		{},
 		&pipeline_rendering_info,
 	};
 
 	auto pipeline = device->logical.createGraphicsPipeline({}, graphics_pipeline_info);
-	BVK_ASSERT(pipeline.result);
+	assert_false(pipeline.result);
 
 	shader_passes[hash_str(name)] = {
 		effect,
@@ -262,9 +260,9 @@ void MaterialSystem::create_pipeline_configuration(
     vk::PipelineRasterizationStateCreateInfo rasterization_state,
     vk::PipelineMultisampleStateCreateInfo multisample_state,
     vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
-    std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
+    vec<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
     vk::PipelineColorBlendStateCreateInfo color_blend_state,
-    std::vector<vk::DynamicState> dynamic_states
+    vec<vk::DynamicState> dynamic_states
 )
 {
 	PipelineConfiguration& configuration = pipline_configurations[hash_str(name)];
@@ -299,7 +297,7 @@ void MaterialSystem::create_material(
     const char* name,
     ShaderPass* shader_pass,
     MaterialParameters parameters,
-    std::vector<class Texture*> textures
+    vec<class Texture*> textures
 )
 {
 	vk::DescriptorSetAllocateInfo allocate_info {
@@ -314,11 +312,11 @@ void MaterialSystem::create_material(
 		    descriptor_pool,
 		    materials[hash_str(name)].descriptor_set
 		);
-		BVK_LOG(LogLvl::eWarn, "Recreating material: {}", name);
+		device->debug_callback(LogLvl::eWarn, fmt::format("Recreating material: {}", name));
 	}
 
 	vk::DescriptorSet set;
-	BVK_ASSERT(device->logical.allocateDescriptorSets(&allocate_info, &set));
+	assert_false(device->logical.allocateDescriptorSets(&allocate_info, &set));
 
 	materials[hash_str(name)] = {
 		.shader_pass = shader_pass,

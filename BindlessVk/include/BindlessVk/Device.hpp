@@ -7,9 +7,9 @@ namespace BINDLESSVK_NAMESPACE {
 struct Device
 {
 	// Layers & Extensions
-	std::vector<const char*> layers;
-	std::vector<const char*> instance_extensions;
-	std::vector<const char*> device_extensions;
+	vec<c_str> layers;
+	vec<c_str> instance_extensions;
+	vec<c_str> device_extensions;
 
 	// instance
 	PFN_vkGetInstanceProcAddr get_vk_instance_proc_addr_func;
@@ -33,9 +33,9 @@ struct Device
 	vk::Queue present_queue;
 	vk::Queue compute_queue;
 
-	uint32_t graphics_queue_index;
-	uint32_t present_queue_index;
-	uint32_t compute_queue_index;
+	u32 graphics_queue_index;
+	u32 present_queue_index;
+	u32 compute_queue_index;
 
 	/** Native platform surface */
 	vk::SurfaceKHR surface;
@@ -50,7 +50,7 @@ struct Device
 	vk::PresentModeKHR present_mode;
 
 	/** */
-	std::function<vk::Extent2D()> get_framebuffer_extent_func;
+	fn<vk::Extent2D()> get_framebuffer_extent_func;
 
 	/** */
 	vk::Extent2D framebuffer_extent;
@@ -59,10 +59,10 @@ struct Device
 	vma::Allocator allocator;
 
 	/** Max number of recording threads */
-	uint32_t num_threads;
+	u32 num_threads;
 
 	/** A command pool for every (thread * frame) */
-	std::vector<vk::CommandPool> dynamic_cmd_pools;
+	vec<vk::CommandPool> dynamic_cmd_pools;
 
 	/** Command pool for immediate submission */
 	vk::CommandPool immediate_cmd_pool;
@@ -70,17 +70,20 @@ struct Device
 	vk::CommandBuffer immediate_cmd;
 	vk::Fence immediate_fence;
 
-	vk::CommandPool get_cmd_pool(uint32_t frame_index, uint32_t thread_index = 0)
+	fn<void(LogLvl, const str& message)> debug_callback;
+
+
+	vk::CommandPool get_cmd_pool(u32 frame_index, u32 thread_index = 0)
 	{
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
 	}
 
-	void immediate_submit(std::function<void(vk::CommandBuffer)>&& func)
+	void immediate_submit(fn<void(vk::CommandBuffer)>&& func)
 	{
 		vk::CommandBufferAllocateInfo allocInfo {
 			immediate_cmd_pool,
 			vk::CommandBufferLevel::ePrimary,
-			1ul,
+			1u,
 		};
 
 		vk::CommandBuffer cmd = logical.allocateCommandBuffers(allocInfo)[0];
@@ -94,13 +97,13 @@ struct Device
 		vk::SubmitInfo submit_info { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
 		graphics_queue.submit(submit_info, immediate_fence);
 
-		BVK_ASSERT(logical.waitForFences(immediate_fence, true, UINT_MAX));
+		assert_false(logical.waitForFences(immediate_fence, true, UINT_MAX));
 		logical.resetFences(immediate_fence);
 		logical.resetCommandPool(immediate_cmd_pool);
 	}
 
 	template<typename T>
-	void set_object_name(T object, const char* name)
+	void set_object_name(T object, c_str name)
 	{
 		logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.objectType,
@@ -139,18 +142,21 @@ public:
 	 * @param debug_messenger_userptr user pointer passed to debug messenger
 	 */
 	void init(
-	    std::vector<const char*> layers,
-	    std::vector<const char*> instance_extensions,
-	    std::vector<const char*> device_extensions,
+	    vec<c_str> layers,
+	    vec<c_str> instance_extensions,
+	    vec<c_str> device_extensions,
 
-	    std::function<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
-	    std::function<vk::Extent2D()> get_framebuffer_extent_func,
+	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
+	    fn<vk::Extent2D()> get_framebuffer_extent_func,
 
 	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
 	    PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
-	    void* debug_messenger_userptr
+	    void* debug_messenger_userptr,
+
+	    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
+	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
 	);
 
 	/** Destroys the device system */
@@ -163,7 +169,7 @@ private:
 	void check_layer_support();
 
 	void create_vulkan_instance(
-	    std::function<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
+	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
 	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
@@ -175,7 +181,10 @@ private:
 
 	void create_logical_device();
 
-	void create_allocator();
+	void create_allocator(
+	    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
+	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
+	);
 
 	void create_command_pools();
 

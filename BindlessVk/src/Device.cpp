@@ -6,42 +6,19 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
 
-
-/// Callback function called after successful vkAllocateMemory.
-void vmaAllocateDeviceMemoryFunction(
-    VmaAllocator VMA_NOT_NULL allocator,
-    uint32_t memory_type,
-    VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
-    VkDeviceSize size,
-    void* VMA_NULLABLE user_data
-)
-{
-	BVK_LOG(LogLvl::eTrace, "Allocate device memory -> {}", size);
-}
-
-/// Callback function called before vkFreeMemory.
-void vmaFreeDeviceMemoryFunction(
-    VmaAllocator VMA_NOT_NULL allocator,
-    uint32_t memory_type,
-    VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
-    VkDeviceSize size,
-    void* VMA_NULLABLE user_data
-)
-{
-	BVK_LOG(LogLvl::eTrace, "Free device memory -> {}", size);
-}
-
 void DeviceSystem::init(
-    std::vector<const char*> layers,
-    std::vector<const char*> instance_extensions,
-    std::vector<const char*> device_extensions,
-    std::function<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
-    std::function<vk::Extent2D()> get_framebuffer_extent_func,
+    vec<c_str> layers,
+    vec<c_str> instance_extensions,
+    vec<c_str> device_extensions,
+    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
+    fn<vk::Extent2D()> get_framebuffer_extent_func,
     bool has_debugging,
     vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
     vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
     PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
-    void* debug_messenger_userptr
+    void* debug_messenger_userptr,
+    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
+    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
 )
 {
 	device.layers = layers;
@@ -77,7 +54,7 @@ void DeviceSystem::init(
 
 	pick_physical_device();
 	create_logical_device();
-	create_allocator();
+	create_allocator(vma_free_device_memory_callback, vma_allocate_device_memory_callback);
 	update_surface_info();
 
 	create_command_pools();
@@ -90,7 +67,7 @@ void DeviceSystem::reset()
 	device.logical.destroyFence(device.immediate_fence);
 	device.logical.destroyCommandPool(device.immediate_cmd_pool);
 
-	for (uint32_t i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
 		device.logical.destroyCommandPool(device.dynamic_cmd_pools[i]);
 	}
@@ -105,11 +82,11 @@ void DeviceSystem::reset()
 
 void DeviceSystem::check_layer_support()
 {
-	std::vector<vk::LayerProperties> available_layers = vk::enumerateInstanceLayerProperties();
-	BVK_ASSERT(available_layers.empty(), "No instance layer found");
+	vec<vk::LayerProperties> available_layers = vk::enumerateInstanceLayerProperties();
+	assert_false(available_layers.empty(), "No instance layer found");
 
 	// Check if we support all the required layers
-	for (const char* required_layer_name : device.layers)
+	for (c_str required_layer_name : device.layers)
 	{
 		bool layer_found = false;
 
@@ -122,12 +99,12 @@ void DeviceSystem::check_layer_support()
 			}
 		}
 
-		BVK_ASSERT(!layer_found, "Required layer not found");
+		assert_true(layer_found, "Required layer not found");
 	}
 }
 
 void DeviceSystem::create_vulkan_instance(
-    std::function<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
+    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
     bool has_debugging,
     vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
     vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
@@ -165,15 +142,15 @@ void DeviceSystem::create_vulkan_instance(
 	// Create the vulkan instance
 
 	vk::InstanceCreateInfo instance_create_info {
-		{},                                                       // flags
-		&application_info,                                        // pApplicationInfo
-		static_cast<uint32_t>(device.layers.size()),              // enabledLayerCount
-		device.layers.data(),                                     // ppEnabledLayerNames
-		static_cast<uint32_t>(device.instance_extensions.size()), // enabledExtensionCount
-		device.instance_extensions.data(),                        // ppEnabledExtensionNames
+		{},                                                  // flags
+		&application_info,                                   // pApplicationInfo
+		static_cast<u32>(device.layers.size()),              // enabledLayerCount
+		device.layers.data(),                                // ppEnabledLayerNames
+		static_cast<u32>(device.instance_extensions.size()), // enabledExtensionCount
+		device.instance_extensions.data(),                   // ppEnabledExtensionNames
 	};
 
-	BVK_ASSERT(vk::createInstance(&instance_create_info, nullptr, &device.instance));
+	assert_false(vk::createInstance(&instance_create_info, nullptr, &device.instance));
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(device.instance);
 	device.surface = create_window_surface_func(device.instance);
 
@@ -184,15 +161,15 @@ void DeviceSystem::create_vulkan_instance(
 void DeviceSystem::pick_physical_device()
 {
 	// Fetch physical devices with vulkan support
-	std::vector<vk::PhysicalDevice> physical_devices = device.instance.enumeratePhysicalDevices();
+	vec<vk::PhysicalDevice> physical_devices = device.instance.enumeratePhysicalDevices();
 
-	BVK_ASSERT(physical_devices.empty(), "No physical device with vulkan support found");
+	assert_false(physical_devices.empty(), "No physical device with vulkan support found");
 
 	// Select the most suitable physical device
-	uint32_t high_score = 0u;
+	u32 high_score = 0u;
 	for (const auto& physical_device : physical_devices)
 	{
-		uint32_t score = 0u;
+		u32 score = 0u;
 
 		// Fetch properties & features
 		vk::PhysicalDeviceProperties properties = physical_device.getProperties();
@@ -205,12 +182,12 @@ void DeviceSystem::pick_physical_device()
 		/** Check if the device supports the required queues **/
 		{
 			// Fetch queue families
-			std::vector<vk::QueueFamilyProperties> queue_families_properties =
+			vec<vk::QueueFamilyProperties> queue_families_properties =
 			    physical_device.getQueueFamilyProperties();
 			if (queue_families_properties.empty())
 				continue;
 
-			uint32_t index = 0u;
+			u32 index = 0u;
 			for (const auto& queue_family_property : queue_families_properties)
 			{
 				// Check if current queue index supports any or all desired queues
@@ -256,7 +233,7 @@ void DeviceSystem::pick_physical_device()
 		{
 			// Fetch extensions
 
-			std::vector<vk::ExtensionProperties> device_extensions_properties =
+			vec<vk::ExtensionProperties> device_extensions_properties =
 			    physical_device.enumerateDeviceExtensionProperties();
 			if (device_extensions_properties.empty())
 				continue;
@@ -303,7 +280,7 @@ void DeviceSystem::pick_physical_device()
 
 		device.physical = score > high_score ? physical_device : device.physical;
 	}
-	BVK_ASSERT(!device.physical, "No suitable physical device found");
+	assert_true(device.physical, "No suitable physical device found");
 
 	// Cache the selected physical device's properties
 	device.properties = device.physical.getProperties();
@@ -359,7 +336,7 @@ void DeviceSystem::pick_physical_device()
 
 void DeviceSystem::create_logical_device()
 {
-	std::vector<vk::DeviceQueueCreateInfo> queues_info;
+	vec<vk::DeviceQueueCreateInfo> queues_info;
 
 	float queue_priority = 1.0f; // Always 1.0
 	queues_info.push_back({
@@ -442,14 +419,14 @@ void DeviceSystem::create_logical_device()
 	};
 
 	vk::DeviceCreateInfo logical_device_info {
-		{},                                                     // flags
-		static_cast<uint32_t>(queues_info.size()),              // queueCreateInfoCount
-		queues_info.data(),                                     // pQueueCreateInfos
-		0u,                                                     // enabledLayerCount
-		nullptr,                                                // ppEnabledLayerNames
-		static_cast<uint32_t>(device.device_extensions.size()), // enabledExtensionCount
-		device.device_extensions.data(),                        // ppEnabledExtensionNames
-		&physical_device_features,                              // pEnabledFeatures
+		{},
+		static_cast<u32>(queues_info.size()),
+		queues_info.data(),
+		0u,
+		nullptr,
+		static_cast<u32>(device.device_extensions.size()),
+		device.device_extensions.data(),
+		&physical_device_features,
 		&dynamic_rendering_features,
 	};
 
@@ -459,11 +436,14 @@ void DeviceSystem::create_logical_device()
 	device.graphics_queue = device.logical.getQueue(device.graphics_queue_index, 0u);
 	device.present_queue = device.logical.getQueue(device.present_queue_index, 0u);
 
-	BVK_ASSERT(!device.graphics_queue, "Failed to fetch graphics queue");
-	BVK_ASSERT(!device.present_queue, "Failed to fetch present queue");
+	assert_true(device.graphics_queue, "Failed to fetch graphics queue");
+	assert_true(device.present_queue, "Failed to fetch present queue");
 }
 
-void DeviceSystem::create_allocator()
+void DeviceSystem::create_allocator(
+    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
+    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
+)
 {
 	vma::VulkanFunctions vulkan_funcs(
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
@@ -495,23 +475,22 @@ void DeviceSystem::create_allocator()
 	);
 
 	vma::DeviceMemoryCallbacks mem_callbacks = {
-
-		&vmaAllocateDeviceMemoryFunction,
-		&vmaFreeDeviceMemoryFunction,
-		nullptr,
+		vma_free_device_memory_callback,
+		vma_allocate_device_memory_callback,
+		&device,
 	};
 
 	vma::AllocatorCreateInfo allocator_info(
-	    {},              // flags
-	    device.physical, // physicalDevice
-	    device.logical,  // device
-	    {},              // preferredLargeHeapBlockSize
-	    {},              // pAllocationCallbacks
+	    {},
+	    device.physical,
+	    device.logical,
+	    {},
+	    {},
 	    &mem_callbacks,
-	    {},              // pHeapSizeLimit
-	    &vulkan_funcs,   // pVulkanFunctions
-	    device.instance, // instance
-	    {}               // vulkanApiVersion
+	    {},
+	    &vulkan_funcs,
+	    device.instance,
+	    {}
 	);
 
 	device.allocator = vma::createAllocator(allocator_info);
@@ -524,9 +503,9 @@ void DeviceSystem::create_command_pools()
 		device.graphics_queue_index,
 	};
 
-	for (uint32_t i = 0; i < device.num_threads; i++)
+	for (u32 i = 0; i < device.num_threads; i++)
 	{
-		for (uint32_t j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; j++)
+		for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; j++)
 		{
 			device.dynamic_cmd_pools.push_back(device.logical.createCommandPool(command_pool_info));
 		}
@@ -540,10 +519,10 @@ void DeviceSystem::update_surface_info()
 {
 	device.surface_capabilities = device.physical.getSurfaceCapabilitiesKHR(device.surface);
 
-	std::vector<vk::SurfaceFormatKHR> supported_formats =
+	vec<vk::SurfaceFormatKHR> supported_formats =
 	    device.physical.getSurfaceFormatsKHR(device.surface);
 
-	std::vector<vk::PresentModeKHR> supported_present_modes =
+	vec<vk::PresentModeKHR> supported_present_modes =
 	    device.physical.getSurfacePresentModesKHR(device.surface);
 
 	// Select surface format

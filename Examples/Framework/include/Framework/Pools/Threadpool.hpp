@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Framework/Core/Common.hpp"
+#include "Framework/Common/Common.hpp"
 
 #include <condition_variable>
 #include <queue>

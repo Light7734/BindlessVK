@@ -279,7 +279,7 @@ void Renderer::end_frame(void* user_pointer)
 	auto render_fence = render_fences[current_frame];
 
 
-	BVK_ASSERT(device->logical.waitForFences(render_fence, VK_TRUE, UINT64_MAX));
+	assert_false(device->logical.waitForFences(render_fence, VK_TRUE, UINT64_MAX));
 
 	device->logical.resetFences(render_fence);
 
@@ -298,9 +298,9 @@ void Renderer::end_frame(void* user_pointer)
 	}
 	else
 	{
-		BVK_ASSERT(
-		    result != vk::Result::eSuccess,
-		    "VkAcquireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or "
+		assert_false(
+		    result,
+		    "VkAcqtireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or "
 		    "VK_SUBOPTIMAL_KHR"
 		);
 	}

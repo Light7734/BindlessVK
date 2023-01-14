@@ -2,7 +2,7 @@
 
 #include "BindlessVk/MaterialSystem.hpp"
 #include "BindlessVk/ModelLoader.hpp"
-#include "Framework/Core/Common.hpp"
+#include "Framework/Common/Common.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>

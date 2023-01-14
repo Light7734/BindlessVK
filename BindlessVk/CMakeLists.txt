@@ -4,7 +4,6 @@ add_library(
     BindlessVk
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Common.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Device.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoader.cpp
@@ -12,7 +11,6 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
-
 )
 
 set_target_properties(
@@ -39,8 +37,8 @@ target_link_libraries(
     PRIVATE ktx
     PRIVATE tinygltf
     PRIVATE spirv-reflect-static
-    PRIVATE spdlog
     PRIVATE fmt
+    PRIVATE spdlog
 )
 
 target_precompile_headers(

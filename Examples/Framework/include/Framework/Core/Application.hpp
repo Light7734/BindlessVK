@@ -4,7 +4,7 @@
 #include "BindlessVk/ModelLoader.hpp"
 #include "BindlessVk/Renderer.hpp"
 #include "BindlessVk/Texture.hpp"
-#include "Framework/Core/Common.hpp"
+#include "Framework/Common/Common.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Pools/StagingPool.hpp"
 #include "Framework/Scene/CameraController.hpp"
@@ -29,19 +29,19 @@ public:
 	virtual void on_swapchain_recreate()    = 0;
 
 public:
-	Window window;
-	Scene scene;
+	Window window = {};
+	Scene scene   = {};
 
-	bvk::DeviceSystem device_system;
-	bvk::Renderer renderer;
-	bvk::TextureSystem texture_system;
-	bvk::MaterialSystem material_system;
-	bvk::ModelLoader model_loader;
+	bvk::DeviceSystem device_system     = {};
+	bvk::Renderer renderer              = {};
+	bvk::TextureSystem texture_system   = {};
+	bvk::MaterialSystem material_system = {};
+	bvk::ModelLoader model_loader       = {};
 
-	std::unordered_map<uint64_t, bvk::Model> models;
-	std::unordered_map<uint64_t, bvk::Texture> textures;
+	std::unordered_map<uint64_t, bvk::Model> models     = {};
+	std::unordered_map<uint64_t, bvk::Texture> textures = {};
 
-	CameraController camera_controller;
+	CameraController camera_controller = {};
 
 	std::vector<const char*> instance_extensions = {};
 	std::vector<const char*> device_extensions   = {};

@@ -1,12 +1,17 @@
 #pragma once
+#ifndef BINDLESSVK_NAMESPACE
+	#define BINDLESSVK_NAMESPACE bvk
+#endif
 
-#include "BindlessVk/BindlessVkConfig.hpp"
 #include "BindlessVk/Common/Aliases.hpp"
+#include "BindlessVk/Common/Assertions.hpp"
 #include "BindlessVk/Common/Types.hpp"
 #include "BindlessVk/Common/VulkanIncludes.hpp"
 
 #include <exception>
-#ifndef BINDLESSVK_NAMESPACE
+#include <fmt/format.h>
+
+#if !defined(BINDLESSVK_NAMESPACE)
 	#define BINDLESSVK_NAMESPACE bvk
 #endif
 
@@ -20,8 +25,6 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-//@note: If BVK_LOG is not overriden by the user
-// then values should reflect spdlog::level::level_enum
 enum class LogLvl
 {
 	eTrace = 0,
@@ -33,20 +36,6 @@ enum class LogLvl
 	eOff = 6,
 
 	nCount,
-};
-
-struct BindlessVkException: std::exception
-{
-	BindlessVkException(const char* statement, const char* file, int line)
-	    : statement(statement)
-	    , file(file)
-	    , line(line)
-	{
-	}
-
-	const char* statement;
-	const char* file;
-	int line;
 };
 
 // simple hash function

@@ -3,9 +3,32 @@
 #include "BindlessVk/Common/Aliases.hpp"
 #include "BindlessVk/Common/VulkanIncludes.hpp"
 
+#include <source_location>
 #include <vector>
 
+static_assert(VK_SUCCESS == false, "VK_SUCCESS was supposed to be 0 (false), but it isn't");
+
 namespace BINDLESSVK_NAMESPACE {
+struct BindlessVkException: std::exception
+{
+	BindlessVkException(
+	    const str& what,
+	    const std::source_location location = std::source_location::current()
+	)
+	    : msg(what.c_str())
+	    , location(location)
+	{
+	}
+
+	virtual c_str what() const noexcept
+	{
+		return msg;
+	}
+
+	c_str msg;
+	c_str expr;
+	std::source_location location;
+};
 
 struct AllocatedImage
 {

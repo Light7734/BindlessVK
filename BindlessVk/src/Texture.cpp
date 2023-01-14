@@ -6,15 +6,16 @@
 #include <ktxvulkan.h>
 #include <tiny_gltf.h>
 
+static_assert(KTX_SUCCESS == false, "KTX_SUCCESS was supposed to be 0 (false), but it isn't");
 namespace BINDLESSVK_NAMESPACE {
 
 void TextureSystem::init(Device* device)
 {
 	this->device = device;
 
-	BVK_ASSERT(
-	    !(device->physical.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures
-	      & vk::FormatFeatureFlagBits::eSampledImageFilterLinear),
+	assert_true(
+	    device->physical.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures
+	        & vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
 	    "Texture image format(eR8G8B8A8Srgb) does not support linear blitting"
 	);
 
@@ -284,7 +285,7 @@ Texture* TextureSystem::create_from_ktx(
 )
 {
 	ktxTexture* texture_ktx;
-	BVK_ASSERT(
+	assert_false(
 	    ktxTexture_CreateFromNamedFile(
 	        uri.c_str(),
 	        KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
@@ -330,17 +331,17 @@ Texture* TextureSystem::create_from_ktx(
 
 	std::vector<vk::BufferImageCopy> bufferCopies;
 
-	BVK_ASSERT(
-	    (type != Texture::Type::eCubeMap),
+	assert_true(
+	    (type == Texture::Type::eCubeMap),
 	    "Create From KTX Only supports cubemaps for the time being..."
-	)
+	);
 
 	for (u32 face = 0; face < 6; face++)
 	{
 		for (u32 level = 0u; level < texture.mip_levels; level++)
 		{
 			size_t offset;
-			BVK_ASSERT(
+			assert_false(
 			    ktxTexture_GetImageOffset(texture_ktx, level, 0u, face, &offset),
 			    "Failed to get ktx image offset"
 			);
@@ -625,11 +626,13 @@ void TextureSystem::transition_layout(
 
 	else
 	{
-		BVK_LOG(
+		device->debug_callback(
 		    LogLvl::eError,
-		    "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
-		    (i32)oldLayout,
-		    (i32)newLayout
+		    fmt::format(
+		        "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
+		        (i32)oldLayout,
+		        (i32)newLayout
+		    )
 		);
 	}
 

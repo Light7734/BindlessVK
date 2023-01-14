@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Buffer.hpp"
-#include "Framework/Core/Common.hpp"
+#include "Framework/Common/Common.hpp"
 
 class StagingPool
 {
