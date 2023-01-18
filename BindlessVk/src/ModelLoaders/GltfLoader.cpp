@@ -44,17 +44,15 @@ void GltfLoader::load_gltf_model_from_ascii(const char* file_path)
 
 	assert_true(
 	    gltf_context.LoadASCIIFromFile(&gltf_model, &err, &warn, file_path),
-	    fmt::format(
-	        "Failed to load gltf file: \nname:{}\npath:{}\nerr: {}",
-	        model.name,
-	        file_path,
-	        err
-	    )
+	    "Failed to load gltf file: \nname: {}\npath: {}\nerr: {}",
+	    model.name,
+	    file_path,
+	    err
 	);
 
 	if (!warn.empty())
 	{
-		device->debug_callback(LogLvl::eWarn, warn);
+		device->log(LogLvl::eWarn, "gltf warning -> ", warn);
 	}
 }
 

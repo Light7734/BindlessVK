@@ -4,6 +4,8 @@
 #include "BindlessVk/RenderGraph.hpp"
 #include "BindlessVk/RenderPass.hpp"
 #include "BindlessVk/Renderer.hpp"
+#include "Framework/Common/Common.hpp"
+//
 #include "Framework/Core/Application.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Scene/CameraController.hpp"
@@ -12,7 +14,6 @@
 
 // passes
 #include "ForwardPass.hpp"
-#include "Framework/Core/Application.hpp"
 #include "Graph.hpp"
 #include "UserInterfacePass.hpp"
 

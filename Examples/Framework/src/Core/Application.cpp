@@ -1,12 +1,115 @@
 #include "Framework/Core/Application.hpp"
 
+#include <any>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
 #include <utility>
 
+VkBool32 Application::vulkan_debug_message_callback(
+  VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+  VkDebugUtilsMessageTypeFlagsEXT message_types,
+  const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+  void* user_data
+)
+{
+	Application* application = (Application*)user_data;
+
+	std::string type = message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ?
+	                     "GENERAL" :
+	                   message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+	                       && message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ?
+	                     "VALIDATION | PERFORMANCE" :
+	                   message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ?
+	                     "VALIDATION" :
+	                     "PERFORMANCE";
+
+	std::string message             = (callback_data->pMessage);
+	std::string url                 = {};
+	std::string vulkanSpecStatement = {};
+
+	// Remove beginning sections ( we'll log them ourselves )
+	auto pos = message.find_last_of("|");
+	if (pos != std::string::npos) {
+		message = message.substr(pos + 2);
+	}
+
+	// Separate url section of message
+	pos = message.find_last_of("(");
+	if (pos != std::string::npos) {
+		url     = message.substr(pos + 1, message.length() - (pos + 2));
+		message = message.substr(0, pos);
+	}
+
+	// Separate the "Vulkan spec states:" section of the message
+	pos = message.find("The Vulkan spec states:");
+	if (pos != std::string::npos) {
+		size_t len          = std::strlen("The Vulkan spec states: ");
+		vulkanSpecStatement = message.substr(pos + len, message.length() - pos - len);
+		message             = message.substr(0, pos);
+	}
+
+	if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+		application->messenger_err_count++;
+
+		LOG(err, "[VK]:");
+		LOG(err, "    Type -> {} - {}", type, callback_data->pMessageIdName);
+		LOG(err, "    Url  -> {}", url);
+		LOG(err, "    Msg  -> {}", message);
+
+
+		if (callback_data->objectCount) {
+			LOG(err, "    {} OBJECTS:", callback_data->objectCount);
+			for (uint32_t object = 0; object < callback_data->objectCount; object++) {
+				LOG(
+				  err,
+				  "            [{}] {} -> Addr: {}, Name: {}",
+				  object,
+				  string_VkObjectType(callback_data->pObjects[object].objectType)
+				    + std::strlen("VK_OBJECT_TYPE_"),
+				  fmt::ptr((void*)callback_data->pObjects[object].objectHandle),
+				  callback_data->pObjects[object].pObjectName ?
+				    callback_data->pObjects[object].pObjectName :
+				    "(Undefined)"
+				);
+			}
+		}
+
+		if (callback_data->cmdBufLabelCount) {
+			LOG(err, "    {} COMMAND BUFFER LABELS:", callback_data->cmdBufLabelCount);
+			for (uint32_t label = 0; label < callback_data->cmdBufLabelCount; label++) {
+				LOG(
+				  err,
+				  "            [{}]-> {} ({}, {}, {}, {})",
+				  label,
+				  callback_data->pCmdBufLabels[label].pLabelName,
+				  callback_data->pCmdBufLabels[label].color[0],
+				  callback_data->pCmdBufLabels[label].color[1],
+				  callback_data->pCmdBufLabels[label].color[2],
+				  callback_data->pCmdBufLabels[label].color[3]
+				);
+			}
+		}
+
+		LOG(err, "");
+	}
+	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+		application->messenger_warn_count++;
+		LOG(warn, "[VK]: {} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
+	}
+	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+		LOG(info, "[VK]: {} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
+	}
+	else {
+		LOG(trace, "[VK]: {} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
+	}
+
+
+	return static_cast<VkBool32>(VK_FALSE);
+}
+
 /// Callback function called after successful vkAllocateMemory.
-void vma_allocate_device_memory_callback(
+static void vma_allocate_device_memory_callback(
   VmaAllocator VMA_NOT_NULL allocator,
   uint32_t memory_type,
   VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
@@ -14,12 +117,12 @@ void vma_allocate_device_memory_callback(
   void* VMA_NULLABLE user_data
 )
 {
-	auto* device = reinterpret_cast<bvk::Device*>(user_data);
-	device->debug_callback(bvk::LogLvl::eTrace, fmt::format("[VMA]: Free device memory -> {}", size));
+	auto* app = reinterpret_cast<Application*>(user_data);
+	app->logger.log(spdlog::level::trace, "[VMA]: Allocate device memory -> {}", size);
 }
 
 /// Callback function called before vkFreeMemory.
-void vma_free_device_memory_callback(
+static void vma_free_device_memory_callback(
   VmaAllocator VMA_NOT_NULL allocator,
   uint32_t memory_type,
   VkDeviceMemory VMA_NOT_NULL_NON_DISPATCHABLE memory,
@@ -27,8 +130,14 @@ void vma_free_device_memory_callback(
   void* VMA_NULLABLE user_data
 )
 {
-	auto* device = reinterpret_cast<bvk::Device*>(user_data);
-	device->debug_callback(bvk::LogLvl::eTrace, fmt::format("[VMA]: Free device memory -> {}", size));
+	auto* app = reinterpret_cast<Application*>(user_data);
+	app->logger.log(spdlog::level::trace, "[VMA]: Free device memory -> {}", size);
+}
+
+static void bindlessvk_debug_callback(bvk::LogLvl severity, const str& message, std::any user_data)
+{
+	auto* logger = std::any_cast<Logger*>(user_data);
+	logger->log((spdlog::level::level_enum)(int)severity, "[BVK]: {}", message);
 }
 
 // @todo: refactor this out
@@ -106,10 +215,6 @@ Application::Application()
 	  required_surface_extensions.end()
 	);
 
-	auto fuck = [](bvk::LogLvl lvl, const str& msg) {
-		LOG(info, msg);
-	};
-
 	device_system.init(
 	  { "VK_LAYER_KHRONOS_validation" },
 	  instance_extensions,
@@ -130,9 +235,13 @@ Application::Application()
 
 	  &vulkan_debug_message_callback,
 	  this,
+
 	  &vma_allocate_device_memory_callback,
 	  &vma_free_device_memory_callback,
-	  fuck
+	  this,
+
+	  &bindlessvk_debug_callback,
+	  std::make_any<Logger*>(&logger)
 	);
 
 	bvk::Device* device = device_system.get_device();
@@ -140,7 +249,10 @@ Application::Application()
 	staging_pool = StagingPool(2, (1024u * 1024u * 256u), device);
 
 	texture_system.init(device);
+	// logger.log(spdlog::level::level_enum::err, "hello");
 
+	// Logger::Get()->log(spdlog::level::err, "Spec");
+	//
 	uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
 	texture_system.create_from_buffer(
 	  "default",
@@ -185,106 +297,4 @@ Application::~Application()
 	staging_pool.destroy_buffers();
 
 	device_system.reset();
-}
-
-VkBool32 Application::vulkan_debug_message_callback(
-  VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-  VkDebugUtilsMessageTypeFlagsEXT message_types,
-  const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-  void* user_data
-)
-{
-	Application* application = (Application*)user_data;
-
-	std::string type = message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ?
-	                     "GENERAL" :
-	                   message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
-	                       && message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT ?
-	                     "VALIDATION | PERFORMANCE" :
-	                   message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT ?
-	                     "VALIDATION" :
-	                     "PERFORMANCE";
-
-	std::string message             = (callback_data->pMessage);
-	std::string url                 = {};
-	std::string vulkanSpecStatement = {};
-
-	// Remove beginning sections ( we'll log them ourselves )
-	auto pos = message.find_last_of("|");
-	if (pos != std::string::npos) {
-		message = message.substr(pos + 2);
-	}
-
-	// Separate url section of message
-	pos = message.find_last_of("(");
-	if (pos != std::string::npos) {
-		url     = message.substr(pos + 1, message.length() - (pos + 2));
-		message = message.substr(0, pos);
-	}
-
-	// Separate the "Vulkan spec states:" section of the message
-	pos = message.find("The Vulkan spec states:");
-	if (pos != std::string::npos) {
-		size_t len          = std::strlen("The Vulkan spec states: ");
-		vulkanSpecStatement = message.substr(pos + len, message.length() - pos - len);
-		message             = message.substr(0, pos);
-	}
-
-	if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-		application->messenger_err_count++;
-
-		LOG(err, "[ __VULKAN_MESSAGE_CALLBACK__ ]");
-		LOG(err, "    Type -> {} - {}", type, callback_data->pMessageIdName);
-		LOG(err, "    Url  -> {}", url);
-		LOG(err, "    Msg  -> {}", message);
-		LOG(err, "    Spec -> {}", vulkanSpecStatement);
-
-		if (callback_data->objectCount) {
-			LOG(err, "    {} OBJECTS:", callback_data->objectCount);
-			for (uint32_t object = 0; object < callback_data->objectCount; object++) {
-				LOG(
-				  err,
-				  "            [{}] {} -> Addr: {}, Name: {}",
-				  object,
-				  string_VkObjectType(callback_data->pObjects[object].objectType)
-				    + std::strlen("VK_OBJECT_TYPE_"),
-				  fmt::ptr((void*)callback_data->pObjects[object].objectHandle),
-				  callback_data->pObjects[object].pObjectName ?
-				    callback_data->pObjects[object].pObjectName :
-				    "(Undefined)"
-				);
-			}
-		}
-
-		if (callback_data->cmdBufLabelCount) {
-			LOG(err, "    {} COMMAND BUFFER LABELS:", callback_data->cmdBufLabelCount);
-			for (uint32_t label = 0; label < callback_data->cmdBufLabelCount; label++) {
-				LOG(
-				  err,
-				  "            [{}]-> {} ({}, {}, {}, {})",
-				  label,
-				  callback_data->pCmdBufLabels[label].pLabelName,
-				  callback_data->pCmdBufLabels[label].color[0],
-				  callback_data->pCmdBufLabels[label].color[1],
-				  callback_data->pCmdBufLabels[label].color[2],
-				  callback_data->pCmdBufLabels[label].color[3]
-				);
-			}
-		}
-
-		LOG(err, "");
-	}
-	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-		application->messenger_warn_count++;
-		LOG(warn, "{} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
-	}
-	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-		LOG(info, "{} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
-	}
-	else {
-		LOG(trace, "{} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
-	}
-
-
-	return static_cast<VkBool32>(VK_FALSE);
 }

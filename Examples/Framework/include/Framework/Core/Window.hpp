@@ -2,8 +2,6 @@
 
 #include "Framework/Common/Common.hpp"
 
-#include <vulkan/vulkan.hpp>
-
 struct GLFWwindow;
 
 struct WindowSpecs

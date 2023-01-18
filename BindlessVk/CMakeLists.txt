@@ -37,8 +37,8 @@ target_link_libraries(
     PRIVATE ktx
     PRIVATE tinygltf
     PRIVATE spirv-reflect-static
-    PRIVATE fmt
     PRIVATE spdlog
+    PRIVATE fmt
 )
 
 target_precompile_headers(

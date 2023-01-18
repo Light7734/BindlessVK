@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Framework/Scene/Components.hpp"
 
 #include <entt/entt.hpp>

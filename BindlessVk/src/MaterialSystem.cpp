@@ -196,7 +196,7 @@ void MaterialSystem::create_shader_pass(
 {
 	if (shader_passes.contains(hash_str(name)))
 	{
-		device->debug_callback(LogLvl::eWarn, fmt::format("Recreating shader pass: {}", name));
+		device->log(LogLvl::eWarn, "Recreating shader pass: {}", name);
 		device->logical.destroyPipeline(shader_passes[hash_str(name)].pipeline);
 	}
 
@@ -312,7 +312,7 @@ void MaterialSystem::create_material(
 		    descriptor_pool,
 		    materials[hash_str(name)].descriptor_set
 		);
-		device->debug_callback(LogLvl::eWarn, fmt::format("Recreating material: {}", name));
+		device->log(LogLvl::eWarn, "Recreating material: {}", name);
 	}
 
 	vk::DescriptorSet set;

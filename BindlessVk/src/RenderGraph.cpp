@@ -127,16 +127,10 @@ void RenderGraph::build(
 	{
 		auto& pass = this->renderpasses[i];
 		auto& pass_info = this->renderpasses_info[i];
-		device->debug_callback(
-		    LogLvl::eTrace,
-		    fmt::format("{} on begin frame {}", pass.name, !!pass.on_begin_frame)
-		);
+		device->log(LogLvl::eTrace, "{} on begin frame {}", pass.name, !!pass.on_begin_frame);
 
 		pass.name = pass_info.name;
-		device->debug_callback(
-		    LogLvl::eTrace,
-		    fmt::format("{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame)
-		);
+		device->log(LogLvl::eTrace, "{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame);
 
 		pass.on_begin_frame = pass_info.on_begin_frame ?
 		                          pass_info.on_begin_frame :
@@ -225,7 +219,7 @@ void RenderGraph::create_cmd_buffers()
 // @todo: Implement
 void RenderGraph::validate_graph()
 {
-	device->debug_callback(LogLvl::eWarn, fmt::format("Unimplemented function call"));
+	device->log(LogLvl::eWarn, "Unimplemented function call");
 }
 
 // @todo: Implement
@@ -620,9 +614,11 @@ void RenderGraph::write_passes_sets()
 		}
 		for (const auto& texture_input_info : pass_info.texture_inputs_info)
 		{
-			device->debug_callback(
+			device->log(
 			    LogLvl::eWarn,
-			    fmt::format("{} - {}", BVK_MAX_FRAMES_IN_FLIGHT, pass.descriptor_sets.size())
+			    "{} - {}",
+			    BVK_MAX_FRAMES_IN_FLIGHT,
+			    pass.descriptor_sets.size()
 			);
 
 			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
@@ -725,10 +721,8 @@ void RenderGraph::create_attachment_resource(
 	}
 	assert_true(
 	    !!image_usage_mask && !!image_aspect_mask,
-	    fmt::format(
-	        "Unsupported render attachment format: {}",
-	        string_VkFormat(static_cast<VkFormat>(attachment_info.format))
-	    )
+	    "Unsupported render attachment format: {}",
+	    string_VkFormat(static_cast<VkFormat>(attachment_info.format))
 	);
 
 	// Set image extent

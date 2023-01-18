@@ -626,13 +626,11 @@ void TextureSystem::transition_layout(
 
 	else
 	{
-		device->debug_callback(
+		device->log(
 		    LogLvl::eError,
-		    fmt::format(
-		        "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
-		        (i32)oldLayout,
-		        (i32)newLayout
-		    )
+		    "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
+		    static_cast<i32>(oldLayout),
+		    static_cast<i32>(newLayout)
 		);
 	}
 

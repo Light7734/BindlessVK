@@ -26,13 +26,11 @@ Buffer::Buffer(
 	    vma_info
 	);
 
-	device->debug_callback(
+	device->log(
 	    LogLvl::eTrace,
-	    fmt::format(
-	        "{} created with {}",
-	        debug_name,
-	        (u32)device->allocator.getAllocationMemoryProperties(buffer.allocation)
-	    )
+	    "{} created with {}",
+	    debug_name,
+	    static_cast<u32>(device->allocator.getAllocationMemoryProperties(buffer.allocation))
 	);
 
 	descriptor_info = {

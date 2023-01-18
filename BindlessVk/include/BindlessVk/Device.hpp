@@ -2,6 +2,8 @@
 
 #include "BindlessVk/Common/Common.hpp"
 
+#include <any>
+
 namespace BINDLESSVK_NAMESPACE {
 
 struct Device
@@ -70,8 +72,18 @@ struct Device
 	vk::CommandBuffer immediate_cmd;
 	vk::Fence immediate_fence;
 
-	fn<void(LogLvl, const str& message)> debug_callback;
+	template<typename... Args>
+	inline void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args&&... args) const
+	{
+		debug_callback(
+		    lvl,
+		    fmt::format(fmt, std::forward<Args>(args)...),
+		    debug_callback_user_data
+		);
+	}
 
+	fn<void(LogLvl, const str&, std::any)> debug_callback;
+	std::any debug_callback_user_data;
 
 	vk::CommandPool get_cmd_pool(u32 frame_index, u32 thread_index = 0)
 	{
@@ -152,13 +164,15 @@ public:
 	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
-	    PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
+	    PFN_vkDebugUtilsMessengerCallbackEXT vulkan_debug_callback,
 	    void* debug_messenger_userptr,
 
-	    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback,
+	    PFN_vmaAllocateDeviceMemoryFunction vma_allocate_device_memory_callback,
+	    PFN_vmaFreeDeviceMemoryFunction vma_free_device_memory_callback,
+	    void* vma_callback_user_data,
 
-	    fn<void(LogLvl, const str& message)> bindlessvk_debug_callback
+	    fn<void(LogLvl, const str& message, std::any user_data)> bindlessvk_debug_callback,
+	    std::any bindlessvk_debug_callback_user_data
 	);
 
 	/** Destroys the device system */
@@ -185,7 +199,8 @@ private:
 
 	void create_allocator(
 	    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
+	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback,
+	    void* vma_callback_user_data
 	);
 
 	void create_command_pools();

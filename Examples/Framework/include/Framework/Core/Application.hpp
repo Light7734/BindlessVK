@@ -1,14 +1,17 @@
 #pragma once
 
+#include "Framework/Common/Common.hpp"
+//
+
 #include "BindlessVk/MaterialSystem.hpp"
 #include "BindlessVk/ModelLoader.hpp"
 #include "BindlessVk/Renderer.hpp"
 #include "BindlessVk/Texture.hpp"
-#include "Framework/Common/Common.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Pools/StagingPool.hpp"
 #include "Framework/Scene/CameraController.hpp"
 #include "Framework/Scene/Scene.hpp"
+#include "Framework/Utils/Logger.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -16,7 +19,7 @@ class Application
 {
 public:
 	Application();
-	~Application();
+	virtual ~Application();
 
 	static VkBool32 vulkan_debug_message_callback(
 	  VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -38,17 +41,19 @@ public:
 	bvk::MaterialSystem material_system = {};
 	bvk::ModelLoader model_loader       = {};
 
-	std::unordered_map<uint64_t, bvk::Model> models     = {};
-	std::unordered_map<uint64_t, bvk::Texture> textures = {};
+	map<u64, bvk::Model> models     = {};
+	map<u64, bvk::Texture> textures = {};
 
 	CameraController camera_controller = {};
 
-	std::vector<const char*> instance_extensions = {};
-	std::vector<const char*> device_extensions   = {};
+	vec<c_str> instance_extensions = {};
+	vec<c_str> device_extensions   = {};
 
 	StagingPool staging_pool = {};
 
+	Logger logger;
+
 protected:
-	uint64_t messenger_warn_count = {};
-	uint64_t messenger_err_count  = {};
+	u64 messenger_warn_count = {};
+	u64 messenger_err_count  = {};
 };

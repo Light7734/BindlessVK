@@ -4,15 +4,13 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     Framework
 
-    # Common
-    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Common/Common.cpp
-
     # Core
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Application.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Window.cpp
 
     # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Utils/CVar.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Utils/Logger.cpp
 
     # Pools
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Pools/ThreadPool.cpp
@@ -27,9 +25,7 @@ set_target_properties(
 target_include_directories(
     Framework
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Framework/include
-
     PRIVATE ${CMAKE_SOURCE_DIR}/BindlessVk/include
-
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/entt/single_include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/glfw/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui/
@@ -64,27 +60,28 @@ set_target_properties(
     CXX_STANDARD 20
 )
 
+
 target_include_directories(
     Example_Development
 
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Development/
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Framework/include
-
     PRIVATE ${CMAKE_SOURCE_DIR}/BindlessVk/include
-
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
-    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spdlog/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/tinygltf/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/entt/single_include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spdlog/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/glfw/include/
 )
 
 target_link_libraries(
     Example_Development
+    PRIVATE spdlog
+
     PRIVATE AssetParser
     PRIVATE BindlessVk
     PRIVATE Framework
@@ -101,6 +98,5 @@ target_precompile_headers(
     Example_Development
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
 )
-
 
 ####### TESTS #######

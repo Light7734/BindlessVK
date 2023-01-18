@@ -159,8 +159,6 @@ private:
 	};
 
 	std::map<std::string, CVarEntry> vars;
-
-	static CVar instance;
 };
 
 class AutoCVar

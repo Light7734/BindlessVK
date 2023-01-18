@@ -12,14 +12,19 @@ void DeviceSystem::init(
     vec<c_str> device_extensions,
     fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
     fn<vk::Extent2D()> get_framebuffer_extent_func,
+
     bool has_debugging,
     vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
     vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
-    PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
+    PFN_vkDebugUtilsMessengerCallbackEXT vulkan_debug_callback,
     void* debug_messenger_userptr,
-    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback,
-    fn<void(LogLvl, const str& message)> bindlessvk_debug_callback
+
+    PFN_vmaAllocateDeviceMemoryFunction vma_allocate_device_memory_callback,
+    PFN_vmaFreeDeviceMemoryFunction vma_free_device_memory_callback,
+    void* vma_callback_user_data,
+
+    fn<void(LogLvl, const str& message, std::any user_data)> bindlessvk_debug_callback,
+    std::any bindlessvk_debug_callback_user_data
 )
 {
 	device.layers = layers;
@@ -41,6 +46,7 @@ void DeviceSystem::init(
 	    dynamic_loader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr");
 
 	device.debug_callback = bindlessvk_debug_callback;
+	device.debug_callback_user_data = bindlessvk_debug_callback_user_data;
 
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(device.get_vk_instance_proc_addr_func);
 
@@ -51,13 +57,19 @@ void DeviceSystem::init(
 	    has_debugging,
 	    debug_messenger_severities,
 	    debug_messenger_types,
-	    debug_messenger_callback_func,
+	    vulkan_debug_callback,
 	    debug_messenger_userptr
 	);
 
 	pick_physical_device();
 	create_logical_device();
-	create_allocator(vma_free_device_memory_callback, vma_allocate_device_memory_callback);
+
+	create_allocator(
+	    vma_allocate_device_memory_callback,
+	    vma_free_device_memory_callback,
+	    vma_callback_user_data
+	);
+
 	update_surface_info();
 
 	create_command_pools();
@@ -111,7 +123,7 @@ void DeviceSystem::create_vulkan_instance(
     bool has_debugging,
     vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
     vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
-    PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
+    PFN_vkDebugUtilsMessengerCallbackEXT vulkan_debug_callback,
     void* debug_messenger_userptr
 )
 {
@@ -127,7 +139,7 @@ void DeviceSystem::create_vulkan_instance(
 		{},                         // flags
 		debug_messenger_severities, // messageSeverity
 		debug_messenger_types,      // messageType
-		debug_messenger_callback_func,
+		vulkan_debug_callback,
 		debug_messenger_userptr,
 	};
 
@@ -444,8 +456,9 @@ void DeviceSystem::create_logical_device()
 }
 
 void DeviceSystem::create_allocator(
-    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback
+    PFN_vmaAllocateDeviceMemoryFunction vma_allocate_device_memory_callback,
+    PFN_vmaFreeDeviceMemoryFunction vma_free_device_memory_callback,
+    void* vma_callback_user_data
 )
 {
 	vma::VulkanFunctions vulkan_funcs(
@@ -480,7 +493,7 @@ void DeviceSystem::create_allocator(
 	vma::DeviceMemoryCallbacks mem_callbacks = {
 		vma_free_device_memory_callback,
 		vma_allocate_device_memory_callback,
-		&device,
+		vma_callback_user_data,
 	};
 
 	vma::AllocatorCreateInfo allocator_info(
