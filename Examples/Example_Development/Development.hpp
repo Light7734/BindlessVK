@@ -375,8 +375,8 @@ private:
 		const auto depth_format = device->depth_format;
 		const auto sample_count = device->max_samples;
 
-		auto* default_texture      = texture_system.get_texture("default");
-		auto* default_texture_cube = texture_system.get_texture("default_cube");
+		auto* default_texture      = &textures[hash_str("default_2d")];
+		auto* default_texture_cube = &textures[hash_str("default_cube")];
 
 		const std::array<float, 4> update_color  = { 1.0, 0.8, 0.8, 1.0 };
 		const std::array<float, 4> barrier_color = { 0.8, 1.0, 0.8, 1.0 };

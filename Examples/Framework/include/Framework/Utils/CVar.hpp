@@ -18,66 +18,66 @@ class CVarVal
 public:
 	CVarVal(bool value)
 	{
-		m_value = value;
+		value = value;
 	}
 
 	CVarVal(float value)
 	{
-		m_value = value;
+		value = value;
 	}
 
 	CVarVal(int value)
 	{
-		m_value = value;
+		value = value;
 	}
 
 	CVarVal(std::string value)
 	{
-		m_value = value;
+		value = value;
 	}
 
 	inline operator bool() const
 	{
-		return std::get<bool>(m_value);
+		return std::get<bool>(value);
 	}
 
 	inline operator bool*()
 	{
-		return std::get_if<bool>(&m_value);
+		return std::get_if<bool>(&value);
 	}
 
 	inline operator float() const
 	{
-		return std::get<float>(m_value);
+		return std::get<float>(value);
 	}
 
 	inline operator float*()
 	{
-		return std::get_if<float>(&m_value);
+		return std::get_if<float>(&value);
 	}
 
 	inline operator int() const
 	{
-		return std::get<int>(m_value);
+		return std::get<int>(value);
 	}
 
 	inline operator int*()
 	{
-		return std::get_if<int>(&m_value);
+		return std::get_if<int>(&value);
 	}
 
 	inline operator std::string() const
 	{
-		return std::get<std::string>(m_value);
+		return std::get<std::string>(value);
 	}
 
 	inline operator std::string*()
 	{
-		return std::get_if<std::string>(&m_value);
+		return std::get_if<std::string>(&value);
 	}
 
 private:
-	std::variant<bool, int, float, std::string> m_value;
+	std::variant<bool, int, float, std::string> value;
 };
 
 class CVar
@@ -91,13 +91,7 @@ public:
 	  CVarVal current_value
 	)
 	{
-		get_instance()->create_impl( // we're no strangers to love
-		  type,
-		  name,
-		  description,
-		  default_value,
-		  current_value
-		);
+		get_instance()->create_impl(type, name, description, default_value, current_value);
 	}
 
 	static inline void set(const char* name, CVarVal value)

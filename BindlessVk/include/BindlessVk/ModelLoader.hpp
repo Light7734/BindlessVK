@@ -3,7 +3,7 @@
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/Model.hpp"
-#include "BindlessVk/Texture.hpp"
+#include "BindlessVk/TextureLoader.hpp"
 
 #include <glm/glm.hpp>
 
@@ -28,7 +28,7 @@ public:
 	 * @param device the bindlessvk device
 	 * @param texture_system the bindlessvk texture system, ModelLoader may load textures
 	 */
-	ModelLoader(Device* device, TextureSystem* texture_system);
+	ModelLoader(Device* device, TextureLoader* texture_system);
 
 	/** @brief Default constructor */
 	ModelLoader() = default;
@@ -50,7 +50,7 @@ public:
 
 private:
 	Device* device;
-	TextureSystem* texture_system;
+	TextureLoader* texture_system;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

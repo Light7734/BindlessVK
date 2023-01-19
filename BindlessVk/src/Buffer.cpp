@@ -26,13 +26,6 @@ Buffer::Buffer(
 	    vma_info
 	);
 
-	device->log(
-	    LogLvl::eTrace,
-	    "{} created with {}",
-	    debug_name,
-	    static_cast<u32>(device->allocator.getAllocationMemoryProperties(buffer.allocation))
-	);
-
 	descriptor_info = {
 		buffer,
 		0u,

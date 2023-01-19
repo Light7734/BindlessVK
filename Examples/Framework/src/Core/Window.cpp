@@ -6,7 +6,7 @@
 
 void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
 {
-	m_specs = specs;
+	this->specs = specs;
 
 	glfwSetErrorCallback([](int code, const char* str) { LOG(critical, str); });
 
@@ -20,17 +20,17 @@ void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
 	}
 
 	// Create window
-	m_glfw_window_handle = glfwCreateWindow(
-	  m_specs.width,
-	  m_specs.height,
-	  m_specs.title.c_str(),
+	glfw_window_handle = glfwCreateWindow(
+	  specs.width,
+	  specs.height,
+	  specs.title.c_str(),
 	  nullptr,
 	  nullptr
 	);
-	assert_true(m_glfw_window_handle, "Failed to create glfw window");
+	assert_true(glfw_window_handle, "Failed to create glfw window");
 
 	// Setup callbacks & userpointer
-	glfwSetWindowUserPointer(m_glfw_window_handle, &m_specs);
+	glfwSetWindowUserPointer(glfw_window_handle, &this->specs);
 	bind_callbacks();
 
 	// glfwSetInputMode(m_GlfwWindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -38,7 +38,7 @@ void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
 
 Window::~Window()
 {
-	glfwDestroyWindow(m_glfw_window_handle);
+	glfwDestroyWindow(glfw_window_handle);
 	glfwTerminate();
 }
 
@@ -58,7 +58,7 @@ void Window::poll_events()
 
 bool Window::should_close()
 {
-	return glfwWindowShouldClose(m_glfw_window_handle);
+	return glfwWindowShouldClose(glfw_window_handle);
 }
 
 vk::SurfaceKHR Window::create_surface(vk::Instance instance)
@@ -67,7 +67,7 @@ vk::SurfaceKHR Window::create_surface(vk::Instance instance)
 
 	VkResult result = glfwCreateWindowSurface(
 	  instance,
-	  m_glfw_window_handle,
+	  glfw_window_handle,
 	  nullptr,
 	  &surface
 
@@ -80,7 +80,7 @@ vk::SurfaceKHR Window::create_surface(vk::Instance instance)
 vk::Extent2D Window::get_framebuffer_size()
 {
 	int width, height;
-	glfwGetFramebufferSize(m_glfw_window_handle, &width, &height);
+	glfwGetFramebufferSize(glfw_window_handle, &width, &height);
 	return vk::Extent2D { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 }
 
@@ -88,7 +88,7 @@ void Window::bind_callbacks()
 {
 	// @todo: callbacks
 	glfwSetKeyCallback(
-	  m_glfw_window_handle,
+	  glfw_window_handle,
 	  [](GLFWwindow* window, int key, int scanCode, int action, int mods) {
 		  if (key == GLFW_KEY_ESCAPE)
 			  glfwSetWindowShouldClose(window, true);
@@ -105,7 +105,7 @@ void Window::bind_callbacks()
 	  }
 	);
 
-	glfwSetWindowSizeCallback(m_glfw_window_handle, [](GLFWwindow* window, int width, int height) {
+	glfwSetWindowSizeCallback(glfw_window_handle, [](GLFWwindow* window, int width, int height) {
 		WindowSpecs* specs = (WindowSpecs*)glfwGetWindowUserPointer(window);
 		specs->width       = width;
 		specs->height      = height;

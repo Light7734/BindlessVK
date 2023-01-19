@@ -10,7 +10,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-ModelLoader::ModelLoader(Device* device, TextureSystem* texture_system)
+ModelLoader::ModelLoader(Device* device, TextureLoader* texture_system)
     : device(device)
     , texture_system(texture_system)
 {

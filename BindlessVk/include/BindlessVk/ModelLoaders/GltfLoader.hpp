@@ -4,7 +4,7 @@
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/Model.hpp"
-#include "BindlessVk/Texture.hpp"
+#include "BindlessVk/TextureLoader.hpp"
 
 #include <glm/glm.hpp>
 #include <tiny_gltf.h>
@@ -20,7 +20,7 @@ class GltfLoader
 public:
 	GltfLoader(
 	    Device* device,
-	    TextureSystem* texture_system,
+	    TextureLoader* texture_loader,
 	    Buffer* staging_vertex_buffer,
 	    Buffer* staging_index_buffer
 	);
@@ -65,7 +65,7 @@ private:
 
 private:
 	Device* device = {};
-	TextureSystem* texture_system = {};
+	TextureLoader* texture_loader = {};
 
 	tinygltf::Model gltf_model = {};
 	Model model = {};

@@ -2,78 +2,52 @@
 
 #include "Framework/Common/Aliases.hpp"
 
-// #include <source_location>
+#include <fmt/format.h>
+#include <source_location>
 
-// same as bindlessvk, w/out being inside a namespace
-
+// same as Framework, w/out being inside a namespace
 struct FrameworkException: std::exception
 {
-	FrameworkException(const str& what
-	                   // const std::source_location location = std::source_location::current()
-	)
-	  : msg(what.c_str())
-	// , location(location)
+	FrameworkException(const str& what): msg(what)
 	{
 	}
 
 	virtual c_str what() const noexcept
 	{
-		return msg;
+		return msg.c_str();
 	}
 
-	c_str msg;
-	c_str expr;
-	// std::source_location location;
+	str msg;
 };
 
-template<typename T>
-inline void assert_true(
-  const T& expr,
-  const str& message = ""
-  // const std::source_location location = std::source_location::current()
-)
+template<typename Expr, typename... Args>
+inline void assert_true(const Expr& expr, fmt::format_string<Args...> fmt = "", Args&&... args)
 {
 	if (!static_cast<bool>(expr)) [[unlikely]] {
-		// throw FrameworkException(message, location);
+		throw FrameworkException(fmt::format(fmt, std::forward<Args>(args)...));
 	}
 }
 
-template<typename T>
-inline void assert_false(
-  const T& expr,
-  const str& message = ""
-  // const std::source_location location = std::source_location::current()
-)
+template<typename T, typename... Args>
+inline void assert_false(const T& expr, fmt::format_string<Args...> fmt = "", Args&&... args)
 {
-	//  assert_true(!static_cast<bool>(expr), message, location);
+	assert_true(!static_cast<bool>(expr), fmt, std::forward<Args>(args)...);
 }
 
-template<typename T1, typename T2>
-inline void assert_eq(
-  const T1& rhs,
-  const T2& lhs,
-  const str& message = ""
-  //  const std::source_location location = std::source_location::current()
-)
+template<typename Expr1, typename Expr2, typename... Args>
+inline void assert_eq(const Expr1& expr1, const Expr2& expr2, Args&&... args)
 {
-	// assert_true(rhs == lhs, message, location);
+	assert_true(expr1 == expr2, std::forward<Args>(args)...);
 }
 
-template<typename T1, typename T2>
-inline void assert_nq(
-  const T1& rhs,
-  const T1& lhs,
-  const str& message = ""
-  // const std::source_location location = std::source_location::current()
-)
+template<typename Expr1, typename Expr2, typename... Args>
+inline void assert_nq(const Expr1& expr1, const Expr2& expr2, Args&&... args)
 {
-	// assert_true(rhs != lhs, message, location);
+	assert_true(expr1 != expr2, std::forward<Args>(args)...);
 }
 
-inline void assert_fail(
-  const str& message = ""
-  // const std::source_location location = std::source_location::current()
-)
+template<typename... Args>
+inline void assert_fail(fmt::format_string<Args...> fmt, Args&&... args)
 {
-	// throw FrameworkException(message, location);
+	throw FrameworkException(fmt::format(fmt, std::forward<Args>(args)...));
 }

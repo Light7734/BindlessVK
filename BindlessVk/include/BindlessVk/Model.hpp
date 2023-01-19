@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Texture.hpp"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
@@ -9,7 +10,6 @@ namespace BINDLESSVK_NAMESPACE {
 
 struct Model
 {
-public:
 	struct Vertex
 	{
 		glm::vec3 position;
@@ -123,7 +123,7 @@ public:
 
 	/// @todo: Support textures with different samplers
 	const char* name;
-	std::vector<class Texture*> textures;
+	std::vector<Texture> textures;
 	std::vector<MaterialParameters> material_parameters;
 	std::vector<Node*> nodes;
 

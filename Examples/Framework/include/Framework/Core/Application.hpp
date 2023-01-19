@@ -37,7 +37,7 @@ public:
 
 	bvk::DeviceSystem device_system     = {};
 	bvk::Renderer renderer              = {};
-	bvk::TextureSystem texture_system   = {};
+	bvk::TextureLoader texture_loader   = {};
 	bvk::MaterialSystem material_system = {};
 	bvk::ModelLoader model_loader       = {};
 

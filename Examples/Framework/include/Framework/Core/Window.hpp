@@ -28,12 +28,12 @@ public:
 
 	inline GLFWwindow* get_glfw_handle()
 	{
-		return m_glfw_window_handle;
+		return glfw_window_handle;
 	}
 
 private:
-	GLFWwindow* m_glfw_window_handle = {};
-	WindowSpecs m_specs              = {};
+	GLFWwindow* glfw_window_handle = {};
+	WindowSpecs specs              = {};
 
 	void bind_callbacks();
 };

@@ -29,10 +29,9 @@ inline void forward_pass_update(
 				  uint32_t normal_texture_index             = material.normal_texture_index;
 				  uint32_t metallic_roughness_texture_index = material.metallic_roughness_texture_index;
 
-				  bvk::Texture* albedo_texture             = model->textures[albedo_texture_index];
-				  bvk::Texture* normal_texture             = model->textures[normal_texture_index];
-				  bvk::Texture* metallic_roughness_texture = model
-				                                               ->textures[metallic_roughness_texture_index];
+				  auto* albedo_texture             = &model->textures[albedo_texture_index];
+				  auto* normal_texture             = &model->textures[normal_texture_index];
+				  auto* metallic_roughness_texture = &model->textures[metallic_roughness_texture_index];
 
 				  std::vector<vk::WriteDescriptorSet> descriptor_writes = {
 					  vk::WriteDescriptorSet {

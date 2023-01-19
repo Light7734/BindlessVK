@@ -9,7 +9,8 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoaders/GltfLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/KtxLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
 )
 

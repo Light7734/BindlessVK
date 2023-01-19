@@ -248,14 +248,12 @@ Application::Application()
 
 	staging_pool = StagingPool(2, (1024u * 1024u * 256u), device);
 
-	texture_system.init(device);
-	// logger.log(spdlog::level::level_enum::err, "hello");
+	texture_loader = bvk::TextureLoader(device);
 
-	// Logger::Get()->log(spdlog::level::err, "Spec");
-	//
 	uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
-	texture_system.create_from_buffer(
-	  "default",
+
+	textures[hash_str("default_2d")] = texture_loader.load_from_buffer(
+	  "default_2d",
 	  defaultTexturePixelData,
 	  1,
 	  1,
@@ -263,16 +261,17 @@ Application::Application()
 	  bvk::Texture::Type::e2D
 	);
 
-	texture_system.create_from_ktx(
+	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
 	  "default_cube",
 	  "Assets/cubemap_yokohama_rgba.ktx",
-	  bvk::Texture::Type::eCubeMap
+	  bvk::Texture::Type::eCubeMap,
+      staging_pool.get_by_index(0)
 	);
 
 	material_system.init(device);
 
 	renderer     = bvk::Renderer(device);
-	model_loader = bvk::ModelLoader(device, &texture_system);
+	model_loader = bvk::ModelLoader(device, &texture_loader);
 
 	initialize_imgui(device, renderer, window);
 
@@ -284,7 +283,7 @@ Application::~Application()
 	device_system.get_device()->logical.waitIdle();
 	destroy_imgui();
 
-	texture_system.reset();
+
 	material_system.reset();
 
 	for (auto& [key, val] : models) {

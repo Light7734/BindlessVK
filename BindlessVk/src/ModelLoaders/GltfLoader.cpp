@@ -10,12 +10,12 @@ namespace BINDLESSVK_NAMESPACE {
 
 GltfLoader::GltfLoader(
     Device* device,
-    TextureSystem* texture_system,
+    TextureLoader* texture_loader,
     Buffer* staging_vertex_buffer,
     Buffer* staging_index_buffer
 )
     : device(device)
-    , texture_system(texture_system)
+    , texture_loader(texture_loader)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
 {
@@ -60,9 +60,17 @@ void GltfLoader::load_textures()
 {
 	model.textures.reserve(gltf_model.images.size());
 
-	for (auto& gltf_image : gltf_model.images)
+	for (auto& image : gltf_model.images)
 	{
-		model.textures.push_back(texture_system->create_from_gltf(gltf_image));
+		model.textures.push_back(texture_loader->load_from_buffer(
+		    image.uri,
+		    &image.image[0],
+		    image.width,
+		    image.height,
+		    image.image.size(),
+		    Texture::Type::e2D,
+		    vk::ImageLayout::eShaderReadOnlyOptimal
+		));
 	}
 }
 
