@@ -8,7 +8,7 @@ class StagingPool
 public:
 	StagingPool() = default;
 
-	StagingPool(uint32_t count, size_t size, bvk::Device* device);
+	StagingPool(u32 count, usize size, bvk::Device* device);
 
 	StagingPool(StagingPool&& other);
 	StagingPool(const StagingPool& rhs) = delete;
@@ -20,7 +20,7 @@ public:
 
 	void destroy_buffers();
 
-	inline bvk::Buffer* get_by_index(uint32_t index)
+	inline bvk::Buffer* get_by_index(u32 index)
 	{
 		assert_true(staging_buffers.size() > index);
 		return &staging_buffers[index];

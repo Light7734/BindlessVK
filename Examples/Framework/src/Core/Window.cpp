@@ -32,8 +32,6 @@ void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
 	// Setup callbacks & userpointer
 	glfwSetWindowUserPointer(glfw_window_handle, &this->specs);
 	bind_callbacks();
-
-	// glfwSetInputMode(m_GlfwWindowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 Window::~Window()

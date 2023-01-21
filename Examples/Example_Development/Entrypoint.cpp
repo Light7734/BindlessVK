@@ -6,7 +6,7 @@
 int main(int argc, char* argv[])
 {
 	try {
-		DevelopmentExampleApplication application;
+		DevelopmentExampleApplication application = DevelopmentExampleApplication();
 		Timer delta_timer;
 
 		while (!application.window.should_close()) {

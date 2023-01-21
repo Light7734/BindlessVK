@@ -11,6 +11,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/KtxLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/BinaryLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
 )
 

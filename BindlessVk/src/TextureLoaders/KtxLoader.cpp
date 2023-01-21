@@ -1,5 +1,6 @@
 #include "BindlessVk/TextureLoaders/KtxLoader.hpp"
 
+
 namespace BINDLESSVK_NAMESPACE {
 
 KtxLoader::KtxLoader(Device* device, Buffer* staging_buffer)
@@ -24,7 +25,7 @@ Texture KtxLoader::load(
 	create_image_view();
 	create_sampler();
 
-	load_texture_data();
+	stage_texture_data();
 	write_texture_data_to_gpu();
 
 	destroy_ktx_texture();
@@ -145,10 +146,11 @@ void KtxLoader::create_sampler()
 	texture.descriptor_info.sampler = texture.sampler;
 }
 
-void KtxLoader::load_texture_data()
+void KtxLoader::stage_texture_data()
 {
 	u8* data = ktxTexture_GetData(ktx_texture);
 	memcpy(staging_buffer->map_block(0), reinterpret_cast<void*>(data), texture.size);
+	staging_buffer->unmap();
 }
 
 void KtxLoader::write_texture_data_to_gpu()
@@ -183,9 +185,9 @@ vec<vk::BufferImageCopy> KtxLoader::create_texture_face_buffer_copies()
 {
 	vec<vk::BufferImageCopy> buffer_copies;
 
-	for (u32 face = 0u; face < 6u; face++)
+	for (u32 face = 0u; face < 6u; ++face)
 	{
-		for (u32 level = 0u; level < texture.mip_levels; level++)
+		for (u32 level = 0u; level < texture.mip_levels; ++level)
 		{
 			usize offset;
 			assert_false(

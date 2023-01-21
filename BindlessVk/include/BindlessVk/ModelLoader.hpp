@@ -45,7 +45,8 @@ public:
 	    const char* debug_name,
 	    const char* file_path,
 	    Buffer* staging_vertex_buffer,
-	    Buffer* staging_index_buffer
+	    Buffer* staging_index_buffer,
+	    Buffer* staging_image_buffer
 	);
 
 private:

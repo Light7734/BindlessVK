@@ -20,10 +20,17 @@ Model ModelLoader::load_from_gltf_ascii(
     const char* name,
     const char* file_path,
     Buffer* staging_vertex_buffer,
-    Buffer* staging_index_buffer
+    Buffer* staging_index_buffer,
+    Buffer* staging_image_buffer
 )
 {
-	GltfLoader loader(device, texture_system, staging_vertex_buffer, staging_index_buffer);
+	GltfLoader loader(
+	    device,
+	    texture_system,
+	    staging_vertex_buffer,
+	    staging_index_buffer,
+	    staging_image_buffer
+	);
 	return loader.load_from_ascii(name, file_path);
 }
 

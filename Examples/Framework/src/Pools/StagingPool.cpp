@@ -34,7 +34,6 @@ StagingPool::~StagingPool()
 {
 }
 
-
 void StagingPool::move(StagingPool&& other)
 {
 	this->staging_buffers = std::move(other.staging_buffers);

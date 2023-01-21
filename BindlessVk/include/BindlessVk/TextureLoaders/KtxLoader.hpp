@@ -10,6 +10,8 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
+static_assert(KTX_SUCCESS == false, "KTX_SUCCESS was supposed to be 0 (false), but it isn't");
+
 namespace BINDLESSVK_NAMESPACE {
 
 /// @todo Should we separate samplers and textures?
@@ -31,7 +33,7 @@ private:
 	void load_ktx_texture(const str& path);
 	void destroy_ktx_texture();
 
-	void load_texture_data();
+	void stage_texture_data();
 	void write_texture_data_to_gpu();
 
 	void create_image();
@@ -42,12 +44,11 @@ private:
 
 private:
 	Device* device = {};
+	Buffer* staging_buffer = {};
 
 	Texture texture = {};
 	ktxTexture* ktx_texture = {};
 	vk::ImageLayout final_layout;
-
-	Buffer* staging_buffer = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

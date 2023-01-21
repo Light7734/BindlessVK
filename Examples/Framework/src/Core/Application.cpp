@@ -3,6 +3,7 @@
 #include <any>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
+#include <cassert>
 #include <imgui.h>
 #include <utility>
 
@@ -159,12 +160,12 @@ static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Windo
 		.ImageCount            = BVK_MAX_FRAMES_IN_FLIGHT,
 		.MSAASamples           = static_cast<VkSampleCountFlagBits>(device->max_samples),
 	};
-	std::pair userData = std::make_pair(device->get_vk_instance_proc_addr_func, device->instance);
+	auto userData = std::make_pair(device->get_vk_instance_proc_addr_func, device->instance);
 
 	assert_true(
 	  ImGui_ImplVulkan_LoadFunctions(
-	    [](const char* func, void* data) {
-		    auto [vkGetProcAddr, instance] = *(std::pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
+	    [](c_str func, void* data) {
+		    auto [vkGetProcAddr, instance] = *(pair<PFN_vkGetInstanceProcAddr, vk::Instance>*)data;
 		    return vkGetProcAddr(instance, func);
 	    },
 	    (void*)&userData
@@ -207,7 +208,7 @@ Application::Application()
 	  }
 	);
 
-	std::vector<const char*> required_surface_extensions = window.get_required_extensions();
+	vec<c_str> required_surface_extensions = window.get_required_extensions();
 
 	instance_extensions.insert(
 	  instance_extensions.end(),
@@ -246,36 +247,34 @@ Application::Application()
 
 	bvk::Device* device = device_system.get_device();
 
-	staging_pool = StagingPool(2, (1024u * 1024u * 256u), device);
+	staging_pool = StagingPool(3, (1024u * 1024u * 256u), device);
 
-	texture_loader = bvk::TextureLoader(device);
+	texture_loader  = bvk::TextureLoader(device);
+	model_loader    = bvk::ModelLoader(device, &texture_loader);
+	material_system = bvk::MaterialSystem(device);
+	renderer        = bvk::Renderer(device);
 
-	uint8_t defaultTexturePixelData[4] = { 255, 0, 255, 255 };
+	initialize_imgui(device, renderer, window);
 
-	textures[hash_str("default_2d")] = texture_loader.load_from_buffer(
+	camera_controller = CameraController(&scene, &window);
+
+	u8 defaultTexturePixelData[4]    = { 255, 0, 255, 255 };
+	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
 	  "default_2d",
 	  defaultTexturePixelData,
 	  1,
 	  1,
 	  sizeof(defaultTexturePixelData),
-	  bvk::Texture::Type::e2D
+	  bvk::Texture::Type::e2D,
+	  staging_pool.get_by_index(0)
 	);
 
 	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
 	  "default_cube",
 	  "Assets/cubemap_yokohama_rgba.ktx",
 	  bvk::Texture::Type::eCubeMap,
-      staging_pool.get_by_index(0)
+	  staging_pool.get_by_index(0)
 	);
-
-	material_system.init(device);
-
-	renderer     = bvk::Renderer(device);
-	model_loader = bvk::ModelLoader(device, &texture_loader);
-
-	initialize_imgui(device, renderer, window);
-
-	camera_controller = CameraController(&scene, &window);
 }
 
 Application::~Application()
@@ -283,17 +282,12 @@ Application::~Application()
 	device_system.get_device()->logical.waitIdle();
 	destroy_imgui();
 
-
-	material_system.reset();
-
 	for (auto& [key, val] : models) {
 		delete val.vertex_buffer;
 		delete val.index_buffer;
 	}
 
 	models.clear();
-
-	staging_pool.destroy_buffers();
 
 	device_system.reset();
 }

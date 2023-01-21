@@ -23,7 +23,6 @@ struct Texture
 	u32 width;
 	u32 height;
 	vk::Format format;
-	u32 channels;
 	u32 mip_levels;
 	vk::DeviceSize size;
 
@@ -33,7 +32,7 @@ struct Texture
 
 	AllocatedImage image;
 
-	void transition_layout(
+	inline void transition_layout(
 	    Device* device,
 	    vk::CommandBuffer cmd,
 	    u32 base_mip_level,
@@ -117,6 +116,50 @@ struct Texture
 		// Execute pipeline barrier
 		cmd.pipelineBarrier(srcStage, dstStage, {}, 0, nullptr, 0, nullptr, 1, &imageMemBarrier);
 		current_layout = new_layout;
+	}
+
+	inline pair<i32, i32> blit(vk::CommandBuffer cmd, u32 mip_index, pair<i32, i32> mip_size)
+	{
+		const auto [mip_width, mip_height] = mip_size;
+		cmd.blitImage(
+		    image,
+		    vk::ImageLayout::eTransferSrcOptimal,
+		    image,
+		    vk::ImageLayout::eTransferDstOptimal,
+		    vk::ImageBlit {
+		        vk::ImageSubresourceLayers {
+		            vk::ImageAspectFlagBits::eColor,
+		            mip_index - 1u,
+		            0u,
+		            1u,
+		        },
+
+		        arr<vk::Offset3D, 2> {
+		            vk::Offset3D { 0, 0, 0 },
+		            vk::Offset3D { mip_width, mip_height, 1 },
+		        },
+
+		        vk::ImageSubresourceLayers {
+		            vk::ImageAspectFlagBits::eColor,
+		            mip_index,
+		            0u,
+		            1u,
+		        },
+
+		        arr<vk::Offset3D, 2> {
+		            vk::Offset3D { 0, 0, 0 },
+		            vk::Offset3D { mip_width > 1 ? mip_width / 2 : 1,
+		                           mip_height > 1 ? mip_height / 2 : 1,
+		                           1 },
+		        },
+		    },
+		    vk::Filter::eLinear
+		);
+
+		const i32 next_mip_width = mip_width > 1 ? mip_width / 2.0 : mip_width;
+		const i32 next_mip_height = mip_height > 1 ? mip_height / 2.0 : mip_height;
+
+		return { next_mip_width, next_mip_height };
 	}
 };
 

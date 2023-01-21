@@ -9,114 +9,74 @@ static_assert(
 
 namespace BINDLESSVK_NAMESPACE {
 
-void MaterialSystem::init(Device* device)
+MaterialSystem::MaterialSystem(Device* device): device(device)
 {
-	this->device = device;
+	vec<vk::DescriptorPoolSize> pool_sizes = { { vk::DescriptorType::eSampler, 1000u },
+		                                       { vk::DescriptorType::eCombinedImageSampler, 1000u },
+		                                       { vk::DescriptorType::eSampledImage, 1000u },
+		                                       { vk::DescriptorType::eStorageImage, 1000u },
+		                                       { vk::DescriptorType::eUniformTexelBuffer, 1000u },
+		                                       { vk::DescriptorType::eStorageTexelBuffer, 1000u },
+		                                       { vk::DescriptorType::eUniformBuffer, 1000u },
+		                                       { vk::DescriptorType::eStorageBuffer, 1000u },
+		                                       { vk::DescriptorType::eUniformBufferDynamic, 1000u },
+		                                       { vk::DescriptorType::eStorageBufferDynamic, 1000u },
+		                                       { vk::DescriptorType::eInputAttachment, 1000u } };
 
-	vec<vk::DescriptorPoolSize> pool_sizes = { { vk::DescriptorType::eSampler, 1000 },
-		                                       { vk::DescriptorType::eCombinedImageSampler, 1000 },
-		                                       { vk::DescriptorType::eSampledImage, 1000 },
-		                                       { vk::DescriptorType::eStorageImage, 1000 },
-		                                       { vk::DescriptorType::eUniformTexelBuffer, 1000 },
-		                                       { vk::DescriptorType::eStorageTexelBuffer, 1000 },
-		                                       { vk::DescriptorType::eUniformBuffer, 1000 },
-		                                       { vk::DescriptorType::eStorageBuffer, 1000 },
-		                                       { vk::DescriptorType::eUniformBufferDynamic, 1000 },
-		                                       { vk::DescriptorType::eStorageBufferDynamic, 1000 },
-		                                       { vk::DescriptorType::eInputAttachment, 1000 } };
-	// descriptorPoolSizes.push_back(VkDescriptorPoolSize {});
-
-	vk::DescriptorPoolCreateInfo descriptor_pool_create_info {
-		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-		100,
-		static_cast<uint32_t>(pool_sizes.size()),
-		pool_sizes.data(),
-	};
-
-	descriptor_pool = device->logical.createDescriptorPool(descriptor_pool_create_info, nullptr);
-
-	const vk::Extent2D& extent = device->framebuffer_extent;
+	descriptor_pool = device->logical.createDescriptorPool(
+	    vk::DescriptorPoolCreateInfo {
+	        vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+	        100u,
+	        static_cast<u32>(pool_sizes.size()),
+	        pool_sizes.data(),
+	    },
+	    nullptr
+	);
 }
 
-void MaterialSystem::reset()
+MaterialSystem::~MaterialSystem()
 {
-	destroy_all_materials();
-
-	device->logical.destroyDescriptorPool(descriptor_pool);
-
-	for (auto& [key, val] : shader_effects)
-	{
-		device->logical.destroyDescriptorSetLayout(val.sets_layout[0]);
-		device->logical.destroyDescriptorSetLayout(val.sets_layout[1]);
-		device->logical.destroyPipelineLayout(val.pipeline_layout);
-
-		static_assert(ShaderEffect().sets_layout.size() == 2, "Sets layout has been resized");
-	}
-
-	for (auto& [key, val] : shaders)
-	{
-		device->logical.destroyShaderModule(val.module);
-	}
-
-
-	shader_effects.clear();
-	shaders.clear();
 }
 
-void MaterialSystem::destroy_all_materials()
-{
-	for (auto& [key, val] : shader_passes)
-	{
-		device->logical.destroyPipeline(val.pipeline);
-	}
-
-	device->logical.resetDescriptorPool(descriptor_pool);
-
-	shader_passes.clear();
-	materials.clear();
-}
-
-void MaterialSystem::load_shader(const char* name, const char* path, vk::ShaderStageFlagBits stage)
+Shader MaterialSystem::load_shader(c_str name, c_str path, vk::ShaderStageFlagBits stage)
 {
 	std::ifstream stream(path, std::ios::ate);
 
-	const size_t file_size = stream.tellg();
-	vec<uint32_t> code(file_size / sizeof(uint32_t));
+	const usize file_size = stream.tellg();
+	vec<u32> code(file_size / sizeof(u32));
 
 	stream.seekg(0);
 	stream.read((char*)code.data(), file_size);
 	stream.close();
 
-	vk::ShaderModuleCreateInfo createInfo {
-		{},                             // flags
-		code.size() * sizeof(uint32_t), // codeSize
-		code.data(),                    // code
-	};
-
-	shaders[hash_str(name)] = {
-		device->logical.createShaderModule(createInfo), // module
-		stage,                                          // stage
-		code,                                           // code
+	return Shader {
+		device->logical.createShaderModule(vk::ShaderModuleCreateInfo {
+		    {},
+		    code.size() * sizeof(u32),
+		    code.data(),
+		}),
+		stage,
+		code,
 	};
 }
 
-void MaterialSystem::create_shader_effect(const char* name, vec<Shader*> shaders)
+ShaderEffect MaterialSystem::create_shader_effect(c_str name, vec<Shader*> shaders)
 {
-	arr<vec<vk::DescriptorSetLayoutBinding>, 2> set_bindings;
+	arr<vec<vk::DescriptorSetLayoutBinding>, 2u> set_bindings;
 
 	for (const auto& shader_stage : shaders)
 	{
 		SpvReflectShaderModule spv_module;
 		assert_false(
 		    spvReflectCreateShaderModule(
-		        shader_stage->code.size() * sizeof(uint32_t),
+		        shader_stage->code.size() * sizeof(u32),
 		        shader_stage->code.data(),
 		        &spv_module
 		    ),
 		    "spvReflectCreateShderModule failed"
 		);
 
-		uint32_t descriptor_sets_count = 0ul;
+		u32 descriptor_sets_count = 0u;
 
 		assert_false(
 		    spvReflectEnumerateDescriptorSets(&spv_module, &descriptor_sets_count, nullptr),
@@ -136,12 +96,12 @@ void MaterialSystem::create_shader_effect(const char* name, vec<Shader*> shaders
 
 		for (const auto& spv_set : descriptor_sets)
 		{
-			for (uint32_t i_binding = 0ull; i_binding < spv_set->binding_count; i_binding++)
+			for (u32 i_binding = 0u; i_binding < spv_set->binding_count; ++i_binding)
 			{
 				const auto& spv_binding = *(spv_set->bindings[i_binding]);
-				if (set_bindings[spv_set->set].size() < spv_binding.binding + 1)
+				if (set_bindings[spv_set->set].size() < spv_binding.binding + 1u)
 				{
-					set_bindings[spv_set->set].resize(spv_binding.binding + 1);
+					set_bindings[spv_set->set].resize(spv_binding.binding + 1u);
 				}
 
 				set_bindings[spv_binding.set][spv_binding.binding].binding = spv_binding.binding;
@@ -152,7 +112,7 @@ void MaterialSystem::create_shader_effect(const char* name, vec<Shader*> shaders
 				set_bindings[spv_binding.set][spv_binding.binding].stageFlags = shader_stage->stage;
 
 				set_bindings[spv_binding.set][spv_binding.binding].descriptorCount = 1u;
-				for (uint32_t i_dim = 0; i_dim < spv_binding.array.dims_count; i_dim++)
+				for (u32 i_dim = 0; i_dim < spv_binding.array.dims_count; ++i_dim)
 				{
 					set_bindings[spv_binding.set][spv_binding.binding].descriptorCount *=
 					    spv_binding.array.dims[i_dim];
@@ -161,48 +121,42 @@ void MaterialSystem::create_shader_effect(const char* name, vec<Shader*> shaders
 		}
 	}
 
-	arr<vk::DescriptorSetLayout, 2ull> sets_layout;
-	uint32_t index = 0ull;
+	arr<vk::DescriptorSetLayout, 2u> sets_layout;
+	u32 index = 0u;
 	for (const auto& set : set_bindings)
 	{
-		vk::DescriptorSetLayoutCreateInfo set_layout_info {
-			{},                                // flags
-			static_cast<uint32_t>(set.size()), // bindingCount
-			set.data(),                        // pBindings
-		};
-		sets_layout[index++] = device->logical.createDescriptorSetLayout(set_layout_info);
+		sets_layout[index++] =
+		    device->logical.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
+		        {},
+		        static_cast<u32>(set.size()),
+		        set.data(),
+		    });
 	}
 	vk::PipelineLayoutCreateInfo pipeline_layout_info = {
-		{},                                        // flags
-		static_cast<uint32_t>(sets_layout.size()), // setLayoutCount
-		sets_layout.data(),                        // pSetLayouts
+		{},
+		static_cast<u32>(sets_layout.size()),
+		sets_layout.data(),
 	};
 
-
-	shader_effects[hash_str(name)] = {
-		shaders,                                                    // shaders
-		device->logical.createPipelineLayout(pipeline_layout_info), // piplineLayout
-		sets_layout                                                 // setsLayout
+	return ShaderEffect {
+		shaders,
+		device->logical.createPipelineLayout(pipeline_layout_info),
+		sets_layout,
 	};
 }
 
-void MaterialSystem::create_shader_pass(
-    const char* name,
+ShaderPass MaterialSystem::create_shader_pass(
+    c_str name,
     ShaderEffect* effect,
     vk::Format color_attachment_format,
     vk::Format depth_attachment_format,
     PipelineConfiguration pipeline_configuration
 )
 {
-	if (shader_passes.contains(hash_str(name)))
-	{
-		device->log(LogLvl::eWarn, "Recreating shader pass: {}", name);
-		device->logical.destroyPipeline(shader_passes[hash_str(name)].pipeline);
-	}
-
+	assert_true(effect, "effect is null for '{}' material", name);
 	vec<vk::PipelineShaderStageCreateInfo> stages(effect->shaders.size());
 
-	uint32_t index = 0;
+	u32 index = 0;
 	for (const auto& shader : effect->shaders)
 	{
 		stages[index++] = {
@@ -214,16 +168,12 @@ void MaterialSystem::create_shader_pass(
 	}
 
 	vk::PipelineRenderingCreateInfo pipeline_rendering_info {
-		{},
-		1u,
-		&color_attachment_format,
-		depth_attachment_format, // :D
-		{},
+		{}, 1u, &color_attachment_format, depth_attachment_format, {},
 	};
 
 	vk::GraphicsPipelineCreateInfo graphics_pipeline_info {
 		{},
-		static_cast<uint32_t>(stages.size()),
+		static_cast<u32>(stages.size()),
 		stages.data(),
 		&pipeline_configuration.vertex_input_state,
 		&pipeline_configuration.input_assembly_state,
@@ -245,14 +195,14 @@ void MaterialSystem::create_shader_pass(
 	auto pipeline = device->logical.createGraphicsPipeline({}, graphics_pipeline_info);
 	assert_false(pipeline.result);
 
-	shader_passes[hash_str(name)] = {
+	return ShaderPass {
 		effect,
 		pipeline.value,
 	};
 }
 
-void MaterialSystem::create_pipeline_configuration(
-    const char* name,
+PipelineConfiguration MaterialSystem::create_pipeline_configuration(
+    c_str name,
     vk::PipelineVertexInputStateCreateInfo vertex_input_state,
     vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
     vk::PipelineTessellationStateCreateInfo tessellation_state,
@@ -265,10 +215,7 @@ void MaterialSystem::create_pipeline_configuration(
     vec<vk::DynamicState> dynamic_states
 )
 {
-	PipelineConfiguration& configuration = pipline_configurations[hash_str(name)];
-
-
-	configuration = PipelineConfiguration {
+	auto configuration = PipelineConfiguration {
 		.vertex_input_state = vertex_input_state,
 		.input_assembly_state = input_assembly_state,
 		.tesselation_state = tessellation_state,
@@ -285,48 +232,39 @@ void MaterialSystem::create_pipeline_configuration(
 
 	configuration.dynamic_state = {
 		{},
-		static_cast<uint32_t>(configuration.dynamic_states.size()),
+		static_cast<u32>(configuration.dynamic_states.size()),
 		configuration.dynamic_states.data(),
 	};
 
 	configuration.color_blend_state.attachmentCount = configuration.color_blend_attachments.size();
 	configuration.color_blend_state.pAttachments = configuration.color_blend_attachments.data();
+
+	return configuration;
 }
 
-void MaterialSystem::create_material(
-    const char* name,
+Material MaterialSystem::create_material(
+    c_str name,
     ShaderPass* shader_pass,
     MaterialParameters parameters,
     vec<class Texture*> textures
 )
 {
 	vk::DescriptorSetAllocateInfo allocate_info {
-		descriptor_pool, // descriptorPool
-		1ull,            // descriptorSetCount
+		descriptor_pool,
+		1ul,
 		&shader_pass->effect->sets_layout.back(),
 	};
-
-	if (materials.contains(hash_str(name)))
-	{
-		device->logical.freeDescriptorSets(
-		    descriptor_pool,
-		    materials[hash_str(name)].descriptor_set
-		);
-		device->log(LogLvl::eWarn, "Recreating material: {}", name);
-	}
 
 	vk::DescriptorSet set;
 	assert_false(device->logical.allocateDescriptorSets(&allocate_info, &set));
 
-	materials[hash_str(name)] = {
+	return Material {
 		.shader_pass = shader_pass,
 		.parameters = parameters,
 		.descriptor_set = set,
 		.textures = textures,
-		.sort_key = static_cast<uint32_t>(hash_str(name)),
+		.sort_key = static_cast<u32>(hash_str(name)),
 	};
-
-	// @todo Bind textures
 }
 
 } // namespace BINDLESSVK_NAMESPACE

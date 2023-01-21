@@ -5,16 +5,12 @@
 #include "BindlessVk/Device.hpp"
 #include "BindlessVk/Texture.hpp"
 
-namespace tinygltf {
-struct Image;
-}
-
 namespace BINDLESSVK_NAMESPACE {
 
 class TextureLoader
 {
 public:
-	/** @brief Main constructoe
+	/** @brief Main constructor
 	 * @param device the bindlessvk device
 	 */
 	TextureLoader(Device* device);
@@ -35,14 +31,15 @@ public:
 	 * @param type   type of the texture (eg. 2d, cubemap)
 	 * @param layout final layout of the created texture
 	 */
-	Texture load_from_buffer(
-	    const std::string& name,
+	Texture load_from_binary(
+	    c_str name,
 	    u8* pixels,
 	    i32 width,
 	    i32 height,
 	    vk::DeviceSize size,
 	    Texture::Type type,
-	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    Buffer* staging_buffer,
+	    vk::ImageLayout final_layout = vk::ImageLayout::eShaderReadOnlyOptimal
 	);
 
 	/** @brief Loads a texture from a ktx(khronos texture) file
@@ -58,17 +55,6 @@ public:
 	    Buffer* staging_buffer,
 	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
 	);
-
-private:
-	void blit_iamge(
-	    vk::CommandBuffer cmd,
-	    AllocatedImage image,
-	    u32 mip_index,
-	    i32& mip_width,
-	    i32& mip_height
-	);
-
-	void copy_buffer_to_image(Texture& texture, vk::CommandBuffer cmdBuffer);
 
 private:
 	Device* device = {};

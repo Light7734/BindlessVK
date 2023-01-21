@@ -12,12 +12,14 @@ GltfLoader::GltfLoader(
     Device* device,
     TextureLoader* texture_loader,
     Buffer* staging_vertex_buffer,
-    Buffer* staging_index_buffer
+    Buffer* staging_index_buffer,
+    Buffer* staging_texture_buffer
 )
     : device(device)
     , texture_loader(texture_loader)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
+    , staging_texture_buffer(staging_texture_buffer)
 {
 }
 
@@ -31,7 +33,7 @@ Model GltfLoader::load_from_ascii(const char* debug_name, c_str file_path)
 
 	load_material_parameters();
 
-	load_mesh_data_to_staging_buffers();
+	stage_mesh_data();
 	write_mesh_data_to_gpu();
 
 	return model;
@@ -62,13 +64,14 @@ void GltfLoader::load_textures()
 
 	for (auto& image : gltf_model.images)
 	{
-		model.textures.push_back(texture_loader->load_from_buffer(
-		    image.uri,
+		model.textures.push_back(texture_loader->load_from_binary(
+		    image.uri.c_str(),
 		    &image.image[0],
 		    image.width,
 		    image.height,
 		    image.image.size(),
 		    Texture::Type::e2D,
+		    staging_texture_buffer,
 		    vk::ImageLayout::eShaderReadOnlyOptimal
 		));
 	}
@@ -90,7 +93,7 @@ void GltfLoader::load_material_parameters()
 	}
 }
 
-void GltfLoader::load_mesh_data_to_staging_buffers()
+void GltfLoader::stage_mesh_data()
 {
 	vertex_map = static_cast<Model::Vertex*>(staging_vertex_buffer->map_block(0));
 	index_map = static_cast<u32*>(staging_index_buffer->map_block(0));

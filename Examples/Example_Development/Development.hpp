@@ -17,10 +17,11 @@
 #include "Graph.hpp"
 #include "UserInterfacePass.hpp"
 
+// @todo: load stuff from files
 class DevelopmentExampleApplication: public Application
 {
 public:
-	DevelopmentExampleApplication()
+	DevelopmentExampleApplication(): Application()
 	{
 		load_shaders();
 		load_shader_effects();
@@ -69,20 +70,20 @@ public:
 private:
 	void load_shaders()
 	{
-		const char* const DIRECTORY          = "Shaders/";
-		const char* const VERTEX_EXTENSION   = ".spv_vs";
-		const char* const FRAGMENT_EXTENSION = ".spv_fs";
+		c_str DIRECTORY          = "Shaders/";
+		c_str VERTEX_EXTENSION   = ".spv_vs";
+		c_str FRAGMENT_EXTENSION = ".spv_fs";
 
 		for (auto& shader : std::filesystem::directory_iterator(DIRECTORY)) {
-			std::string path(shader.path().c_str());
-			std::string extension(shader.path().extension().c_str());
-			std::string name(shader.path().filename().replace_extension().c_str());
+			const str path(shader.path().c_str());
+			const str extension(shader.path().extension().c_str());
+			const str name(shader.path().filename().replace_extension().c_str());
 
 			if (strcmp(extension.c_str(), VERTEX_EXTENSION) && strcmp(extension.c_str(), FRAGMENT_EXTENSION)) {
 				continue;
 			}
 
-			material_system.load_shader(
+			shaders[hash_str(name.c_str())] = material_system.load_shader(
 			  name.c_str(),
 			  path.c_str(),
 			  !strcmp(extension.c_str(), VERTEX_EXTENSION) ? vk::ShaderStageFlagBits::eVertex :
@@ -93,20 +94,19 @@ private:
 
 	void load_shader_effects()
 	{
-		// @TODO: Load from files instead of hard-coding
-		material_system.create_shader_effect(
+		shader_effects[hash_str("opaque_mesh")] = material_system.create_shader_effect(
 		  "opaque_mesh",
 		  {
-		    material_system.get_shader("defaultVertex"),
-		    material_system.get_shader("defaultFragment"),
+		    &shaders[hash_str("defaultVertex")],
+		    &shaders[hash_str("defaultFragment")],
 		  }
 		);
 
-		material_system.create_shader_effect(
-		  "skybox",
+		shader_effects[hash_str("skybox")] = material_system.create_shader_effect(
+		  "opaque_mesh",
 		  {
-		    material_system.get_shader("skybox_vertex"),
-		    material_system.get_shader("skybox_fragment"),
+		    &shaders[hash_str("skybox_vertex")],
+		    &shaders[hash_str("skybox_fragment")],
 		  }
 		);
 	}
@@ -115,74 +115,76 @@ private:
 	{
 		bvk::Device* device = device_system.get_device();
 
-		material_system.create_pipeline_configuration(
-		  "opaque_mesh",
-		  bvk::Model::Vertex::get_vertex_input_state(),
-		  vk::PipelineInputAssemblyStateCreateInfo {
-		    {},
-		    vk::PrimitiveTopology::eTriangleList,
-		    VK_FALSE,
-		  },
-		  vk::PipelineTessellationStateCreateInfo {},
-		  vk::PipelineViewportStateCreateInfo {
-		    {},
-		    1u,
-		    {},
-		    1u,
-		    {},
-		  },
-		  vk::PipelineRasterizationStateCreateInfo {
-		    {},
-		    VK_FALSE,
-		    VK_FALSE,
-		    vk::PolygonMode::eFill,
-		    vk::CullModeFlagBits::eBack,
-		    vk::FrontFace::eClockwise,
-		    VK_FALSE,
-		    0.0f,
-		    0.0f,
-		    0.0f,
-		    1.0f,
-		  },
-		  vk::PipelineMultisampleStateCreateInfo {
-		    {},
-		    device->max_samples,
-		    VK_FALSE,
-		    {},
-		    VK_FALSE,
-		    VK_FALSE,
-		  },
-		  vk::PipelineDepthStencilStateCreateInfo {
-		    {},
-		    VK_TRUE,
-		    VK_TRUE,
-		    vk::CompareOp::eLess,
-		    VK_FALSE,
-		    VK_FALSE,
-		    {},
-		    {},
-		    0.0f,
-		    1.0,
-		  },
-		  std::vector<vk::PipelineColorBlendAttachmentState> {
-		    { VK_FALSE,
-		      vk::BlendFactor::eSrcAlpha,
-		      vk::BlendFactor::eOneMinusSrcAlpha,
-		      vk::BlendOp::eAdd,
-		      vk::BlendFactor::eOne,
-		      vk::BlendFactor::eZero,
-		      vk::BlendOp::eAdd,
-		      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-		        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA },
-		  },
-		  vk::PipelineColorBlendStateCreateInfo {},
-		  std::vector<vk::DynamicState> {
-		    vk::DynamicState::eViewport,
-		    vk::DynamicState::eScissor,
-		  }
-		);
+		pipeline_configurations[hash_str("opaque_mesh"
+		)] = material_system
+		       .create_pipeline_configuration(
+		         "opaque_mesh",
+		         bvk::Model::Vertex::get_vertex_input_state(),
+		         vk::PipelineInputAssemblyStateCreateInfo {
+		           {},
+		           vk::PrimitiveTopology::eTriangleList,
+		           VK_FALSE,
+		         },
+		         vk::PipelineTessellationStateCreateInfo {},
+		         vk::PipelineViewportStateCreateInfo {
+		           {},
+		           1u,
+		           {},
+		           1u,
+		           {},
+		         },
+		         vk::PipelineRasterizationStateCreateInfo {
+		           {},
+		           VK_FALSE,
+		           VK_FALSE,
+		           vk::PolygonMode::eFill,
+		           vk::CullModeFlagBits::eBack,
+		           vk::FrontFace::eClockwise,
+		           VK_FALSE,
+		           0.0f,
+		           0.0f,
+		           0.0f,
+		           1.0f,
+		         },
+		         vk::PipelineMultisampleStateCreateInfo {
+		           {},
+		           device->max_samples,
+		           VK_FALSE,
+		           {},
+		           VK_FALSE,
+		           VK_FALSE,
+		         },
+		         vk::PipelineDepthStencilStateCreateInfo {
+		           {},
+		           VK_TRUE,
+		           VK_TRUE,
+		           vk::CompareOp::eLess,
+		           VK_FALSE,
+		           VK_FALSE,
+		           {},
+		           {},
+		           0.0f,
+		           1.0,
+		         },
+		         std::vector<vk::PipelineColorBlendAttachmentState> {
+		           { VK_FALSE,
+		             vk::BlendFactor::eSrcAlpha,
+		             vk::BlendFactor::eOneMinusSrcAlpha,
+		             vk::BlendOp::eAdd,
+		             vk::BlendFactor::eOne,
+		             vk::BlendFactor::eZero,
+		             vk::BlendOp::eAdd,
+		             vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+		               | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA },
+		         },
+		         vk::PipelineColorBlendStateCreateInfo {},
+		         std::vector<vk::DynamicState> {
+		           vk::DynamicState::eViewport,
+		           vk::DynamicState::eScissor,
+		         }
+		       );
 
-		material_system.create_pipeline_configuration(
+		pipeline_configurations[hash_str("skybox")] = material_system.create_pipeline_configuration(
 		  "skybox",
 		  bvk::Model::Vertex::get_vertex_input_state(),
 		  vk::PipelineInputAssemblyStateCreateInfo {
@@ -240,7 +242,6 @@ private:
 		      vk::BlendFactor::eOne,
 		      vk::BlendFactor::eZero,
 		      vk::BlendOp::eAdd,
-
 		      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
 		        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA // colorWriteMask
 		    },
@@ -257,49 +258,56 @@ private:
 	{
 		bvk::Device* device = device_system.get_device();
 
-		// create shader passes
-		material_system.create_shader_pass(
+		shader_passes[hash_str("opaque_mesh")] = material_system.create_shader_pass(
 		  "opaque_mesh",
-		  material_system.get_shader_effect("opaque_mesh"),
+		  &shader_effects[hash_str("opaque_mesh")],
 		  device->surface_format.format,
 		  device->depth_format,
-		  material_system.get_pipeline_configuration("opaque_mesh")
+		  pipeline_configurations[hash_str("opaque_mesh")]
 		);
 
-		material_system.create_shader_pass(
+		shader_passes[hash_str("skybox")] = material_system.create_shader_pass(
 		  "skybox",
-		  material_system.get_shader_effect("skybox"),
+		  &shader_effects[hash_str("skybox")],
 		  device->surface_format.format,
 		  device->depth_format,
-		  material_system.get_pipeline_configuration("skybox")
+		  pipeline_configurations[hash_str("skybox")]
 		);
 	}
 
-	// @todo: Load from files instead of hard-coding
 	void load_materials()
 	{
-		material_system
+		materials[hash_str("opaque_mesh")] = material_system.create_material(
+		  "opaque_mesh",
+		  &shader_passes[hash_str("opaque_mesh")],
+		  {},
+		  {}
+		);
 
-		  .create_material("opaque_mesh", material_system.get_shader_pass("opaque_mesh"), {}, {});
-
-		material_system.create_material("skybox", material_system.get_shader_pass("skybox"), {}, {});
+		materials[hash_str("skybox")] = material_system.create_material(
+		  "skybox",
+		  &shader_passes[hash_str("skybox")],
+		  {},
+		  {}
+		);
 	}
 
-	// @todo: Load from files instead of hard-coding
 	void load_models()
 	{
 		models[bvk::hash_str("flight_helmet")] = model_loader.load_from_gltf_ascii(
 		  "flight_helmet",
 		  "Assets/FlightHelmet/FlightHelmet.gltf",
-		  staging_pool.get_by_index(0),
-		  staging_pool.get_by_index(1)
+		  staging_pool.get_by_index(0u),
+		  staging_pool.get_by_index(1u),
+		  staging_pool.get_by_index(2u)
 		);
 
 		models[bvk::hash_str("skybox")] = model_loader.load_from_gltf_ascii(
 		  "skybox",
 		  "Assets/Cube/Cube.gltf",
-		  staging_pool.get_by_index(0),
-		  staging_pool.get_by_index(1)
+		  staging_pool.get_by_index(0u),
+		  staging_pool.get_by_index(1u),
+		  staging_pool.get_by_index(2u)
 		);
 	}
 
@@ -317,7 +325,7 @@ private:
 
 		scene.emplace<StaticMeshRendererComponent>(
 		  testModel,
-		  material_system.get_material("opaque_mesh"),
+		  &materials[hash_str("opaque_mesh")],
 		  &models[bvk::hash_str("flight_helmet")]
 		);
 
@@ -331,7 +339,7 @@ private:
 
 		scene.emplace<StaticMeshRendererComponent>(
 		  skybox,
-		  material_system.get_material("skybox"),
+		  &materials[hash_str("skybox")],
 		  &models[bvk::hash_str("skybox")]
 		);
 

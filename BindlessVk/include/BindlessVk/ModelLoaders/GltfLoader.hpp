@@ -22,7 +22,8 @@ public:
 	    Device* device,
 	    TextureLoader* texture_loader,
 	    Buffer* staging_vertex_buffer,
-	    Buffer* staging_index_buffer
+	    Buffer* staging_index_buffer,
+	    Buffer* staging_texture_buffer
 	);
 	GltfLoader() = default;
 	~GltfLoader() = default;
@@ -36,7 +37,7 @@ private:
 
 	void load_textures();
 	void load_material_parameters();
-	void load_mesh_data_to_staging_buffers();
+	void stage_mesh_data();
 
 	void write_mesh_data_to_gpu();
 
@@ -72,6 +73,7 @@ private:
 
 	Buffer* staging_vertex_buffer = {};
 	Buffer* staging_index_buffer = {};
+	Buffer* staging_texture_buffer = {};
 
 	Model::Vertex* vertex_map = {};
 	u32* index_map = {};

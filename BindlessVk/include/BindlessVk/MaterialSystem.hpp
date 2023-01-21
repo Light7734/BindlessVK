@@ -18,10 +18,10 @@ struct PipelineConfiguration
 	vk::PipelineMultisampleStateCreateInfo multisample_state;
 	vk::PipelineDepthStencilStateCreateInfo depth_stencil_state;
 
-	std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
+	vec<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
 	vk::PipelineColorBlendStateCreateInfo color_blend_state;
 
-	std::vector<vk::DynamicState> dynamic_states;
+	vec<vk::DynamicState> dynamic_states;
 	vk::PipelineDynamicStateCreateInfo dynamic_state;
 };
 
@@ -41,7 +41,7 @@ struct Shader
 {
 	vk::ShaderModule module;
 	vk::ShaderStageFlagBits stage;
-	std::vector<uint32_t> code;
+	vec<u32> code;
 };
 
 /** @brief Shaders and pipeline layout for creating ShaderPasses
@@ -49,86 +49,52 @@ struct Shader
  */
 struct ShaderEffect
 {
-	std::vector<Shader*> shaders;
+	vec<Shader*> shaders;
 	vk::PipelineLayout pipeline_layout;
-	std::array<vk::DescriptorSetLayout, 2> sets_layout;
+	arr<vk::DescriptorSetLayout, 2> sets_layout;
 };
 
-/// @brief Full shader & pipeline state needed for creating a master material
+/** @brief Full shader & pipeline state needed for creating a material */
 struct ShaderPass
 {
 	ShaderEffect* effect;
 	vk::Pipeline pipeline;
+	PipelineConfiguration pipeline_configuration;
 };
 
-/// @brief Graphics state needed to render an object during a renderpass
+/** @brief Graphics state needed to render an object during a renderpass */
 struct Material
 {
 	ShaderPass* shader_pass;
 	MaterialParameters parameters;
 	vk::DescriptorSet descriptor_set;
-	std::vector<class Texture*> textures;
-	uint32_t sort_key;
+	vec<class Texture*> textures;
+	u32 sort_key;
 };
 
 /** @brief System for loading/destroying materials
- * @todo: complete docs
- * @todo: refactor code
+ * @todo #docs: Complete docs
+ * @todo #refactor: Tidy up code
+ * @todo #responsibility: This class should not be responsible for creating descriptor pools
  */
 class MaterialSystem
 {
 public:
+	/** @brief Main constructor */
+	MaterialSystem(Device* device);
+
+	/** @brief Main destructor */
+	~MaterialSystem();
+
+	/** @brief default constructo */
 	MaterialSystem() = default;
-
-	/** @return shader named @p name */
-	inline Shader* get_shader(const char* name)
-	{
-		return &shaders[hash_str(name)];
-	}
-
-	/** @return shader effect named @p name */
-	inline ShaderEffect* get_shader_effect(const char* name)
-	{
-		return &shader_effects[hash_str(name)];
-	}
-
-	/** @return shader pass named @p name */
-	inline ShaderPass* get_shader_pass(const char* name)
-	{
-		return &shader_passes[hash_str(name)];
-	}
-
-	/** @return material named @p name */
-	inline Material* get_material(const char* name)
-	{
-		return &materials[hash_str(name)];
-	}
-
-	/** @return pipeline configuration named @p name */
-	inline const PipelineConfiguration& get_pipeline_configuration( // Nvr-gnna-gv-u-up
-	    const char* name
-	) const
-	{
-		return pipline_configurations.at(hash_str(name));
-	}
-
-	/** Initializes the material system
-	 * @param device the bindlessvk device
-	 */
-	void init(Device* device);
-
-	/** Destroys the material system */
-	void reset();
-
-	/** Destroys all pipelines and resets the descriptor pool  */
-	void destroy_all_materials();
 
 	/** Loads compiled shader named @p name from @p path
 	 * @param name name of the shader
 	 * @param path path to the compiled shader
 	 * @param stage shader stage (eg. vertex)
 	 */
-	void load_shader(const char* name, const char* path, vk::ShaderStageFlagBits stage);
+	Shader load_shader(c_str name, c_str path, vk::ShaderStageFlagBits stage);
 
 	/** Caches pipeline states for future pipeline creation (used in shader pass)
 	 * @param name name of the pipeline configuration
@@ -140,11 +106,10 @@ public:
 	 * @param depth_stencil_state vulkan pipeline's depth-stencil state
 	 * @param color_blend_attachments vulkan pipeline's color-blend attachments
 	 * @param color_blend_state vulkan pipeline's color blend state
-	 * @param dynamic_states vulkan dynamic pipeline's states, usually viewports &
-	 * scissors
+	 * @param dynamic_states vulkan dynamic pipeline's states, usually viewports & scissors
 	 */
-	void create_pipeline_configuration(
-	    const char* name,
+	PipelineConfiguration create_pipeline_configuration(
+	    c_str name,
 	    vk::PipelineVertexInputStateCreateInfo vertex_input_state,
 	    vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
 	    vk::PipelineTessellationStateCreateInfo tessellation_state,
@@ -152,16 +117,16 @@ public:
 	    vk::PipelineRasterizationStateCreateInfo rasterization_state,
 	    vk::PipelineMultisampleStateCreateInfo multisample_state,
 	    vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
-	    std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
+	    vec<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
 	    vk::PipelineColorBlendStateCreateInfo color_blend_state,
-	    std::vector<vk::DynamicState> dynamic_states
+	    vec<vk::DynamicState> dynamic_states
 	);
 
 	/** Creates shader effect named @p name
 	 * @param name name of the shader effect
 	 * @param shaders shader programs making up the effect
 	 */
-	void create_shader_effect(const char* name, std::vector<Shader*> shaders);
+	ShaderEffect create_shader_effect(c_str name, vec<Shader*> shaders);
 
 	/** Creates shader pass named @p name, vulkan graphics pipeline is created
 	 * here
@@ -173,8 +138,8 @@ public:
 	 * pass
 	 * @param pipeline_configuration vulkan pipeline states
 	 */
-	void create_shader_pass(
-	    const char* name,
+	ShaderPass create_shader_pass(
+	    c_str name,
 	    ShaderEffect* effect,
 	    vk::Format color_attachment_format,
 	    vk::Format depth_attachment_format,
@@ -187,24 +152,17 @@ public:
 	 * @param parameters inital material parameters
 	 * @param textures textures used in the material
 	 */
-	void create_material(
-	    const char* name,
+	Material create_material(
+	    c_str name,
 	    ShaderPass* shader_pass,
 	    MaterialParameters parameters,
-	    std::vector<class Texture*> textures
+	    vec<class Texture*> textures
 	);
 
 private:
-	Device* device;
+private:
+	Device* device = {};
 	vk::DescriptorPool descriptor_pool = {};
-
-	hash_map<u64, Shader> shaders = {};
-	hash_map<u64, ShaderEffect> shader_effects = {};
-	hash_map<u64, ShaderPass> shader_passes = {};
-
-	hash_map<u64, PipelineConfiguration> pipline_configurations = {};
-
-	hash_map<u64, Material> materials = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE
