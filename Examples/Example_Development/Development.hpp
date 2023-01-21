@@ -280,14 +280,12 @@ private:
 		materials[hash_str("opaque_mesh")] = material_system.create_material(
 		  "opaque_mesh",
 		  &shader_passes[hash_str("opaque_mesh")],
-		  {},
 		  {}
 		);
 
 		materials[hash_str("skybox")] = material_system.create_material(
 		  "skybox",
 		  &shader_passes[hash_str("skybox")],
-		  {},
 		  {}
 		);
 	}

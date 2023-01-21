@@ -1,5 +1,6 @@
 #include "BindlessVk/MaterialSystem.hpp"
 
+#include <ranges>
 #include <spirv_reflect.h>
 
 static_assert(
@@ -11,17 +12,19 @@ namespace BINDLESSVK_NAMESPACE {
 
 MaterialSystem::MaterialSystem(Device* device): device(device)
 {
-	vec<vk::DescriptorPoolSize> pool_sizes = { { vk::DescriptorType::eSampler, 1000u },
-		                                       { vk::DescriptorType::eCombinedImageSampler, 1000u },
-		                                       { vk::DescriptorType::eSampledImage, 1000u },
-		                                       { vk::DescriptorType::eStorageImage, 1000u },
-		                                       { vk::DescriptorType::eUniformTexelBuffer, 1000u },
-		                                       { vk::DescriptorType::eStorageTexelBuffer, 1000u },
-		                                       { vk::DescriptorType::eUniformBuffer, 1000u },
-		                                       { vk::DescriptorType::eStorageBuffer, 1000u },
-		                                       { vk::DescriptorType::eUniformBufferDynamic, 1000u },
-		                                       { vk::DescriptorType::eStorageBufferDynamic, 1000u },
-		                                       { vk::DescriptorType::eInputAttachment, 1000u } };
+	vec<vk::DescriptorPoolSize> pool_sizes = {
+		{ vk::DescriptorType::eSampler, 1000u },
+		{ vk::DescriptorType::eCombinedImageSampler, 1000u },
+		{ vk::DescriptorType::eSampledImage, 1000u },
+		{ vk::DescriptorType::eStorageImage, 1000u },
+		{ vk::DescriptorType::eUniformTexelBuffer, 1000u },
+		{ vk::DescriptorType::eStorageTexelBuffer, 1000u },
+		{ vk::DescriptorType::eUniformBuffer, 1000u },
+		{ vk::DescriptorType::eStorageBuffer, 1000u },
+		{ vk::DescriptorType::eUniformBufferDynamic, 1000u },
+		{ vk::DescriptorType::eStorageBufferDynamic, 1000u },
+		{ vk::DescriptorType::eInputAttachment, 1000u },
+	};
 
 	descriptor_pool = device->logical.createDescriptorPool(
 	    vk::DescriptorPoolCreateInfo {
@@ -40,107 +43,32 @@ MaterialSystem::~MaterialSystem()
 
 Shader MaterialSystem::load_shader(c_str name, c_str path, vk::ShaderStageFlagBits stage)
 {
-	std::ifstream stream(path, std::ios::ate);
-
-	const usize file_size = stream.tellg();
-	vec<u32> code(file_size / sizeof(u32));
-
-	stream.seekg(0);
-	stream.read((char*)code.data(), file_size);
-	stream.close();
+	auto shader_code = load_shader_code(path);
 
 	return Shader {
 		device->logical.createShaderModule(vk::ShaderModuleCreateInfo {
 		    {},
-		    code.size() * sizeof(u32),
-		    code.data(),
+		    shader_code.size() * sizeof(u32),
+		    shader_code.data(),
 		}),
 		stage,
-		code,
+		shader_code,
 	};
 }
 
 ShaderEffect MaterialSystem::create_shader_effect(c_str name, vec<Shader*> shaders)
 {
-	arr<vec<vk::DescriptorSetLayoutBinding>, 2u> set_bindings;
-
-	for (const auto& shader_stage : shaders)
-	{
-		SpvReflectShaderModule spv_module;
-		assert_false(
-		    spvReflectCreateShaderModule(
-		        shader_stage->code.size() * sizeof(u32),
-		        shader_stage->code.data(),
-		        &spv_module
-		    ),
-		    "spvReflectCreateShderModule failed"
-		);
-
-		u32 descriptor_sets_count = 0u;
-
-		assert_false(
-		    spvReflectEnumerateDescriptorSets(&spv_module, &descriptor_sets_count, nullptr),
-		    "spvReflectEnumerateDescriptorSets failed"
-		);
-
-		vec<SpvReflectDescriptorSet*> descriptor_sets(descriptor_sets_count);
-
-		assert_false(
-		    spvReflectEnumerateDescriptorSets(
-		        &spv_module,
-		        &descriptor_sets_count,
-		        descriptor_sets.data()
-		    ),
-		    "spvReflectEnumerateDescriptorSets failed"
-		);
-
-		for (const auto& spv_set : descriptor_sets)
-		{
-			for (u32 i_binding = 0u; i_binding < spv_set->binding_count; ++i_binding)
-			{
-				const auto& spv_binding = *(spv_set->bindings[i_binding]);
-				if (set_bindings[spv_set->set].size() < spv_binding.binding + 1u)
-				{
-					set_bindings[spv_set->set].resize(spv_binding.binding + 1u);
-				}
-
-				set_bindings[spv_binding.set][spv_binding.binding].binding = spv_binding.binding;
-
-				set_bindings[spv_binding.set][spv_binding.binding].descriptorType =
-				    static_cast<vk::DescriptorType>(spv_binding.descriptor_type);
-
-				set_bindings[spv_binding.set][spv_binding.binding].stageFlags = shader_stage->stage;
-
-				set_bindings[spv_binding.set][spv_binding.binding].descriptorCount = 1u;
-				for (u32 i_dim = 0; i_dim < spv_binding.array.dims_count; ++i_dim)
-				{
-					set_bindings[spv_binding.set][spv_binding.binding].descriptorCount *=
-					    spv_binding.array.dims[i_dim];
-				}
-			}
-		}
-	}
-
-	arr<vk::DescriptorSetLayout, 2u> sets_layout;
-	u32 index = 0u;
-	for (const auto& set : set_bindings)
-	{
-		sets_layout[index++] =
-		    device->logical.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
-		        {},
-		        static_cast<u32>(set.size()),
-		        set.data(),
-		    });
-	}
-	vk::PipelineLayoutCreateInfo pipeline_layout_info = {
-		{},
-		static_cast<u32>(sets_layout.size()),
-		sets_layout.data(),
-	};
+	auto sets_bindings = reflect_shader_effect_bindings(shaders);
+	auto sets_layout = create_descriptor_sets_layout(sets_bindings);
 
 	return ShaderEffect {
 		shaders,
-		device->logical.createPipelineLayout(pipeline_layout_info),
+		vk::PipelineLayoutCreateInfo {
+		    {},
+		    static_cast<u32>(sets_layout.size()),
+		    sets_layout.data(),
+		},
+		device->logical.createPipelineLayout(),
 		sets_layout,
 	};
 }
@@ -245,7 +173,6 @@ PipelineConfiguration MaterialSystem::create_pipeline_configuration(
 Material MaterialSystem::create_material(
     c_str name,
     ShaderPass* shader_pass,
-    MaterialParameters parameters,
     vec<class Texture*> textures
 )
 {
@@ -260,11 +187,128 @@ Material MaterialSystem::create_material(
 
 	return Material {
 		.shader_pass = shader_pass,
-		.parameters = parameters,
 		.descriptor_set = set,
 		.textures = textures,
 		.sort_key = static_cast<u32>(hash_str(name)),
 	};
+}
+
+
+vec<u32> MaterialSystem::load_shader_code(c_str path)
+{
+	std::ifstream stream(path, std::ios::ate);
+	const usize file_size = stream.tellg();
+	vec<u32> code(file_size / sizeof(u32));
+
+	stream.seekg(0);
+	stream.read((char*)code.data(), file_size);
+	stream.close();
+
+	return code;
+}
+
+arr<vec<vk::DescriptorSetLayoutBinding>, 2u> MaterialSystem::reflect_shader_effect_bindings(
+    vec<Shader*> shaders
+)
+{
+	arr<vec<vk::DescriptorSetLayoutBinding>, 2u> bindings = {};
+
+	for (const auto& shader : shaders)
+	{
+		auto spv_sets = reflect_spv_descriptor_sets(shader);
+
+		for (const auto& spv_set : spv_sets)
+		{
+			for (u32 i_binding = 0u; i_binding < spv_set->binding_count; ++i_binding)
+			{
+				const auto& spv_binding = *spv_set->bindings[i_binding];
+				if (bindings[spv_set->set].size() < spv_binding.binding + 1u)
+				{
+					bindings[spv_set->set].resize(spv_binding.binding + 1u);
+				}
+
+				const u32 set_index = spv_binding.set;
+				const u32 binding_index = spv_binding.binding;
+
+				bindings[set_index][binding_index] =
+				    extract_descriptor_binding(spv_set->bindings[i_binding], shader);
+			}
+		}
+	}
+
+	return bindings;
+}
+
+arr<vk::DescriptorSetLayout, 2u> MaterialSystem::create_descriptor_sets_layout(
+    arr<vec<vk::DescriptorSetLayoutBinding>, 2> sets_bindings
+)
+{
+	vec<vk::DescriptorSetLayout> sets_layout;
+
+	for (u32 i = 0u; const auto& set_bindings : sets_bindings)
+	{
+		sets_layout[i++] =
+		    device->logical.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
+		        {},
+		        static_cast<u32>(set_bindings.size()),
+		        set_bindings.data(),
+		    });
+	}
+}
+
+vec<SpvReflectDescriptorSet*> MaterialSystem::reflect_spv_descriptor_sets(Shader* shader)
+{
+	SpvReflectShaderModule spv_module;
+	assert_false(
+	    spvReflectCreateShaderModule(
+	        shader->code.size() * sizeof(u32),
+	        shader->code.data(),
+	        &spv_module
+	    ),
+	    "spvReflectCreateShderModule failed"
+	);
+
+	u32 descriptor_sets_count = 0u;
+
+	assert_false(
+	    spvReflectEnumerateDescriptorSets(&spv_module, &descriptor_sets_count, nullptr),
+	    "spvReflectEnumerateDescriptorSets failed"
+	);
+
+	vec<SpvReflectDescriptorSet*> descriptor_sets(descriptor_sets_count);
+
+	assert_false(
+	    spvReflectEnumerateDescriptorSets(
+	        &spv_module,
+	        &descriptor_sets_count,
+	        descriptor_sets.data()
+	    ),
+	    "spvReflectEnumerateDescriptorSets failed"
+	);
+
+	return descriptor_sets;
+}
+
+vk::DescriptorSetLayoutBinding MaterialSystem::extract_descriptor_binding(
+    SpvReflectDescriptorBinding* spv_binding,
+    Shader* shader
+)
+{
+	vk::DescriptorSetLayoutBinding binding;
+	binding = spv_binding->binding;
+
+	binding.descriptorType = static_cast<vk::DescriptorType>(spv_binding->descriptor_type);
+
+	binding.stageFlags = shader->stage;
+
+	binding.descriptorCount = 1u;
+	for (u32 i_dim = 0; i_dim < spv_binding->array.dims_count; ++i_dim)
+	{
+		binding.descriptorCount *= spv_binding->array.dims[i_dim];
+	}
+
+	return binding;
+	;
 }
 
 } // namespace BINDLESSVK_NAMESPACE

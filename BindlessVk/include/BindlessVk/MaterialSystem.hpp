@@ -6,8 +6,10 @@
 
 #include <glm/glm.hpp>
 
-namespace BINDLESSVK_NAMESPACE {
+struct SpvReflectDescriptorSet;
+struct SpvReflectDescriptorBinding;
 
+namespace BINDLESSVK_NAMESPACE {
 struct PipelineConfiguration
 {
 	vk::PipelineVertexInputStateCreateInfo vertex_input_state;
@@ -36,7 +38,9 @@ struct MaterialParameters
 	float roughness_factor;
 };
 
-/** @brief A vulkan shader module & it's code, for building ShaderEffects */
+/** @brief A vulkan shader module & it's code, for building ShaderEffects
+ * @todo Don't store shader code
+ */
 struct Shader
 {
 	vk::ShaderModule module;
@@ -66,7 +70,6 @@ struct ShaderPass
 struct Material
 {
 	ShaderPass* shader_pass;
-	MaterialParameters parameters;
 	vk::DescriptorSet descriptor_set;
 	vec<class Texture*> textures;
 	u32 sort_key;
@@ -152,14 +155,27 @@ public:
 	 * @param parameters inital material parameters
 	 * @param textures textures used in the material
 	 */
-	Material create_material(
-	    c_str name,
-	    ShaderPass* shader_pass,
-	    MaterialParameters parameters,
-	    vec<class Texture*> textures
-	);
+	Material create_material(c_str name, ShaderPass* shader_pass, vec<class Texture*> textures);
 
 private:
+	vec<u32> load_shader_code(c_str path);
+
+	arr<vec<vk::DescriptorSetLayoutBinding>, 2> reflect_shader_effect_bindings(vec<Shader*> shader);
+
+	vec<SpvReflectDescriptorSet*> reflect_spv_descriptor_sets(Shader* shader);
+	arr<vk::DescriptorSetLayout, 2u> create_descriptor_sets_layout(
+	    arr <vec<vk::DescriptorSetLayoutBinding>, 2> sets_bindings
+	);
+
+	vec<vk::DescriptorSetLayoutBinding> extract_spv_descriptor_set_bindings(
+	    SpvReflectDescriptorSet* spv_set
+	);
+
+	vk::DescriptorSetLayoutBinding extract_descriptor_binding(
+	    SpvReflectDescriptorBinding* spv_binding,
+	    Shader* shader
+	);
+
 private:
 	Device* device = {};
 	vk::DescriptorPool descriptor_pool = {};
