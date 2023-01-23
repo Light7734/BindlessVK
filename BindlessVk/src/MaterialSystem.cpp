@@ -63,69 +63,43 @@ ShaderEffect MaterialSystem::create_shader_effect(c_str name, vec<Shader*> shade
 
 	return ShaderEffect {
 		shaders,
-		vk::PipelineLayoutCreateInfo {
+		device->logical.createPipelineLayout(vk::PipelineLayoutCreateInfo {
 		    {},
 		    static_cast<u32>(sets_layout.size()),
 		    sets_layout.data(),
-		},
-		device->logical.createPipelineLayout(),
+		}),
 		sets_layout,
 	};
 }
 
 ShaderPass MaterialSystem::create_shader_pass(
     c_str name,
-    ShaderEffect* effect,
+    ShaderEffect* shader_effect,
     vk::Format color_attachment_format,
     vk::Format depth_attachment_format,
     PipelineConfiguration pipeline_configuration
 )
 {
-	assert_true(effect, "effect is null for '{}' material", name);
-	vec<vk::PipelineShaderStageCreateInfo> stages(effect->shaders.size());
-
-	u32 index = 0;
-	for (const auto& shader : effect->shaders)
-	{
-		stages[index++] = {
-			{},
-			shader->stage,
-			shader->module,
-			"main",
-		};
-	}
-
-	vk::PipelineRenderingCreateInfo pipeline_rendering_info {
-		{}, 1u, &color_attachment_format, depth_attachment_format, {},
+	auto pipeline_layout = shader_effect->pipeline_layout;
+	auto pipeline_shader_stage_create_infos = create_pipeline_shader_stage_infos(shader_effect);
+	auto pipeline_rendering_info = vk::PipelineRenderingCreateInfo {
+		{},
+		1u,
+		&color_attachment_format,
+		depth_attachment_format, //
+		{},
 	};
 
-	vk::GraphicsPipelineCreateInfo graphics_pipeline_info {
-		{},
-		static_cast<u32>(stages.size()),
-		stages.data(),
-		&pipeline_configuration.vertex_input_state,
-		&pipeline_configuration.input_assembly_state,
-		&pipeline_configuration.tesselation_state,
-		&pipeline_configuration.viewport_state,
-		&pipeline_configuration.rasterization_state,
-		&pipeline_configuration.multisample_state,
-		&pipeline_configuration.depth_stencil_state,
-		&pipeline_configuration.color_blend_state,
-		&pipeline_configuration.dynamic_state,
-		effect->pipeline_layout,
-		{},
-		{},
-		{},
-		{},
-		&pipeline_rendering_info,
-	};
-
-	auto pipeline = device->logical.createGraphicsPipeline({}, graphics_pipeline_info);
-	assert_false(pipeline.result);
+	const auto graphics_pipeline = create_graphics_pipeline(
+	    pipeline_shader_stage_create_infos,
+	    pipeline_rendering_info,
+	    pipeline_configuration,
+	    pipeline_layout
+	);
 
 	return ShaderPass {
-		effect,
-		pipeline.value,
+		shader_effect,
+		graphics_pipeline,
 	};
 }
 
@@ -239,11 +213,11 @@ arr<vec<vk::DescriptorSetLayoutBinding>, 2u> MaterialSystem::reflect_shader_effe
 	return bindings;
 }
 
-arr<vk::DescriptorSetLayout, 2u> MaterialSystem::create_descriptor_sets_layout(
+arr<vk::DescriptorSetLayout, 2> MaterialSystem::create_descriptor_sets_layout(
     arr<vec<vk::DescriptorSetLayoutBinding>, 2> sets_bindings
 )
 {
-	vec<vk::DescriptorSetLayout> sets_layout;
+	arr<vk::DescriptorSetLayout, 2> sets_layout;
 
 	for (u32 i = 0u; const auto& set_bindings : sets_bindings)
 	{
@@ -254,6 +228,62 @@ arr<vk::DescriptorSetLayout, 2u> MaterialSystem::create_descriptor_sets_layout(
 		        set_bindings.data(),
 		    });
 	}
+
+	return sets_layout;
+}
+
+vec<vk::PipelineShaderStageCreateInfo> MaterialSystem::create_pipeline_shader_stage_infos(
+    ShaderEffect* shader_effect
+)
+{
+	vec<vk::PipelineShaderStageCreateInfo> pipeline_shader_stage_infos;
+	pipeline_shader_stage_infos.resize(shader_effect->shaders.size());
+
+	for (u32 i = 0; const auto& shader : shader_effect->shaders)
+	{
+		pipeline_shader_stage_infos[i] = {
+			{},
+			shader->stage,
+			shader->module,
+			"main",
+		};
+	}
+
+	return pipeline_shader_stage_infos;
+}
+
+vk::Pipeline MaterialSystem::create_graphics_pipeline(
+    vec<vk::PipelineShaderStageCreateInfo> shader_stage_create_infos,
+    const vk::PipelineRenderingCreateInfoKHR& rendering_info,
+    const PipelineConfiguration& configuration,
+    vk::PipelineLayout layout
+)
+{
+	vk::GraphicsPipelineCreateInfo graphics_pipeline_info {
+		{},
+		static_cast<u32>(shader_stage_create_infos.size()),
+		shader_stage_create_infos.data(),
+		&configuration.vertex_input_state,
+		&configuration.input_assembly_state,
+		&configuration.tesselation_state,
+		&configuration.viewport_state,
+		&configuration.rasterization_state,
+		&configuration.multisample_state,
+		&configuration.depth_stencil_state,
+		&configuration.color_blend_state,
+		&configuration.dynamic_state,
+		layout,
+		{},
+		{},
+		{},
+		{},
+		&rendering_info,
+	};
+
+	auto pipeline = device->logical.createGraphicsPipeline({}, graphics_pipeline_info);
+	assert_false(pipeline.result);
+
+	return pipeline.value;
 }
 
 vec<SpvReflectDescriptorSet*> MaterialSystem::reflect_spv_descriptor_sets(Shader* shader)
@@ -268,7 +298,7 @@ vec<SpvReflectDescriptorSet*> MaterialSystem::reflect_spv_descriptor_sets(Shader
 	    "spvReflectCreateShderModule failed"
 	);
 
-	u32 descriptor_sets_count = 0u;
+	u32 descriptor_sets_count = 0;
 
 	assert_false(
 	    spvReflectEnumerateDescriptorSets(&spv_module, &descriptor_sets_count, nullptr),

@@ -128,13 +128,13 @@ public:
 	/** Creates shader effect named @p name
 	 * @param name name of the shader effect
 	 * @param shaders shader programs making up the effect
-	 */
+     */
 	ShaderEffect create_shader_effect(c_str name, vec<Shader*> shaders);
 
 	/** Creates shader pass named @p name, vulkan graphics pipeline is created
 	 * here
 	 * @param name name of the shader pass
-	 * @param effect shader effect of the pass
+	 * @param shader_effect shader effect of the pass
 	 * @param color_attachment_format format of the color attachment of shader
 	 * pass
 	 * @param depth_attachment_format format of the depth attachment of shader
@@ -143,7 +143,7 @@ public:
 	 */
 	ShaderPass create_shader_pass(
 	    c_str name,
-	    ShaderEffect* effect,
+	    ShaderEffect* shader_effect,
 	    vk::Format color_attachment_format,
 	    vk::Format depth_attachment_format,
 	    PipelineConfiguration pipeline_configuration
@@ -158,18 +158,27 @@ public:
 	Material create_material(c_str name, ShaderPass* shader_pass, vec<class Texture*> textures);
 
 private:
+	// pub-priv ...
 	vec<u32> load_shader_code(c_str path);
 
 	arr<vec<vk::DescriptorSetLayoutBinding>, 2> reflect_shader_effect_bindings(vec<Shader*> shader);
 
-	vec<SpvReflectDescriptorSet*> reflect_spv_descriptor_sets(Shader* shader);
 	arr<vk::DescriptorSetLayout, 2u> create_descriptor_sets_layout(
-	    arr <vec<vk::DescriptorSetLayoutBinding>, 2> sets_bindings
+	    arr<vec<vk::DescriptorSetLayoutBinding>, 2> sets_bindings
 	);
 
-	vec<vk::DescriptorSetLayoutBinding> extract_spv_descriptor_set_bindings(
-	    SpvReflectDescriptorSet* spv_set
+	vec<vk::PipelineShaderStageCreateInfo> create_pipeline_shader_stage_infos(
+	    ShaderEffect* shader_effect
 	);
+
+	vk::Pipeline create_graphics_pipeline(
+	    vec<vk::PipelineShaderStageCreateInfo> shader_stage_create_infos,
+	    const vk::PipelineRenderingCreateInfoKHR& rendering_info,
+	    const PipelineConfiguration& configuration,
+	    vk::PipelineLayout layout
+	);
+
+	vec<SpvReflectDescriptorSet*> reflect_spv_descriptor_sets(Shader* shader);
 
 	vk::DescriptorSetLayoutBinding extract_descriptor_binding(
 	    SpvReflectDescriptorBinding* spv_binding,
@@ -180,5 +189,6 @@ private:
 	Device* device = {};
 	vk::DescriptorPool descriptor_pool = {};
 };
+
 
 } // namespace BINDLESSVK_NAMESPACE
