@@ -25,9 +25,9 @@ inline void forward_pass_update(
 				  const auto& model    = render_comp.model;
 				  const auto& material = model->material_parameters[primitive.material_index];
 
-				  uint32_t albedo_texture_index             = material.albedo_texture_index;
-				  uint32_t normal_texture_index             = material.normal_texture_index;
-				  uint32_t metallic_roughness_texture_index = material.metallic_roughness_texture_index;
+				  u32 albedo_texture_index             = material.albedo_texture_index;
+				  u32 normal_texture_index             = material.normal_texture_index;
+				  u32 metallic_roughness_texture_index = material.metallic_roughness_texture_index;
 
 				  auto* albedo_texture             = &model->textures[albedo_texture_index];
 				  auto* normal_texture             = &model->textures[normal_texture_index];
@@ -111,7 +111,7 @@ inline void forward_pass_render(
 	Scene* scene = (Scene*)user_pointer;
 	scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>)
 	  .each([&](TransformComponent& transform_comp, StaticMeshRendererComponent& render_comp) {
-		  vk::Pipeline new_pipeline = render_comp.material->shader_pass->pipeline;
+		  vk::Pipeline new_pipeline = render_comp.material->effect->pipeline;
 		  if (pipeline != new_pipeline) {
 			  // bind new pipeline
 			  pipeline = new_pipeline;

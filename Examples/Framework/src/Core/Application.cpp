@@ -14,7 +14,9 @@ VkBool32 Application::vulkan_debug_message_callback(
   void* user_data
 )
 {
-	Application* application = (Application*)user_data;
+	using namespace spdlog::level;
+
+	Application* app = (Application*)user_data;
 
 	std::string type = message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT ?
 	                     "GENERAL" :
@@ -51,18 +53,18 @@ VkBool32 Application::vulkan_debug_message_callback(
 	}
 
 	if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-		application->messenger_err_count++;
+		app->messenger_err_count++;
 
-		LOG(err, "[VK]:");
-		LOG(err, "    Type -> {} - {}", type, callback_data->pMessageIdName);
-		LOG(err, "    Url  -> {}", url);
-		LOG(err, "    Msg  -> {}", message);
+		app->logger.log(err, "[VK]:");
+		app->logger.log(err, "    Type -> {} - {}", type, callback_data->pMessageIdName);
+		app->logger.log(err, "    Url  -> {}", url);
+		app->logger.log(err, "    Msg  -> {}", message);
 
 
 		if (callback_data->objectCount) {
-			LOG(err, "    {} OBJECTS:", callback_data->objectCount);
+			app->logger.log(err, "    {} OBJECTS:", callback_data->objectCount);
 			for (uint32_t object = 0; object < callback_data->objectCount; object++) {
-				LOG(
+				app->logger.log(
 				  err,
 				  "            [{}] {} -> Addr: {}, Name: {}",
 				  object,
@@ -77,9 +79,9 @@ VkBool32 Application::vulkan_debug_message_callback(
 		}
 
 		if (callback_data->cmdBufLabelCount) {
-			LOG(err, "    {} COMMAND BUFFER LABELS:", callback_data->cmdBufLabelCount);
+			app->logger.log(err, "    {} COMMAND BUFFER LABELS:", callback_data->cmdBufLabelCount);
 			for (uint32_t label = 0; label < callback_data->cmdBufLabelCount; label++) {
-				LOG(
+				app->logger.log(
 				  err,
 				  "            [{}]-> {} ({}, {}, {}, {})",
 				  label,
@@ -92,17 +94,35 @@ VkBool32 Application::vulkan_debug_message_callback(
 			}
 		}
 
-		LOG(err, "");
+		app->logger.log(err, "");
 	}
 	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-		application->messenger_warn_count++;
-		LOG(warn, "[VK]: {} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
+		app->messenger_warn_count++;
+		app->logger.log(
+		  warn,
+		  "[VK]: {} - {}-> {}",
+		  type,
+		  callback_data->pMessageIdName,
+		  callback_data->pMessage
+		);
 	}
 	else if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-		LOG(info, "[VK]: {} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
+		app->logger.log(
+		  info,
+		  "[VK]: {} - {}-> {}",
+		  type,
+		  callback_data->pMessageIdName,
+		  callback_data->pMessage
+		);
 	}
 	else {
-		LOG(trace, "[VK]: {} - {}-> {}", type, callback_data->pMessageIdName, callback_data->pMessage);
+		app->logger.log(
+		  trace,
+		  "[VK]: {} - {}-> {}",
+		  type,
+		  callback_data->pMessageIdName,
+		  callback_data->pMessage
+		);
 	}
 
 
@@ -249,8 +269,10 @@ Application::Application()
 
 	staging_pool = StagingPool(3, (1024u * 1024u * 256u), device);
 
-	texture_loader  = bvk::TextureLoader(device);
-	model_loader    = bvk::ModelLoader(device, &texture_loader);
+	texture_loader = bvk::TextureLoader(device);
+	model_loader   = bvk::ModelLoader(device, &texture_loader);
+	shader_loader  = bvk::ShaderLoader(device);
+
 	material_system = bvk::MaterialSystem(device);
 	renderer        = bvk::Renderer(device);
 

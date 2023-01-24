@@ -1,4 +1,5 @@
-#version 450
+#version 450 core
+#pragma shader_stage(fragment)
 
 layout(location = 0) in vec3 inUVW;
 

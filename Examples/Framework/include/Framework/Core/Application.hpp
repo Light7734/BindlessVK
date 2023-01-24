@@ -6,6 +6,8 @@
 #include "BindlessVk/MaterialSystem.hpp"
 #include "BindlessVk/ModelLoader.hpp"
 #include "BindlessVk/Renderer.hpp"
+#include "BindlessVk/Shader.hpp"
+#include "BindlessVk/ShaderLoader.hpp"
 #include "BindlessVk/Texture.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Pools/StagingPool.hpp"
@@ -36,17 +38,18 @@ public:
 	Scene scene   = {};
 
 	bvk::DeviceSystem device_system     = {};
-	bvk::Renderer renderer              = {};
-	bvk::TextureLoader texture_loader   = {};
 	bvk::MaterialSystem material_system = {};
-	bvk::ModelLoader model_loader       = {};
+	bvk::Renderer renderer              = {};
+
+	bvk::TextureLoader texture_loader = {};
+	bvk::ModelLoader model_loader     = {};
+	bvk::ShaderLoader shader_loader   = {};
 
 	hash_map<u64, bvk::Model> models     = {};
 	hash_map<u64, bvk::Texture> textures = {};
 
 	hash_map<u64, bvk::Shader> shaders                                = {};
 	hash_map<u64, bvk::ShaderEffect> shader_effects                   = {};
-	hash_map<u64, bvk::ShaderPass> shader_passes                      = {};
 	hash_map<u64, bvk::PipelineConfiguration> pipeline_configurations = {};
 	hash_map<u64, bvk::Material> materials                            = {};
 
