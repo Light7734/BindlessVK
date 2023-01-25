@@ -3,16 +3,22 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     BindlessVk
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Device.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoaders/GltfLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/KtxLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/BinaryLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderLoaders/SpvLoader.cpp
 )
 
 set_target_properties(

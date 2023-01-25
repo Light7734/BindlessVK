@@ -34,20 +34,8 @@ inline void assert_false(const T& expr, fmt::format_string<Args...> fmt = "", Ar
 	assert_true(!static_cast<bool>(expr), fmt, std::forward<Args>(args)...);
 }
 
-template<typename Expr1, typename Expr2, typename... Args>
-inline void assert_eq(const Expr1& expr1, const Expr2& expr2, Args&&... args)
-{
-	assert_true(expr1 == expr2, std::forward<Args>(args)...);
-}
-
-template<typename Expr1, typename Expr2, typename... Args>
-inline void assert_nq(const Expr1& expr1, const Expr2& expr2, Args&&... args)
-{
-	assert_true(expr1 != expr2, std::forward<Args>(args)...);
-}
-
 template<typename... Args>
-inline void assert_fail(fmt::format_string<Args...> fmt, Args&&... args)
+inline void assert_fail(fmt::format_string<Args...> fmt = "", Args&&... args)
 {
 	throw BindlessVkException(fmt::format(fmt, std::forward<Args>(args)...));
 }

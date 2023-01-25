@@ -90,24 +90,22 @@ private:
 	{
 		auto* device = device_system.get_device();
 
-		shader_effects[hash_str("opaque_mesh")] = material_system.create_shader_effect(
+		shader_effects[hash_str("opaque_mesh")] = bvk::ShaderEffect(
+		  device,
 		  {
 		    &shaders[hash_str("vertex")],
 		    &shaders[hash_str("pixel")],
 		  },
-		  device->surface_format.format,
-		  device->depth_format,
-		  pipeline_configurations[hash_str("opaque_mesh")]
+		  shader_effect_configurations[hash_str("opaque_mesh")]
 		);
 
-		shader_effects[hash_str("skybox")] = material_system.create_shader_effect(
+		shader_effects[hash_str("skybox")] = bvk::ShaderEffect(
+		  device,
 		  {
 		    &shaders[hash_str("skybox_vertex")],
 		    &shaders[hash_str("skybox_fragment")],
 		  },
-		  device->surface_format.format,
-		  device->depth_format,
-		  pipeline_configurations[hash_str("skybox")]
+		  shader_effect_configurations[hash_str("skybox")]
 		);
 	}
 
@@ -115,153 +113,155 @@ private:
 	{
 		bvk::Device* device = device_system.get_device();
 
-		pipeline_configurations[hash_str("opaque_mesh"
-		)] = material_system
-		       .create_pipeline_configuration(
-		         bvk::Model::Vertex::get_vertex_input_state(),
-		         vk::PipelineInputAssemblyStateCreateInfo {
-		           {},
-		           vk::PrimitiveTopology::eTriangleList,
-		           VK_FALSE,
-		         },
-		         vk::PipelineTessellationStateCreateInfo {},
-		         vk::PipelineViewportStateCreateInfo {
-		           {},
-		           1u,
-		           {},
-		           1u,
-		           {},
-		         },
-		         vk::PipelineRasterizationStateCreateInfo {
-		           {},
-		           VK_FALSE,
-		           VK_FALSE,
-		           vk::PolygonMode::eFill,
-		           vk::CullModeFlagBits::eBack,
-		           vk::FrontFace::eClockwise,
-		           VK_FALSE,
-		           0.0f,
-		           0.0f,
-		           0.0f,
-		           1.0f,
-		         },
-		         vk::PipelineMultisampleStateCreateInfo {
-		           {},
-		           device->max_samples,
-		           VK_FALSE,
-		           {},
-		           VK_FALSE,
-		           VK_FALSE,
-		         },
-		         vk::PipelineDepthStencilStateCreateInfo {
-		           {},
-		           VK_TRUE,
-		           VK_TRUE,
-		           vk::CompareOp::eLess,
-		           VK_FALSE,
-		           VK_FALSE,
-		           {},
-		           {},
-		           0.0f,
-		           1.0,
-		         },
-		         std::vector<vk::PipelineColorBlendAttachmentState> {
-		           {
-		             VK_FALSE,
-		             vk::BlendFactor::eSrcAlpha,
-		             vk::BlendFactor::eOneMinusSrcAlpha,
-		             vk::BlendOp::eAdd,
-		             vk::BlendFactor::eOne,
-		             vk::BlendFactor::eZero,
-		             vk::BlendOp::eAdd,
-		             vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-		               | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-		           },
-		         },
-		         vk::PipelineColorBlendStateCreateInfo {},
-		         std::vector<vk::DynamicState> {
-		           vk::DynamicState::eViewport,
-		           vk::DynamicState::eScissor,
-		         }
-		       );
+		shader_effect_configurations[hash_str("opaque_mesh")] = bvk::ShaderEffect::Configuration {
+			bvk::Model::Vertex::get_vertex_input_state(),
+			vk::PipelineInputAssemblyStateCreateInfo {
+			  {},
+			  vk::PrimitiveTopology::eTriangleList,
+			  VK_FALSE,
+			},
+			vk::PipelineTessellationStateCreateInfo {},
+			vk::PipelineViewportStateCreateInfo {
+			  {},
+			  1u,
+			  {},
+			  1u,
+			  {},
+			},
+			vk::PipelineRasterizationStateCreateInfo {
+			  {},
+			  VK_FALSE,
+			  VK_FALSE,
+			  vk::PolygonMode::eFill,
+			  vk::CullModeFlagBits::eBack,
+			  vk::FrontFace::eClockwise,
+			  VK_FALSE,
+			  0.0f,
+			  0.0f,
+			  0.0f,
+			  1.0f,
+			},
+			vk::PipelineMultisampleStateCreateInfo {
+			  {},
+			  device->max_samples,
+			  VK_FALSE,
+			  {},
+			  VK_FALSE,
+			  VK_FALSE,
+			},
+			vk::PipelineDepthStencilStateCreateInfo {
+			  {},
+			  VK_TRUE,
+			  VK_TRUE,
+			  vk::CompareOp::eLess,
+			  VK_FALSE,
+			  VK_FALSE,
+			  {},
+			  {},
+			  0.0f,
+			  1.0,
+			},
+			vk::PipelineColorBlendStateCreateInfo {},
+			std::vector<vk::PipelineColorBlendAttachmentState> {
+			  {
+			    VK_FALSE,
+			    vk::BlendFactor::eSrcAlpha,
+			    vk::BlendFactor::eOneMinusSrcAlpha,
+			    vk::BlendOp::eAdd,
+			    vk::BlendFactor::eOne,
+			    vk::BlendFactor::eZero,
+			    vk::BlendOp::eAdd,
+			    vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+			      | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+			  },
+			},
+			std::vector<vk::DynamicState> {
+			  vk::DynamicState::eViewport,
+			  vk::DynamicState::eScissor,
+			},
+		};
 
-		pipeline_configurations[hash_str("skybox")] = material_system.create_pipeline_configuration(
-		  bvk::Model::Vertex::get_vertex_input_state(),
-		  vk::PipelineInputAssemblyStateCreateInfo {
-		    {},
-		    vk::PrimitiveTopology::eTriangleList,
-		    VK_FALSE,
-		  },
-		  vk::PipelineTessellationStateCreateInfo {},
-		  vk::PipelineViewportStateCreateInfo {
-		    {},
-		    1u,
-		    {},
-		    1u,
-		    {},
-		  },
-		  vk::PipelineRasterizationStateCreateInfo {
-		    {},
-		    VK_FALSE,
-		    VK_FALSE,
-		    vk::PolygonMode::eFill,
-		    vk::CullModeFlagBits::eBack,
-		    vk::FrontFace::eCounterClockwise,
-		    VK_FALSE,
-		    0.0f,
-		    0.0f,
-		    0.0f,
-		    1.0f,
-		  },
-		  vk::PipelineMultisampleStateCreateInfo {
-		    {},
-		    device->max_samples,
-		    VK_FALSE,
-		    {},
-		    VK_FALSE,
-		    VK_FALSE,
-		  },
-		  vk::PipelineDepthStencilStateCreateInfo {
-		    {},
-		    VK_TRUE,
-		    VK_TRUE,
-		    vk::CompareOp::eLessOrEqual,
-		    VK_FALSE,
-		    VK_FALSE,
-		    {},
-		    {},
-		    0.0f,
-		    1.0,
-		  },
-		  std::vector<vk::PipelineColorBlendAttachmentState> {
-		    {
-		      VK_FALSE,
-		      vk::BlendFactor::eSrcAlpha,
-		      vk::BlendFactor::eOneMinusSrcAlpha,
-		      vk::BlendOp::eAdd,
-		      vk::BlendFactor::eOne,
-		      vk::BlendFactor::eZero,
-		      vk::BlendOp::eAdd,
-		      vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
-		        | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-		    },
-		  },
-		  vk::PipelineColorBlendStateCreateInfo {},
-		  std::vector<vk::DynamicState> {
-		    vk::DynamicState::eViewport,
-		    vk::DynamicState::eScissor,
-		  }
-		);
+		shader_effect_configurations[hash_str("skybox")] = bvk::ShaderEffect::Configuration {
+			bvk::Model::Vertex::get_vertex_input_state(),
+			vk::PipelineInputAssemblyStateCreateInfo {
+			  {},
+			  vk::PrimitiveTopology::eTriangleList,
+			  VK_FALSE,
+			},
+			vk::PipelineTessellationStateCreateInfo {},
+			vk::PipelineViewportStateCreateInfo {
+			  {},
+			  1u,
+			  {},
+			  1u,
+			  {},
+			},
+			vk::PipelineRasterizationStateCreateInfo {
+			  {},
+			  VK_FALSE,
+			  VK_FALSE,
+			  vk::PolygonMode::eFill,
+			  vk::CullModeFlagBits::eBack,
+			  vk::FrontFace::eCounterClockwise,
+			  VK_FALSE,
+			  0.0f,
+			  0.0f,
+			  0.0f,
+			  1.0f,
+			},
+			vk::PipelineMultisampleStateCreateInfo {
+			  {},
+			  device->max_samples,
+			  VK_FALSE,
+			  {},
+			  VK_FALSE,
+			  VK_FALSE,
+			},
+			vk::PipelineDepthStencilStateCreateInfo {
+			  {},
+			  VK_TRUE,
+			  VK_TRUE,
+			  vk::CompareOp::eLessOrEqual,
+			  VK_FALSE,
+			  VK_FALSE,
+			  {},
+			  {},
+			  0.0f,
+			  1.0,
+			},
+			vk::PipelineColorBlendStateCreateInfo {},
+			std::vector<vk::PipelineColorBlendAttachmentState> {
+			  {
+			    VK_FALSE,
+			    vk::BlendFactor::eSrcAlpha,
+			    vk::BlendFactor::eOneMinusSrcAlpha,
+			    vk::BlendOp::eAdd,
+			    vk::BlendFactor::eOne,
+			    vk::BlendFactor::eZero,
+			    vk::BlendOp::eAdd,
+			    vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG
+			      | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
+			  },
+			},
+			std::vector<vk::DynamicState> {
+			  vk::DynamicState::eViewport,
+			  vk::DynamicState::eScissor,
+			},
+		};
 	}
 
 	void load_materials()
 	{
-		materials[hash_str("opaque_mesh")] = material_system.create_material(
-		  &shader_effects[hash_str("opaque_mesh")]
+		auto* device = device_system.get_device();
+
+		materials.emplace(
+		  hash_str("opaque_mesh"),
+		  bvk::Material(device, &shader_effects[hash_str("opaque_mesh")], descriptor_pool)
 		);
 
-		materials[hash_str("skybox")] = material_system.create_material(
-		  &shader_effects[hash_str("skybox")]
+		materials.emplace(
+		  hash_str("skybox"),
+		  bvk::Material(device, &shader_effects[hash_str("skybox")], descriptor_pool)
 		);
 	}
 
@@ -298,7 +298,7 @@ private:
 
 		scene.emplace<StaticMeshRendererComponent>(
 		  testModel,
-		  &materials[hash_str("opaque_mesh")],
+		  &materials.at(hash_str("opaque_mesh")),
 		  &models[bvk::hash_str("flight_helmet")]
 		);
 
@@ -351,17 +351,17 @@ private:
 
 	void create_render_graph()
 	{
-		auto* device            = device_system.get_device();
+		auto* device = device_system.get_device();
 		const auto color_format = device->surface_format.format;
 		const auto depth_format = device->depth_format;
 		const auto sample_count = device->max_samples;
 
-		auto* default_texture      = &textures[hash_str("default_2d")];
+		auto* default_texture = &textures[hash_str("default_2d")];
 		auto* default_texture_cube = &textures[hash_str("default_cube")];
 
-		const std::array<float, 4> update_color  = { 1.0, 0.8, 0.8, 1.0 };
+		const std::array<float, 4> update_color = { 1.0, 0.8, 0.8, 1.0 };
 		const std::array<float, 4> barrier_color = { 0.8, 1.0, 0.8, 1.0 };
-		const std::array<float, 4> render_color  = { 0.8, 0.8, 1.0, 1.0 };
+		const std::array<float, 4> render_color = { 0.8, 0.8, 1.0, 1.0 };
 
 		bvk::Renderpass::CreateInfo forward_pass_info {
                  "forwardpass",
@@ -407,10 +407,10 @@ private:
                     bvk::Renderpass::CreateInfo::TextureInputInfo {
                         .name           = "texture_cubes",
                         .binding        = 1,
-                        .count          = 8u,
-                        .type           = vk::DescriptorType::eCombinedImageSampler,
-                        .stage_mask      = vk::ShaderStageFlagBits::eFragment,
-                        .default_texture =default_texture_cube,
+                        .count           = 8u,
+                        .type  = vk::DescriptorType::eCombinedImageSampler,
+                        .stage_mask = vk::ShaderStageFlagBits::eFragment,
+                        .default_texture=default_texture_cube,
                     },
                 },
                 {},
@@ -437,12 +437,12 @@ private:
 			&user_interface_pass_render,
 			{
 			  bvk::Renderpass::CreateInfo::AttachmentInfo {
-			    .name      = "backbuffer",
-			    .size      = { 1.0, 1.0 },
+			    .name = "backbuffer",
+			    .size = { 1.0, 1.0 },
 			    .size_type = bvk::Renderpass::CreateInfo::SizeType::eSwapchainRelative,
-			    .format    = color_format,
-			    .samples   = sample_count,
-			    .input     = "forwardpass",
+			    .format = color_format,
+			    .samples = sample_count,
+			    .input = "forwardpass",
 			  },
 			},
 			{},
@@ -468,23 +468,23 @@ private:
 		  "backbuffer",
 		  {
 		    bvk::Renderpass::CreateInfo::BufferInputInfo {
-		      .name       = "frame_data",
-		      .binding    = 0,
-		      .count      = 1,
-		      .type       = vk::DescriptorType::eUniformBuffer,
+		      .name = "frame_data",
+		      .binding = 0,
+		      .count = 1,
+		      .type = vk::DescriptorType::eUniformBuffer,
 		      .stage_mask = vk::ShaderStageFlagBits::eVertex,
 
-		      .size         = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+		      .size = (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
 		      .initial_data = nullptr,
 		    },
 		    bvk::Renderpass::CreateInfo::BufferInputInfo {
-		      .name       = "scene_data",
-		      .binding    = 1,
-		      .count      = 1,
-		      .type       = vk::DescriptorType::eUniformBuffer,
+		      .name = "scene_data",
+		      .binding = 1,
+		      .count = 1,
+		      .type = vk::DescriptorType::eUniformBuffer,
 		      .stage_mask = vk::ShaderStageFlagBits::eVertex,
 
-		      .size         = sizeof(glm::vec4),
+		      .size = sizeof(glm::vec4),
 		      .initial_data = nullptr,
 		    },
 		  },

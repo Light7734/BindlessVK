@@ -27,7 +27,5 @@ public:
 	}
 
 private:
-	void move(StagingPool&& other);
-
 	std::vector<bvk::Buffer> staging_buffers = {};
 };

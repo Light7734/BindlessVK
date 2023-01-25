@@ -27,8 +27,8 @@ VkBool32 Application::vulkan_debug_message_callback(
 	                     "VALIDATION" :
 	                     "PERFORMANCE";
 
-	std::string message             = (callback_data->pMessage);
-	std::string url                 = {};
+	std::string message = (callback_data->pMessage);
+	std::string url = {};
 	std::string vulkanSpecStatement = {};
 
 	// Remove beginning sections ( we'll log them ourselves )
@@ -40,16 +40,16 @@ VkBool32 Application::vulkan_debug_message_callback(
 	// Separate url section of message
 	pos = message.find_last_of("(");
 	if (pos != std::string::npos) {
-		url     = message.substr(pos + 1, message.length() - (pos + 2));
+		url = message.substr(pos + 1, message.length() - (pos + 2));
 		message = message.substr(0, pos);
 	}
 
 	// Separate the "Vulkan spec states:" section of the message
 	pos = message.find("The Vulkan spec states:");
 	if (pos != std::string::npos) {
-		size_t len          = std::strlen("The Vulkan spec states: ");
+		size_t len = std::strlen("The Vulkan spec states: ");
 		vulkanSpecStatement = message.substr(pos + len, message.length() - pos - len);
-		message             = message.substr(0, pos);
+		message = message.substr(0, pos);
 	}
 
 	if (message_severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
@@ -169,16 +169,16 @@ static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Windo
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
 	ImGui_ImplVulkan_InitInfo initInfo {
-		.Instance              = device->instance,
-		.PhysicalDevice        = device->physical,
-		.Device                = device->logical,
-		.Queue                 = device->graphics_queue,
-		.DescriptorPool        = renderer.get_descriptor_pool(),
-		.UseDynamicRendering   = true,
+		.Instance = device->instance,
+		.PhysicalDevice = device->physical,
+		.Device = device->logical,
+		.Queue = device->graphics_queue,
+		.DescriptorPool = renderer.get_descriptor_pool(),
+		.UseDynamicRendering = true,
 		.ColorAttachmentFormat = static_cast<VkFormat>(device->surface_format.format),
-		.MinImageCount         = BVK_MAX_FRAMES_IN_FLIGHT,
-		.ImageCount            = BVK_MAX_FRAMES_IN_FLIGHT,
-		.MSAASamples           = static_cast<VkSampleCountFlagBits>(device->max_samples),
+		.MinImageCount = BVK_MAX_FRAMES_IN_FLIGHT,
+		.ImageCount = BVK_MAX_FRAMES_IN_FLIGHT,
+		.MSAASamples = static_cast<VkSampleCountFlagBits>(device->max_samples),
 	};
 	auto userData = std::make_pair(device->get_vk_instance_proc_addr_func, device->instance);
 
@@ -218,8 +218,8 @@ Application::Application()
 {
 	window.init(
 	  WindowSpecs {
-	    .title  = "BindlessVk",
-	    .width  = 1920u,
+	    .title = "BindlessVk",
+	    .width = 1920u,
 	    .height = 1080u,
 	  },
 	  {
@@ -270,17 +270,16 @@ Application::Application()
 	staging_pool = StagingPool(3, (1024u * 1024u * 256u), device);
 
 	texture_loader = bvk::TextureLoader(device);
-	model_loader   = bvk::ModelLoader(device, &texture_loader);
-	shader_loader  = bvk::ShaderLoader(device);
+	model_loader = bvk::ModelLoader(device, &texture_loader);
+	shader_loader = bvk::ShaderLoader(device);
 
-	material_system = bvk::MaterialSystem(device);
-	renderer        = bvk::Renderer(device);
+	renderer = bvk::Renderer(device);
 
 	initialize_imgui(device, renderer, window);
 
 	camera_controller = CameraController(&scene, &window);
 
-	u8 defaultTexturePixelData[4]    = { 255, 0, 255, 255 };
+	u8 defaultTexturePixelData[4] = { 255, 0, 255, 255 };
 	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
 	  "default_2d",
 	  defaultTexturePixelData,
@@ -296,6 +295,30 @@ Application::Application()
 	  "Assets/cubemap_yokohama_rgba.ktx",
 	  bvk::Texture::Type::eCubeMap,
 	  staging_pool.get_by_index(0)
+	);
+
+	vec<vk::DescriptorPoolSize> pool_sizes = {
+		{ vk::DescriptorType::eSampler, 1000u },
+		{ vk::DescriptorType::eCombinedImageSampler, 1000u },
+		{ vk::DescriptorType::eSampledImage, 1000u },
+		{ vk::DescriptorType::eStorageImage, 1000u },
+		{ vk::DescriptorType::eUniformTexelBuffer, 1000u },
+		{ vk::DescriptorType::eStorageTexelBuffer, 1000u },
+		{ vk::DescriptorType::eUniformBuffer, 1000u },
+		{ vk::DescriptorType::eStorageBuffer, 1000u },
+		{ vk::DescriptorType::eUniformBufferDynamic, 1000u },
+		{ vk::DescriptorType::eStorageBufferDynamic, 1000u },
+		{ vk::DescriptorType::eInputAttachment, 1000u },
+	};
+
+	descriptor_pool = device->logical.createDescriptorPool(
+	  vk::DescriptorPoolCreateInfo {
+	    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+	    100u,
+	    static_cast<u32>(pool_sizes.size()),
+	    pool_sizes.data(),
+	  },
+	  nullptr
 	);
 }
 

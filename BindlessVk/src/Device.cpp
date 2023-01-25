@@ -128,17 +128,17 @@ void DeviceSystem::create_vulkan_instance(
 )
 {
 	vk::ApplicationInfo application_info {
-		"BindlessVK",             // pApplicationName
-		VK_MAKE_VERSION(1, 0, 0), // applicationVersion
-		"BindlessVK",             // pEngineName
-		VK_MAKE_VERSION(1, 0, 0), // engineVersion
-		VK_API_VERSION_1_3,       // apiVersion
+		"BindlessVK",
+		VK_MAKE_VERSION(1, 0, 0),
+		"BindlessVK", //
+		VK_MAKE_VERSION(1, 0, 0),
+		VK_API_VERSION_1_3,
 	};
 
 	vk::DebugUtilsMessengerCreateInfoEXT debug_messenger_create_info {
-		{},                         // flags
-		debug_messenger_severities, // messageSeverity
-		debug_messenger_types,      // messageType
+		{},
+		debug_messenger_severities,
+		debug_messenger_types,
 		vulkan_debug_callback,
 		debug_messenger_userptr,
 	};

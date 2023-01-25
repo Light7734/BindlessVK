@@ -39,7 +39,7 @@ public:
 	/**
 	 * @brief Loads a model from a gltf file
 	 * @param name debug name attached to vulkan objects for debugging tools like renderdoc
-	 * @param gltf_path path to the gltf model file
+	 * @param file_path path to the gltf model file
 	 */
 	Model load_from_gltf_ascii(
 	    const char* debug_name,
@@ -49,9 +49,18 @@ public:
 	    Buffer* staging_image_buffer
 	);
 
+	/** @todo Implement */
+	Model load_from_gltf_binary() = delete;
+
+	/** @todo Implement */
+	Model load_from_fbx() = delete;
+
+	/** @todo Implement */
+	Model load_from_obj() = delete;
+
 private:
 	Device* device;
-	TextureLoader* texture_system;
+	TextureLoader* texture_loader;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

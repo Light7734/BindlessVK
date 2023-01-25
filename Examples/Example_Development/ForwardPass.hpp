@@ -22,15 +22,15 @@ inline void forward_pass_update(
 	  .each([&](TransformComponent& transform_comp, StaticMeshRendererComponent& render_comp) {
 		  for (const auto* node : render_comp.model->nodes) {
 			  for (const auto& primitive : node->mesh) {
-				  const auto& model    = render_comp.model;
+				  const auto& model = render_comp.model;
 				  const auto& material = model->material_parameters[primitive.material_index];
 
-				  u32 albedo_texture_index             = material.albedo_texture_index;
-				  u32 normal_texture_index             = material.normal_texture_index;
+				  u32 albedo_texture_index = material.albedo_texture_index;
+				  u32 normal_texture_index = material.normal_texture_index;
 				  u32 metallic_roughness_texture_index = material.metallic_roughness_texture_index;
 
-				  auto* albedo_texture             = &model->textures[albedo_texture_index];
-				  auto* normal_texture             = &model->textures[normal_texture_index];
+				  auto* albedo_texture = &model->textures[albedo_texture_index];
+				  auto* normal_texture = &model->textures[normal_texture_index];
 				  auto* metallic_roughness_texture = &model->textures[metallic_roughness_texture_index];
 
 				  std::vector<vk::WriteDescriptorSet> descriptor_writes = {
@@ -106,33 +106,36 @@ inline void forward_pass_render(
   void* user_pointer
 )
 {
-	vk::Pipeline pipeline = VK_NULL_HANDLE;
+	auto pipeline = vk::Pipeline {};
+	auto* scene = reinterpret_cast<Scene*>(user_pointer);
+	auto renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
 
-	Scene* scene = (Scene*)user_pointer;
-	scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>)
-	  .each([&](TransformComponent& transform_comp, StaticMeshRendererComponent& render_comp) {
-		  vk::Pipeline new_pipeline = render_comp.material->effect->pipeline;
-		  if (pipeline != new_pipeline) {
-			  // bind new pipeline
-			  pipeline = new_pipeline;
-			  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+	renderables.each([&](auto& transform_component, auto& render_component) {
+		const auto material = render_component.material;
+		const auto effect = material->get_effect();
+		const auto new_pipeline = effect->get_pipeline();
 
-			  // set dynamic states
-			  cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, device->framebuffer_extent } });
-			  cmd.setViewport(
-			    0,
-			    {
-			      vk::Viewport {
-			        0.0f,
-			        0.0f,
-			        (float)device->framebuffer_extent.width,
-			        (float)device->framebuffer_extent.height,
-			        0.0f,
-			        1.0f,
-			      },
-			    }
-			  );
-		  }
-		  draw_model(render_comp.model, cmd);
-	  });
+		if (pipeline != new_pipeline) {
+			// bind new pipeline
+			pipeline = new_pipeline;
+			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+
+			// set dynamic states
+			cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, device->framebuffer_extent } });
+			cmd.setViewport(
+			  0,
+			  {
+			    vk::Viewport {
+			      0.0f,
+			      0.0f,
+			      (float)device->framebuffer_extent.width,
+			      (float)device->framebuffer_extent.height,
+			      0.0f,
+			      1.0f,
+			    },
+			  }
+			);
+		}
+		draw_model(render_component.model, cmd);
+	});
 }

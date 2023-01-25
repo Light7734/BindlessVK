@@ -21,22 +21,17 @@ StagingPool::StagingPool(uint32_t count, size_t size, bvk::Device* device)
 
 StagingPool::StagingPool(StagingPool&& other)
 {
-	this->move(std::move(other));
+	*this = std::move(other);
 }
 
 StagingPool& StagingPool::operator=(StagingPool&& rhs)
 {
-	this->move(std::move(rhs));
+	this->staging_buffers = std::move(rhs.staging_buffers);
 	return *this;
 }
 
 StagingPool::~StagingPool()
 {
-}
-
-void StagingPool::move(StagingPool&& other)
-{
-	this->staging_buffers = std::move(other.staging_buffers);
 }
 
 void StagingPool::destroy_buffers()

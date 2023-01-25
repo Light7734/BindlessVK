@@ -31,32 +31,33 @@ public:
 	);
 
 	virtual void on_tick(double delta_time) = 0;
-	virtual void on_swapchain_recreate()    = 0;
+	virtual void on_swapchain_recreate() = 0;
 
 public:
 	Window window = {};
-	Scene scene   = {};
+	Scene scene = {};
 
-	bvk::DeviceSystem device_system     = {};
-	bvk::MaterialSystem material_system = {};
-	bvk::Renderer renderer              = {};
+	bvk::Device device = {};
+	bvk::DeviceSystem device_system = {};
+	bvk::Renderer renderer = {};
 
 	bvk::TextureLoader texture_loader = {};
-	bvk::ModelLoader model_loader     = {};
-	bvk::ShaderLoader shader_loader   = {};
+	bvk::ModelLoader model_loader = {};
+	bvk::ShaderLoader shader_loader = {};
 
-	hash_map<u64, bvk::Model> models     = {};
+	vk::DescriptorPool descriptor_pool = {};
+
+	hash_map<u64, bvk::Model> models = {};
 	hash_map<u64, bvk::Texture> textures = {};
-
-	hash_map<u64, bvk::Shader> shaders                                = {};
-	hash_map<u64, bvk::ShaderEffect> shader_effects                   = {};
-	hash_map<u64, bvk::PipelineConfiguration> pipeline_configurations = {};
-	hash_map<u64, bvk::Material> materials                            = {};
+	hash_map<u64, bvk::Shader> shaders = {};
+	hash_map<u64, bvk::ShaderEffect> shader_effects = {};
+	hash_map<u64, bvk::ShaderEffect::Configuration> shader_effect_configurations = {};
+	hash_map<u64, bvk::Material> materials = {};
 
 	CameraController camera_controller = {};
 
 	vec<c_str> instance_extensions = {};
-	vec<c_str> device_extensions   = {};
+	vec<c_str> device_extensions = {};
 
 	StagingPool staging_pool = {};
 
@@ -64,5 +65,5 @@ public:
 
 protected:
 	u64 messenger_warn_count = {};
-	u64 messenger_err_count  = {};
+	u64 messenger_err_count = {};
 };

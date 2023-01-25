@@ -3,29 +3,11 @@
 
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Device.hpp"
+#include "BindlessVk/Shader.hpp"
 
 #include <glm/glm.hpp>
 
-struct SpvReflectDescriptorSet;
-struct SpvReflectDescriptorBinding;
-
 namespace BINDLESSVK_NAMESPACE {
-struct PipelineConfiguration
-{
-	vk::PipelineVertexInputStateCreateInfo vertex_input_state;
-	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state;
-	vk::PipelineTessellationStateCreateInfo tesselation_state;
-	vk::PipelineViewportStateCreateInfo viewport_state;
-	vk::PipelineRasterizationStateCreateInfo rasterization_state;
-	vk::PipelineMultisampleStateCreateInfo multisample_state;
-	vk::PipelineDepthStencilStateCreateInfo depth_stencil_state;
-
-	vec<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
-	vk::PipelineColorBlendStateCreateInfo color_blend_state;
-
-	vec<vk::DynamicState> dynamic_states;
-	vk::PipelineDynamicStateCreateInfo dynamic_state;
-};
 
 /// @todo
 struct MaterialParameters
@@ -38,157 +20,121 @@ struct MaterialParameters
 	float roughness_factor;
 };
 
-/** @brief A vulkan shader module & it's code, for building ShaderEffects
- * @todo Don't store shader code
- */
-struct Shader
-{
-	vk::ShaderModule module;
-	vk::ShaderStageFlagBits stage;
-	vec<u32> code;
-};
-
 /** @brief Shaders and pipeline layout for creating ShaderPasses
  * usually a pair of vertex and fragment shaders
  */
-struct ShaderEffect
-{
-	vec<Shader*> shaders;
-	vk::PipelineLayout pipeline_layout;
-	arr<vk::DescriptorSetLayout, 2> sets_layout;
-};
-
-/** @brief Full shader & pipeline state needed for creating a material */
-struct ShaderPass
-{
-	ShaderEffect* effect;
-	vk::Pipeline pipeline;
-	PipelineConfiguration pipeline_configuration;
-};
-
-/** @brief Graphics state needed to render an object during a renderpass */
-struct Material
-{
-	ShaderPass* shader_pass;
-	vk::DescriptorSet descriptor_set;
-	vec<class Texture*> textures;
-	u32 sort_key;
-};
-
-/** @brief System for loading/destroying materials
- * @todo #docs: Complete docs
- * @todo #refactor: Tidy up code
- * @todo #responsibility: This class should not be responsible for creating descriptor pools
- */
-class MaterialSystem
+class ShaderEffect
 {
 public:
-	/** @brief Main constructor */
-	MaterialSystem(Device* device);
+	struct Configuration
+	{
+		vk::PipelineVertexInputStateCreateInfo vertex_input_state;
+		vk::PipelineInputAssemblyStateCreateInfo input_assembly_state;
+		vk::PipelineTessellationStateCreateInfo tesselation_state;
+		vk::PipelineViewportStateCreateInfo viewport_state;
+		vk::PipelineRasterizationStateCreateInfo rasterization_state;
+		vk::PipelineMultisampleStateCreateInfo multisample_state;
+		vk::PipelineDepthStencilStateCreateInfo depth_stencil_state;
 
-	/** @brief Main destructor */
-	~MaterialSystem();
+		vk::PipelineColorBlendStateCreateInfo color_blend_state;
 
-	/** @brief default constructo */
-	MaterialSystem() = default;
+		vec<vk::PipelineColorBlendAttachmentState> color_blend_attachments;
+		vec<vk::DynamicState> dynamic_states;
+	};
 
-	/** Loads compiled shader named @p name from @p path
-	 * @param name name of the shader
-	 * @param path path to the compiled shader
-	 * @param stage shader stage (eg. vertex)
-	 */
-	Shader load_shader(c_str name, c_str path, vk::ShaderStageFlagBits stage);
+public:
+	ShaderEffect(Device* device, vec<Shader*> shaders, ShaderEffect::Configuration configuration);
+	~ShaderEffect();
 
-	/** Caches pipeline states for future pipeline creation (used in shader pass)
-	 * @param name name of the pipeline configuration
-	 * @param vertex_input_state vulkan pipeline's vertex input state
-	 * @param input_assembly_state vulkan pipeline's input assembly state
-	 * @param viewport_state vulkan pipeline's viewport state
-	 * @param rasterization_state vulkan pipeilne's rasterization state
-	 * @param multisample_state vulkan pipeline's multi-sample state
-	 * @param depth_stencil_state vulkan pipeline's depth-stencil state
-	 * @param color_blend_attachments vulkan pipeline's color-blend attachments
-	 * @param color_blend_state vulkan pipeline's color blend state
-	 * @param dynamic_states vulkan dynamic pipeline's states, usually viewports & scissors
-	 */
-	PipelineConfiguration create_pipeline_configuration(
-	    c_str name,
-	    vk::PipelineVertexInputStateCreateInfo vertex_input_state,
-	    vk::PipelineInputAssemblyStateCreateInfo input_assembly_state,
-	    vk::PipelineTessellationStateCreateInfo tessellation_state,
-	    vk::PipelineViewportStateCreateInfo viewport_state,
-	    vk::PipelineRasterizationStateCreateInfo rasterization_state,
-	    vk::PipelineMultisampleStateCreateInfo multisample_state,
-	    vk::PipelineDepthStencilStateCreateInfo depth_stencil_state,
-	    vec<vk::PipelineColorBlendAttachmentState> color_blend_attachments,
-	    vk::PipelineColorBlendStateCreateInfo color_blend_state,
-	    vec<vk::DynamicState> dynamic_states
-	);
+	ShaderEffect(ShaderEffect&&);
+	ShaderEffect& operator=(ShaderEffect&&);
 
-	/** Creates shader effect named @p name
-	 * @param name name of the shader effect
-	 * @param shaders shader programs making up the effect
-     */
-	ShaderEffect create_shader_effect(c_str name, vec<Shader*> shaders);
+	ShaderEffect() = default;
+	ShaderEffect(const ShaderEffect&) = delete;
 
-	/** Creates shader pass named @p name, vulkan graphics pipeline is created
-	 * here
-	 * @param name name of the shader pass
-	 * @param shader_effect shader effect of the pass
-	 * @param color_attachment_format format of the color attachment of shader
-	 * pass
-	 * @param depth_attachment_format format of the depth attachment of shader
-	 * pass
-	 * @param pipeline_configuration vulkan pipeline states
-	 */
-	ShaderPass create_shader_pass(
-	    c_str name,
-	    ShaderEffect* shader_effect,
-	    vk::Format color_attachment_format,
-	    vk::Format depth_attachment_format,
-	    PipelineConfiguration pipeline_configuration
-	);
+	ShaderEffect& operator=(const ShaderEffect&) = delete;
 
-	/** Creates material named @p name shader_pass
-	 * @param name name of the material
-	 * @param shader_pass the shader pass used in the material
-	 * @param parameters inital material parameters
-	 * @param textures textures used in the material
-	 */
-	Material create_material(c_str name, ShaderPass* shader_pass, vec<class Texture*> textures);
+	inline vk::Pipeline get_pipeline() const
+	{
+		return pipeline;
+	}
+
+	inline vk::PipelineLayout get_pipeline_layout() const
+	{
+		return pipeline_layout;
+	}
+
+	inline const arr<vk::DescriptorSetLayout, 2>& get_descriptor_set_layouts() const
+	{
+		return descriptor_sets_layout;
+	}
 
 private:
-	// pub-priv ...
-	vec<u32> load_shader_code(c_str path);
+	ShaderEffect& move(ShaderEffect&& effect);
 
-	arr<vec<vk::DescriptorSetLayoutBinding>, 2> reflect_shader_effect_bindings(vec<Shader*> shader);
+	void create_descriptor_sets_layout(vec<Shader*> shaders);
 
-	arr<vk::DescriptorSetLayout, 2u> create_descriptor_sets_layout(
-	    arr<vec<vk::DescriptorSetLayoutBinding>, 2> sets_bindings
+	arr<vec<vk::DescriptorSetLayoutBinding>, 2> combine_descriptor_sets_bindings(
+	    vec<Shader*> shaders
 	);
 
-	vec<vk::PipelineShaderStageCreateInfo> create_pipeline_shader_stage_infos(
-	    ShaderEffect* shader_effect
-	);
+	vk::PipelineLayout create_pipeline_layout();
+
+	vec<vk::PipelineShaderStageCreateInfo> create_pipeline_shader_stage_infos(vec<Shader*> shaders);
 
 	vk::Pipeline create_graphics_pipeline(
 	    vec<vk::PipelineShaderStageCreateInfo> shader_stage_create_infos,
-	    const vk::PipelineRenderingCreateInfoKHR& rendering_info,
-	    const PipelineConfiguration& configuration,
-	    vk::PipelineLayout layout
-	);
-
-	vec<SpvReflectDescriptorSet*> reflect_spv_descriptor_sets(Shader* shader);
-
-	vk::DescriptorSetLayoutBinding extract_descriptor_binding(
-	    SpvReflectDescriptorBinding* spv_binding,
-	    Shader* shader
+	    vk::PipelineRenderingCreateInfoKHR rendering_info,
+	    ShaderEffect::Configuration configuration
 	);
 
 private:
 	Device* device = {};
-	vk::DescriptorPool descriptor_pool = {};
+
+	vk::Pipeline pipeline = {};
+	vk::PipelineLayout pipeline_layout = {};
+	arr<vk::DescriptorSetLayout, 2> descriptor_sets_layout = {};
+
+private:
 };
 
+class Material
+{
+public:
+	Material(Device* device, ShaderEffect* effect, vk::DescriptorPool descriptor_pool)
+	    : effect(effect)
+	{
+		vk::DescriptorSetAllocateInfo allocate_info {
+			descriptor_pool,
+			1,
+			&effect->get_descriptor_set_layouts().back(),
+		};
+
+		assert_false(device->logical.allocateDescriptorSets(&allocate_info, &descriptor_set));
+	}
+
+	Material() = default;
+	Material(const Material&) = default;
+	Material(Material&&) = default;
+
+	Material& operator=(const Material&) = default;
+	Material& operator=(Material&&) = default;
+
+	~Material() = default;
+
+	inline ShaderEffect* get_effect() const
+	{
+		return effect;
+	}
+
+	inline vk::DescriptorSet get_descriptor_set() const
+	{
+		return descriptor_set;
+	}
+
+private:
+	ShaderEffect* effect = {};
+	vk::DescriptorSet descriptor_set = {};
+};
 
 } // namespace BINDLESSVK_NAMESPACE

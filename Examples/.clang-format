@@ -93,7 +93,7 @@ DerivePointerAlignment: 'false'
 AlignEscapedNewlines: Left
 AlignAfterOpenBracket: BlockIndent
 AlignConsecutiveDeclarations: 'false'
-AlignConsecutiveAssignments: 'true'
+AlignConsecutiveAssignments: 'false'
 AlignConsecutiveMacros: 'true'
 AlignOperands: 'true'
 AlignTrailingComments: 'true'

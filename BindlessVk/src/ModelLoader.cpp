@@ -10,9 +10,9 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-ModelLoader::ModelLoader(Device* device, TextureLoader* texture_system)
+ModelLoader::ModelLoader(Device* device, TextureLoader* texture_loader)
     : device(device)
-    , texture_system(texture_system)
+    , texture_loader(texture_loader)
 {
 }
 
@@ -26,7 +26,7 @@ Model ModelLoader::load_from_gltf_ascii(
 {
 	GltfLoader loader(
 	    device,
-	    texture_system,
+	    texture_loader,
 	    staging_vertex_buffer,
 	    staging_index_buffer,
 	    staging_image_buffer
