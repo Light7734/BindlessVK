@@ -12,6 +12,10 @@ RenderGraph::RenderGraph()
 
 void RenderGraph::reset()
 {
+	const auto device = vk_context->get_device();
+	const auto allocator = vk_context->get_allocator();
+	const auto num_threads = vk_context->get_num_threads();
+
 	for (auto& resource_container : attachment_resources)
 	{
 		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
@@ -21,15 +25,15 @@ void RenderGraph::reset()
 			{
 				for (auto& resource : resource_container.resources)
 				{
-					device->logical.destroyImageView(resource.image_view);
-					device->allocator.destroyImage(resource.image, resource.image);
+					device.destroyImageView(resource.image_view);
+					allocator.destroyImage(resource.image, resource.image);
 				}
 			}
 			resource_container.resources.clear();
 
-			device->logical.destroyImageView(resource_container.transient_ms_image_view);
+			device.destroyImageView(resource_container.transient_ms_image_view);
 
-			device->allocator.destroyImage(
+			allocator.destroyImage(
 			    resource_container.transient_ms_image,
 			    resource_container.transient_ms_image
 			);
@@ -41,18 +45,18 @@ void RenderGraph::reset()
 
 	for (const auto& descriptor_set : sets)
 	{
-		device->logical.freeDescriptorSets(descriptor_pool, descriptor_set);
+		device.freeDescriptorSets(descriptor_pool, descriptor_set);
 	}
 
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		for (u32 j = 0; j < device->num_threads; ++j)
+		for (u32 j = 0; j < num_threads; ++j)
 		{
-			vk::CommandPool pool = device->get_cmd_pool(i, j);
+			vk::CommandPool pool = vk_context->get_cmd_pool(i, j);
 
 			for (u32 k = 0; k < renderpasses.size(); ++k)
 			{
-				device->logical.freeCommandBuffers(pool, get_cmd(k, i, j));
+				device.freeCommandBuffers(pool, get_cmd(k, i, j));
 			}
 		}
 	}
@@ -65,8 +69,8 @@ void RenderGraph::reset()
 		delete val;
 	}
 
-	device->logical.destroyPipelineLayout(pipeline_layout);
-	device->logical.destroyDescriptorSetLayout(descriptor_set_layout);
+	device.destroyPipelineLayout(pipeline_layout);
+	device.destroyDescriptorSetLayout(descriptor_set_layout);
 
 	for (auto& pass : renderpasses)
 	{
@@ -75,46 +79,49 @@ void RenderGraph::reset()
 			delete val;
 		}
 
-		device->logical.destroyDescriptorSetLayout(pass.descriptor_set_layout);
-		device->logical.destroyPipelineLayout(pass.pipeline_layout);
+		device.destroyDescriptorSetLayout(pass.descriptor_set_layout);
+		device.destroyPipelineLayout(pass.pipeline_layout);
 		for (auto descriptor_set : pass.descriptor_sets)
 		{
-			device->logical.freeDescriptorSets(descriptor_pool, descriptor_set);
+			device.freeDescriptorSets(descriptor_pool, descriptor_set);
 		}
 	}
 }
 
 void RenderGraph::init(
-    Device* device,
+    VkContext* vk_context,
     vk::DescriptorPool descriptor_pool,
     vec<vk::Image> swapchain_images,
     vec<vk::ImageView> swapchain_image_views
 )
 {
-	this->device = device;
+	this->vk_context = vk_context;
 	this->descriptor_pool = descriptor_pool;
 	this->swapchain_images = swapchain_images;
 	this->swapchain_image_views = swapchain_image_views;
 }
 
 void RenderGraph::build(
-    std::string backbuffer_name,
+    str backbuffer_name,
     vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
     vec<Renderpass::CreateInfo> renderpasses,
-    void (*on_update)(Device*, RenderGraph*, u32, void*),
-    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
+    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
+    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
     vk::DebugUtilsLabelEXT update_debug_label,
     vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label
 )
 {
+	const auto device = vk_context->get_device();
+
 	// Assign graph members
 	this->renderpasses_info = renderpasses;
 	buffer_inputs_info = buffer_inputs;
-	this->on_update = on_update ? on_update : [](Device*, RenderGraph*, u32, void*) {
+	this->on_update = on_update ? on_update : [](VkContext*, RenderGraph*, u32, void*) {
 	};
 
-	this->on_begin_frame = on_begin_frame ? on_begin_frame : [](Device*, RenderGraph*, u32, void*) {
-	};
+	this->on_begin_frame =
+	    on_begin_frame ? on_begin_frame : [](VkContext*, RenderGraph*, u32, void*) {
+	    };
 
 	swapchain_attachment_names.push_back(backbuffer_name);
 
@@ -127,23 +134,23 @@ void RenderGraph::build(
 	{
 		auto& pass = this->renderpasses[i];
 		auto& pass_info = this->renderpasses_info[i];
-		device->log(LogLvl::eTrace, "{} on begin frame {}", pass.name, !!pass.on_begin_frame);
+		vk_context->log(LogLvl::eTrace, "{} on begin frame {}", pass.name, !!pass.on_begin_frame);
 
 		pass.name = pass_info.name;
-		device->log(LogLvl::eTrace, "{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame);
+		vk_context->log(LogLvl::eTrace, "{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame);
 
 		pass.on_begin_frame = pass_info.on_begin_frame ?
 		                          pass_info.on_begin_frame :
-		                          [](Device*, class RenderGraph*, Renderpass*, u32, void*) {
+		                          [](VkContext*, class RenderGraph*, Renderpass*, u32, void*) {
 		                          };
 
 		pass.on_update = pass_info.on_update ?
 		                     pass_info.on_update :
-		                     [](Device*, class RenderGraph*, Renderpass*, u32, void*) {
+		                     [](VkContext*, class RenderGraph*, Renderpass*, u32, void*) {
 		                     };
 
 		pass.on_render = pass_info.on_render ? pass_info.on_render :
-		                                       [](Device*,
+		                                       [](VkContext*,
 		                                          class RenderGraph*,
 		                                          Renderpass*,
 		                                          vk::CommandBuffer cmd,
@@ -195,22 +202,25 @@ void RenderGraph::build(
 
 void RenderGraph::create_cmd_buffers()
 {
-	u32 num_pass = renderpasses_info.size();
-	secondary_cmd_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT * device->num_threads * num_pass);
+	const auto device = vk_context->get_device();
+	const auto num_threads = vk_context->get_num_threads();
+	const auto num_pass = renderpasses_info.size();
+
+	secondary_cmd_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT * num_threads * num_pass);
 
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		for (u32 j = 0; j < device->num_threads; ++j)
+		for (u32 j = 0; j < num_threads; ++j)
 		{
-			vk::CommandBufferAllocateInfo cmdBufferallocInfo {
-				device->get_cmd_pool(i, j),
+			const auto cmdBufferallocInfo = vk::CommandBufferAllocateInfo {
+				vk_context->get_cmd_pool(i, j),
 				vk::CommandBufferLevel::eSecondary,
-				num_pass,
+				static_cast<u32>(num_pass),
 			};
 
-			assert_false(device->logical.allocateCommandBuffers(
+			assert_false(device.allocateCommandBuffers(
 			    &cmdBufferallocInfo,
-			    &secondary_cmd_buffers[num_pass * (j + (device->num_threads * i))]
+			    &secondary_cmd_buffers[num_pass * (j + (num_threads * i))]
 			));
 		}
 	}
@@ -219,7 +229,7 @@ void RenderGraph::create_cmd_buffers()
 // @todo: Implement
 void RenderGraph::validate_graph()
 {
-	device->log(LogLvl::eWarn, "Unimplemented function call");
+	vk_context->log(LogLvl::eWarn, "Unimplemented function call");
 }
 
 // @todo: Implement
@@ -399,7 +409,7 @@ void RenderGraph::build_graph_buffer_inputs()
 		    hash_str(buffer_input_info.name.c_str()),
 		    new Buffer(
 		        buffer_input_info.name.c_str(),
-		        device,
+		        vk_context,
 		        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
 		            vk::BufferUsageFlagBits::eUniformBuffer :
 		            vk::BufferUsageFlagBits::eStorageBuffer,
@@ -427,7 +437,7 @@ void RenderGraph::build_passes_buffer_inputs()
 			    hash_str(buffer_input_info.name.c_str()),
 			    new Buffer(
 			        buffer_input_info.name.c_str(),
-			        device,
+			        vk_context,
 			        buffer_input_info.type == vk::DescriptorType::eUniformBuffer ?
 			            vk::BufferUsageFlagBits::eUniformBuffer :
 			            vk::BufferUsageFlagBits::eStorageBuffer,
@@ -445,6 +455,8 @@ void RenderGraph::build_passes_buffer_inputs()
 
 void RenderGraph::build_graph_sets()
 {
+	const auto device = vk_context->get_device();
+
 	// Create set & pipeline layout
 	vec<vk::DescriptorSetLayoutBinding> bindings;
 	for (const auto& buffer_input_info : buffer_inputs_info)
@@ -456,23 +468,23 @@ void RenderGraph::build_graph_sets()
 		    buffer_input_info.stage_mask,
 		});
 	}
-	descriptor_set_layout = device->logical.createDescriptorSetLayout({
+	descriptor_set_layout = device.createDescriptorSetLayout({
 	    {},
 	    static_cast<u32>(bindings.size()),
 	    bindings.data(),
 	});
-	pipeline_layout = device->logical.createPipelineLayout({ {}, 1, &descriptor_set_layout });
+	pipeline_layout = device.createPipelineLayout({ {}, 1, &descriptor_set_layout });
 
 	// Allocate sets
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		sets.push_back(device->logical.allocateDescriptorSets({
+		sets.push_back(device.allocateDescriptorSets({
 		    descriptor_pool,
 		    1,
 		    &descriptor_set_layout,
 		})[0]);
 
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eDescriptorSet,
 		    (uint64_t)(VkDescriptorSet)sets.back(),
 		    fmt::format("render_graph_descriptor_set_{}", i).c_str(),
@@ -482,6 +494,8 @@ void RenderGraph::build_graph_sets()
 
 void RenderGraph::build_passes_sets()
 {
+	const auto device = vk_context->get_device();
+
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
 		auto& pass = renderpasses[i];
@@ -507,21 +521,21 @@ void RenderGraph::build_passes_sets()
 			    texture_input_info.stage_mask,
 			});
 		}
-		pass.descriptor_set_layout = device->logical.createDescriptorSetLayout(
+		pass.descriptor_set_layout = device.createDescriptorSetLayout(
 		    { {}, static_cast<u32>(bindings.size()), bindings.data() }
 		);
 		arr<vk::DescriptorSetLayout, 2> layouts {
 			descriptor_set_layout,
 			pass.descriptor_set_layout,
 		};
-		pass.pipeline_layout = device->logical.createPipelineLayout({ {}, 2ull, layouts.data() });
+		pass.pipeline_layout = device.createPipelineLayout({ {}, 2ull, layouts.data() });
 
 		// Allocate descriptor sets
 		if (!pass_info.buffer_inputs_info.empty() || !pass_info.texture_inputs_info.empty())
 		{
 			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
 			{
-				auto set = device->logical.allocateDescriptorSets({
+				auto set = device.allocateDescriptorSets({
 				    descriptor_pool,
 				    1u,
 				    &pass.descriptor_set_layout,
@@ -529,7 +543,7 @@ void RenderGraph::build_passes_sets()
 
 				pass.descriptor_sets.push_back(set);
 
-				device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+				device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 				    vk::ObjectType::eDescriptorSet,
 				    (uint64_t)(VkDescriptorSet)pass.descriptor_sets.back(),
 				    fmt::format("{}_descriptor_set_{}", pass.name, i).c_str(),
@@ -541,6 +555,8 @@ void RenderGraph::build_passes_sets()
 
 void RenderGraph::write_graph_sets()
 {
+	const auto device = vk_context->get_device();
+
 	vec<vk::DescriptorBufferInfo> buffers_info;
 	buffers_info.reserve(buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
 	for (const auto& buffer_input_info : buffer_inputs_info)
@@ -568,15 +584,17 @@ void RenderGraph::write_graph_sets()
 				});
 			}
 		}
-		device->logical.updateDescriptorSets(writes.size(), writes.data(), 0u, nullptr);
+		device.updateDescriptorSets(writes.size(), writes.data(), 0u, nullptr);
 
 		// @todo should we wait idle?
-		device->logical.waitIdle();
+		device.waitIdle();
 	}
 }
 
 void RenderGraph::write_passes_sets()
 {
+	const auto device = vk_context->get_device();
+
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
 		const auto& pass_info = renderpasses_info[i];
@@ -614,7 +632,7 @@ void RenderGraph::write_passes_sets()
 		}
 		for (const auto& texture_input_info : pass_info.texture_inputs_info)
 		{
-			device->log(
+			vk_context->log(
 			    LogLvl::eWarn,
 			    "{} - {}",
 			    BVK_MAX_FRAMES_IN_FLIGHT,
@@ -638,16 +656,18 @@ void RenderGraph::write_passes_sets()
 			}
 		}
 
-		device->logical.updateDescriptorSets(set_writes.size(), set_writes.data(), 0u, nullptr);
+		device.updateDescriptorSets(set_writes.size(), set_writes.data(), 0u, nullptr);
 
 		// @todo should we wait idle?
-		device->logical.waitIdle();
+		device.waitIdle();
 	}
 }
 
 
 void RenderGraph::build_pass_cmd_buffer_begin_infos()
 {
+	const auto surface = vk_context->get_surface();
+
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
 		auto& pass = renderpasses[i];
@@ -656,11 +676,11 @@ void RenderGraph::build_pass_cmd_buffer_begin_infos()
 		{
 			if (attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				pass.color_attachments_format.push_back(device->surface_format.format);
+				pass.color_attachments_format.push_back(surface.color_format);
 			}
 			else
 			{
-				pass.depth_attachment_format = device->depth_format;
+				pass.depth_attachment_format = vk_context->get_depth_format();
 			}
 		}
 
@@ -698,6 +718,10 @@ void RenderGraph::create_attachment_resource(
     u32 recreate_resource_index
 )
 {
+	const auto device = vk_context->get_device();
+	const auto surface = vk_context->get_surface();
+	const auto allocator = vk_context->get_allocator();
+
 	if (recreate_resource_index == UINT32_MAX)
 	{
 		attachment_resources.push_back({});
@@ -709,12 +733,12 @@ void RenderGraph::create_attachment_resource(
 	// Set usage & askect masks
 	vk::ImageUsageFlags image_usage_mask;
 	vk::ImageAspectFlags image_aspect_mask;
-	if (attachment_info.format == device->surface_format.format)
+	if (attachment_info.format == surface.color_format)
 	{
 		image_usage_mask = vk::ImageUsageFlagBits::eColorAttachment;
 		image_aspect_mask = vk::ImageAspectFlagBits::eColor;
 	}
-	else if (attachment_info.format == device->depth_format)
+	else if (attachment_info.format == vk_context->get_depth_format())
 	{
 		image_usage_mask = vk::ImageUsageFlagBits::eDepthStencilAttachment,
 		image_aspect_mask = vk::ImageAspectFlagBits::eDepth;
@@ -794,8 +818,8 @@ void RenderGraph::create_attachment_resource(
 		    vk::MemoryPropertyFlagBits::eDeviceLocal
 		);
 
-		AllocatedImage image = device->allocator.createImage(image_info, image_allocate_info);
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		AllocatedImage image = allocator.createImage(image_info, image_allocate_info);
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
 		    fmt::format("{}_image (single)", attachment_info.name).c_str(),
@@ -820,8 +844,8 @@ void RenderGraph::create_attachment_resource(
 			    1u,
 			},
 		};
-		vk::ImageView image_view = device->logical.createImageView(image_view_info, nullptr);
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		vk::ImageView image_view = device.createImageView(image_view_info, nullptr);
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)image_view,
 		    fmt::format("{}_image_view (single)", attachment_info.name).c_str(),
@@ -867,10 +891,9 @@ void RenderGraph::create_attachment_resource(
 		    vk::MemoryPropertyFlagBits::eDeviceLocal
 		);
 
-		AllocatedImage image =
-		    device->allocator.createImage(image_create_info, image_allocate_info);
+		AllocatedImage image = allocator.createImage(image_create_info, image_allocate_info);
 
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (uint64_t)(VkImage)(vk::Image)image,
 		    fmt::format("{}_transient_ms_image", attachment_info.name).c_str(),
@@ -896,8 +919,8 @@ void RenderGraph::create_attachment_resource(
 			    1u,
 			},
 		};
-		vk::ImageView image_view = device->logical.createImageView(image_view_info, nullptr);
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		vk::ImageView image_view = device.createImageView(image_view_info, nullptr);
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (uint64_t)(VkImageView)image_view,
 		    fmt::format("{}_transient_ms_image_view", attachment_info.name).c_str(),
@@ -914,6 +937,9 @@ void RenderGraph::on_swapchain_invalidated(
     vec<vk::ImageView> swapchain_image_views
 )
 {
+	const auto device = vk_context->get_device();
+	const auto allocator = vk_context->get_allocator();
+
 	swapchain_images = swapchain_images;
 	swapchain_image_views = swapchain_image_views;
 
@@ -927,14 +953,14 @@ void RenderGraph::on_swapchain_invalidated(
 			{
 				for (AttachmentResource& resource : resource_container.resources)
 				{
-					device->logical.destroyImageView(resource.image_view);
-					device->allocator.destroyImage(resource.image, resource.image);
+					device.destroyImageView(resource.image_view);
+					allocator.destroyImage(resource.image, resource.image);
 				}
 			}
 			resource_container.resources.clear();
 
-			device->logical.destroyImageView(resource_container.transient_ms_image_view);
-			device->allocator.destroyImage(
+			device.destroyImageView(resource_container.transient_ms_image_view);
+			allocator.destroyImage(
 			    resource_container.transient_ms_image,
 			    resource_container.transient_ms_image
 			);
@@ -953,12 +979,11 @@ void RenderGraph::on_swapchain_invalidated(
 
 void RenderGraph::begin_frame(u32 frame_index, void* user_pointer)
 {
-	on_begin_frame(device, this, frame_index, user_pointer);
+	on_begin_frame(vk_context, this, frame_index, user_pointer);
 
 	for (u32 i = 0; i < renderpasses.size(); ++i)
-	{
-		renderpasses[i].on_begin_frame(device, this, &renderpasses[i], frame_index, user_pointer);
-	}
+		renderpasses[i]
+		    .on_begin_frame(vk_context, this, &renderpasses[i], frame_index, user_pointer);
 }
 
 // @todo: Setup render barriers
@@ -970,13 +995,15 @@ void RenderGraph::end_frame(
     void* user_pointer
 )
 {
-	const u32 thread_index = 0;
+	const auto& queues = vk_context->get_queues();
+	const auto num_threads = vk_context->get_num_threads();
+	const auto thread_index = 0;
 
 	// Update graph
 	{
-		device->graphics_queue.beginDebugUtilsLabelEXT(update_debug_label);
-		on_update(device, this, frame_index, user_pointer);
-		device->graphics_queue.endDebugUtilsLabelEXT();
+		queues.graphics.beginDebugUtilsLabelEXT(update_debug_label);
+		on_update(vk_context, this, frame_index, user_pointer);
+		queues.graphics.endDebugUtilsLabelEXT();
 	}
 
 	// Update passes
@@ -984,9 +1011,9 @@ void RenderGraph::end_frame(
 	{
 		auto& pass = renderpasses[i];
 
-		device->graphics_queue.beginDebugUtilsLabelEXT(pass.update_debug_label);
-		pass.on_update(device, this, &renderpasses[i], frame_index, user_pointer);
-		device->graphics_queue.endDebugUtilsLabelEXT(); // pass.update_debug_label
+		queues.graphics.beginDebugUtilsLabelEXT(pass.update_debug_label);
+		pass.on_update(vk_context, this, &renderpasses[i], frame_index, user_pointer);
+		queues.graphics.endDebugUtilsLabelEXT(); // pass.update_debug_label
 	}
 
 	// Render passes (record their rendering cmds to secondary cmd buffers)
@@ -1008,7 +1035,7 @@ void RenderGraph::end_frame(
 		primary_cmd.beginRendering(pass_rendering_info.rendering_info);
 		primary_cmd.executeCommands(
 		    secondary_cmd_buffers
-		        [i + renderpasses.size() * (thread_index + device->num_threads * frame_index)]
+		        [i + renderpasses.size() * (thread_index + num_threads * frame_index)]
 		);
 		primary_cmd.endRendering();
 
@@ -1055,7 +1082,7 @@ void RenderGraph::record_pass_cmds(
 	}
 
 	pass.on_render(
-	    device,
+	    vk_context,
 	    this,
 	    &renderpasses[pass_index],
 	    cmd,
@@ -1074,6 +1101,9 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
     u32 pass_index
 )
 {
+	const auto& queues = vk_context->get_queues();
+	const auto& surface = vk_context->get_surface();
+
 	auto& pass = renderpasses[pass_index];
 	cmd.beginDebugUtilsLabelEXT(pass.barrier_debug_label);
 
@@ -1086,7 +1116,7 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 
 		vk::ImageMemoryBarrier image_barrier {
 			resource.src_access_mask, attachment.access_mask,       resource.src_image_layout,
-			attachment.layout,        device->graphics_queue_index, device->graphics_queue_index,
+			attachment.layout,        queues.graphics_index,        queues.graphics_index,
 			resource.image,           attachment.subresource_range, nullptr,
 		};
 
@@ -1155,7 +1185,7 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 		vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
 		vk::Rect2D {
 		    { 0, 0 },
-		    device->framebuffer_extent,
+		    surface.framebuffer_extent,
 		},
 		1u,
 		{},
@@ -1214,13 +1244,15 @@ vk::Extent3D RenderGraph::calculate_attachment_image_extent(
     const Renderpass::CreateInfo::AttachmentInfo& attachment_info
 )
 {
+	const auto surface = vk_context->get_surface();
+
 	switch (attachment_info.size_type)
 	{
 	case Renderpass::CreateInfo::SizeType::eSwapchainRelative:
 	{
 		return {
-			static_cast<u32>(device->framebuffer_extent.width * attachment_info.size.x),
-			static_cast<u32>(device->framebuffer_extent.height * attachment_info.size.y),
+			static_cast<u32>(surface.framebuffer_extent.width * attachment_info.size.x),
+			static_cast<u32>(surface.framebuffer_extent.height * attachment_info.size.y),
 			1,
 		};
 	}

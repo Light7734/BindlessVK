@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #include <vulkan/vulkan.hpp>
 
@@ -11,8 +11,8 @@ class Buffer
 {
 public:
 	Buffer(
-	    const char* debug_name,
-	    Device* device,
+	    c_str debug_name,
+	    VkContext* vk_context,
 	    vk::BufferUsageFlags buffer_usage,
 	    const vma::AllocationCreateInfo& vma_info,
 	    vk::DeviceSize min_block_size,
@@ -28,37 +28,37 @@ public:
 
 	void unmap();
 
-	inline vk::Buffer* get_buffer()
+	inline auto* get_buffer()
 	{
 		return &buffer.buffer;
 	}
 
-	inline vk::DescriptorBufferInfo* get_descriptor_info()
+	inline auto* get_descriptor_info()
 	{
 		return &descriptor_info;
 	}
 
-	inline vk::DeviceSize get_whole_size() const
+	inline auto get_whole_size() const
 	{
 		return whole_size;
 	}
 
-	inline vk::DeviceSize get_block_size() const
+	inline auto get_block_size() const
 	{
 		return block_size;
 	}
 
-	inline vk::DeviceSize get_block_valid_size() const
+	inline auto get_block_valid_size() const
 	{
 		return valid_block_size;
 	}
 
-	inline vk::DeviceSize get_block_padding_size() const
+	inline auto get_block_padding_size() const
 	{
 		return block_size - valid_block_size;
 	}
 
-	inline u32 get_block_count() const
+	inline auto get_block_count() const
 	{
 		return block_count;
 	}
@@ -67,7 +67,7 @@ private:
 	void calculate_block_size();
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 
 	AllocatedBuffer buffer = {};
 

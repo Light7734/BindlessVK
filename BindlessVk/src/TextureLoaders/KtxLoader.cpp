@@ -3,8 +3,8 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-KtxLoader::KtxLoader(Device* device, Buffer* staging_buffer)
-    : device(device)
+KtxLoader::KtxLoader(VkContext* vk_context, Buffer* staging_buffer)
+    : vk_context(vk_context)
     , staging_buffer(staging_buffer)
 {
 }
@@ -61,7 +61,7 @@ void KtxLoader::destroy_ktx_texture()
 
 void KtxLoader::create_image()
 {
-	texture.image = device->allocator.createImage(
+	texture.image = vk_context->get_allocator().createImage(
 	    vk::ImageCreateInfo {
 	        vk::ImageCreateFlagBits::eCubeCompatible,
 	        vk::ImageType::e2D,
@@ -92,8 +92,8 @@ void KtxLoader::create_image()
 
 void KtxLoader::create_image_view()
 {
-	device->log(LogLvl::eWarn, "ktx image assumes cubemap type for now...");
-	texture.image_view = device->logical.createImageView(
+	vk_context->log(LogLvl::eWarn, "ktx image assumes cubemap type for now...");
+	texture.image_view = vk_context->get_device().createImageView(
 	    vk::ImageViewCreateInfo {
 	        {},
 	        texture.image,
@@ -121,7 +121,7 @@ void KtxLoader::create_image_view()
 
 void KtxLoader::create_sampler()
 {
-	texture.sampler = device->logical.createSampler(
+	texture.sampler = vk_context->get_device().createSampler(
 	    vk::SamplerCreateInfo {
 	        {},
 	        vk::Filter::eLinear,
@@ -157,9 +157,9 @@ void KtxLoader::write_texture_data_to_gpu()
 {
 	auto buffer_copies = create_texture_face_buffer_copies();
 
-	device->immediate_submit([&](vk::CommandBuffer&& cmd) {
+	vk_context->immediate_submit([&](vk::CommandBuffer&& cmd) {
 		texture.transition_layout(
-		    device,
+		    vk_context,
 		    cmd,
 		    0u,
 		    texture.mip_levels,
@@ -175,7 +175,7 @@ void KtxLoader::write_texture_data_to_gpu()
 		    buffer_copies.data()
 		);
 
-		texture.transition_layout(device, cmd, 0u, texture.mip_levels, 6u, final_layout);
+		texture.transition_layout(vk_context, cmd, 0u, texture.mip_levels, 6u, final_layout);
 	});
 
 	texture.descriptor_info.imageLayout = texture.current_layout;

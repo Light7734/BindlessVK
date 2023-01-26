@@ -2,15 +2,15 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Texture.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
 class BinaryLoader
 {
 public:
-	BinaryLoader(Device* device, Buffer* staging_buffer);
+	BinaryLoader(VkContext* vk_context, Buffer* staging_buffer);
 
 	Texture load(
 	    c_str name,
@@ -34,7 +34,7 @@ private:
 
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 	Buffer* staging_buffer = {};
 
 	Texture texture = {};

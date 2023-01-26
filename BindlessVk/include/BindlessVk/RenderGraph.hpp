@@ -4,8 +4,8 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/RenderPass.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #ifndef MAX_FRAMES_IN_FLIGHT
 	#define MAX_FRAMES_IN_FLIGHT 3
@@ -29,7 +29,7 @@ public:
 	 * @param swapchain_iamge_views the swapchain's image views
 	 */
 	void init(
-	    Device* device,
+	    VkContext* vk_context,
 	    vk::DescriptorPool descriptor_pool,
 	    vec<vk::Image> swapchain_images,
 	    vec<vk::ImageView> swapchain_image_views
@@ -56,11 +56,11 @@ public:
 	 * (eg. start imgui frame)
 	 */
 	void build(
-	    std::string backbuffer_name,
+	    str backbuffer_name,
 	    vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
 	    vec<Renderpass::CreateInfo> renderpasses,
-	    void (*on_update)(Device*, RenderGraph*, u32, void*),
-	    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
+	    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
+	    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
 	    vk::DebugUtilsLabelEXT update_debug_label,
 	    vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label
 	);
@@ -97,10 +97,10 @@ public:
 	}
 
 private:
-	inline vk::CommandBuffer get_cmd(u32 pass_index, u32 frame_index, u32 thread_index) const
+	inline auto get_cmd(u32 pass_index, u32 frame_index, u32 thread_index) const
 	{
 		const u32 numPass = renderpasses.size();
-		const u32 numThreads = device->num_threads;
+		const u32 numThreads = vk_context->get_num_threads();
 
 		return secondary_cmd_buffers
 		    [pass_index + (numPass * (thread_index + (numThreads * frame_index)))];
@@ -195,7 +195,7 @@ private:
 		VkExtent3D extent;
 		glm::vec2 size;
 		Renderpass::CreateInfo::SizeType size_type;
-		std::string relative_size_name;
+		str relative_size_name;
 
 		// Transient multi-sampled images
 		vk::SampleCountFlagBits sample_count;
@@ -204,7 +204,7 @@ private:
 		vk::ImageView transient_ms_image_view;
 
 		// Required for aliasing Read-Modify-Write attachments
-		std::string last_write_name;
+		str last_write_name;
 
 		vec<AttachmentResource> resources;
 
@@ -226,7 +226,7 @@ private:
 
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 
 	vk::DescriptorPool descriptor_pool = {};
 	vec<Renderpass> renderpasses = {};
@@ -235,8 +235,8 @@ private:
 	vk::DescriptorSetLayout descriptor_set_layout = {};
 	vec<vk::DescriptorSet> sets = {};
 
-	void (*on_update)(Device*, RenderGraph*, u32, void*);
-	void (*on_begin_frame)(Device*, RenderGraph*, u32, void*);
+	void (*on_update)(VkContext*, RenderGraph*, u32, void*);
+	void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*);
 
 	vec<AttachmentResourceContainer> attachment_resources = {};
 
@@ -245,8 +245,8 @@ private:
 	vec<vk::Image> swapchain_images = {};
 	vec<vk::ImageView> swapchain_image_views = {};
 
-	vec<std::string> swapchain_attachment_names = {};
-	std::string swapchain_resource_names = {};
+	vec<str> swapchain_attachment_names = {};
+	str swapchain_resource_names = {};
 	u32 swapchain_resource_index = {};
 
 	vec<Renderpass::CreateInfo> renderpasses_info = {};

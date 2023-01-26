@@ -162,25 +162,26 @@ static void bindlessvk_debug_callback(bvk::LogLvl severity, const str& message, 
 }
 
 // @todo: refactor this out
-static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Window& window)
+static void initialize_imgui(bvk::VkContext* vk_context, bvk::Renderer& renderer, Window& window)
 {
 	ImGui::CreateContext();
 
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
 	ImGui_ImplVulkan_InitInfo initInfo {
-		.Instance = device->instance,
-		.PhysicalDevice = device->physical,
-		.Device = device->logical,
-		.Queue = device->graphics_queue,
+		.Instance = vk_context->get_instance(),
+		.PhysicalDevice = vk_context->get_gpu(),
+		.Device = vk_context->get_device(),
+		.Queue = vk_context->get_queues().graphics,
 		.DescriptorPool = renderer.get_descriptor_pool(),
 		.UseDynamicRendering = true,
-		.ColorAttachmentFormat = static_cast<VkFormat>(device->surface_format.format),
+		.ColorAttachmentFormat = static_cast<VkFormat>(vk_context->get_surface().color_format),
 		.MinImageCount = BVK_MAX_FRAMES_IN_FLIGHT,
 		.ImageCount = BVK_MAX_FRAMES_IN_FLIGHT,
-		.MSAASamples = static_cast<VkSampleCountFlagBits>(device->max_samples),
+		.MSAASamples = static_cast<VkSampleCountFlagBits>(vk_context->get_max_color_and_depth_samples()
+		),
 	};
-	auto userData = std::make_pair(device->get_vk_instance_proc_addr_func, device->instance);
+	auto userData = std::make_pair(vk_context->get_vk_instance_proc_addr, vk_context->get_instance());
 
 	assert_true(
 	  ImGui_ImplVulkan_LoadFunctions(
@@ -195,7 +196,9 @@ static void initialize_imgui(bvk::Device* device, bvk::Renderer& renderer, Windo
 
 	ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
 
-	device->immediate_submit([](vk::CommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(cmd); });
+	vk_context->immediate_submit([](vk::CommandBuffer cmd) {
+		ImGui_ImplVulkan_CreateFontsTexture(cmd);
+	});
 
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
@@ -236,7 +239,7 @@ Application::Application()
 	  required_surface_extensions.end()
 	);
 
-	device_system.init(
+	vk_context = bvk::VkContext(
 	  { "VK_LAYER_KHRONOS_validation" },
 	  instance_extensions,
 	  device_extensions,
@@ -265,17 +268,17 @@ Application::Application()
 	  std::make_any<Logger*>(&logger)
 	);
 
-	bvk::Device* device = device_system.get_device();
+	const auto device = vk_context.get_device();
 
-	staging_pool = StagingPool(3, (1024u * 1024u * 256u), device);
+	staging_pool = StagingPool(3, (1024u * 1024u * 256u), &vk_context);
 
-	texture_loader = bvk::TextureLoader(device);
-	model_loader = bvk::ModelLoader(device, &texture_loader);
-	shader_loader = bvk::ShaderLoader(device);
+	texture_loader = bvk::TextureLoader(&vk_context);
+	model_loader = bvk::ModelLoader(&vk_context, &texture_loader);
+	shader_loader = bvk::ShaderLoader(&vk_context);
 
-	renderer = bvk::Renderer(device);
+	renderer = bvk::Renderer(&vk_context);
 
-	initialize_imgui(device, renderer, window);
+	initialize_imgui(&vk_context, renderer, window);
 
 	camera_controller = CameraController(&scene, &window);
 
@@ -297,7 +300,7 @@ Application::Application()
 	  staging_pool.get_by_index(0)
 	);
 
-	vec<vk::DescriptorPoolSize> pool_sizes = {
+	const auto pool_sizes = vec<vk::DescriptorPoolSize> {
 		{ vk::DescriptorType::eSampler, 1000u },
 		{ vk::DescriptorType::eCombinedImageSampler, 1000u },
 		{ vk::DescriptorType::eSampledImage, 1000u },
@@ -311,7 +314,7 @@ Application::Application()
 		{ vk::DescriptorType::eInputAttachment, 1000u },
 	};
 
-	descriptor_pool = device->logical.createDescriptorPool(
+	descriptor_pool = device.createDescriptorPool(
 	  vk::DescriptorPoolCreateInfo {
 	    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
 	    100u,
@@ -324,7 +327,7 @@ Application::Application()
 
 Application::~Application()
 {
-	device_system.get_device()->logical.waitIdle();
+	vk_context.get_device().waitIdle();
 	destroy_imgui();
 
 	for (auto& [key, val] : models) {
@@ -333,6 +336,4 @@ Application::~Application()
 	}
 
 	models.clear();
-
-	device_system.reset();
 }

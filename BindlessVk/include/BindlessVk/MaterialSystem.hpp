@@ -2,13 +2,12 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Shader.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #include <glm/glm.hpp>
 
 namespace BINDLESSVK_NAMESPACE {
-
 /// @todo
 struct MaterialParameters
 {
@@ -43,7 +42,11 @@ public:
 	};
 
 public:
-	ShaderEffect(Device* device, vec<Shader*> shaders, ShaderEffect::Configuration configuration);
+	ShaderEffect(
+	    VkContext* vk_context,
+	    vec<Shader*> shaders,
+	    ShaderEffect::Configuration configuration
+	);
 	~ShaderEffect();
 
 	ShaderEffect(ShaderEffect&&);
@@ -89,7 +92,7 @@ private:
 	);
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 
 	vk::Pipeline pipeline = {};
 	vk::PipelineLayout pipeline_layout = {};
@@ -101,7 +104,7 @@ private:
 class Material
 {
 public:
-	Material(Device* device, ShaderEffect* effect, vk::DescriptorPool descriptor_pool)
+	Material(VkContext* vk_context, ShaderEffect* effect, vk::DescriptorPool descriptor_pool)
 	    : effect(effect)
 	{
 		vk::DescriptorSetAllocateInfo allocate_info {
@@ -110,7 +113,8 @@ public:
 			&effect->get_descriptor_set_layouts().back(),
 		};
 
-		assert_false(device->logical.allocateDescriptorSets(&allocate_info, &descriptor_set));
+		const auto device = vk_context->get_device();
+		assert_false(device.allocateDescriptorSets(&allocate_info, &descriptor_set));
 	}
 
 	Material() = default;

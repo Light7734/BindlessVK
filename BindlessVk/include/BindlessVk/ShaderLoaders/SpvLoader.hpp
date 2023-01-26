@@ -1,8 +1,8 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Shader.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #include <spirv_reflect.h>
 
@@ -16,7 +16,7 @@ namespace BINDLESSVK_NAMESPACE {
 class SpvLoader
 {
 public:
-	SpvLoader(Device* device);
+	SpvLoader(VkContext* vk_context);
 
 	Shader load(c_str path);
 
@@ -38,7 +38,7 @@ private:
 	);
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 	Shader shader = {};
 	vec<u32> code = {};
 	SpvReflectShaderModule reflection = {};

@@ -2,8 +2,8 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Texture.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,9 +11,9 @@ class TextureLoader
 {
 public:
 	/** @brief Main constructor
-	 * @param device the bindlessvk device
+	 * @param vk_context the vulkan context
 	 */
-	TextureLoader(Device* device);
+	TextureLoader(VkContext* vk_context);
 
 	/** @brief Default constructor */
 	TextureLoader() = default;
@@ -57,7 +57,7 @@ public:
 	);
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

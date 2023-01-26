@@ -1,9 +1,9 @@
 #pragma once
 
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/RenderGraph.hpp"
 #include "BindlessVk/RenderPass.hpp"
 #include "BindlessVk/Renderer.hpp"
+#include "BindlessVk/VkContext.hpp"
 #include "Framework/Common/Common.hpp"
 //
 #include "Framework/Core/Application.hpp"
@@ -44,7 +44,7 @@ public:
 		renderer.begin_frame(&scene);
 
 		if (renderer.is_swapchain_invalidated()) {
-			device_system.update_surface_info();
+			vk_context.update_surface_info();
 			renderer.on_swapchain_invalidated();
 			camera_controller.on_window_resize(
 			  window.get_framebuffer_size().width,
@@ -88,10 +88,8 @@ private:
 
 	void load_shader_effects()
 	{
-		auto* device = device_system.get_device();
-
 		shader_effects[hash_str("opaque_mesh")] = bvk::ShaderEffect(
-		  device,
+		 &vk_context,
 		  {
 		    &shaders[hash_str("vertex")],
 		    &shaders[hash_str("pixel")],
@@ -100,7 +98,7 @@ private:
 		);
 
 		shader_effects[hash_str("skybox")] = bvk::ShaderEffect(
-		  device,
+		  &vk_context,
 		  {
 		    &shaders[hash_str("skybox_vertex")],
 		    &shaders[hash_str("skybox_fragment")],
@@ -111,8 +109,6 @@ private:
 
 	void load_pipeline_configuration()
 	{
-		bvk::Device* device = device_system.get_device();
-
 		shader_effect_configurations[hash_str("opaque_mesh")] = bvk::ShaderEffect::Configuration {
 			bvk::Model::Vertex::get_vertex_input_state(),
 			vk::PipelineInputAssemblyStateCreateInfo {
@@ -143,7 +139,7 @@ private:
 			},
 			vk::PipelineMultisampleStateCreateInfo {
 			  {},
-			  device->max_samples,
+			  vk_context.get_max_color_and_depth_samples(),
 			  VK_FALSE,
 			  {},
 			  VK_FALSE,
@@ -211,7 +207,7 @@ private:
 			},
 			vk::PipelineMultisampleStateCreateInfo {
 			  {},
-			  device->max_samples,
+			  vk_context.get_max_color_and_depth_samples(),
 			  VK_FALSE,
 			  {},
 			  VK_FALSE,
@@ -252,16 +248,14 @@ private:
 
 	void load_materials()
 	{
-		auto* device = device_system.get_device();
-
 		materials.emplace(
 		  hash_str("opaque_mesh"),
-		  bvk::Material(device, &shader_effects[hash_str("opaque_mesh")], descriptor_pool)
+		  bvk::Material(&vk_context, &shader_effects[hash_str("opaque_mesh")], descriptor_pool)
 		);
 
 		materials.emplace(
 		  hash_str("skybox"),
-		  bvk::Material(device, &shader_effects[hash_str("skybox")], descriptor_pool)
+		  bvk::Material(&vk_context, &shader_effects[hash_str("skybox")], descriptor_pool)
 		);
 	}
 
@@ -351,10 +345,11 @@ private:
 
 	void create_render_graph()
 	{
-		auto* device = device_system.get_device();
-		const auto color_format = device->surface_format.format;
-		const auto depth_format = device->depth_format;
-		const auto sample_count = device->max_samples;
+		const auto& surface = vk_context.get_surface();
+
+		const auto color_format = surface.color_format;
+		const auto depth_format = vk_context.get_depth_format();
+		const auto sample_count = vk_context.get_max_color_and_depth_samples();
 
 		auto* default_texture = &textures[hash_str("default_2d")];
 		auto* default_texture_cube = &textures[hash_str("default_cube")];

@@ -2,8 +2,8 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-BinaryLoader::BinaryLoader(Device* device, Buffer* staging_buffer)
-    : device(device)
+BinaryLoader::BinaryLoader(VkContext* vk_context, Buffer* staging_buffer)
+    : vk_context(vk_context)
     , staging_buffer(staging_buffer)
 {
 }
@@ -44,7 +44,7 @@ Texture BinaryLoader::load(
 
 void BinaryLoader::create_image()
 {
-	texture.image = device->allocator.createImage(
+	texture.image = vk_context->get_allocator().createImage(
 	    vk::ImageCreateInfo {
 	        {},
 	        vk::ImageType::e2D,
@@ -76,7 +76,7 @@ void BinaryLoader::create_image()
 
 void BinaryLoader::create_image_view()
 {
-	texture.image_view = device->logical.createImageView(
+	texture.image_view = vk_context->get_device().createImageView(
 	    vk::ImageViewCreateInfo {
 	        {},
 	        texture.image,
@@ -104,7 +104,7 @@ void BinaryLoader::create_image_view()
 
 void BinaryLoader::create_sampler()
 {
-	texture.sampler = device->logical.createSampler(
+	texture.sampler = vk_context->get_device().createSampler(
 	    vk::SamplerCreateInfo {
 	        {},
 	        vk::Filter::eLinear,
@@ -137,9 +137,9 @@ void BinaryLoader::stage_texture_data(u8* pixels, vk::DeviceSize size)
 
 void BinaryLoader::write_texture_data_to_gpu()
 {
-	device->immediate_submit([&](vk::CommandBuffer cmd) {
+	vk_context->immediate_submit([&](vk::CommandBuffer cmd) {
 		texture.transition_layout(
-		    device,
+		    vk_context,
 		    cmd,
 		    0u,
 		    texture.mip_levels,
@@ -172,7 +172,7 @@ void BinaryLoader::write_texture_data_to_gpu()
 		// @todo hacked
 		texture.current_layout = vk::ImageLayout::eTransferDstOptimal;
 		texture.transition_layout(
-		    device,
+		    vk_context,
 		    cmd,
 		    texture.mip_levels - 1ul,
 		    1u,
@@ -192,13 +192,19 @@ void BinaryLoader::create_mipmaps(vk::CommandBuffer cmd)
 	{
 		// @todo hacked
 		texture.current_layout = vk::ImageLayout::eTransferDstOptimal;
-		texture
-		    .transition_layout(device, cmd, i - 1u, 1u, 1u, vk::ImageLayout::eTransferSrcOptimal);
+		texture.transition_layout(
+		    vk_context,
+		    cmd,
+		    i - 1u,
+		    1u,
+		    1u,
+		    vk::ImageLayout::eTransferSrcOptimal
+		);
 
 		mip_size = texture.blit(cmd, i, mip_size);
 
 		texture.transition_layout(
-		    device,
+		    vk_context,
 		    cmd,
 		    i - 1u,
 		    1u,

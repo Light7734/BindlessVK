@@ -6,14 +6,15 @@
 using u32 = uint32_t;
 
 inline void forward_pass_update(
-  bvk::Device* device,
+  bvk::VkContext* vk_context,
   bvk::RenderGraph* render_graph,
   bvk::Renderpass* render_pass,
   uint32_t frame_index,
   void* user_pointer
 )
 {
-	Scene* scene = (Scene*)user_pointer;
+	const auto device = vk_context->get_device();
+	auto* scene = reinterpret_cast<Scene*>(user_pointer);
 
 	vk::DescriptorSet descriptor_set = render_pass->descriptor_sets[frame_index];
 
@@ -66,7 +67,7 @@ inline void forward_pass_update(
 					  }
 				  };
 
-				  device->logical.updateDescriptorSets(
+				  device.updateDescriptorSets(
 				    static_cast<uint32_t>(descriptor_writes.size()),
 				    descriptor_writes.data(),
 				    0ull,
@@ -97,7 +98,7 @@ inline void draw_model(bvk::Model* model, vk::CommandBuffer cmd)
 }
 
 inline void forward_pass_render(
-  bvk::Device* device,
+  bvk::VkContext* vk_context,
   bvk::RenderGraph* render_graph,
   bvk::Renderpass* render_pass,
   vk::CommandBuffer cmd,
@@ -106,6 +107,9 @@ inline void forward_pass_render(
   void* user_pointer
 )
 {
+	const auto device = vk_context->get_device();
+	const auto& surface = vk_context->get_surface();
+
 	auto pipeline = vk::Pipeline {};
 	auto* scene = reinterpret_cast<Scene*>(user_pointer);
 	auto renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
@@ -121,21 +125,22 @@ inline void forward_pass_render(
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 			// set dynamic states
-			cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, device->framebuffer_extent } });
+			cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, surface.framebuffer_extent } });
 			cmd.setViewport(
 			  0,
 			  {
 			    vk::Viewport {
 			      0.0f,
 			      0.0f,
-			      (float)device->framebuffer_extent.width,
-			      (float)device->framebuffer_extent.height,
+			      static_cast<f32>(surface.framebuffer_extent.width),
+			      static_cast<f32>(surface.framebuffer_extent.height),
 			      0.0f,
 			      1.0f,
 			    },
 			  }
 			);
 		}
+
 		draw_model(render_component.model, cmd);
 	});
 }

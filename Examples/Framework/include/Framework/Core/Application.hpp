@@ -37,8 +37,7 @@ public:
 	Window window = {};
 	Scene scene = {};
 
-	bvk::Device device = {};
-	bvk::DeviceSystem device_system = {};
+	bvk::VkContext vk_context;
 	bvk::Renderer renderer = {};
 
 	bvk::TextureLoader texture_loader = {};

@@ -60,10 +60,10 @@ struct Renderpass
 
 		std::string name;
 
-		void (*on_begin_frame)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
-		void (*on_update)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
+		void (*on_begin_frame)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
+		void (*on_update)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
 		void (*on_render
-		)(Device*,
+		)(VkContext*,
 		  class RenderGraph*,
 		  Renderpass*,
 		  vk::CommandBuffer cmd,
@@ -109,11 +109,17 @@ struct Renderpass
 	vk::DescriptorSetLayout descriptor_set_layout;
 	vk::PipelineLayout pipeline_layout;
 
-	void (*on_begin_frame)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
-	void (*on_update)(Device*, class RenderGraph*, Renderpass*, uint32_t, void*);
+	void (*on_begin_frame)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
+	void (*on_update)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
 
 	void (*on_render
-	)(Device*, class RenderGraph*, Renderpass*, vk::CommandBuffer cmd, uint32_t, uint32_t, void*);
+	)(VkContext*,
+	  class RenderGraph*,
+	  Renderpass*,
+	  vk::CommandBuffer cmd,
+	  uint32_t,
+	  uint32_t,
+	  void*);
 
 
 	vec<vk::Format> color_attachments_format;

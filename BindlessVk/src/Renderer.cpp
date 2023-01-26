@@ -4,10 +4,8 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Renderer::Renderer(Device* device)
+Renderer::Renderer(VkContext* vk_context): vk_context(vk_context)
 {
-	this->device = device;
-
 	create_sync_objects();
 	create_descriptor_pools();
 	create_cmd_buffers();
@@ -16,36 +14,33 @@ Renderer::Renderer(Device* device)
 
 Renderer::Renderer(Renderer&& other)
 {
-	swap(std::move(other));
+	*this = std::move(other);
 }
 
 Renderer& Renderer::operator=(Renderer&& rhs)
 {
-	swap(std::move(rhs));
+	this->vk_context = rhs.vk_context;
+	this->render_graph = rhs.render_graph;
+	this->render_fences = rhs.render_fences;
+	this->render_semaphores = rhs.render_semaphores;
+	this->present_semaphores = rhs.present_semaphores;
+	this->is_swapchain_invalid = rhs.is_swapchain_invalid;
+	this->swapchain = rhs.swapchain;
+	this->swapchain_images = rhs.swapchain_images;
+	this->swapchain_image_views = rhs.swapchain_image_views;
+	this->descriptor_pool = rhs.descriptor_pool;
+	this->cmd_buffers = rhs.cmd_buffers;
+	this->current_frame = rhs.current_frame;
+
+	rhs.vk_context = {};
 	return *this;
-}
-
-void Renderer::swap(Renderer&& other)
-{
-	this->device = other.device;
-	this->render_graph = other.render_graph;
-	this->render_fences = other.render_fences;
-	this->render_semaphores = other.render_semaphores;
-	this->present_semaphores = other.present_semaphores;
-	this->is_swapchain_invalid = other.is_swapchain_invalid;
-	this->swapchain = other.swapchain;
-	this->swapchain_images = other.swapchain_images;
-	this->swapchain_image_views = other.swapchain_image_views;
-	this->descriptor_pool = other.descriptor_pool;
-	this->cmd_buffers = other.cmd_buffers;
-	this->current_frame = other.current_frame;
-
-	other.device = {};
 }
 
 Renderer::~Renderer()
 {
-	if (!device)
+	const auto device = vk_context->get_device();
+
+	if (!vk_context)
 	{
 		return;
 	}
@@ -54,20 +49,22 @@ Renderer::~Renderer()
 
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		device->logical.destroyFence(render_fences[i]);
-		device->logical.destroySemaphore(render_semaphores[i]);
-		device->logical.destroySemaphore(present_semaphores[i]);
+		device.destroyFence(render_fences[i]);
+		device.destroySemaphore(render_semaphores[i]);
+		device.destroySemaphore(present_semaphores[i]);
 	}
 
 	render_graph.reset();
-	device->logical.resetDescriptorPool(descriptor_pool);
-	device->logical.destroyDescriptorPool(descriptor_pool);
+	device.resetDescriptorPool(descriptor_pool);
+	device.destroyDescriptorPool(descriptor_pool);
 
-	device->logical.destroySwapchainKHR(swapchain);
+	device.destroySwapchainKHR(swapchain);
 }
 
 void Renderer::on_swapchain_invalidated()
 {
+	const auto device = vk_context->get_device();
+
 	destroy_swapchain_resources();
 
 	create_swapchain();
@@ -75,21 +72,23 @@ void Renderer::on_swapchain_invalidated()
 	render_graph.on_swapchain_invalidated(swapchain_images, swapchain_image_views);
 
 	is_swapchain_invalid = false;
-	device->logical.waitIdle();
+	device.waitIdle();
 }
 
 void Renderer::destroy_swapchain_resources()
 {
+	const auto device = vk_context->get_device();
+
 	if (!swapchain)
 	{
 		return;
 	}
 
-	device->logical.waitIdle();
+	device.waitIdle();
 
 	for (const auto& imageView : swapchain_image_views)
 	{
-		device->logical.destroyImageView(imageView);
+		device.destroyImageView(imageView);
 	}
 
 	swapchain_image_views.clear();
@@ -98,19 +97,23 @@ void Renderer::destroy_swapchain_resources()
 
 void Renderer::create_sync_objects()
 {
+	const auto device = vk_context->get_device();
+
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		render_fences[i] = device->logical.createFence({
+		render_fences[i] = device.createFence({
 		    vk::FenceCreateFlagBits::eSignaled,
 		});
 
-		render_semaphores[i] = device->logical.createSemaphore({});
-		present_semaphores[i] = device->logical.createSemaphore({});
+		render_semaphores[i] = device.createSemaphore({});
+		present_semaphores[i] = device.createSemaphore({});
 	}
 }
 
 void Renderer::create_descriptor_pools()
 {
+	const auto device = vk_context->get_device();
+
 	std::vector<vk::DescriptorPoolSize> pool_sizes = {
 		{ vk::DescriptorType::eSampler, 8000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 8000 },
@@ -125,7 +128,7 @@ void Renderer::create_descriptor_pools()
 		{ vk::DescriptorType::eInputAttachment, 8000 }
 	};
 
-	descriptor_pool = device->logical.createDescriptorPool({
+	descriptor_pool = device.createDescriptorPool({
 	    vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind
 	        | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
 	    100,
@@ -135,11 +138,14 @@ void Renderer::create_descriptor_pools()
 
 void Renderer::create_swapchain()
 {
-	const u32 min_image = device->surface_capabilities.minImageCount;
-	const u32 max_image = device->surface_capabilities.maxImageCount;
+	const auto device = vk_context->get_device();
+	const auto queues = vk_context->get_queues();
+	const auto surface = vk_context->get_surface();
+
+	const u32 min_image = surface.capabilities.minImageCount;
+	const u32 max_image = surface.capabilities.maxImageCount;
 
 	u32 image_count;
-
 	if ((max_image == 0ul || max_image >= DESIRED_SWAPCHAIN_IMAGES)
 	    && min_image <= DESIRED_SWAPCHAIN_IMAGES)
 	{
@@ -159,41 +165,41 @@ void Renderer::create_swapchain()
 	}
 
 	// Create swapchain
-	bool same_queue_index = device->graphics_queue_index == device->present_queue_index;
+	const bool queues_have_same_index = queues.graphics_index == queues.present_index;
 
 	vk::SwapchainKHR old_swapchain = swapchain;
 
 	vk::SwapchainCreateInfoKHR swapchain_info {
 		{},
-		device->surface,
+		surface,
 		image_count,
-		device->surface_format.format,
-		device->surface_format.colorSpace,
-		device->framebuffer_extent,
+		surface.color_format,
+		surface.color_space,
+		surface.framebuffer_extent,
 		1u,
 		vk::ImageUsageFlagBits::eColorAttachment,
-		same_queue_index ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent,
-		same_queue_index ? 0u : 2u,
-		same_queue_index ? nullptr : &device->graphics_queue_index,
-		device->surface_capabilities.currentTransform,
+		queues_have_same_index ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent,
+		queues_have_same_index ? 0u : 2u,
+		queues_have_same_index ? nullptr : &queues.graphics_index,
+		surface.capabilities.currentTransform,
 		vk::CompositeAlphaFlagBitsKHR::eOpaque,
-		device->present_mode,
+		surface.present_mode,
 		VK_TRUE,
 		old_swapchain,
 	};
 
-	swapchain = device->logical.createSwapchainKHR(swapchain_info, nullptr);
-	device->logical.destroySwapchainKHR(old_swapchain);
+	swapchain = device.createSwapchainKHR(swapchain_info, nullptr);
+	device.destroySwapchainKHR(old_swapchain);
 
-	swapchain_images = device->logical.getSwapchainImagesKHR(swapchain);
+	swapchain_images = device.getSwapchainImagesKHR(swapchain);
 
 	for (u32 i = 0; i < swapchain_images.size(); i++)
 	{
-		swapchain_image_views.push_back(device->logical.createImageView({
+		swapchain_image_views.push_back(device.createImageView({
 		    {},
 		    swapchain_images[i],
 		    vk::ImageViewType::e2D,
-		    device->surface_format.format,
+		    surface.color_format,
 		    vk::ComponentMapping {
 		        vk::ComponentSwizzle::eIdentity,
 		        vk::ComponentSwizzle::eIdentity,
@@ -213,13 +219,13 @@ void Renderer::create_swapchain()
 
 	for (u32 i = 0; i < swapchain_images.size(); i++)
 	{
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImage,
 		    (u64)(VkImage)swapchain_images[i],
 		    fmt::format("swap_chain_image_{}", i).c_str(),
 		});
 
-		device->logical.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eImageView,
 		    (u64)(VkImageView)swapchain_image_views[i],
 		    fmt::format("swapchain_image_view_{}", i).c_str(),
@@ -229,12 +235,14 @@ void Renderer::create_swapchain()
 
 void Renderer::create_cmd_buffers()
 {
+	const auto device = vk_context->get_device();
+
 	cmd_buffers.resize(BVK_MAX_FRAMES_IN_FLIGHT);
 
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
 	{
-		cmd_buffers[i] = device->logical.allocateCommandBuffers({
-		    device->get_cmd_pool(i),
+		cmd_buffers[i] = device.allocateCommandBuffers({
+		    vk_context->get_cmd_pool(i),
 		    vk::CommandBufferLevel::ePrimary,
 		    1u,
 		})[0];
@@ -245,13 +253,14 @@ void Renderer::build_render_graph(
     std::string backbuffer_name,
     std::vector<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
     std::vector<Renderpass::CreateInfo> renderpasses,
-    void (*on_update)(Device*, RenderGraph*, u32, void*),
-    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
+    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
+    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
     vk::DebugUtilsLabelEXT graph_update_debug_label,
     vk::DebugUtilsLabelEXT graph_backbuffer_barrier_debug_label
 )
 {
-	render_graph.init(device, descriptor_pool, swapchain_images, swapchain_image_views);
+	const auto device = vk_context->get_device();
+	render_graph.init(vk_context, descriptor_pool, swapchain_images, swapchain_image_views);
 	render_graph.build(
 	    backbuffer_name,
 	    buffer_inputs,
@@ -270,29 +279,29 @@ void Renderer::begin_frame(void* user_pointer)
 
 void Renderer::end_frame(void* user_pointer)
 {
+	const auto device = vk_context->get_device();
+
 	if (is_swapchain_invalid)
 	{
 		return;
 	}
 
 	// Wait for frame's fence
-	auto render_fence = render_fences[current_frame];
+	const auto render_fence = render_fences[current_frame];
 
+	assert_false(device.waitForFences(render_fence, VK_TRUE, UINT64_MAX));
 
-	assert_false(device->logical.waitForFences(render_fence, VK_TRUE, UINT64_MAX));
-
-	device->logical.resetFences(render_fence);
+	device.resetFences(render_fence);
 
 	// Aquire next swapchain image
-	auto render_semaphore = render_semaphores[current_frame];
-	auto [result, image_index] =
-	    device->logical
-	        .acquireNextImageKHR(swapchain, UINT64_MAX, render_semaphore, VK_NULL_HANDLE);
+	const auto render_semaphore = render_semaphores[current_frame];
+	const auto [result, image_index] =
+	    device.acquireNextImageKHR(swapchain, UINT64_MAX, render_semaphore, VK_NULL_HANDLE);
 
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR
 	    || is_swapchain_invalid) [[unlikely]]
 	{
-		device->logical.waitIdle();
+		device.waitIdle();
 		is_swapchain_invalid = true;
 		return;
 	}
@@ -306,8 +315,8 @@ void Renderer::end_frame(void* user_pointer)
 	}
 
 	// Draw scene
-	auto cmd = cmd_buffers[current_frame];
-	device->logical.resetCommandPool(device->get_cmd_pool(current_frame));
+	const auto cmd = cmd_buffers[current_frame];
+	device.resetCommandPool(vk_context->get_cmd_pool(current_frame));
 	render_graph.end_frame(cmd, current_frame, image_index, user_pointer);
 
 	// Submit & present
@@ -326,10 +335,12 @@ void Renderer::submit_queue(
     vk::CommandBuffer cmd
 )
 {
+	const auto queues = vk_context->get_queues();
+
 	cmd.end();
 
 	vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	device->graphics_queue.submit(
+	queues.graphics.submit(
 	    vk::SubmitInfo {
 	        wait_semaphore,
 	        wait_stage,
@@ -342,9 +353,12 @@ void Renderer::submit_queue(
 
 void Renderer::present_frame(vk::Semaphore wait_semaphore, u32 image_index)
 {
+	const auto device = vk_context->get_device();
+	const auto queues = vk_context->get_queues();
+
 	try
 	{
-		vk::Result result = device->present_queue.presentKHR({
+		vk::Result result = queues.present.presentKHR({
 		    wait_semaphore,
 		    swapchain,
 		    image_index,
@@ -352,7 +366,7 @@ void Renderer::present_frame(vk::Semaphore wait_semaphore, u32 image_index)
 
 		if (result == vk::Result::eSuboptimalKHR || is_swapchain_invalid)
 		{
-			device->logical.waitIdle();
+			device.waitIdle();
 			is_swapchain_invalid = true;
 			return;
 		}
@@ -360,7 +374,7 @@ void Renderer::present_frame(vk::Semaphore wait_semaphore, u32 image_index)
 	// OutOfDateKHR is not considered a success value and throws an error (presentKHR)
 	catch (vk::OutOfDateKHRError err)
 	{
-		device->logical.waitIdle();
+		device.waitIdle();
 		is_swapchain_invalid = true;
 		return;
 	}

@@ -9,13 +9,13 @@
 namespace BINDLESSVK_NAMESPACE {
 
 GltfLoader::GltfLoader(
-    Device* device,
+    VkContext* vk_context,
     TextureLoader* texture_loader,
     Buffer* staging_vertex_buffer,
     Buffer* staging_index_buffer,
     Buffer* staging_texture_buffer
 )
-    : device(device)
+    : vk_context(vk_context)
     , texture_loader(texture_loader)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
@@ -54,7 +54,7 @@ void GltfLoader::load_gltf_model_from_ascii(const char* file_path)
 
 	if (!warn.empty())
 	{
-		device->log(LogLvl::eWarn, "gltf warning -> ", warn);
+		vk_context->log(LogLvl::eWarn, "gltf warning -> ", warn);
 	}
 }
 
@@ -138,7 +138,7 @@ void GltfLoader::write_vertex_buffer_to_gpu()
 {
 	model.vertex_buffer = new Buffer(
 	    fmt::format("{}_model_vb", model.name).c_str(),
-	    device,
+	    vk_context,
 	    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	    vma::AllocationCreateInfo {
 	        {},
@@ -163,7 +163,7 @@ void GltfLoader::write_index_buffer_to_gpu()
 {
 	model.index_buffer = new Buffer(
 	    fmt::format("{}_model_ib", model.name).c_str(),
-	    device,
+	    vk_context,
 	    vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	    vma::AllocationCreateInfo {
 	        {},
@@ -183,7 +183,7 @@ void GltfLoader::write_index_buffer_to_gpu()
 	    }
 	);
 
-	device->logical.waitIdle();
+	vk_context->get_device().waitIdle();
 }
 
 void GltfLoader::load_mesh_primitives(const tinygltf::Mesh& gltf_mesh, Model::Node* node)

@@ -2,7 +2,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-SpvLoader::SpvLoader(Device* device): device(device)
+SpvLoader::SpvLoader(VkContext* vk_context): vk_context(vk_context)
 {
 }
 
@@ -40,7 +40,7 @@ void SpvLoader::reflect_code()
 
 void SpvLoader::create_vulkan_shader_module()
 {
-	shader.module = device->logical.createShaderModule(vk::ShaderModuleCreateInfo {
+	shader.module = vk_context->get_device().createShaderModule(vk::ShaderModuleCreateInfo {
 	    {},
 	    code.size() * sizeof(u32),
 	    code.data(),

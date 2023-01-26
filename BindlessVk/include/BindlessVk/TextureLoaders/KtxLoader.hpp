@@ -2,8 +2,8 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Texture.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #include <AssetParser.hpp>
 #include <TextureAsset.hpp>
@@ -18,7 +18,7 @@ namespace BINDLESSVK_NAMESPACE {
 class KtxLoader
 {
 public:
-	KtxLoader(Device* device, Buffer* staging_buffer);
+	KtxLoader(VkContext* vk_context, Buffer* staging_buffer);
 	KtxLoader() = default;
 	~KtxLoader() = default;
 
@@ -43,7 +43,7 @@ private:
 	vec<vk::BufferImageCopy> create_texture_face_buffer_copies();
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 	Buffer* staging_buffer = {};
 
 	Texture texture = {};

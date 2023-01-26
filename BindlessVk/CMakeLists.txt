@@ -3,8 +3,7 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     BindlessVk
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Device.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/VkContext.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
@@ -19,6 +18,8 @@ add_library(
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderLoaders/SpvLoader.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
 )
 
 set_target_properties(

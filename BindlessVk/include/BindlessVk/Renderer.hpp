@@ -1,8 +1,8 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/RenderGraph.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,14 +11,13 @@ class Renderer
 public:
 	Renderer() = default;
 
-	Renderer(Device* device);
+	Renderer(VkContext* vk_context);
 
 	Renderer(Renderer&& other);
 	Renderer(const Renderer& rhs) = delete;
 
 	Renderer& operator=(Renderer&& rhs);
 	Renderer& operator=(const Renderer& rhs) = delete;
-
 
 	~Renderer();
 
@@ -32,26 +31,26 @@ public:
 	    std::string backbuffer_name,
 	    std::vector<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
 	    std::vector<Renderpass::CreateInfo> renderpasses,
-	    void (*on_update)(Device*, RenderGraph*, u32, void*),
-	    void (*on_begin_frame)(Device*, RenderGraph*, u32, void*),
+	    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
+	    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
 	    vk::DebugUtilsLabelEXT graph_update_debug_label,
 	    vk::DebugUtilsLabelEXT graph_backbuffer_barrier_debug_label
 	);
 
 	/** @return descriptor pool  */
-	inline vk::DescriptorPool get_descriptor_pool() const
+	inline auto get_descriptor_pool() const
 	{
 		return descriptor_pool;
 	}
 
 	/** @return swapchain image count  */
-	inline u32 get_image_count() const
+	inline auto get_image_count() const
 	{
 		return swapchain_images.size();
 	}
 
 	/** @return wether or not swapchain is invalidated  */
-	inline bool is_swapchain_invalidated() const
+	inline auto is_swapchain_invalidated() const
 	{
 		return is_swapchain_invalid;
 	}
@@ -75,7 +74,7 @@ private:
 	void present_frame(vk::Semaphore wait_semaphore, uint32_t image_index);
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 	RenderGraph render_graph = {};
 
 	// Sync objects

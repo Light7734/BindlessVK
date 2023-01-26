@@ -15,7 +15,7 @@ public:
 	~Logger();
 
 	template<typename... Args>
-	inline void log(spdlog::level::level_enum level, fmt::format_string<Args...> fmt, Args&&... args)
+	inline void log(spdlog::level::level_enum level, fmt::format_string<Args...> fmt = "", Args&&... args)
 	  const
 	{
 		logger->log(level, fmt, std::forward<Args>(args)...);

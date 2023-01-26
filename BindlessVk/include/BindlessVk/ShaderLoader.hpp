@@ -1,8 +1,8 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Shader.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,9 +11,9 @@ class ShaderLoader
 public:
 	/**
 	 * @brief Main constructor
-	 * @param device the bindlessvk device
+	 * @param vk_context the vulkan context
 	 */
-	ShaderLoader(Device* device);
+	ShaderLoader(VkContext* vk_context);
 
 	/** @brief Default constructor */
 	ShaderLoader() = default;
@@ -34,7 +34,7 @@ public:
 	Shader load_from_hlsl(c_str file_path) = delete;
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

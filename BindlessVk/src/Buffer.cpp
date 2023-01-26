@@ -3,20 +3,23 @@
 namespace BINDLESSVK_NAMESPACE {
 
 Buffer::Buffer(
-    const char* debug_name,
-    Device* device,
+    c_str debug_name,
+    VkContext* vk_context,
     vk::BufferUsageFlags buffer_usage,
     const vma::AllocationCreateInfo& vma_info,
     vk::DeviceSize desired_block_size,
     u32 block_count
 )
-    : device(device)
+    : vk_context(vk_context)
     , block_count(block_count)
     , valid_block_size(desired_block_size)
 {
 	calculate_block_size();
 
-	buffer = device->allocator.createBuffer(
+	const auto device = vk_context->get_device();
+	const auto allocator = vk_context->get_allocator();
+
+	buffer = allocator.createBuffer(
 	    {
 	        {},
 	        whole_size,
@@ -32,13 +35,13 @@ Buffer::Buffer(
 		VK_WHOLE_SIZE,
 	};
 
-	device->allocator.setAllocationName(buffer.allocation, debug_name);
-	device->set_object_name(buffer.buffer, debug_name);
+	allocator.setAllocationName(buffer.allocation, debug_name);
+	vk_context->set_object_name(buffer.buffer, debug_name);
 }
 
 Buffer::~Buffer()
 {
-	device->allocator.destroyBuffer(buffer, buffer);
+	vk_context->get_allocator().destroyBuffer(buffer, buffer);
 }
 
 void Buffer::write_data(const void* src_data, usize src_data_size, u32 block_index)
@@ -49,14 +52,15 @@ void Buffer::write_data(const void* src_data, usize src_data_size, u32 block_ind
 
 void Buffer::write_buffer(const Buffer& src_buffer, const vk::BufferCopy& src_copy)
 {
-	device->immediate_submit([&](vk::CommandBuffer cmd) {
+	vk_context->immediate_submit([&](vk::CommandBuffer cmd) {
 		cmd.copyBuffer(*const_cast<Buffer&>(src_buffer).get_buffer(), buffer, 1u, &src_copy);
 	});
 }
 
 void Buffer::calculate_block_size()
 {
-	const auto min_alignment = device->properties.limits.minUniformBufferOffsetAlignment;
+	const auto gpu_properties = vk_context->get_gpu().getProperties();
+	const auto min_alignment = gpu_properties.limits.minUniformBufferOffsetAlignment;
 
 	// Round up minBlockSize to be the next multiple of minUniformBufferOffsetAlignment
 	block_size = (valid_block_size + min_alignment - 1) & -min_alignment;
@@ -65,12 +69,12 @@ void Buffer::calculate_block_size()
 
 void* Buffer::map_block(u32 block_index)
 {
-	return ((uint8_t*)device->allocator.mapMemory(buffer)) + (block_size * block_index);
+	return ((u8*)vk_context->get_allocator().mapMemory(buffer)) + (block_size * block_index);
 }
 
 void Buffer::unmap()
 {
-	device->allocator.unmapMemory(buffer);
+	vk_context->get_allocator().unmapMemory(buffer);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

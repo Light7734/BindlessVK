@@ -120,10 +120,10 @@ PenaltyBreakAssignment: '0'
 PenaltyBreakBeforeFirstCallParameter: '0'
 PenaltyBreakComment: '0'
 PenaltyBreakFirstLessLess: '0'
-PenaltyBreakString: '0'
+PenaltyBreakString: '99'
 PenaltyBreakTemplateDeclaration: '0'
 PenaltyExcessCharacter: '999999999'
-PenaltyReturnTypeOnItsOwnLine: '9999999' # Nope
+PenaltyReturnTypeOnItsOwnLine: '999999' # Nope
 
 # Constructor Initializers
 ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'

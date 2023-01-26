@@ -2,9 +2,9 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Model.hpp"
 #include "BindlessVk/TextureLoader.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #include <glm/glm.hpp>
 #include <tiny_gltf.h>
@@ -19,7 +19,7 @@ class GltfLoader
 {
 public:
 	GltfLoader(
-	    Device* device,
+	    VkContext* vk_context,
 	    TextureLoader* texture_loader,
 	    Buffer* staging_vertex_buffer,
 	    Buffer* staging_index_buffer,
@@ -65,7 +65,7 @@ private:
 	bool node_has_any_mesh(const tinygltf::Node& gltf_node);
 
 private:
-	Device* device = {};
+	VkContext* vk_context = {};
 	TextureLoader* texture_loader = {};
 
 	tinygltf::Model gltf_model = {};

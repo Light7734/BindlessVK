@@ -1,9 +1,9 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
 #include "BindlessVk/Model.hpp"
 #include "BindlessVk/TextureLoader.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 #include <glm/glm.hpp>
 
@@ -25,10 +25,10 @@ class ModelLoader
 public:
 	/**
 	 * @brief Main constructor
-	 * @param device the bindlessvk device
+	 * @param vk_context the vulkan context
 	 * @param texture_system the bindlessvk texture system, ModelLoader may load textures
 	 */
-	ModelLoader(Device* device, TextureLoader* texture_system);
+	ModelLoader(VkContext* vk_context, TextureLoader* texture_system);
 
 	/** @brief Default constructor */
 	ModelLoader() = default;
@@ -59,7 +59,7 @@ public:
 	Model load_from_obj() = delete;
 
 private:
-	Device* device;
+	VkContext* vk_context;
 	TextureLoader* texture_loader;
 };
 

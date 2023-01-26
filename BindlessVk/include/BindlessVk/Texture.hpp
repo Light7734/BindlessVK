@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Device.hpp"
+#include "BindlessVk/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -33,7 +33,7 @@ struct Texture
 	AllocatedImage image;
 
 	inline void transition_layout(
-	    Device* device,
+	    bvk::VkContext* vk_context,
 	    vk::CommandBuffer cmd,
 	    u32 base_mip_level,
 	    u32 level_count,
@@ -105,7 +105,7 @@ struct Texture
 
 		else
 		{
-			device->log(
+			vk_context->log(
 			    LogLvl::eError,
 			    "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
 			    static_cast<i32>(current_layout),

@@ -20,20 +20,20 @@ struct SceneData
 };
 
 inline void render_graph_update(
-  bvk::Device* device,
+  bvk::VkContext* vk_context,
   bvk::RenderGraph* render_graph,
   uint32_t frame_index,
   void* user_pointer
 )
 {
-	Scene* scene = (Scene*)user_pointer;
+	auto* scene = reinterpret_cast<Scene*>(user_pointer);
 
 	scene->group(entt::get<TransformComponent, CameraComponent>)
 	  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
 		  *(CameraData*)render_graph->map_descriptor_buffer("frame_data", frame_index) = {
 			  .projection = cameraComp.GetProjection(),
-			  .view       = cameraComp.GetView(transformComp.translation),
-			  .viewPos    = glm::vec4(transformComp.translation, 1.0f),
+			  .view = cameraComp.GetView(transformComp.translation),
+			  .viewPos = glm::vec4(transformComp.translation, 1.0f),
 		  };
 		  render_graph->unmap_descriptor_buffer("frame_data");
 	  });

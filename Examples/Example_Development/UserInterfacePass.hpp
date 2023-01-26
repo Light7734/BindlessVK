@@ -8,7 +8,7 @@
 #include <imgui.h>
 
 inline void user_interface_pass_begin_frame(
-  bvk::Device* device,
+  bvk::VkContext* vk_context,
   bvk::RenderGraph* render_graph,
   bvk::Renderpass* render_pass,
   uint32_t frame_index,
@@ -21,7 +21,7 @@ inline void user_interface_pass_begin_frame(
 }
 
 inline void user_interface_pass_update(
-  bvk::Device* device,
+  bvk::VkContext* vk_context,
   bvk::RenderGraph* render_graph,
   bvk::Renderpass* render_pass,
   uint32_t frame_index,
@@ -32,7 +32,7 @@ inline void user_interface_pass_update(
 }
 
 inline void user_interface_pass_render(
-  bvk::Device* device,
+  bvk::VkContext* vk_context,
   bvk::RenderGraph* render_graph,
   bvk::Renderpass* render_pass,
   vk::CommandBuffer cmd,

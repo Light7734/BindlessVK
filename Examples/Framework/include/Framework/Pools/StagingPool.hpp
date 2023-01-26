@@ -8,7 +8,7 @@ class StagingPool
 public:
 	StagingPool() = default;
 
-	StagingPool(u32 count, usize size, bvk::Device* device);
+	StagingPool(u32 count, usize size, bvk::VkContext* vk_context);
 
 	StagingPool(StagingPool&& other);
 	StagingPool(const StagingPool& rhs) = delete;

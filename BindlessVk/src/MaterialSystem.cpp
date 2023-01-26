@@ -5,17 +5,19 @@
 namespace BINDLESSVK_NAMESPACE {
 
 ShaderEffect::ShaderEffect(
-    Device* device,
+    VkContext* vk_context,
     vec<Shader*> shaders,
     ShaderEffect::Configuration configuration
 )
-    : device(device)
+    : vk_context(vk_context)
 {
 	create_descriptor_sets_layout(shaders);
 
+	const auto device = vk_context->get_device();
+	const auto surface = vk_context->get_surface();
 	const auto pipeline_shader_stage_create_infos = create_pipeline_shader_stage_infos(shaders);
 
-	pipeline_layout = device->logical.createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	pipeline_layout = device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
 	    {},
 	    static_cast<u32>(descriptor_sets_layout.size()),
 	    descriptor_sets_layout.data(),
@@ -24,8 +26,8 @@ ShaderEffect::ShaderEffect(
 	const auto pipeline_rendering_info = vk::PipelineRenderingCreateInfo {
 		{},
 		1u,
-		&device->surface_format.format,
-		device->depth_format, //
+		&surface.color_format,
+		vk_context->get_depth_format(), //
 		{},
 	};
 
@@ -43,12 +45,12 @@ ShaderEffect::ShaderEffect(ShaderEffect&& effect)
 
 ShaderEffect& ShaderEffect::operator=(ShaderEffect&& effect)
 {
-	this->device = effect.device;
+	this->vk_context = effect.vk_context;
 	this->pipeline = effect.pipeline;
 	this->pipeline_layout = effect.pipeline_layout;
 	this->descriptor_sets_layout = effect.descriptor_sets_layout;
 
-	effect.device = {};
+	effect.vk_context = {};
 	effect.pipeline = VK_NULL_HANDLE;
 	effect.pipeline_layout = VK_NULL_HANDLE;
 	effect.descriptor_sets_layout = {};
@@ -59,23 +61,26 @@ ShaderEffect& ShaderEffect::operator=(ShaderEffect&& effect)
 
 ShaderEffect::~ShaderEffect()
 {
-	if (device)
+	if (vk_context)
 	{
-		device->logical.destroyPipeline(pipeline);
-		device->logical.destroyPipelineLayout(pipeline_layout);
-		device->logical.destroyDescriptorSetLayout(descriptor_sets_layout[0]);
-		device->logical.destroyDescriptorSetLayout(descriptor_sets_layout[1]);
+		const auto device = vk_context->get_device();
+
+		device.destroyPipeline(pipeline);
+		device.destroyPipelineLayout(pipeline_layout);
+		device.destroyDescriptorSetLayout(descriptor_sets_layout[0]);
+		device.destroyDescriptorSetLayout(descriptor_sets_layout[1]);
 	}
 }
 
 void ShaderEffect::create_descriptor_sets_layout(vec<Shader*> shaders)
 {
+	const auto device = vk_context->get_device();
 	const auto sets_bindings = combine_descriptor_sets_bindings(shaders);
 
 	for (u32 i = 0u; const auto& set_bindings : sets_bindings)
 	{
 		descriptor_sets_layout[i++] =
-		    device->logical.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
+		    device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
 		        {},
 		        static_cast<u32>(set_bindings.size()),
 		        set_bindings.data(),
@@ -137,6 +142,8 @@ vk::Pipeline ShaderEffect::create_graphics_pipeline(
     ShaderEffect::Configuration configuration
 )
 {
+	const auto device = vk_context->get_device();
+
 	const auto color_blend_state = vk::PipelineColorBlendStateCreateInfo {
 		{},
 		{},
@@ -172,7 +179,7 @@ vk::Pipeline ShaderEffect::create_graphics_pipeline(
 		&rendering_info,
 	};
 
-	const auto pipeline = device->logical.createGraphicsPipeline({}, graphics_pipeline_info);
+	const auto pipeline = device.createGraphicsPipeline({}, graphics_pipeline_info);
 	assert_false(pipeline.result);
 
 	return pipeline.value;

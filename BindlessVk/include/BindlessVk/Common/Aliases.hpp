@@ -1,5 +1,15 @@
 #pragma once
 
+#include <array>
+#include <functional>
+#include <inttypes.h>
+#include <map>
+#include <set>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 namespace BINDLESSVK_NAMESPACE {
 
 // primitve type aliases
