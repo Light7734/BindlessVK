@@ -3,12 +3,12 @@
 namespace BINDLESSVK_NAMESPACE {
 
 Buffer::Buffer(
-    c_str debug_name,
-    VkContext* vk_context,
-    vk::BufferUsageFlags buffer_usage,
-    const vma::AllocationCreateInfo& vma_info,
-    vk::DeviceSize desired_block_size,
-    u32 block_count
+    c_str const debug_name,
+    VkContext const *const vk_context,
+    vk::BufferUsageFlags const buffer_usage,
+    vma::AllocationCreateInfo const &vma_info,
+    vk::DeviceSize const desired_block_size,
+    u32 const block_count
 )
     : vk_context(vk_context)
     , block_count(block_count)
@@ -41,19 +41,26 @@ Buffer::Buffer(
 
 Buffer::~Buffer()
 {
+	if (!vk_context)
+		return;
+
 	vk_context->get_allocator().destroyBuffer(buffer, buffer);
 }
 
-void Buffer::write_data(const void* src_data, usize src_data_size, u32 block_index)
+void Buffer::write_data(
+    void const *const src_data,
+    usize const src_data_size,
+    u32 const block_index
+)
 {
 	memcpy(map_block(block_index), src_data, src_data_size);
 	unmap();
 }
 
-void Buffer::write_buffer(const Buffer& src_buffer, const vk::BufferCopy& src_copy)
+void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_copy)
 {
 	vk_context->immediate_submit([&](vk::CommandBuffer cmd) {
-		cmd.copyBuffer(*const_cast<Buffer&>(src_buffer).get_buffer(), buffer, 1u, &src_copy);
+		cmd.copyBuffer(*const_cast<Buffer &>(src_buffer).get_buffer(), buffer, 1u, &src_copy);
 	});
 }
 
@@ -67,9 +74,9 @@ void Buffer::calculate_block_size()
 	whole_size = block_size * block_count;
 }
 
-void* Buffer::map_block(u32 block_index)
+void *Buffer::map_block(u32 const block_index)
 {
-	return ((u8*)vk_context->get_allocator().mapMemory(buffer)) + (block_size * block_index);
+	return ((u8 *)vk_context->get_allocator().mapMemory(buffer)) + (block_size * block_index);
 }
 
 void Buffer::unmap()

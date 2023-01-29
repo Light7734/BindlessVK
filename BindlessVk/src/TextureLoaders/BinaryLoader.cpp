@@ -2,7 +2,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-BinaryLoader::BinaryLoader(VkContext* vk_context, Buffer* staging_buffer)
+BinaryLoader::BinaryLoader(VkContext const *const vk_context, Buffer *staging_buffer)
     : vk_context(vk_context)
     , staging_buffer(staging_buffer)
 {
@@ -10,7 +10,7 @@ BinaryLoader::BinaryLoader(VkContext* vk_context, Buffer* staging_buffer)
 
 Texture BinaryLoader::load(
     c_str name,
-    u8* pixels,
+    u8 const *const pixels,
     u32 width,
     u32 height,
     vk::DeviceSize size,
@@ -76,60 +76,54 @@ void BinaryLoader::create_image()
 
 void BinaryLoader::create_image_view()
 {
-	texture.image_view = vk_context->get_device().createImageView(
-	    vk::ImageViewCreateInfo {
-	        {},
-	        texture.image,
-	        vk::ImageViewType::e2D,
-	        vk::Format::eR8G8B8A8Srgb,
-	        vk::ComponentMapping {
-	            vk::ComponentSwizzle::eIdentity,
-	            vk::ComponentSwizzle::eIdentity,
-	            vk::ComponentSwizzle::eIdentity,
-	            vk::ComponentSwizzle::eIdentity,
-	        },
-	        vk::ImageSubresourceRange {
-	            vk::ImageAspectFlagBits::eColor,
-	            0u,
-	            texture.mip_levels,
-	            0u,
-	            1u,
-	        },
+	texture.image_view = vk_context->get_device().createImageView(vk::ImageViewCreateInfo {
+	    {},
+	    texture.image,
+	    vk::ImageViewType::e2D,
+	    vk::Format::eR8G8B8A8Srgb,
+	    vk::ComponentMapping {
+	        vk::ComponentSwizzle::eIdentity,
+	        vk::ComponentSwizzle::eIdentity,
+	        vk::ComponentSwizzle::eIdentity,
+	        vk::ComponentSwizzle::eIdentity,
 	    },
-	    nullptr
-	);
+	    vk::ImageSubresourceRange {
+	        vk::ImageAspectFlagBits::eColor,
+	        0u,
+	        texture.mip_levels,
+	        0u,
+	        1u,
+	    },
+	});
 
 	texture.descriptor_info.imageView = texture.image_view;
 }
 
 void BinaryLoader::create_sampler()
 {
-	texture.sampler = vk_context->get_device().createSampler(
-	    vk::SamplerCreateInfo {
-	        {},
-	        vk::Filter::eLinear,
-	        vk::Filter::eLinear,
-	        vk::SamplerMipmapMode::eLinear,
-	        vk::SamplerAddressMode::eRepeat,
-	        vk::SamplerAddressMode::eRepeat,
-	        vk::SamplerAddressMode::eRepeat,
-	        0.0f,
-	        VK_FALSE,
-	        {},
-	        VK_FALSE,
-	        vk::CompareOp::eAlways,
-	        0.0f,
-	        static_cast<float>(texture.mip_levels),
-	        vk::BorderColor::eIntOpaqueBlack,
-	        VK_FALSE,
-	    },
-	    nullptr
-	);
+	texture.sampler = vk_context->get_device().createSampler(vk::SamplerCreateInfo {
+	    {},
+	    vk::Filter::eLinear,
+	    vk::Filter::eLinear,
+	    vk::SamplerMipmapMode::eLinear,
+	    vk::SamplerAddressMode::eRepeat,
+	    vk::SamplerAddressMode::eRepeat,
+	    vk::SamplerAddressMode::eRepeat,
+	    0.0f,
+	    VK_FALSE,
+	    {},
+	    VK_FALSE,
+	    vk::CompareOp::eAlways,
+	    0.0f,
+	    static_cast<f32>(texture.mip_levels),
+	    vk::BorderColor::eIntOpaqueBlack,
+	    VK_FALSE,
+	});
 
 	texture.descriptor_info.sampler = texture.sampler;
 }
 
-void BinaryLoader::stage_texture_data(u8* pixels, vk::DeviceSize size)
+void BinaryLoader::stage_texture_data(u8 const *const pixels, vk::DeviceSize size)
 {
 	memcpy(staging_buffer->map_block(0), pixels, size);
 	staging_buffer->unmap();

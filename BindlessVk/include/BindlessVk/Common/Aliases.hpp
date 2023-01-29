@@ -26,7 +26,7 @@ using f64 = double;
 using usize = size_t;
 
 // c-style string alias
-using c_str = const char*;
+using c_str = char const *;
 
 // standard type aliases
 using str = std::string;

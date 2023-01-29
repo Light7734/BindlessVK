@@ -19,21 +19,21 @@ class GltfLoader
 {
 public:
 	GltfLoader(
-	    VkContext* vk_context,
-	    TextureLoader* texture_loader,
-	    Buffer* staging_vertex_buffer,
-	    Buffer* staging_index_buffer,
-	    Buffer* staging_texture_buffer
+	    VkContext const *vk_context,
+	    TextureLoader const *texture_loader,
+	    Buffer *staging_vertex_buffer,
+	    Buffer *staging_index_buffer,
+	    Buffer *staging_texture_buffer
 	);
 	GltfLoader() = default;
 	~GltfLoader() = default;
 
-	Model load_from_ascii(const char* debug_name, const char* file_path);
-	Model load_from_binary(const char* debug_name, const char* file_path) = delete;
+	auto load_from_ascii(c_str debug_name, c_str file_path) -> Model;
+	auto load_from_binary(c_str debug_name, c_str file_path) -> Model = delete;
 
 private:
-	void load_gltf_model_from_ascii(const char* file_path);
-	void load_gltf_model_from_binary(const char* file_path) = delete;
+	void load_gltf_model_from_ascii(c_str file_path);
+	void load_gltf_model_from_binary(c_str file_path) = delete;
 
 	void load_textures();
 	void load_material_parameters();
@@ -41,42 +41,42 @@ private:
 
 	void write_mesh_data_to_gpu();
 
-	Model::Node* load_node(const tinygltf::Node& gltf_node, Model::Node* parent_node);
+	auto load_node(tinygltf::Node const &gltf_node, Model::Node *parent_node) -> Model::Node *;
 
 	void write_vertex_buffer_to_gpu();
 	void write_index_buffer_to_gpu();
 
-	void load_mesh_primitives(const tinygltf::Mesh& gltf_mesh, Model::Node* node);
+	void load_mesh_primitives(tinygltf::Mesh const &gltf_mesh, Model::Node *node);
 
-	void load_mesh_primitive_vertices(const tinygltf::Primitive& gltf_primitive);
-	u32 load_mesh_primitive_indices(const tinygltf::Primitive& gltf_primitive);
+	void load_mesh_primitive_vertices(tinygltf::Primitive const &gltf_primitive);
+	auto load_mesh_primitive_indices(tinygltf::Primitive const &gltf_primitive) -> u32;
 
-	const f32* get_primitive_attribute_buffer(
-	    const tinygltf::Primitive& gltf_primitive,
-	    const char* attribute_name
-	);
+	auto get_primitive_attribute_buffer(
+	    const tinygltf::Primitive &gltf_primitive,
+	    const char *attribute_name
+	) -> const f32 *;
 
-	usize get_primitive_vertex_count(const tinygltf::Primitive& gltf_primitive);
-	usize get_primitive_index_count(const tinygltf::Primitive& gltf_primitive);
+	auto get_primitive_vertex_count(tinygltf::Primitive const &gltf_primitive) -> usize;
+	auto get_primitive_index_count(tinygltf::Primitive const &gltf_primitive) -> usize;
 
-	void set_initial_node_transform(const tinygltf::Node& gltf_node, Model::Node* node);
+	void set_initial_node_transform(tinygltf::Node const &gltf_node, Model::Node *node);
 
-	bool node_has_any_children(const tinygltf::Node& gltf_node);
-	bool node_has_any_mesh(const tinygltf::Node& gltf_node);
+	auto node_has_any_children(tinygltf::Node const &gltf_node) -> bool;
+	auto node_has_any_mesh(tinygltf::Node const &gltf_node) -> bool;
 
 private:
-	VkContext* vk_context = {};
-	TextureLoader* texture_loader = {};
+	VkContext const *const vk_context = {};
+	TextureLoader const *const texture_loader = {};
 
 	tinygltf::Model gltf_model = {};
 	Model model = {};
 
-	Buffer* staging_vertex_buffer = {};
-	Buffer* staging_index_buffer = {};
-	Buffer* staging_texture_buffer = {};
+	Buffer *staging_vertex_buffer = {};
+	Buffer *staging_index_buffer = {};
+	Buffer *staging_texture_buffer = {};
 
-	Model::Vertex* vertex_map = {};
-	u32* index_map = {};
+	Model::Vertex *vertex_map = {};
+	u32 *index_map = {};
 
 	usize vertex_count = {};
 	usize index_count = {};

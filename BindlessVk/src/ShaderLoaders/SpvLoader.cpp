@@ -2,11 +2,11 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-SpvLoader::SpvLoader(VkContext* vk_context): vk_context(vk_context)
+SpvLoader::SpvLoader(VkContext const *const vk_context): vk_context(vk_context)
 {
 }
 
-Shader SpvLoader::load(c_str path)
+Shader SpvLoader::load(c_str const path)
 {
 	load_code(path);
 	reflect_code();
@@ -16,15 +16,15 @@ Shader SpvLoader::load(c_str path)
 	return shader;
 }
 
-void SpvLoader::load_code(c_str path)
+void SpvLoader::load_code(c_str const path)
 {
-	std::ifstream stream(path, std::ios::ate);
-	const usize file_size = stream.tellg();
+	auto file_stream = std::ifstream(path, std::ios::ate);
+	usize const file_size = file_stream.tellg();
 	code.resize(file_size / sizeof(u32));
 
-	stream.seekg(0);
-	stream.read((char*)code.data(), file_size);
-	stream.close();
+	file_stream.seekg(0);
+	file_stream.read((char *)code.data(), file_size);
+	file_stream.close();
 }
 
 void SpvLoader::reflect_code()
@@ -55,7 +55,7 @@ void SpvLoader::reflect_descriptor_sets()
 	    "spvReflectEnumerateDescriptorSets failed"
 	);
 
-	vec<SpvReflectDescriptorSet*> descriptor_sets_reflection(descriptor_sets_count);
+	vec<SpvReflectDescriptorSet *> descriptor_sets_reflection(descriptor_sets_count);
 	assert_false(
 	    spvReflectEnumerateDescriptorSets(
 	        &reflection,
@@ -65,19 +65,18 @@ void SpvLoader::reflect_descriptor_sets()
 	    "spvReflectEnumerateDescriptorSets failed"
 	);
 
-	for (const auto& spv_set : descriptor_sets_reflection)
+	for (auto const &spv_set : descriptor_sets_reflection)
 		shader.descriptor_sets_bindings[spv_set->set] = reflect_descriptor_set_bindings(spv_set);
 }
 
-vec<vk::DescriptorSetLayoutBinding> SpvLoader::reflect_descriptor_set_bindings(
-    SpvReflectDescriptorSet* spv_set
-)
+auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *const spv_set)
+    -> vec<vk::DescriptorSetLayoutBinding>
 {
 	vec<vk::DescriptorSetLayoutBinding> bindings = {};
 
 	for (u32 i_binding = 0; i_binding < spv_set->binding_count; ++i_binding)
 	{
-		const auto& spv_binding = *spv_set->bindings[i_binding];
+		const auto &spv_binding = *spv_set->bindings[i_binding];
 		if (bindings.size() < spv_binding.binding + 1u)
 			bindings.resize(spv_binding.binding + 1u);
 
@@ -90,9 +89,8 @@ vec<vk::DescriptorSetLayoutBinding> SpvLoader::reflect_descriptor_set_bindings(
 	return bindings;
 }
 
-vk::DescriptorSetLayoutBinding SpvLoader::extract_descriptor_set_binding(
-    SpvReflectDescriptorBinding* binding
-)
+auto SpvLoader::extract_descriptor_set_binding(SpvReflectDescriptorBinding const *const binding)
+    -> vk::DescriptorSetLayoutBinding
 {
 	vk::DescriptorSetLayoutBinding set_binding;
 	set_binding = binding->binding;

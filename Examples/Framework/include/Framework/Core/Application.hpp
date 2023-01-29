@@ -23,21 +23,16 @@ public:
 	Application();
 	virtual ~Application();
 
-	static VkBool32 vulkan_debug_message_callback(
-	  VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-	  VkDebugUtilsMessageTypeFlagsEXT message_types,
-	  const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-	  void* user_data
-	);
-
 	virtual void on_tick(double delta_time) = 0;
 	virtual void on_swapchain_recreate() = 0;
 
 public:
+	Logger logger = Logger();
+
 	Window window = {};
 	Scene scene = {};
 
-	bvk::VkContext vk_context;
+	bvk::VkContext vk_context = {};
 	bvk::Renderer renderer = {};
 
 	bvk::TextureLoader texture_loader = {};
@@ -60,9 +55,13 @@ public:
 
 	StagingPool staging_pool = {};
 
-	Logger logger;
+private:
+	vk::PhysicalDeviceFeatures physical_device_features;
 
 protected:
 	u64 messenger_warn_count = {};
 	u64 messenger_err_count = {};
+
+private:
+	void load_default_textures();
 };

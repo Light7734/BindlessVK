@@ -88,7 +88,7 @@ SpacesInParentheses: 'false'
 SpacesInSquareBrackets: 'false'
 
 # Alignment 
-PointerAlignment: Left
+PointerAlignment: Right
 DerivePointerAlignment: 'false'
 AlignEscapedNewlines: Left
 AlignAfterOpenBracket: BlockIndent

@@ -43,7 +43,7 @@ struct Renderpass
 			vk::DescriptorType type;
 			vk::ShaderStageFlagBits stage_mask;
 
-			class Texture* default_texture;
+			class Texture const *default_texture;
 		};
 
 		struct BufferInputInfo
@@ -55,21 +55,21 @@ struct Renderpass
 			vk::ShaderStageFlagBits stage_mask;
 
 			size_t size;
-			void* initial_data;
+			void *initial_data;
 		};
 
 		std::string name;
 
-		void (*on_begin_frame)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
-		void (*on_update)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
+		void (*on_begin_frame)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
+		void (*on_update)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
 		void (*on_render
-		)(VkContext*,
-		  class RenderGraph*,
-		  Renderpass*,
+		)(VkContext *,
+		  class RenderGraph *,
+		  Renderpass *,
 		  vk::CommandBuffer cmd,
 		  uint32_t,
 		  uint32_t,
-		  void*);
+		  void *);
 
 		vec<CreateInfo::AttachmentInfo> color_attachments_info;
 		CreateInfo::AttachmentInfo depth_stencil_attachment_info;
@@ -77,7 +77,7 @@ struct Renderpass
 		vec<CreateInfo::TextureInputInfo> texture_inputs_info;
 		vec<CreateInfo::BufferInputInfo> buffer_inputs_info;
 
-		void* user_pointer;
+		void *user_pointer;
 
 		vk::DebugUtilsLabelEXT update_debug_label;
 		vk::DebugUtilsLabelEXT barrier_debug_label;
@@ -103,23 +103,23 @@ struct Renderpass
 
 	vec<Attachment> attachments;
 
-	std::unordered_map<uint64_t, class Buffer*> buffer_inputs;
+	hash_map<u64, class Buffer *> buffer_inputs;
 
 	vec<vk::DescriptorSet> descriptor_sets;
 	vk::DescriptorSetLayout descriptor_set_layout;
 	vk::PipelineLayout pipeline_layout;
 
-	void (*on_begin_frame)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
-	void (*on_update)(VkContext*, class RenderGraph*, Renderpass*, uint32_t, void*);
+	void (*on_begin_frame)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
+	void (*on_update)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
 
 	void (*on_render
-	)(VkContext*,
-	  class RenderGraph*,
-	  Renderpass*,
+	)(VkContext *,
+	  class RenderGraph *,
+	  Renderpass *,
 	  vk::CommandBuffer cmd,
 	  uint32_t,
 	  uint32_t,
-	  void*);
+	  void *);
 
 
 	vec<vk::Format> color_attachments_format;
@@ -129,7 +129,7 @@ struct Renderpass
 	vk::CommandBufferInheritanceInfo cmd_buffer_inheritance_info;
 	vk::CommandBufferBeginInfo cmd_buffer_begin_info;
 
-	void* user_pointer;
+	void *user_pointer;
 
 	vk::DebugUtilsLabelEXT update_debug_label;
 	vk::DebugUtilsLabelEXT barrier_debug_label;

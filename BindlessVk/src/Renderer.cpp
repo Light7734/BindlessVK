@@ -17,33 +17,38 @@ Renderer::Renderer(Renderer&& other)
 	*this = std::move(other);
 }
 
-Renderer& Renderer::operator=(Renderer&& rhs)
+Renderer& Renderer::operator=(Renderer&& other)
 {
-	this->vk_context = rhs.vk_context;
-	this->render_graph = rhs.render_graph;
-	this->render_fences = rhs.render_fences;
-	this->render_semaphores = rhs.render_semaphores;
-	this->present_semaphores = rhs.present_semaphores;
-	this->is_swapchain_invalid = rhs.is_swapchain_invalid;
-	this->swapchain = rhs.swapchain;
-	this->swapchain_images = rhs.swapchain_images;
-	this->swapchain_image_views = rhs.swapchain_image_views;
-	this->descriptor_pool = rhs.descriptor_pool;
-	this->cmd_buffers = rhs.cmd_buffers;
-	this->current_frame = rhs.current_frame;
+	if (this == &other)
+		return *this;
 
-	rhs.vk_context = {};
+	this->vk_context = other.vk_context;
+	this->render_graph = other.render_graph;
+	this->render_fences = other.render_fences;
+	this->render_semaphores = other.render_semaphores;
+	this->present_semaphores = other.present_semaphores;
+	this->is_swapchain_invalid = other.is_swapchain_invalid;
+	this->swapchain = other.swapchain;
+	this->swapchain_images = other.swapchain_images;
+	this->swapchain_image_views = other.swapchain_image_views;
+	this->descriptor_pool = other.descriptor_pool;
+	this->cmd_buffers = other.cmd_buffers;
+	this->current_frame = other.current_frame;
+
+	other.vk_context = {};
+	other.render_graph = {};
+
 	return *this;
 }
 
 Renderer::~Renderer()
 {
-	const auto device = vk_context->get_device();
-
 	if (!vk_context)
 	{
 		return;
 	}
+
+	const auto device = vk_context->get_device();
 
 	destroy_swapchain_resources();
 
@@ -69,7 +74,10 @@ void Renderer::on_swapchain_invalidated()
 
 	create_swapchain();
 
-	render_graph.on_swapchain_invalidated(swapchain_images, swapchain_image_views);
+	if (render_graph)
+	{
+		render_graph.on_swapchain_invalidated(swapchain_images, swapchain_image_views);
+	}
 
 	is_swapchain_invalid = false;
 	device.waitIdle();

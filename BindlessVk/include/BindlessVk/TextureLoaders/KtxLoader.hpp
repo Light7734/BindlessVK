@@ -14,11 +14,11 @@ static_assert(KTX_SUCCESS == false, "KTX_SUCCESS was supposed to be 0 (false), b
 
 namespace BINDLESSVK_NAMESPACE {
 
-/// @todo Should we separate samplers and textures?
+/** @warn KtxLoader assumes cubemap type for now...  */
 class KtxLoader
 {
 public:
-	KtxLoader(VkContext* vk_context, Buffer* staging_buffer);
+	KtxLoader(VkContext const *vk_context, Buffer *staging_buffer);
 	KtxLoader() = default;
 	~KtxLoader() = default;
 
@@ -30,25 +30,24 @@ public:
 	);
 
 private:
-	void load_ktx_texture(const str& path);
+	void load_ktx_texture(str const &path);
 	void destroy_ktx_texture();
 
 	void stage_texture_data();
-	void write_texture_data_to_gpu();
+	void write_texture_data_to_gpu(vk::ImageLayout final_layout);
 
 	void create_image();
 	void create_image_view();
 	void create_sampler();
 
-	vec<vk::BufferImageCopy> create_texture_face_buffer_copies();
+	auto create_texture_face_buffer_copies() -> vec<vk::BufferImageCopy>;
 
 private:
-	VkContext* vk_context = {};
-	Buffer* staging_buffer = {};
+	VkContext const *const vk_context = {};
+	Buffer *const staging_buffer = {};
 
 	Texture texture = {};
-	ktxTexture* ktx_texture = {};
-	vk::ImageLayout final_layout;
+	ktxTexture *ktx_texture = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

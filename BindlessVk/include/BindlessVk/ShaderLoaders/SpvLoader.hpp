@@ -16,7 +16,7 @@ namespace BINDLESSVK_NAMESPACE {
 class SpvLoader
 {
 public:
-	SpvLoader(VkContext* vk_context);
+	SpvLoader(VkContext const *vk_context);
 
 	Shader load(c_str path);
 
@@ -28,17 +28,14 @@ private:
 	void reflect_descriptor_sets();
 	void reflect_shader_stage();
 
-	vec<vk::DescriptorSetLayoutBinding> reflect_descriptor_set_bindings(
-	    SpvReflectDescriptorSet* spv_set
-	);
+	auto reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *spv_set)
+	    -> vec<vk::DescriptorSetLayoutBinding>;
 
-
-	vk::DescriptorSetLayoutBinding extract_descriptor_set_binding(
-	    SpvReflectDescriptorBinding* binding
-	);
+	auto extract_descriptor_set_binding(SpvReflectDescriptorBinding const *binding)
+	    -> vk::DescriptorSetLayoutBinding;
 
 private:
-	VkContext* vk_context = {};
+	VkContext const *const vk_context = {};
 	Shader shader = {};
 	vec<u32> code = {};
 	SpvReflectShaderModule reflection = {};

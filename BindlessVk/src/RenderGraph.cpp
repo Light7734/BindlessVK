@@ -12,6 +12,9 @@ RenderGraph::RenderGraph()
 
 void RenderGraph::reset()
 {
+	if (!initialized)
+		return;
+
 	const auto device = vk_context->get_device();
 	const auto allocator = vk_context->get_allocator();
 	const auto num_threads = vk_context->get_num_threads();
@@ -99,6 +102,7 @@ void RenderGraph::init(
 	this->descriptor_pool = descriptor_pool;
 	this->swapchain_images = swapchain_images;
 	this->swapchain_image_views = swapchain_image_views;
+	this->initialized = true;
 }
 
 void RenderGraph::build(

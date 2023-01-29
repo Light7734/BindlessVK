@@ -6,14 +6,14 @@
 class StagingPool
 {
 public:
-	StagingPool() = default;
-
 	StagingPool(u32 count, usize size, bvk::VkContext* vk_context);
 
-	StagingPool(StagingPool&& other);
-	StagingPool(const StagingPool& rhs) = delete;
+	StagingPool() = default;
 
+	StagingPool(StagingPool&& other);
 	StagingPool& operator=(StagingPool&& rhs);
+
+	StagingPool(const StagingPool& rhs) = delete;
 	StagingPool& operator=(const StagingPool& rhs) = delete;
 
 	~StagingPool();

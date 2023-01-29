@@ -28,7 +28,7 @@ public:
 	 * @param vk_context the vulkan context
 	 * @param texture_system the bindlessvk texture system, ModelLoader may load textures
 	 */
-	ModelLoader(VkContext* vk_context, TextureLoader* texture_system);
+	ModelLoader(VkContext const *vk_context, TextureLoader const *texture_system);
 
 	/** @brief Default constructor */
 	ModelLoader() = default;
@@ -41,26 +41,26 @@ public:
 	 * @param name debug name attached to vulkan objects for debugging tools like renderdoc
 	 * @param file_path path to the gltf model file
 	 */
-	Model load_from_gltf_ascii(
-	    const char* debug_name,
-	    const char* file_path,
-	    Buffer* staging_vertex_buffer,
-	    Buffer* staging_index_buffer,
-	    Buffer* staging_image_buffer
-	);
+	auto load_from_gltf_ascii(
+	    c_str debug_name,
+	    c_str file_path,
+	    Buffer *staging_vertex_buffer,
+	    Buffer *staging_index_buffer,
+	    Buffer *staging_image_buffer
+	) const -> Model;
 
 	/** @todo Implement */
-	Model load_from_gltf_binary() = delete;
+	auto load_from_gltf_binary() -> Model = delete;
 
 	/** @todo Implement */
-	Model load_from_fbx() = delete;
+	auto load_from_fbx() -> Model = delete;
 
 	/** @todo Implement */
-	Model load_from_obj() = delete;
+	auto load_from_obj() -> Model = delete;
 
 private:
-	VkContext* vk_context;
-	TextureLoader* texture_loader;
+	VkContext const *vk_context = {};
+	TextureLoader const *texture_loader = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

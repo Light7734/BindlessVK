@@ -96,6 +96,11 @@ public:
 		buffer_inputs[hash_str(name)]->unmap();
 	}
 
+	inline operator bool() const
+	{
+		return initialized;
+	}
+
 private:
 	inline auto get_cmd(u32 pass_index, u32 frame_index, u32 thread_index) const
 	{
@@ -258,6 +263,8 @@ private:
 
 	vk::DebugUtilsLabelEXT update_debug_label;
 	vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label;
+
+	bool initialized = false;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

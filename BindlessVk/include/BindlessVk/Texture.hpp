@@ -5,6 +5,10 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/**
+ * @todo Should image and sampler be in separate structs?
+ */
+
 struct Texture
 {
 	enum class Type : u8
@@ -33,7 +37,7 @@ struct Texture
 	AllocatedImage image;
 
 	inline void transition_layout(
-	    bvk::VkContext* vk_context,
+	    VkContext const *const vk_context,
 	    vk::CommandBuffer cmd,
 	    u32 base_mip_level,
 	    u32 level_count,
@@ -118,7 +122,8 @@ struct Texture
 		current_layout = new_layout;
 	}
 
-	inline pair<i32, i32> blit(vk::CommandBuffer cmd, u32 mip_index, pair<i32, i32> mip_size)
+	inline auto blit(vk::CommandBuffer cmd, u32 mip_index, pair<i32, i32> mip_size)
+	    -> pair<i32, i32> // next_mip_size
 	{
 		const auto [mip_width, mip_height] = mip_size;
 		cmd.blitImage(

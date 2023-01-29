@@ -13,7 +13,7 @@ public:
 	 * @brief Main constructor
 	 * @param vk_context the vulkan context
 	 */
-	ShaderLoader(VkContext* vk_context);
+	ShaderLoader(VkContext const *vk_context);
 
 	/** @brief Default constructor */
 	ShaderLoader() = default;
@@ -25,16 +25,16 @@ public:
 	 * @brief Loads a shader from spv file
 	 * @param file_path path to the spv shader file
 	 */
-	Shader load_from_spv(c_str file_path);
+	auto load_from_spv(c_str file_path) -> Shader;
 
 	/** @todo Implement */
-	Shader load_from_glsl(c_str file_path) = delete;
+	auto load_from_glsl(c_str file_path) -> Shader = delete;
 
 	/** @todo Implement  */
-	Shader load_from_hlsl(c_str file_path) = delete;
+	auto load_from_hlsl(c_str file_path) -> Shader = delete;
 
 private:
-	VkContext* vk_context = {};
+	VkContext const *vk_context = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

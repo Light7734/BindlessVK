@@ -1,10 +1,10 @@
 #include "Framework/Pools/StagingPool.hpp"
 
-StagingPool::StagingPool(uint32_t count, size_t size, bvk::VkContext* vk_context)
+StagingPool::StagingPool(u32 count, size_t size, bvk::VkContext* vk_context)
 {
 	staging_buffers.reserve(count);
 
-	for (uint32_t i = 0; i < count; ++i) {
+	for (u32 i = 0; i < count; ++i) {
 		staging_buffers.emplace_back(
 		  fmt::format("staging_buffer_{}", i).c_str(),
 		  vk_context,

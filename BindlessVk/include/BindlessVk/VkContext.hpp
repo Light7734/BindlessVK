@@ -6,7 +6,17 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+enum class DebugCallbackSource
+{
+	eBindlessVk,
+	eValidationLayers,
+	eVma,
+
+	nCount
+};
+
 // @todo move cmd pool management and thread stuff to a dedicated class
+// @todo compute queue
 class VkContext
 {
 public:
@@ -37,7 +47,7 @@ public:
 		vk::PresentModeKHR present_mode;
 		vk::Extent2D framebuffer_extent;
 
-		inline operator auto() const
+		inline operator vk::SurfaceKHR() const
 		{
 			return surface_object;
 		}
@@ -50,43 +60,37 @@ public:
 	    vec<c_str> instance_extensions,
 	    vec<c_str> device_extensions,
 
+	    vk::PhysicalDeviceFeatures physical_device_features,
+
 	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
 	    fn<vk::Extent2D()> get_framebuffer_extent_func,
 
 	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
-	    PFN_vkDebugUtilsMessengerCallbackEXT vulkan_debug_callback,
-	    void* debug_messenger_userptr,
 
-	    PFN_vmaAllocateDeviceMemoryFunction vma_allocate_device_memory_callback,
-	    PFN_vmaFreeDeviceMemoryFunction vma_free_device_memory_callback,
-	    void* vma_callback_user_data,
-
-	    fn<void(LogLvl, const str& message, std::any user_data)> bindlessvk_debug_callback,
+	    fn<void(DebugCallbackSource, LogLvl, str const &, std::any)> bindlessvk_debug_callback,
 	    std::any bindlessvk_debug_callback_user_data
 	);
 
-	VkContext& operator=(VkContext&& other);
+	VkContext(VkContext &&other);
+
+	VkContext &operator=(VkContext &&other);
 
 	~VkContext();
-
-
-	fn<void(LogLvl, const str&, std::any)> debug_callback;
-	std::any debug_callback_user_data;
 
 	/** Updates the surface info, (to be called after swapchain-invalidation) */
 	void update_surface_info();
 
-	void immediate_submit(fn<void(vk::CommandBuffer)>&& func)
+	void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
 	{
-		vk::CommandBufferAllocateInfo allocInfo {
+		auto const alloc_info = vk::CommandBufferAllocateInfo {
 			immediate_cmd_pool,
 			vk::CommandBufferLevel::ePrimary,
 			1u,
 		};
 
-		vk::CommandBuffer cmd = device.allocateCommandBuffers(allocInfo)[0];
+		vk::CommandBuffer cmd = device.allocateCommandBuffers(alloc_info)[0];
 
 		vk::CommandBufferBeginInfo beginInfo { vk::CommandBufferUsageFlagBits::eOneTimeSubmit };
 
@@ -103,17 +107,20 @@ public:
 	}
 
 	template<typename... Args>
-	inline void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args&&... args) const
+	inline void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args &&...args) const
 	{
-		debug_callback(
+		auto [callback, data] = debug_callback_data;
+
+		callback(
+		    DebugCallbackSource::eBindlessVk,
 		    lvl,
 		    fmt::format(fmt, std::forward<Args>(args)...),
-		    debug_callback_user_data
+		    data
 		);
 	}
 
 	template<typename T>
-	inline void set_object_name(T object, c_str name)
+	inline void set_object_name(T object, c_str name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.objectType,
@@ -122,7 +129,7 @@ public:
 		});
 	}
 
-	inline auto get_cmd_pool(u32 frame_index, u32 thread_index = 0)
+	inline auto get_cmd_pool(u32 const frame_index, u32 const thread_index = 0) const
 	{
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
 	}
@@ -157,7 +164,7 @@ public:
 		return selected_gpu;
 	}
 
-	inline const auto& get_available_gpus() const
+	inline auto const &get_available_gpus() const
 	{
 		return available_gpus;
 	}
@@ -167,12 +174,12 @@ public:
 		return allocator;
 	}
 
-	inline const auto& get_queues() const
+	inline auto const &get_queues() const
 	{
 		return queues;
 	}
 
-	inline const auto& get_surface() const
+	inline auto const &get_surface() const
 	{
 		return surface;
 	}
@@ -184,33 +191,34 @@ public:
 
 	inline auto get_depth_format_has_stencil() const
 	{
-		return depth_format == vk::Format::eD32SfloatS8Uint
-		    || depth_format == vk::Format::eD24UnormS8Uint;
+		return depth_format == vk::Format::eD32SfloatS8Uint ||
+		       depth_format == vk::Format::eD24UnormS8Uint;
 	}
 
-	inline const auto get_max_color_and_depth_samples() const
+	inline auto get_max_color_and_depth_samples() const
 	{
 		return max_color_and_depth_samples;
 	}
 
-	inline const auto get_max_color_samples() const
+	inline auto get_max_color_samples() const
 	{
 		return max_color_samples;
 	}
 
-	inline const auto get_max_depth_samples() const
+	inline auto get_max_depth_samples() const
 	{
 		return max_depth_samples;
 	}
 
-	// @warn
-	inline const auto get_num_threads() const
+	inline auto get_num_threads() const
 	{
 		return num_threads;
 	}
 
-	// @todo what the hellll
-	PFN_vkGetInstanceProcAddr get_vk_instance_proc_addr;
+	inline auto const get_pfn_get_vk_instance_proc_addr() const
+	{
+		return pfn_vk_get_instance_proc_addr;
+	}
 
 private:
 	void check_layer_support();
@@ -219,42 +227,48 @@ private:
 	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
 	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
-	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
-	    PFN_vkDebugUtilsMessengerCallbackEXT debug_messenger_callback_func,
-	    void* debug_messenger_userptr
+	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types
 	);
 
 	void pick_physical_device();
 
 	void create_logical_device();
 
-	void create_allocator(
-	    PFN_vmaAllocateDeviceMemoryFunction vma_free_device_memory_callback,
-	    PFN_vmaFreeDeviceMemoryFunction vma_allocate_device_memory_callback,
-	    void* vma_callback_user_data
-	);
+	void fetch_queues();
+
+	void create_allocator();
 
 	void create_command_pools();
 
+	auto create_queues_create_info() const -> vec<vk::DeviceQueueCreateInfo>;
+
 private:
+	vk::DynamicLoader dynamic_loader;
+
+	PFN_vkGetInstanceProcAddr pfn_vk_get_instance_proc_addr;
+
 	fn<vk::Extent2D()> get_framebuffer_extent;
+
+	static pair<fn<void(DebugCallbackSource, LogLvl, str const &, std::any)>, std::any>
+	    debug_callback_data;
 
 private:
 	vec<c_str> layers;
-	vec<c_str> instance_extensions;
-	vec<c_str> device_extensions;
 
 	vk::Instance instance;
+	vec<c_str> instance_extensions;
 
 	vk::Device device;
+	vec<c_str> device_extensions;
+
+
 	vk::PhysicalDevice selected_gpu;
 	vec<vk::PhysicalDevice> available_gpus;
-
+	vk::PhysicalDeviceFeatures physical_device_features;
 
 	vma::Allocator allocator;
 
 	Queues queues;
-
 	Surface surface;
 
 	vk::Format depth_format;
@@ -271,7 +285,6 @@ private:
 	vk::CommandBuffer immediate_cmd;
 	vk::Fence immediate_fence;
 
-	vk::DynamicLoader dynamic_loader;
 	vk::DebugUtilsMessengerEXT debug_util_messenger = {};
 };
 

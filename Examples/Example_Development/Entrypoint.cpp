@@ -24,6 +24,8 @@ int main(int argc, char* argv[])
 	}
 	catch (std::exception exception) {
 		std::cout << "exception failed: " << exception.what() << std::endl;
+		return 2;
 	}
+
 	return 0;
 }

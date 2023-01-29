@@ -13,7 +13,7 @@ public:
 	/** @brief Main constructor
 	 * @param vk_context the vulkan context
 	 */
-	TextureLoader(VkContext* vk_context);
+	TextureLoader(VkContext const *vk_context);
 
 	/** @brief Default constructor */
 	TextureLoader() = default;
@@ -31,16 +31,16 @@ public:
 	 * @param type   type of the texture (eg. 2d, cubemap)
 	 * @param layout final layout of the created texture
 	 */
-	Texture load_from_binary(
+	auto load_from_binary(
 	    c_str name,
-	    u8* pixels,
+	    u8 const *pixels,
 	    i32 width,
 	    i32 height,
 	    vk::DeviceSize size,
 	    Texture::Type type,
-	    Buffer* staging_buffer,
+	    Buffer *staging_buffer,
 	    vk::ImageLayout final_layout = vk::ImageLayout::eShaderReadOnlyOptimal
-	);
+	) const -> Texture;
 
 	/** @brief Loads a texture from a ktx(khronos texture) file
 	 * @param name   name of the texture
@@ -48,16 +48,16 @@ public:
 	 * @param type   type of the texture (eg. 2d, cubemap)
 	 * @param layout final layout of the created texture
 	 */
-	Texture load_from_ktx(
+	auto load_from_ktx(
 	    c_str name,
 	    c_str uri,
 	    Texture::Type type,
-	    Buffer* staging_buffer,
+	    Buffer *staging_buffer,
 	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
-	);
+	) const -> Texture;
 
 private:
-	VkContext* vk_context = {};
+	VkContext const *vk_context = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

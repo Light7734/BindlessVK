@@ -39,11 +39,12 @@ public:
 	{
 	}
 
-	virtual void on_tick(double deltaTime) override
+	virtual void on_tick(f64 deltaTime) override
 	{
 		renderer.begin_frame(&scene);
 
-		if (renderer.is_swapchain_invalidated()) {
+		if (renderer.is_swapchain_invalidated())
+		{
 			vk_context.update_surface_info();
 			renderer.on_swapchain_invalidated();
 			camera_controller.on_window_resize(
@@ -72,12 +73,14 @@ private:
 	{
 		c_str DIRECTORY = "Shaders/";
 
-		for (auto& shader_file : std::filesystem::directory_iterator(DIRECTORY)) {
+		for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY))
+		{
 			const str path(shader_file.path().c_str());
 			const str name(shader_file.path().filename().replace_extension().c_str());
 			const str extension(shader_file.path().extension().c_str());
 
-			if (strcmp(extension.c_str(), ".spv")) {
+			if (strcmp(extension.c_str(), ".spv"))
+			{
 				continue;
 			}
 
@@ -89,7 +92,7 @@ private:
 	void load_shader_effects()
 	{
 		shader_effects[hash_str("opaque_mesh")] = bvk::ShaderEffect(
-		 &vk_context,
+		  &vk_context,
 		  {
 		    &shaders[hash_str("vertex")],
 		    &shaders[hash_str("pixel")],
@@ -281,53 +284,53 @@ private:
 	// @todo: Load from files instead of hard-coding
 	void load_entities()
 	{
-		Entity testModel = scene.create();
+		auto const test_model_entity = scene.create();
 
 		scene.emplace<TransformComponent>(
-		  testModel,
+		  test_model_entity,
 		  glm::vec3(0.0f),
 		  glm::vec3(1.0f),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
 		scene.emplace<StaticMeshRendererComponent>(
-		  testModel,
+		  test_model_entity,
 		  &materials.at(hash_str("opaque_mesh")),
 		  &models[bvk::hash_str("flight_helmet")]
 		);
 
-		Entity skybox = scene.create();
+		auto const skybox_entity = scene.create();
 		scene.emplace<TransformComponent>(
-		  skybox,
+		  skybox_entity,
 		  glm::vec3(0.0f),
 		  glm::vec3(1.0f),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
 		scene.emplace<StaticMeshRendererComponent>(
-		  skybox,
+		  skybox_entity,
 		  &materials[hash_str("skybox")],
 		  &models[bvk::hash_str("skybox")]
 		);
 
-		Entity light = scene.create();
+		auto const light_entity = scene.create();
 		scene.emplace<TransformComponent>(
-		  light,
+		  light_entity,
 		  glm::vec3(2.0f, 2.0f, 1.0f),
 		  glm::vec3(1.0f),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
-		Entity camera = scene.create();
+		auto const camera_entity = scene.create();
 		scene.emplace<TransformComponent>(
-		  camera,
+		  camera_entity,
 		  glm::vec3(6.0, 7.0, 2.5),
 		  glm::vec3(1.0),
 		  glm::vec3(0.0f, 0.0, 0.0)
 		);
 
 		scene.emplace<CameraComponent>(
-		  camera,
+		  camera_entity,
 		  45.0f,
 		  5.0,
 		  1.0,
@@ -340,25 +343,25 @@ private:
 		  10.0f
 		);
 
-		scene.emplace<LightComponent>(light, 12);
+		scene.emplace<LightComponent>(light_entity, 12);
 	}
 
 	void create_render_graph()
 	{
-		const auto& surface = vk_context.get_surface();
+		auto const &surface = vk_context.get_surface();
 
-		const auto color_format = surface.color_format;
-		const auto depth_format = vk_context.get_depth_format();
-		const auto sample_count = vk_context.get_max_color_and_depth_samples();
+		auto const color_format = surface.color_format;
+		auto const depth_format = vk_context.get_depth_format();
+		auto const sample_count = vk_context.get_max_color_and_depth_samples();
 
-		auto* default_texture = &textures[hash_str("default_2d")];
-		auto* default_texture_cube = &textures[hash_str("default_cube")];
+		auto const *const default_texture = &textures[hash_str("default_2d")];
+		auto const *const default_texture_cube = &textures[hash_str("default_cube")];
 
-		const std::array<float, 4> update_color = { 1.0, 0.8, 0.8, 1.0 };
-		const std::array<float, 4> barrier_color = { 0.8, 1.0, 0.8, 1.0 };
-		const std::array<float, 4> render_color = { 0.8, 0.8, 1.0, 1.0 };
+		auto const update_color = arr<f32, 4> { 1.0, 0.8, 0.8, 1.0 };
+		auto const barrier_color = arr<f32, 4> { 0.8, 1.0, 0.8, 1.0 };
+		auto const render_color = arr<f32, 4> { 0.8, 0.8, 1.0, 1.0 };
 
-		bvk::Renderpass::CreateInfo forward_pass_info {
+		auto const forward_pass_info = bvk::Renderpass::CreateInfo{
                  "forwardpass",
                      {},
                  &forward_pass_update,
@@ -425,7 +428,7 @@ private:
                 }),
             };
 
-		bvk::Renderpass::CreateInfo ui_pass_info {
+		auto const ui_pass_info = bvk::Renderpass::CreateInfo {
 			"uipass",
 			&user_interface_pass_begin_frame,
 			&user_interface_pass_update,
