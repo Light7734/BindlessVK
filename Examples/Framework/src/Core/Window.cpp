@@ -4,11 +4,11 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 
-void Window::init(WindowSpecs specs, std::vector<std::pair<int, int>> hints)
+void Window::init(WindowSpecs specs, vec<pair<int, int>> hints)
 {
 	this->specs = specs;
 
-	glfwSetErrorCallback([](int code, const char* str) { LOG(critical, str); });
+	glfwSetErrorCallback([](int code, char const *str) { LOG(critical, str); });
 
 	// Initialzie glfw
 	assert_true(glfwInit(), "Failed to initalize glfw");
@@ -40,13 +40,13 @@ Window::~Window()
 	glfwTerminate();
 }
 
-std::vector<const char*> Window::get_required_extensions()
+vec<c_str> Window::get_required_extensions() const
 {
-	const char** extensions;
-	uint32_t count;
+	c_str *extensions;
+	u32 count;
 
 	extensions = glfwGetRequiredInstanceExtensions(&count);
-	return std::vector<const char*>(extensions, extensions + count);
+	return vec<c_str>(extensions, extensions + count);
 }
 
 void Window::poll_events()
@@ -87,7 +87,7 @@ void Window::bind_callbacks()
 	// @todo: callbacks
 	glfwSetKeyCallback(
 	  glfw_window_handle,
-	  [](GLFWwindow* window, int key, int scanCode, int action, int mods) {
+	  [](GLFWwindow *window, int key, int scanCode, int action, int mods) {
 		  if (key == GLFW_KEY_ESCAPE)
 			  glfwSetWindowShouldClose(window, true);
 		  if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
@@ -103,9 +103,9 @@ void Window::bind_callbacks()
 	  }
 	);
 
-	glfwSetWindowSizeCallback(glfw_window_handle, [](GLFWwindow* window, int width, int height) {
-		WindowSpecs* specs = (WindowSpecs*)glfwGetWindowUserPointer(window);
-		specs->width       = width;
-		specs->height      = height;
+	glfwSetWindowSizeCallback(glfw_window_handle, [](GLFWwindow *window, int width, int height) {
+		WindowSpecs *specs = (WindowSpecs *)glfwGetWindowUserPointer(window);
+		specs->width = width;
+		specs->height = height;
 	});
 }

@@ -41,10 +41,15 @@ public:
 
 	virtual void on_tick(f64 deltaTime) override
 	{
-		renderer.begin_frame(&scene);
+		ImGui::ShowDemoWindow();
+		CVar::draw_imgui_editor();
 
-		if (renderer.is_swapchain_invalidated())
-		{
+		camera_controller.update();
+		renderer.render_frame(render_graph, &scene);
+
+		if (renderer.is_swapchain_invalid()) {
+			logger.log(spdlog::level::trace, "Swapchain invalidated");
+
 			vk_context.update_surface_info();
 			renderer.on_swapchain_invalidated();
 			camera_controller.on_window_resize(
@@ -52,15 +57,13 @@ public:
 			  window.get_framebuffer_size().height
 			);
 
-			logger.log(spdlog::level::trace, "re-loading materials");
 			load_materials();
+
+			render_graph.on_swapchain_invalidated(
+			  renderer.get_swapchain_images(),
+			  renderer.get_swapchain_image_views()
+			);
 		}
-
-		ImGui::ShowDemoWindow();
-		CVar::draw_imgui_editor();
-
-		camera_controller.update();
-		renderer.end_frame(&scene);
 	}
 
 	virtual void on_swapchain_recreate() override
@@ -73,14 +76,12 @@ private:
 	{
 		c_str DIRECTORY = "Shaders/";
 
-		for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY))
-		{
+		for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY)) {
 			const str path(shader_file.path().c_str());
 			const str name(shader_file.path().filename().replace_extension().c_str());
 			const str extension(shader_file.path().extension().c_str());
 
-			if (strcmp(extension.c_str(), ".spv"))
-			{
+			if (strcmp(extension.c_str(), ".spv")) {
 				continue;
 			}
 
@@ -363,7 +364,6 @@ private:
 
 		auto const forward_pass_info = bvk::Renderpass::CreateInfo{
                  "forwardpass",
-                     {},
                  &forward_pass_update,
                  &forward_pass_render,
                  {
@@ -430,7 +430,6 @@ private:
 
 		auto const ui_pass_info = bvk::Renderpass::CreateInfo {
 			"uipass",
-			&user_interface_pass_begin_frame,
 			&user_interface_pass_update,
 			&user_interface_pass_render,
 			{
@@ -461,8 +460,7 @@ private:
 			  render_color,
 			}),
 		};
-
-		renderer.build_render_graph(
+		render_graph.build(
 		  "backbuffer",
 		  {
 		    bvk::Renderpass::CreateInfo::BufferInputInfo {
@@ -491,7 +489,6 @@ private:
 		    ui_pass_info,
 		  },
 		  &render_graph_update,
-		  nullptr,
 		  vk::DebugUtilsLabelEXT({
 		    "graph_update",
 		    update_color,

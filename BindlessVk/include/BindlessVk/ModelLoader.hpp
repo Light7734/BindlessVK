@@ -26,9 +26,8 @@ public:
 	/**
 	 * @brief Main constructor
 	 * @param vk_context the vulkan context
-	 * @param texture_system the bindlessvk texture system, ModelLoader may load textures
 	 */
-	ModelLoader(VkContext const *vk_context, TextureLoader const *texture_system);
+	ModelLoader(VkContext const *vk_context);
 
 	/** @brief Default constructor */
 	ModelLoader() = default;
@@ -60,7 +59,6 @@ public:
 
 private:
 	VkContext const *vk_context = {};
-	TextureLoader const *texture_loader = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

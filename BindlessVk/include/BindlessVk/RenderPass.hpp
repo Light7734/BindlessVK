@@ -60,7 +60,6 @@ struct Renderpass
 
 		std::string name;
 
-		void (*on_begin_frame)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
 		void (*on_update)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
 		void (*on_render
 		)(VkContext *,

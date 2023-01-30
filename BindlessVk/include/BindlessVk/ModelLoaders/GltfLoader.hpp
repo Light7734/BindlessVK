@@ -20,7 +20,6 @@ class GltfLoader
 public:
 	GltfLoader(
 	    VkContext const *vk_context,
-	    TextureLoader const *texture_loader,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_texture_buffer
@@ -66,7 +65,7 @@ private:
 
 private:
 	VkContext const *const vk_context = {};
-	TextureLoader const *const texture_loader = {};
+	TextureLoader const texture_loader = {};
 
 	tinygltf::Model gltf_model = {};
 	Model model = {};

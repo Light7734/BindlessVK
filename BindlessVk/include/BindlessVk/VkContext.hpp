@@ -20,6 +20,10 @@ enum class DebugCallbackSource
 class VkContext
 {
 public:
+	struct CreateInfo
+	{
+	};
+
 	// @warn do not reorder fields! they have to be contiguous in memory
 	struct Queues
 	{
@@ -59,13 +63,11 @@ public:
 	    vec<c_str> layers,
 	    vec<c_str> instance_extensions,
 	    vec<c_str> device_extensions,
-
 	    vk::PhysicalDeviceFeatures physical_device_features,
 
 	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
 	    fn<vk::Extent2D()> get_framebuffer_extent_func,
 
-	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
 
@@ -225,7 +227,6 @@ private:
 
 	void create_vulkan_instance(
 	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
-	    bool has_debugging,
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types
 	);

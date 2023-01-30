@@ -7,53 +7,145 @@
 #include <imgui.h>
 #include <utility>
 
-static void bindlessvk_debug_callback(
-  bvk::DebugCallbackSource const source,
-  bvk::LogLvl const severity,
-  str const &message,
-  std::any const user_data
-)
+Application::Application()
 {
-	try {
-		auto const *const logger = std::any_cast<Logger const *const>(user_data);
+	create_window();
+	create_vk_context();
+	create_descriptor_pool();
 
-		auto const source_str = //
-		  source == bvk::DebugCallbackSource::eBindlessVk       ? "BindlessVk" :
-		  source == bvk::DebugCallbackSource::eValidationLayers ? "Validation Layers" :
-		                                                          "Memory Allocator";
+	create_renderer();
+	create_render_graph();
+
+	create_user_interface();
 
 
-		logger->log((spdlog::level::level_enum)(int)severity, "[{}]: {}", source_str, message);
-	}
+	camera_controller = CameraController(&scene, &window);
+	staging_pool = StagingPool(3, (1024u * 1024u * 256u), &vk_context);
 
-	catch (std::bad_any_cast bad_cast_exception) {
-		std::cout << " we fucked up big time " << std::endl;
-	}
+	create_loaders();
+	load_default_textures();
 }
 
-// @todo: refactor this out
-static void initialize_imgui(bvk::VkContext *vk_context, bvk::Renderer &renderer, Window &window)
+Application::~Application()
+{
+	vk_context.get_device().waitIdle();
+
+	destroy_models();
+	destroy_user_interface();
+	destroy_descriptor_pool();
+}
+
+void Application::create_window()
+{
+	using WindowHints = vec<pair<int, int>>;
+
+	window.init(
+	  WindowSpecs {
+	    "BindlessVk",
+	    1920u,
+	    1080u,
+	  },
+	  WindowHints {
+	    { GLFW_CLIENT_API, GLFW_NO_API },
+	    { GLFW_FLOATING, GLFW_TRUE },
+	  }
+	);
+}
+
+void Application::create_vk_context()
+{
+	auto const layers = get_layers();
+	auto const instance_extensions = get_instance_extensions();
+	auto const physical_device_features = get_physical_device_features();
+	auto const device_extensions = get_device_extensions();
+
+	vk_context = bvk::VkContext(
+	  layers,
+	  instance_extensions,
+	  device_extensions,
+	  physical_device_features,
+
+	  [&](vk::Instance instance) { return window.create_surface(instance); },
+	  [&]() { return window.get_framebuffer_size(); },
+
+	  vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+
+	  vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
+	    | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+	    | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+
+	  &Logger::bindlessvk_callback,
+	  std::make_any<Logger const *const>(&logger)
+	);
+}
+void Application::create_descriptor_pool()
+{
+	auto const device = vk_context.get_device();
+
+	auto const pool_sizes = vec<vk::DescriptorPoolSize> {
+		{ vk::DescriptorType::eSampler, 8000 },
+		{ vk::DescriptorType::eCombinedImageSampler, 8000 },
+		{ vk::DescriptorType::eSampledImage, 8000 },
+		{ vk::DescriptorType::eStorageImage, 8000 },
+		{ vk::DescriptorType::eUniformTexelBuffer, 8000 },
+		{ vk::DescriptorType::eStorageTexelBuffer, 8000 },
+		{ vk::DescriptorType::eUniformBuffer, 8000 },
+		{ vk::DescriptorType::eStorageBuffer, 8000 },
+		{ vk::DescriptorType::eUniformBufferDynamic, 8000 },
+		{ vk::DescriptorType::eStorageBufferDynamic, 8000 },
+		{ vk::DescriptorType::eInputAttachment, 8000 },
+	};
+
+	descriptor_pool = device.createDescriptorPool(vk::DescriptorPoolCreateInfo {
+	  vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind
+	    | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+	  100,
+	  pool_sizes,
+	});
+}
+
+void Application::create_renderer()
+{
+	renderer = bvk::Renderer(&vk_context);
+}
+
+void Application::create_render_graph()
+{
+	render_graph.init(
+	  &vk_context,
+	  descriptor_pool,
+	  renderer.get_swapchain_images(),
+	  renderer.get_swapchain_image_views()
+	);
+}
+
+void Application::create_user_interface()
 {
 	ImGui::CreateContext();
 
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
-	ImGui_ImplVulkan_InitInfo initInfo {
-		.Instance = vk_context->get_instance(),
-		.PhysicalDevice = vk_context->get_gpu(),
-		.Device = vk_context->get_device(),
-		.Queue = vk_context->get_queues().graphics,
-		.DescriptorPool = renderer.get_descriptor_pool(),
-		.UseDynamicRendering = true,
-		.ColorAttachmentFormat = static_cast<VkFormat>(vk_context->get_surface().color_format),
-		.MinImageCount = BVK_MAX_FRAMES_IN_FLIGHT,
-		.ImageCount = BVK_MAX_FRAMES_IN_FLIGHT,
-		.MSAASamples = static_cast<VkSampleCountFlagBits>(vk_context->get_max_color_and_depth_samples()
-		),
+	ImGui_ImplVulkan_InitInfo imgui_info {
+		vk_context.get_instance(),
+		vk_context.get_gpu(),
+		vk_context.get_device(),
+		vk_context.get_queues().graphics_index,
+		vk_context.get_queues().graphics,
+		{},
+		descriptor_pool,
+		{},
+		true,
+		static_cast<VkFormat>(vk_context.get_surface().color_format),
+		BVK_MAX_FRAMES_IN_FLIGHT,
+		BVK_MAX_FRAMES_IN_FLIGHT,
+		static_cast<VkSampleCountFlagBits>(vk_context.get_max_color_and_depth_samples()),
 	};
 
-	auto pfn_get_vk_instance_proc_addr = vk_context->get_pfn_get_vk_instance_proc_addr();
-	auto userData = std::make_pair(pfn_get_vk_instance_proc_addr, vk_context->get_instance());
+	auto pfn_get_vk_instance_proc_addr = vk_context.get_pfn_get_vk_instance_proc_addr();
+	auto user_data = std::make_pair(pfn_get_vk_instance_proc_addr, vk_context.get_instance());
 
 	assert_true(
 	  ImGui_ImplVulkan_LoadFunctions(
@@ -61,49 +153,78 @@ static void initialize_imgui(bvk::VkContext *vk_context, bvk::Renderer &renderer
 		    auto [vkGetProcAddr, instance] = *(pair<PFN_vkGetInstanceProcAddr, vk::Instance> *)data;
 		    return vkGetProcAddr(instance, func);
 	    },
-	    (void *)&userData
+	    (void *)&user_data
 	  ),
 	  "ImGui failed to load vulkan functions"
 	);
 
-	ImGui_ImplVulkan_Init(&initInfo, VK_NULL_HANDLE);
+	ImGui_ImplVulkan_Init(&imgui_info, VK_NULL_HANDLE);
 
-	vk_context->immediate_submit([](vk::CommandBuffer cmd) {
+	vk_context.immediate_submit([](vk::CommandBuffer cmd) {
 		ImGui_ImplVulkan_CreateFontsTexture(cmd);
 	});
 
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
+
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
 }
 
-static void destroy_imgui()
+void Application::create_loaders()
 {
-	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
+	texture_loader = bvk::TextureLoader(&vk_context);
+	model_loader = bvk::ModelLoader(&vk_context);
+	shader_loader = bvk::ShaderLoader(&vk_context);
 }
 
-Application::Application()
-    : instance_extensions {
-	    VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-    }
-    , device_extensions {
-	    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-    }
+void Application::load_default_textures()
 {
-	window.init(
-	  WindowSpecs {
-	    .title = "BindlessVk",
-	    .width = 1920u,
-	    .height = 1080u,
-	  },
-	  {
-	    { GLFW_CLIENT_API, GLFW_NO_API },
-	    { GLFW_FLOATING, GLFW_TRUE },
-	  }
+	u8 defaultTexturePixelData[] = { 255, 0, 255, 255 };
+	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
+	  "default_2d",
+	  defaultTexturePixelData,
+	  1,
+	  1,
+	  sizeof(defaultTexturePixelData),
+	  bvk::Texture::Type::e2D,
+	  staging_pool.get_by_index(0)
 	);
 
-	physical_device_features = vk::PhysicalDeviceFeatures {
+	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
+	  "default_cube",
+	  "Assets/cubemap_yokohama_rgba.ktx",
+	  bvk::Texture::Type::eCubeMap,
+	  staging_pool.get_by_index(0)
+	);
+}
+
+auto Application::get_layers() const -> vec<c_str>
+{
+	return vec<c_str> {
+		"VK_LAYER_KHRONOS_validation",
+	};
+}
+
+auto Application::get_instance_extensions() const -> vec<c_str>
+{
+	auto instance_extensions = window.get_required_extensions();
+	instance_extensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+	return instance_extensions;
+}
+
+auto Application::get_device_extensions() const -> vec<c_str>
+{
+	return vec<c_str> {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+	};
+}
+
+auto Application::get_physical_device_features() const -> vk::PhysicalDeviceFeatures
+{
+	return vk::PhysicalDeviceFeatures {
 		VK_FALSE, // robustBufferAccess
 		VK_FALSE, // fullDrawIndexUint32
 		VK_FALSE, // imageCubeArray
@@ -160,81 +281,10 @@ Application::Application()
 		VK_FALSE, // variableMultisampleRate
 		VK_FALSE, // inheritedQueries
 	};
-
-	vec<c_str> required_surface_extensions = window.get_required_extensions();
-
-	instance_extensions.insert(
-	  instance_extensions.end(),
-	  required_surface_extensions.begin(),
-	  required_surface_extensions.end()
-	);
-
-	vk_context = bvk::VkContext(
-	  { "VK_LAYER_KHRONOS_validation" },
-	  instance_extensions,
-	  device_extensions,
-	  physical_device_features,
-
-	  [&](vk::Instance instance) { return window.create_surface(instance); },
-	  [&]() { return window.get_framebuffer_size(); },
-
-	  true,
-	  vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-
-	  vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
-	    | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-	    | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-
-	  &bindlessvk_debug_callback,
-	  std::make_any<Logger const *const>(&logger)
-	);
-
-	texture_loader = bvk::TextureLoader(&vk_context);
-	model_loader = bvk::ModelLoader(&vk_context, &texture_loader);
-	shader_loader = bvk::ShaderLoader(&vk_context);
-
-	renderer = bvk::Renderer(&vk_context);
-
-	initialize_imgui(&vk_context, renderer, window);
-
-	camera_controller = CameraController(&scene, &window);
-
-	staging_pool = StagingPool(3, (1024u * 1024u * 256u), &vk_context);
-	load_default_textures();
-
-	const auto pool_sizes = vec<vk::DescriptorPoolSize> {
-		{ vk::DescriptorType::eSampler, 1000u },
-		{ vk::DescriptorType::eCombinedImageSampler, 1000u },
-		{ vk::DescriptorType::eSampledImage, 1000u },
-		{ vk::DescriptorType::eStorageImage, 1000u },
-		{ vk::DescriptorType::eUniformTexelBuffer, 1000u },
-		{ vk::DescriptorType::eStorageTexelBuffer, 1000u },
-		{ vk::DescriptorType::eUniformBuffer, 1000u },
-		{ vk::DescriptorType::eStorageBuffer, 1000u },
-		{ vk::DescriptorType::eUniformBufferDynamic, 1000u },
-		{ vk::DescriptorType::eStorageBufferDynamic, 1000u },
-		{ vk::DescriptorType::eInputAttachment, 1000u },
-	};
-
-	descriptor_pool = vk_context.get_device().createDescriptorPool(
-	  vk::DescriptorPoolCreateInfo {
-	    vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-	    100u,
-	    static_cast<u32>(pool_sizes.size()),
-	    pool_sizes.data(),
-	  },
-	  nullptr
-	);
 }
 
-Application::~Application()
+void Application::destroy_models()
 {
-	vk_context.get_device().waitIdle();
-	destroy_imgui();
-
 	for (auto &[key, val] : models) {
 		delete val.vertex_buffer;
 		delete val.index_buffer;
@@ -243,23 +293,17 @@ Application::~Application()
 	models.clear();
 }
 
-void Application::load_default_textures()
+void Application::destroy_user_interface()
 {
-	u8 defaultTexturePixelData[] = { 255, 0, 255, 255 };
-	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
-	  "default_2d",
-	  defaultTexturePixelData,
-	  1,
-	  1,
-	  sizeof(defaultTexturePixelData),
-	  bvk::Texture::Type::e2D,
-	  staging_pool.get_by_index(0)
-	);
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+}
 
-	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
-	  "default_cube",
-	  "Assets/cubemap_yokohama_rgba.ktx",
-	  bvk::Texture::Type::eCubeMap,
-	  staging_pool.get_by_index(0)
-	);
+void Application::destroy_descriptor_pool()
+{
+	auto const device = vk_context.get_device();
+
+	device.resetDescriptorPool(descriptor_pool);
+	device.destroyDescriptorPool(descriptor_pool);
 }

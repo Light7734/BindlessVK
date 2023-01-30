@@ -6,58 +6,53 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** @brief
+ *
+ */
 class Renderer
 {
 public:
 	Renderer() = default;
 
-	Renderer(VkContext* vk_context);
+	Renderer(VkContext *vk_context);
 
-	Renderer(Renderer&& other);
-	Renderer(const Renderer& rhs) = delete;
+	Renderer(Renderer &&other);
+	Renderer(const Renderer &rhs) = delete;
 
-	Renderer& operator=(Renderer&& rhs);
-	Renderer& operator=(const Renderer& rhs) = delete;
+	Renderer &operator=(Renderer &&rhs);
+	Renderer &operator=(const Renderer &rhs) = delete;
 
 	~Renderer();
 
 	void on_swapchain_invalidated();
-	void destroy_swapchain_resources();
 
-	void begin_frame(void* user_pointer);
-	void end_frame(void* user_pointer);
+	void render_frame(RenderGraph &render_graph, void *user_pointer);
 
-	void build_render_graph(
-	    std::string backbuffer_name,
-	    std::vector<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
-	    std::vector<Renderpass::CreateInfo> renderpasses,
-	    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
-	    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
-	    vk::DebugUtilsLabelEXT graph_update_debug_label,
-	    vk::DebugUtilsLabelEXT graph_backbuffer_barrier_debug_label
-	);
-
-	/** @return descriptor pool  */
-	inline auto get_descriptor_pool() const
+	/** @return swapchain images */
+	inline auto get_swapchain_images() const
 	{
-		return descriptor_pool;
+		return swapchain_images;
 	}
 
-	/** @return swapchain image count  */
+	/** @return swapchain image views */
+	inline auto get_swapchain_image_views() const
+	{
+		return swapchain_image_views;
+	}
+
+	/** @return swapchain image count */
 	inline auto get_image_count() const
 	{
 		return swapchain_images.size();
 	}
 
-	/** @return wether or not swapchain is invalidated  */
-	inline auto is_swapchain_invalidated() const
+	/** @return wether or not swapchain is invalidated */
+	inline auto is_swapchain_invalid() const
 	{
-		return is_swapchain_invalid;
+		return swapchain_invalid;
 	}
 
 private:
-	void swap(Renderer&& other);
-
 	void create_sync_objects();
 	void create_descriptor_pools();
 
@@ -65,33 +60,33 @@ private:
 
 	void create_cmd_buffers();
 
+	void destroy_swapchain_resources();
+	void destroy_sync_objects();
+
 	void submit_queue(
 	    vk::Semaphore wait_semaphores,
 	    vk::Semaphore signal_semaphore,
 	    vk::Fence signal_fence,
 	    vk::CommandBuffer cmd
 	);
-	void present_frame(vk::Semaphore wait_semaphore, uint32_t image_index);
+
+	void present_frame(u32 image_index);
 
 private:
-	VkContext* vk_context = {};
-	RenderGraph render_graph = {};
+	VkContext *vk_context = {};
 
 	// Sync objects
 	arr<vk::Fence, BVK_MAX_FRAMES_IN_FLIGHT> render_fences = {};
 	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> render_semaphores = {};
 	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> present_semaphores = {};
 
-	bool is_swapchain_invalid = false;
+	bool swapchain_invalid = false;
 
 	// Swapchain
 	vk::SwapchainKHR swapchain = {};
 
 	vec<vk::Image> swapchain_images {};
 	vec<vk::ImageView> swapchain_image_views = {};
-
-	// Pools
-	vk::DescriptorPool descriptor_pool = {};
 
 	vec<vk::CommandBuffer> cmd_buffers = {};
 

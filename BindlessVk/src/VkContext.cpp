@@ -109,7 +109,6 @@ VkContext::VkContext(
     fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
     fn<vk::Extent2D()> get_framebuffer_extent_func,
 
-    bool has_debugging,
     vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
     vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
 
@@ -145,7 +144,6 @@ VkContext::VkContext(
 
 	create_vulkan_instance(
 	    create_window_surface_func,
-	    has_debugging,
 	    debug_messenger_severities,
 	    debug_messenger_types
 	);
@@ -254,7 +252,6 @@ void VkContext::check_layer_support()
 
 void VkContext::create_vulkan_instance(
     fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
-    bool has_debugging,
     vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
     vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types
 )

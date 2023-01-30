@@ -14,18 +14,13 @@ namespace BINDLESSVK_NAMESPACE {
 TextureLoader::TextureLoader(VkContext const *vk_context): vk_context(vk_context)
 {
 	const auto gpu = vk_context->get_gpu();
-	const auto &queues = vk_context->get_queues();
 
+	// @todo move this assertion to a proper place
 	assert_true(
-	    gpu.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures
-	        & vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
+	    gpu.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
+	        vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
 	    "Texture image format(eR8G8B8A8Srgb) does not support linear blitting"
 	);
-
-	vk::CommandPoolCreateInfo commnad_pool_create_info {
-		vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-		queues.graphics_index,
-	};
 }
 
 auto TextureLoader::load_from_binary(

@@ -27,19 +27,22 @@ public:
 	virtual void on_swapchain_recreate() = 0;
 
 public:
-	Logger logger = Logger();
+	Logger logger = {};
 
-	Window window = {};
 	Scene scene = {};
+	Window window = {};
+	StagingPool staging_pool = {};
+	CameraController camera_controller = {};
+
+	vk::DescriptorPool descriptor_pool = {};
 
 	bvk::VkContext vk_context = {};
 	bvk::Renderer renderer = {};
+	bvk::RenderGraph render_graph = {};
 
 	bvk::TextureLoader texture_loader = {};
 	bvk::ModelLoader model_loader = {};
 	bvk::ShaderLoader shader_loader = {};
-
-	vk::DescriptorPool descriptor_pool = {};
 
 	hash_map<u64, bvk::Model> models = {};
 	hash_map<u64, bvk::Texture> textures = {};
@@ -48,20 +51,23 @@ public:
 	hash_map<u64, bvk::ShaderEffect::Configuration> shader_effect_configurations = {};
 	hash_map<u64, bvk::Material> materials = {};
 
-	CameraController camera_controller = {};
-
-	vec<c_str> instance_extensions = {};
-	vec<c_str> device_extensions = {};
-
-	StagingPool staging_pool = {};
-
 private:
-	vk::PhysicalDeviceFeatures physical_device_features;
+	void create_window();
+	void create_vk_context();
+	void create_descriptor_pool();
+	void create_user_interface();
+	void create_loaders();
+	void create_renderer();
+	void create_render_graph();
 
-protected:
-	u64 messenger_warn_count = {};
-	u64 messenger_err_count = {};
-
-private:
 	void load_default_textures();
+
+	auto get_layers() const -> vec<c_str>;
+	auto get_instance_extensions() const -> vec<c_str>;
+	auto get_device_extensions() const -> vec<c_str>;
+	auto get_physical_device_features() const -> vk::PhysicalDeviceFeatures;
+
+	void destroy_models();
+	void destroy_user_interface();
+	void destroy_descriptor_pool();
 };

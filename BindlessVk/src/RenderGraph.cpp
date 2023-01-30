@@ -19,14 +19,14 @@ void RenderGraph::reset()
 	const auto allocator = vk_context->get_allocator();
 	const auto num_threads = vk_context->get_num_threads();
 
-	for (auto& resource_container : attachment_resources)
+	for (auto &resource_container : attachment_resources)
 	{
 		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
 		{
 			//  Destroy image resources if it's not from swapchain
 			if (resource_container.type != AttachmentResourceContainer::Type::ePerImage)
 			{
-				for (auto& resource : resource_container.resources)
+				for (auto &resource : resource_container.resources)
 				{
 					device.destroyImageView(resource.image_view);
 					allocator.destroyImage(resource.image, resource.image);
@@ -46,7 +46,7 @@ void RenderGraph::reset()
 		}
 	}
 
-	for (const auto& descriptor_set : sets)
+	for (const auto &descriptor_set : sets)
 	{
 		device.freeDescriptorSets(descriptor_pool, descriptor_set);
 	}
@@ -67,7 +67,7 @@ void RenderGraph::reset()
 	// for (vk::CommandBuffer command_buffer : m_secondary_cmd_buffers) {
 	// }
 
-	for (auto& [key, val] : buffer_inputs)
+	for (auto &[key, val] : buffer_inputs)
 	{
 		delete val;
 	}
@@ -75,9 +75,9 @@ void RenderGraph::reset()
 	device.destroyPipelineLayout(pipeline_layout);
 	device.destroyDescriptorSetLayout(descriptor_set_layout);
 
-	for (auto& pass : renderpasses)
+	for (auto &pass : renderpasses)
 	{
-		for (auto& [key, val] : pass.buffer_inputs)
+		for (auto &[key, val] : pass.buffer_inputs)
 		{
 			delete val;
 		}
@@ -92,7 +92,7 @@ void RenderGraph::reset()
 }
 
 void RenderGraph::init(
-    VkContext* vk_context,
+    VkContext *vk_context,
     vk::DescriptorPool descriptor_pool,
     vec<vk::Image> swapchain_images,
     vec<vk::ImageView> swapchain_image_views
@@ -109,8 +109,7 @@ void RenderGraph::build(
     str backbuffer_name,
     vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
     vec<Renderpass::CreateInfo> renderpasses,
-    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
-    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
+    void (*on_update)(VkContext *, RenderGraph *, u32, void *),
     vk::DebugUtilsLabelEXT update_debug_label,
     vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label
 )
@@ -120,12 +119,8 @@ void RenderGraph::build(
 	// Assign graph members
 	this->renderpasses_info = renderpasses;
 	buffer_inputs_info = buffer_inputs;
-	this->on_update = on_update ? on_update : [](VkContext*, RenderGraph*, u32, void*) {
+	this->on_update = on_update ? on_update : [](VkContext *, RenderGraph *, u32, void *) {
 	};
-
-	this->on_begin_frame =
-	    on_begin_frame ? on_begin_frame : [](VkContext*, RenderGraph*, u32, void*) {
-	    };
 
 	swapchain_attachment_names.push_back(backbuffer_name);
 
@@ -136,31 +131,24 @@ void RenderGraph::build(
 	this->renderpasses.resize(renderpasses_info.size(), Renderpass {});
 	for (u32 i = renderpasses_info.size(); i-- > 0;)
 	{
-		auto& pass = this->renderpasses[i];
-		auto& pass_info = this->renderpasses_info[i];
-		vk_context->log(LogLvl::eTrace, "{} on begin frame {}", pass.name, !!pass.on_begin_frame);
+		auto &pass = this->renderpasses[i];
+		auto &pass_info = this->renderpasses_info[i];
 
 		pass.name = pass_info.name;
-		vk_context->log(LogLvl::eTrace, "{} : {}, {}", i, pass.name, !!pass_info.on_begin_frame);
-
-		pass.on_begin_frame = pass_info.on_begin_frame ?
-		                          pass_info.on_begin_frame :
-		                          [](VkContext*, class RenderGraph*, Renderpass*, u32, void*) {
-		                          };
 
 		pass.on_update = pass_info.on_update ?
 		                     pass_info.on_update :
-		                     [](VkContext*, class RenderGraph*, Renderpass*, u32, void*) {
+		                     [](VkContext *, class RenderGraph *, Renderpass *, u32, void *) {
 		                     };
 
 		pass.on_render = pass_info.on_render ? pass_info.on_render :
-		                                       [](VkContext*,
-		                                          class RenderGraph*,
-		                                          Renderpass*,
+		                                       [](VkContext *,
+		                                          class RenderGraph *,
+		                                          Renderpass *,
 		                                          vk::CommandBuffer cmd,
 		                                          u32,
 		                                          u32,
-		                                          void*) {
+		                                          void *) {
 		                                       };
 
 
@@ -168,7 +156,7 @@ void RenderGraph::build(
 		pass.barrier_debug_label = pass_info.barrier_debug_label;
 		pass.render_debug_label = pass_info.render_debug_label;
 
-		for (const auto& attachment_info : this->renderpasses_info[i].color_attachments_info)
+		for (const auto &attachment_info : this->renderpasses_info[i].color_attachments_info)
 		{
 			auto it = std::find(
 			    swapchain_attachment_names.begin(),
@@ -245,12 +233,12 @@ void RenderGraph::build_attachment_resources()
 {
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = renderpasses[i];
-		const auto& pass_info = renderpasses_info[i];
+		auto &pass = renderpasses[i];
+		const auto &pass_info = renderpasses_info[i];
 
 		for (u32 j = 0; j < pass_info.color_attachments_info.size(); ++j)
 		{
-			const auto& color_attachment_info = pass_info.color_attachments_info[j];
+			const auto &color_attachment_info = pass_info.color_attachments_info[j];
 
 			// Write only ; create new resource
 			if (color_attachment_info.input == "")
@@ -286,13 +274,13 @@ void RenderGraph::build_attachment_resources()
 			{
 				for (u32 k = 0; k < attachment_resources.size(); ++k)
 				{
-					auto& resource_container = attachment_resources[k];
+					auto &resource_container = attachment_resources[k];
 					if (resource_container.last_write_name != color_attachment_info.input)
 						continue;
 
 					assert_true(
-					    resource_container.size == color_attachment_info.size
-					        && resource_container.size_type == color_attachment_info.size_type,
+					    resource_container.size == color_attachment_info.size &&
+					        resource_container.size_type == color_attachment_info.size_type,
 					    "ReadWrite attachment with different size from input is currently not "
 					    "supported"
 					);
@@ -322,7 +310,7 @@ void RenderGraph::build_attachment_resources()
 		if (pass_info.depth_stencil_attachment_info.name.empty())
 			continue;
 
-		const auto& depth_stencil_attachment_info = pass_info.depth_stencil_attachment_info;
+		const auto &depth_stencil_attachment_info = pass_info.depth_stencil_attachment_info;
 		// Write only ; create new resource
 		if (depth_stencil_attachment_info.input == "")
 		{
@@ -341,8 +329,8 @@ void RenderGraph::build_attachment_resources()
 
 			pass.attachments.push_back({
 			    vk::PipelineStageFlagBits::eEarlyFragmentTests,
-			    vk::AccessFlagBits::eDepthStencilAttachmentWrite
-			        | vk::AccessFlagBits::eDepthStencilAttachmentRead,
+			    vk::AccessFlagBits::eDepthStencilAttachmentWrite |
+			        vk::AccessFlagBits::eDepthStencilAttachmentRead,
 			    vk::ImageLayout::eDepthAttachmentOptimal,
 			    vk::ImageSubresourceRange {
 			        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
@@ -362,13 +350,13 @@ void RenderGraph::build_attachment_resources()
 		{
 			for (u32 k = 0; k < attachment_resources.size(); ++k)
 			{
-				auto& resource_container = attachment_resources[k];
+				auto &resource_container = attachment_resources[k];
 				if (resource_container.last_write_name == depth_stencil_attachment_info.input)
 					continue;
 
 				assert_true(
-				    resource_container.size != depth_stencil_attachment_info.size
-				        && resource_container.size_type != depth_stencil_attachment_info.size_type,
+				    resource_container.size != depth_stencil_attachment_info.size &&
+				        resource_container.size_type != depth_stencil_attachment_info.size_type,
 				    "ReadWrite attachment with different size from input is currently not "
 				    "supported"
 				);
@@ -376,8 +364,8 @@ void RenderGraph::build_attachment_resources()
 				resource_container.last_write_name = depth_stencil_attachment_info.name;
 				pass.attachments.push_back({
 				    vk::PipelineStageFlagBits::eEarlyFragmentTests,
-				    vk::AccessFlagBits::eDepthStencilAttachmentWrite
-				        | vk::AccessFlagBits::eDepthStencilAttachmentRead,
+				    vk::AccessFlagBits::eDepthStencilAttachmentWrite |
+				        vk::AccessFlagBits::eDepthStencilAttachmentRead,
 				    vk::ImageLayout::eDepthAttachmentOptimal,
 				    vk::ImageSubresourceRange {
 				        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
@@ -407,7 +395,7 @@ void RenderGraph::build_passes_texture_inputs()
 
 void RenderGraph::build_graph_buffer_inputs()
 {
-	for (auto& buffer_input_info : buffer_inputs_info)
+	for (auto &buffer_input_info : buffer_inputs_info)
 	{
 		buffer_inputs.emplace(
 		    hash_str(buffer_input_info.name.c_str()),
@@ -432,10 +420,10 @@ void RenderGraph::build_passes_buffer_inputs()
 {
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = renderpasses[i];
-		const auto& pass_info = renderpasses_info[i];
+		auto &pass = renderpasses[i];
+		const auto &pass_info = renderpasses_info[i];
 
-		for (auto& buffer_input_info : pass_info.buffer_inputs_info)
+		for (auto &buffer_input_info : pass_info.buffer_inputs_info)
 		{
 			pass.buffer_inputs.emplace(
 			    hash_str(buffer_input_info.name.c_str()),
@@ -463,7 +451,7 @@ void RenderGraph::build_graph_sets()
 
 	// Create set & pipeline layout
 	vec<vk::DescriptorSetLayoutBinding> bindings;
-	for (const auto& buffer_input_info : buffer_inputs_info)
+	for (const auto &buffer_input_info : buffer_inputs_info)
 	{
 		bindings.push_back(vk::DescriptorSetLayoutBinding {
 		    buffer_input_info.binding,
@@ -502,12 +490,12 @@ void RenderGraph::build_passes_sets()
 
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = renderpasses[i];
-		const auto& pass_info = renderpasses_info[i];
+		auto &pass = renderpasses[i];
+		const auto &pass_info = renderpasses_info[i];
 
 		// Create set & pipeline layout
 		vec<vk::DescriptorSetLayoutBinding> bindings;
-		for (const auto& buffer_input_info : pass_info.buffer_inputs_info)
+		for (const auto &buffer_input_info : pass_info.buffer_inputs_info)
 		{
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
 			    buffer_input_info.binding,
@@ -516,7 +504,7 @@ void RenderGraph::build_passes_sets()
 			    buffer_input_info.stage_mask,
 			});
 		}
-		for (const auto& texture_input_info : pass_info.texture_inputs_info)
+		for (const auto &texture_input_info : pass_info.texture_inputs_info)
 		{
 			bindings.push_back(vk::DescriptorSetLayoutBinding {
 			    texture_input_info.binding,
@@ -563,7 +551,7 @@ void RenderGraph::write_graph_sets()
 
 	vec<vk::DescriptorBufferInfo> buffers_info;
 	buffers_info.reserve(buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
-	for (const auto& buffer_input_info : buffer_inputs_info)
+	for (const auto &buffer_input_info : buffer_inputs_info)
 	{
 		vec<vk::WriteDescriptorSet> writes;
 
@@ -601,8 +589,8 @@ void RenderGraph::write_passes_sets()
 
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		const auto& pass_info = renderpasses_info[i];
-		auto& pass = renderpasses[i];
+		const auto &pass_info = renderpasses_info[i];
+		auto &pass = renderpasses[i];
 
 		vec<vk::WriteDescriptorSet> set_writes;
 		set_writes.reserve(pass.buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
@@ -610,7 +598,7 @@ void RenderGraph::write_passes_sets()
 		vec<vk::DescriptorBufferInfo> buffer_infos;
 		buffer_infos.reserve(pass.buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
 
-		for (const auto& buffer_input_info : pass_info.buffer_inputs_info)
+		for (const auto &buffer_input_info : pass_info.buffer_inputs_info)
 		{
 			for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 			{
@@ -634,7 +622,7 @@ void RenderGraph::write_passes_sets()
 				}
 			}
 		}
-		for (const auto& texture_input_info : pass_info.texture_inputs_info)
+		for (const auto &texture_input_info : pass_info.texture_inputs_info)
 		{
 			vk_context->log(
 			    LogLvl::eWarn,
@@ -674,9 +662,9 @@ void RenderGraph::build_pass_cmd_buffer_begin_infos()
 
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
-		auto& pass = renderpasses[i];
+		auto &pass = renderpasses[i];
 
-		for (auto& attachment : pass.attachments)
+		for (auto &attachment : pass.attachments)
 		{
 			if (attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
@@ -717,7 +705,7 @@ void RenderGraph::build_pass_cmd_buffer_begin_infos()
 }
 
 void RenderGraph::create_attachment_resource(
-    const Renderpass::CreateInfo::AttachmentInfo& attachment_info,
+    const Renderpass::CreateInfo::AttachmentInfo &attachment_info,
     RenderGraph::AttachmentResourceContainer::Type attachment_type,
     u32 recreate_resource_index
 )
@@ -756,7 +744,7 @@ void RenderGraph::create_attachment_resource(
 	// Set image extent
 	vk::Extent3D image_extent = calculate_attachment_image_extent(attachment_info);
 
-	auto* resource_container = recreate_resource_index == UINT32_MAX ?
+	auto *resource_container = recreate_resource_index == UINT32_MAX ?
 	                             &attachment_resources.back() :
 	                             &attachment_resources[recreate_resource_index];
 	*resource_container = {
@@ -868,8 +856,8 @@ void RenderGraph::create_attachment_resource(
 	default: assert_fail("Invalid attachment resource type");
 	}
 
-	if (static_cast<u32>(attachment_info.samples) > 1
-	    && image_aspect_mask & vk::ImageAspectFlagBits::eColor)
+	if (static_cast<u32>(attachment_info.samples) > 1 &&
+	    image_aspect_mask & vk::ImageAspectFlagBits::eColor)
 	{
 		vk::ImageCreateInfo image_create_info {
 			{},
@@ -949,13 +937,13 @@ void RenderGraph::on_swapchain_invalidated(
 
 	for (u32 i = 0; i < attachment_resources.size(); ++i)
 	{
-		auto& resource_container = attachment_resources[i];
+		auto &resource_container = attachment_resources[i];
 		if (resource_container.size_type == Renderpass::CreateInfo::SizeType::eSwapchainRelative)
 		{
 			// Destroy image resources if it's not from swapchain
 			if (resource_container.type != AttachmentResourceContainer::Type::ePerImage)
 			{
-				for (AttachmentResource& resource : resource_container.resources)
+				for (AttachmentResource &resource : resource_container.resources)
 				{
 					device.destroyImageView(resource.image_view);
 					allocator.destroyImage(resource.image, resource.image);
@@ -981,25 +969,16 @@ void RenderGraph::on_swapchain_invalidated(
 	}
 }
 
-void RenderGraph::begin_frame(u32 frame_index, void* user_pointer)
-{
-	on_begin_frame(vk_context, this, frame_index, user_pointer);
-
-	for (u32 i = 0; i < renderpasses.size(); ++i)
-		renderpasses[i]
-		    .on_begin_frame(vk_context, this, &renderpasses[i], frame_index, user_pointer);
-}
-
 // @todo: Setup render barriers
 // @todo: Multi-threaded recording
-void RenderGraph::end_frame(
+void RenderGraph::update_and_render(
     vk::CommandBuffer primary_cmd,
     u32 frame_index,
     u32 image_index,
-    void* user_pointer
+    void *user_pointer
 )
 {
-	const auto& queues = vk_context->get_queues();
+	const auto &queues = vk_context->get_queues();
 	const auto num_threads = vk_context->get_num_threads();
 	const auto thread_index = 0;
 
@@ -1013,7 +992,7 @@ void RenderGraph::end_frame(
 	// Update passes
 	for (u32 i = 0; i < renderpasses.size(); ++i)
 	{
-		auto& pass = renderpasses[i];
+		auto &pass = renderpasses[i];
 
 		queues.graphics.beginDebugUtilsLabelEXT(pass.update_debug_label);
 		pass.on_update(vk_context, this, &renderpasses[i], frame_index, user_pointer);
@@ -1030,7 +1009,7 @@ void RenderGraph::end_frame(
 
 	for (u32 i = 0; i < renderpasses.size(); ++i)
 	{
-		auto& pass = renderpasses[i];
+		auto &pass = renderpasses[i];
 
 		auto pass_rendering_info = apply_pass_barriers(primary_cmd, frame_index, image_index, i);
 
@@ -1054,10 +1033,10 @@ void RenderGraph::record_pass_cmds(
     u32 frame_index,
     u32 image_index,
     u32 pass_index,
-    void* user_pointer
+    void *user_pointer
 )
 {
-	auto& pass = renderpasses[pass_index];
+	auto &pass = renderpasses[pass_index];
 	cmd.begin(pass.cmd_buffer_begin_info);
 
 	// Graph descriptor set (set = 0)
@@ -1105,18 +1084,18 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
     u32 pass_index
 )
 {
-	const auto& queues = vk_context->get_queues();
-	const auto& surface = vk_context->get_surface();
+	const auto &queues = vk_context->get_queues();
+	const auto &surface = vk_context->get_surface();
 
-	auto& pass = renderpasses[pass_index];
+	auto &pass = renderpasses[pass_index];
 	cmd.beginDebugUtilsLabelEXT(pass.barrier_debug_label);
 
 	PassRenderingInfo pass_rendering_info = {};
-	for (auto& attachment : pass.attachments)
+	for (auto &attachment : pass.attachments)
 	{
-		auto& resource_container = attachment_resources[attachment.resource_index];
+		auto &resource_container = attachment_resources[attachment.resource_index];
 
-		auto& resource = resource_container.get_resource(image_index, frame_index);
+		auto &resource = resource_container.get_resource(image_index, frame_index);
 
 		vk::ImageMemoryBarrier image_barrier {
 			resource.src_access_mask, attachment.access_mask,       resource.src_image_layout,
@@ -1124,10 +1103,10 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 			resource.image,           attachment.subresource_range, nullptr,
 		};
 
-		if ((resource.src_access_mask != attachment.access_mask
-		     || resource.src_image_layout != attachment.layout
-		     || resource.src_stage_mask != attachment.stage_mask)
-		    && attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
+		if ((resource.src_access_mask != attachment.access_mask ||
+		     resource.src_image_layout != attachment.layout ||
+		     resource.src_stage_mask != attachment.stage_mask) &&
+		    attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 		{
 			cmd.pipelineBarrier(
 			    resource.src_stage_mask,
@@ -1146,8 +1125,8 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 
 		vk::RenderingAttachmentInfo rendering_attachment_info {};
 		// Multi-sampled image
-		if (static_cast<u32>(resource_container.sample_count) > 1
-		    && attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
+		if (static_cast<u32>(resource_container.sample_count) > 1 &&
+		    attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 		{
 			rendering_attachment_info = {
 				resource_container.transient_ms_image_view,
@@ -1209,7 +1188,7 @@ void RenderGraph::apply_backbuffer_barrier(vk::CommandBuffer cmd, u32 frame_inde
 {
 	vk::DebugUtilsLabelEXT a;
 	cmd.beginDebugUtilsLabelEXT(backbuffer_barrier_debug_label);
-	auto& backbuffer_resource =
+	auto &backbuffer_resource =
 	    attachment_resources[swapchain_resource_index].get_resource(image_index, frame_index);
 
 	cmd.pipelineBarrier(
@@ -1245,7 +1224,7 @@ void RenderGraph::apply_backbuffer_barrier(vk::CommandBuffer cmd, u32 frame_inde
 }
 
 vk::Extent3D RenderGraph::calculate_attachment_image_extent(
-    const Renderpass::CreateInfo::AttachmentInfo& attachment_info
+    const Renderpass::CreateInfo::AttachmentInfo &attachment_info
 )
 {
 	const auto surface = vk_context->get_surface();

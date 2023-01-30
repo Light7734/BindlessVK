@@ -16,9 +16,9 @@ public:
 	Window() = default;
 	~Window();
 
-	void init(WindowSpecs specs, std::vector<std::pair<int, int>> hints);
+	void init(WindowSpecs specs, vec<pair<int, int>> hints);
 
-	std::vector<const char*> get_required_extensions();
+	vec<c_str> get_required_extensions() const;
 
 	void poll_events();
 	bool should_close();
@@ -26,14 +26,14 @@ public:
 	vk::SurfaceKHR create_surface(vk::Instance instance);
 	vk::Extent2D get_framebuffer_size();
 
-	inline GLFWwindow* get_glfw_handle()
+	inline GLFWwindow *get_glfw_handle()
 	{
 		return glfw_window_handle;
 	}
 
 private:
-	GLFWwindow* glfw_window_handle = {};
-	WindowSpecs specs              = {};
+	GLFWwindow *glfw_window_handle = {};
+	WindowSpecs specs = {};
 
 	void bind_callbacks();
 };

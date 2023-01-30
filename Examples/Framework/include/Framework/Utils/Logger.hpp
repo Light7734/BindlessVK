@@ -5,6 +5,7 @@
 #include "Framework/Common/Common.hpp"
 
 #include <BindlessVk/Common/Common.hpp>
+#include <BindlessVk/VkContext.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
@@ -15,12 +16,22 @@ public:
 	~Logger();
 
 	template<typename... Args>
-	inline void log(spdlog::level::level_enum level, fmt::format_string<Args...> fmt = "", Args&&... args)
-	  const
+	void inline log(
+	  spdlog::level::level_enum level,
+	  fmt::format_string<Args...> fmt = "",
+	  Args &&...args
+	) const
 	{
-		logger->log(level, fmt, std::forward<Args>(args)...);
+		spd_logger->log(level, fmt, std::forward<Args>(args)...);
 	}
 
+	void static bindlessvk_callback(
+	  bvk::DebugCallbackSource const source,
+	  bvk::LogLvl const severity,
+	  str const &message,
+	  std::any const user_data
+	);
+
 private:
-	ref<spdlog::logger> logger;
+	ref<spdlog::logger> spd_logger;
 };

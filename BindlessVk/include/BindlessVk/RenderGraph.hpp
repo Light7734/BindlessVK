@@ -29,7 +29,7 @@ public:
 	 * @param swapchain_iamge_views the swapchain's image views
 	 */
 	void init(
-	    VkContext* vk_context,
+	    VkContext *vk_context,
 	    vk::DescriptorPool descriptor_pool,
 	    vec<vk::Image> swapchain_images,
 	    vec<vk::ImageView> swapchain_image_views
@@ -51,16 +51,12 @@ public:
 	 *
 	 * @param on_update function to be called before rendering to update the
 	 * graph descriptor sets (set = 0)
-	 *
-	 * @param on_begin_frame function to be called at the beginning of the frame
-	 * (eg. start imgui frame)
 	 */
 	void build(
 	    str backbuffer_name,
 	    vec<Renderpass::CreateInfo::BufferInputInfo> buffer_inputs,
 	    vec<Renderpass::CreateInfo> renderpasses,
-	    void (*on_update)(VkContext*, RenderGraph*, u32, void*),
-	    void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*),
+	    void (*on_update)(VkContext *, RenderGraph *, u32, void *),
 	    vk::DebugUtilsLabelEXT update_debug_label,
 	    vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label
 	);
@@ -74,24 +70,19 @@ public:
 	    vec<vk::ImageView> swapchain_iamge_views
 	);
 
-	/** Calls on_begin frame functions of the graph & passes
-	 * @param device:
-	 */
-	void begin_frame(u32 frame_index, void* user_pointer);
-
-	void end_frame(
+	void update_and_render(
 	    vk::CommandBuffer primary_cmd,
 	    u32 frame_index,
 	    u32 image_index,
-	    void* user_pointer
+	    void *user_pointer
 	);
 
-	inline void* map_descriptor_buffer(const char* name, u32 frame_index)
+	inline void *map_descriptor_buffer(const char *name, u32 frame_index)
 	{
 		return buffer_inputs[hash_str(name)]->map_block(frame_index);
 	}
 
-	inline void unmap_descriptor_buffer(const char* name)
+	inline void unmap_descriptor_buffer(const char *name)
 	{
 		buffer_inputs[hash_str(name)]->unmap();
 	}
@@ -137,7 +128,7 @@ private:
 	void build_pass_cmd_buffer_begin_infos();
 
 	vk::Extent3D calculate_attachment_image_extent(
-	    const Renderpass::CreateInfo::AttachmentInfo& attachment_info
+	    const Renderpass::CreateInfo::AttachmentInfo &attachment_info
 	);
 
 	void record_pass_cmds(
@@ -145,7 +136,7 @@ private:
 	    u32 frame_index,
 	    u32 image_index,
 	    u32 pass_index,
-	    void* user_pointer
+	    void *user_pointer
 	);
 
 	struct PassRenderingInfo
@@ -215,7 +206,7 @@ private:
 
 		Renderpass::CreateInfo::AttachmentInfo cached_renderpass_info;
 
-		inline AttachmentResource& get_resource(u32 image_index, u32 frame_index)
+		inline AttachmentResource &get_resource(u32 image_index, u32 frame_index)
 		{
 			return type == Type::ePerImage ? resources[image_index] :
 			       type == Type::ePerFrame ? resources[frame_index] :
@@ -224,14 +215,14 @@ private:
 	};
 
 	void create_attachment_resource(
-	    const Renderpass::CreateInfo::AttachmentInfo& attachment_info,
+	    const Renderpass::CreateInfo::AttachmentInfo &attachment_info,
 	    RenderGraph::AttachmentResourceContainer::Type attachment_type,
 	    u32 recreate_resource_index
 	);
 
 
 private:
-	VkContext* vk_context = {};
+	VkContext *vk_context = {};
 
 	vk::DescriptorPool descriptor_pool = {};
 	vec<Renderpass> renderpasses = {};
@@ -240,12 +231,11 @@ private:
 	vk::DescriptorSetLayout descriptor_set_layout = {};
 	vec<vk::DescriptorSet> sets = {};
 
-	void (*on_update)(VkContext*, RenderGraph*, u32, void*);
-	void (*on_begin_frame)(VkContext*, RenderGraph*, u32, void*);
+	void (*on_update)(VkContext *, RenderGraph *, u32, void *);
 
 	vec<AttachmentResourceContainer> attachment_resources = {};
 
-	std::unordered_map<uint64_t, Buffer*> buffer_inputs = {};
+	std::unordered_map<uint64_t, Buffer *> buffer_inputs = {};
 
 	vec<vk::Image> swapchain_images = {};
 	vec<vk::ImageView> swapchain_image_views = {};
