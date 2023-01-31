@@ -9,7 +9,7 @@
 </div>
 
 ## What's all this?
-BindlessVK is a realtime 3d renderer developed using the Vulkan graphics API and C++, built mostly for learning purposes.
+BindlessVK is a physically based renderer(PBR) written in modern C++ using Vulkan API, it utilizes a bindless design to minimize the state changes.
 
 ## Development Guideline
 **Getting started:**
