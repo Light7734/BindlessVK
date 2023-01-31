@@ -1,4 +1,4 @@
-# Vulkan-Renderer [![forthebadge](https://forthebadge.com/images/badges/works-on-my-machine.svg)](https://forthebadge.com)
+# BindlessVK [![forthebadge](https://forthebadge.com/images/badges/works-on-my-machine.svg)](https://forthebadge.com)
 
 <div align="center">
 <img src="https://github.com/Light7734/Vulkan-Renderer/raw/main/Branding/bindlessvk.svg"/>
