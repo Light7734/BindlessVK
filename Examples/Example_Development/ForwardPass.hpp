@@ -3,92 +3,89 @@
 #include "BindlessVk/RenderPass.hpp"
 #include "Framework/Scene/Scene.hpp"
 
-using u32 = uint32_t;
+using u32 = u32;
 
 inline void forward_pass_update(
-  bvk::VkContext* vk_context,
-  bvk::RenderGraph* render_graph,
-  bvk::Renderpass* render_pass,
-  uint32_t frame_index,
-  void* user_pointer
+  bvk::VkContext *vk_context,
+  bvk::RenderGraph *render_graph,
+  bvk::Renderpass *render_pass,
+  u32 frame_index,
+  void *user_pointer
 )
 {
-	const auto device = vk_context->get_device();
-	auto* scene = reinterpret_cast<Scene*>(user_pointer);
+	auto const device = vk_context->get_device();
+	auto const descriptor_set = render_pass->descriptor_sets[frame_index];
 
-	vk::DescriptorSet descriptor_set = render_pass->descriptor_sets[frame_index];
+	auto *scene = reinterpret_cast<Scene *>(user_pointer);
 
 	// @todo: don't update every frame
-	scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>)
-	  .each([&](TransformComponent& transform_comp, StaticMeshRendererComponent& render_comp) {
-		  for (const auto* node : render_comp.model->nodes) {
-			  for (const auto& primitive : node->mesh) {
-				  const auto& model = render_comp.model;
-				  const auto& material = model->material_parameters[primitive.material_index];
+	auto const renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
 
-				  u32 albedo_texture_index = material.albedo_texture_index;
-				  u32 normal_texture_index = material.normal_texture_index;
-				  u32 metallic_roughness_texture_index = material.metallic_roughness_texture_index;
+	auto descriptor_writes = vec<vk::WriteDescriptorSet> {};
 
-				  auto* albedo_texture = &model->textures[albedo_texture_index];
-				  auto* normal_texture = &model->textures[normal_texture_index];
-				  auto* metallic_roughness_texture = &model->textures[metallic_roughness_texture_index];
+	renderables.each([&](auto const &transform_component, auto const &render_component) {
+		for (auto const *const node : render_component.model->nodes) {
+			for (const auto &primitive : node->mesh) {
+				auto const &model = render_component.model;
+				auto const &material = model->material_parameters[primitive.material_index];
 
-				  std::vector<vk::WriteDescriptorSet> descriptor_writes = {
-					  vk::WriteDescriptorSet {
-					    descriptor_set,
-					    0ul,
-					    albedo_texture_index,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &albedo_texture->descriptor_info,
-					    nullptr,
-					    nullptr,
-					  },
-					  vk::WriteDescriptorSet {
-					    descriptor_set,
-					    0ul,
-					    metallic_roughness_texture_index,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &metallic_roughness_texture->descriptor_info,
-					    nullptr,
-					    nullptr,
-					  },
-					  vk::WriteDescriptorSet {
-					    descriptor_set,
-					    0ul,
-					    normal_texture_index,
-					    1ul,
-					    vk::DescriptorType::eCombinedImageSampler,
-					    &normal_texture->descriptor_info,
-					    nullptr,
-					    nullptr,
-					  }
-				  };
+				u32 albedo_texture_index = material.albedo_texture_index;
+				u32 normal_texture_index = material.normal_texture_index;
+				u32 metallic_roughness_texture_index = material.metallic_roughness_texture_index;
 
-				  device.updateDescriptorSets(
-				    static_cast<uint32_t>(descriptor_writes.size()),
-				    descriptor_writes.data(),
-				    0ull,
-				    nullptr
-				  );
-			  }
-		  }
-	  });
+				auto const *const albedo_texture = &model->textures[albedo_texture_index];
+				auto const *const normal_texture = &model->textures[normal_texture_index];
+				auto const *const metallic_roughness_texture = &model->textures
+				                                                  [metallic_roughness_texture_index];
+
+				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
+				  descriptor_set,
+				  0ul,
+				  albedo_texture_index,
+				  1ul,
+				  vk::DescriptorType::eCombinedImageSampler,
+				  &albedo_texture->descriptor_info,
+				  nullptr,
+				  nullptr,
+				});
+				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
+				  descriptor_set,
+				  0ul,
+				  metallic_roughness_texture_index,
+				  1ul,
+				  vk::DescriptorType::eCombinedImageSampler,
+				  &metallic_roughness_texture->descriptor_info,
+				  nullptr,
+				  nullptr,
+				});
+				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
+				  descriptor_set,
+				  0ul,
+				  normal_texture_index,
+				  1ul,
+				  vk::DescriptorType::eCombinedImageSampler,
+				  &normal_texture->descriptor_info,
+				  nullptr,
+				  nullptr,
+				});
+			};
+		}
+	});
+
+	device.updateDescriptorSets(descriptor_writes, 0);
 }
 
 
-inline void draw_model(bvk::Model* model, vk::CommandBuffer cmd)
+inline void draw_model(bvk::Model *model, vk::CommandBuffer cmd)
 {
-	static const VkDeviceSize offset { 0 };
+	auto const offset = VkDeviceSize { 0 };
 
 	// bind buffers
 	cmd.bindVertexBuffers(0, 1, model->vertex_buffer->get_buffer(), &offset);
 	cmd.bindIndexBuffer(*(model->index_buffer->get_buffer()), 0u, vk::IndexType::eUint32);
 
-	for (const auto* node : model->nodes) {
-		for (const auto& primitive : node->mesh) {
+	for (auto const *node : model->nodes) {
+		for (auto const &primitive : node->mesh) {
 			u32 texture_index = model->material_parameters[primitive.material_index].albedo_texture_index;
 
 			// @todo: fix this hack
@@ -98,26 +95,27 @@ inline void draw_model(bvk::Model* model, vk::CommandBuffer cmd)
 }
 
 inline void forward_pass_render(
-  bvk::VkContext* vk_context,
-  bvk::RenderGraph* render_graph,
-  bvk::Renderpass* render_pass,
+  bvk::VkContext *vk_context,
+  bvk::RenderGraph *render_graph,
+  bvk::Renderpass *render_pass,
   vk::CommandBuffer cmd,
-  uint32_t frame_index,
-  uint32_t image_index,
-  void* user_pointer
+  u32 frame_index,
+  u32 image_index,
+  void *user_pointer
 )
 {
 	const auto device = vk_context->get_device();
-	const auto& surface = vk_context->get_surface();
+	const auto &surface = vk_context->get_surface();
 
 	auto pipeline = vk::Pipeline {};
-	auto* scene = reinterpret_cast<Scene*>(user_pointer);
-	auto renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
 
-	renderables.each([&](auto& transform_component, auto& render_component) {
-		const auto material = render_component.material;
-		const auto effect = material->get_effect();
-		const auto new_pipeline = effect->get_pipeline();
+	auto *const scene = reinterpret_cast<Scene *>(user_pointer);
+	auto const renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
+
+	renderables.each([&](auto const &transform_component, auto const &render_component) {
+		auto const material = render_component.material;
+		auto const effect = material->get_effect();
+		auto const new_pipeline = effect->get_pipeline();
 
 		if (pipeline != new_pipeline) {
 			// bind new pipeline

@@ -45,7 +45,8 @@ public:
 		CVar::draw_imgui_editor();
 
 		camera_controller.update();
-		renderer.render_frame(render_graph, &scene);
+
+		renderer.render_graph(render_graph, &scene);
 
 		if (renderer.is_swapchain_invalid()) {
 			logger.log(spdlog::level::trace, "Swapchain invalidated");
