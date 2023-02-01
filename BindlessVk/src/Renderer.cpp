@@ -40,188 +40,16 @@ Renderer &Renderer::operator=(Renderer &&other)
 Renderer::~Renderer()
 {
 	if (!vk_context)
-	{
 		return;
-	}
 
 	auto const device = vk_context->get_device();
 
-	destroy_swapchain_resources();
+	destroy_swapchain_image_views();
 	destroy_sync_objects();
 	device.destroySwapchainKHR(swapchain);
 }
 
-void Renderer::on_swapchain_invalidated()
-{
-	auto const device = vk_context->get_device();
-
-	destroy_swapchain_resources();
-
-	create_swapchain();
-
-	swapchain_invalid = false;
-	device.waitIdle();
-}
-
-void Renderer::destroy_swapchain_resources()
-{
-	auto const device = vk_context->get_device();
-
-	if (!swapchain)
-	{
-		return;
-	}
-
-	device.waitIdle();
-
-	for (auto const &imageView : swapchain_image_views)
-	{
-		device.destroyImageView(imageView);
-	}
-
-	swapchain_image_views.clear();
-	swapchain_images.clear();
-};
-
-void Renderer::destroy_sync_objects()
-{
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		device.destroyFence(render_fences[i]);
-		device.destroySemaphore(render_semaphores[i]);
-		device.destroySemaphore(present_semaphores[i]);
-	}
-}
-
-void Renderer::create_sync_objects()
-{
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		render_fences[i] = device.createFence({
-		    vk::FenceCreateFlagBits::eSignaled,
-		});
-
-		render_semaphores[i] = device.createSemaphore({});
-		present_semaphores[i] = device.createSemaphore({});
-	}
-}
-
-void Renderer::create_swapchain()
-{
-	auto const device = vk_context->get_device();
-	auto const queues = vk_context->get_queues();
-	auto const surface = vk_context->get_surface();
-
-	const u32 min_image = surface.capabilities.minImageCount;
-	const u32 max_image = surface.capabilities.maxImageCount;
-
-	u32 image_count;
-	if ((max_image == 0ul || max_image >= DESIRED_SWAPCHAIN_IMAGES) &&
-	    min_image <= DESIRED_SWAPCHAIN_IMAGES)
-	{
-		image_count = DESIRED_SWAPCHAIN_IMAGES;
-	}
-	else if (min_image <= 2ul && max_image >= 2ul)
-	{
-		image_count = 2ul;
-	}
-	else if (min_image == 0ul && max_image >= 2ul)
-	{
-		image_count = 2ul;
-	}
-	else
-	{
-		image_count = min_image;
-	}
-
-	// Create swapchain
-	const bool queues_have_same_index = queues.graphics_index == queues.present_index;
-
-	vk::SwapchainKHR old_swapchain = swapchain;
-
-	vk::SwapchainCreateInfoKHR swapchain_info {
-		{},
-		surface,
-		image_count,
-		surface.color_format,
-		surface.color_space,
-		surface.framebuffer_extent,
-		1u,
-		vk::ImageUsageFlagBits::eColorAttachment,
-		queues_have_same_index ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent,
-		queues_have_same_index ? 0u : 2u,
-		queues_have_same_index ? nullptr : &queues.graphics_index,
-		surface.capabilities.currentTransform,
-		vk::CompositeAlphaFlagBitsKHR::eOpaque,
-		surface.present_mode,
-		VK_TRUE,
-		old_swapchain,
-	};
-
-	swapchain = device.createSwapchainKHR(swapchain_info, nullptr);
-	device.destroySwapchainKHR(old_swapchain);
-
-	swapchain_images = device.getSwapchainImagesKHR(swapchain);
-
-	for (u32 i = 0; i < swapchain_images.size(); i++)
-	{
-		swapchain_image_views.push_back(device.createImageView({
-		    {},
-		    swapchain_images[i],
-		    vk::ImageViewType::e2D,
-		    surface.color_format,
-		    vk::ComponentMapping {
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		    },
-		    vk::ImageSubresourceRange {
-		        vk::ImageAspectFlagBits::eColor,
-		        0,
-		        1,
-		        0,
-		        1,
-		    },
-		}));
-	}
-
-
-	for (u32 i = 0; i < swapchain_images.size(); i++)
-	{
-		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-		    vk::ObjectType::eImage,
-		    (u64)(VkImage)swapchain_images[i],
-		    fmt::format("swap_chain_image_{}", i).c_str(),
-		});
-
-		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-		    vk::ObjectType::eImageView,
-		    (u64)(VkImageView)swapchain_image_views[i],
-		    fmt::format("swapchain_image_view_{}", i).c_str(),
-		});
-	}
-}
-
-void Renderer::create_cmd_buffers()
-{
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		cmd_buffers.emplace_back(device.allocateCommandBuffers({
-		    vk_context->get_cmd_pool(i),
-		    vk::CommandBufferLevel::ePrimary,
-		    1u,
-		})[0]);
-	}
-}
-
-void Renderer::render_frame(RenderGraph &render_graph, void *user_pointer)
+void Renderer::render_graph(RenderGraph &render_graph, void *user_pointer)
 {
 	auto const device = vk_context->get_device();
 
@@ -232,7 +60,6 @@ void Renderer::render_frame(RenderGraph &render_graph, void *user_pointer)
 
 	device.resetFences(render_fence);
 
-	// has_armor()
 	// Aquire next swapchain image
 	auto const render_semaphore = render_semaphores[current_frame];
 	auto const [result, image_index] =
@@ -298,7 +125,6 @@ void Renderer::present_frame(u32 image_index)
 	auto const device = vk_context->get_device();
 	auto const queues = vk_context->get_queues();
 
-
 	try
 	{
 		auto const result = queues.present.presentKHR({
@@ -322,4 +148,174 @@ void Renderer::present_frame(u32 image_index)
 		return;
 	}
 }
+
+void Renderer::on_swapchain_invalidated()
+{
+	auto const device = vk_context->get_device();
+
+	destroy_swapchain_image_views();
+	create_swapchain_images();
+	create_swapchain_image_views();
+	device.waitIdle();
+
+	swapchain_invalid = false;
+}
+
+void Renderer::create_swapchain_images()
+{
+	auto const device = vk_context->get_device();
+	auto const queues = vk_context->get_queues();
+	auto const surface = vk_context->get_surface();
+
+	auto const image_count = calculate_swapchain_image_count();
+
+	// Create swapchain
+	auto const queues_have_same_index = queues.graphics_index == queues.present_index;
+
+	auto const old_swapchain = swapchain;
+
+	auto const swapchain_info = vk::SwapchainCreateInfoKHR {
+		{},
+		surface,
+		image_count,
+		surface.color_format,
+		surface.color_space,
+		surface.framebuffer_extent,
+		1u,
+		vk::ImageUsageFlagBits::eColorAttachment,
+		queues_have_same_index ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent,
+		queues_have_same_index ? 0u : 2u,
+		queues_have_same_index ? nullptr : &queues.graphics_index,
+		surface.capabilities.currentTransform,
+		vk::CompositeAlphaFlagBitsKHR::eOpaque,
+		surface.present_mode,
+		VK_TRUE,
+		old_swapchain,
+	};
+
+	swapchain = device.createSwapchainKHR(swapchain_info, nullptr);
+	device.destroySwapchainKHR(old_swapchain);
+
+	swapchain_images = device.getSwapchainImagesKHR(swapchain);
+}
+
+void Renderer::create_swapchain_image_views()
+{
+	auto const device = vk_context->get_device();
+	auto const queues = vk_context->get_queues();
+	auto const surface = vk_context->get_surface();
+
+	auto const image_count = swapchain_images.size();
+
+	swapchain_image_views.resize(image_count);
+
+	for (u32 i = 0; i < image_count; i++)
+	{
+		swapchain_image_views[i] = device.createImageView({
+		    {},
+		    swapchain_images[i],
+		    vk::ImageViewType::e2D,
+		    surface.color_format,
+		    vk::ComponentMapping {
+		        vk::ComponentSwizzle::eIdentity,
+		        vk::ComponentSwizzle::eIdentity,
+		        vk::ComponentSwizzle::eIdentity,
+		        vk::ComponentSwizzle::eIdentity,
+		    },
+		    vk::ImageSubresourceRange {
+		        vk::ImageAspectFlagBits::eColor,
+		        0,
+		        1,
+		        0,
+		        1,
+		    },
+		});
+
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImage,
+		    (u64)(VkImage)swapchain_images[i],
+		    fmt::format("swap_chain_image_{}", i).c_str(),
+		});
+
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    vk::ObjectType::eImageView,
+		    (u64)(VkImageView)swapchain_image_views[i],
+		    fmt::format("swapchain_image_view_{}", i).c_str(),
+		});
+	}
+}
+
+void Renderer::create_sync_objects()
+{
+	auto const device = vk_context->get_device();
+
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		render_fences[i] = device.createFence({
+		    vk::FenceCreateFlagBits::eSignaled,
+		});
+
+		render_semaphores[i] = device.createSemaphore({});
+		present_semaphores[i] = device.createSemaphore({});
+	}
+}
+
+void Renderer::create_cmd_buffers()
+{
+	auto const device = vk_context->get_device();
+
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		cmd_buffers.emplace_back(device.allocateCommandBuffers({
+		    vk_context->get_cmd_pool(i),
+		    vk::CommandBufferLevel::ePrimary,
+		    1u,
+		})[0]);
+	}
+}
+
+void Renderer::destroy_swapchain_image_views()
+{
+	auto const device = vk_context->get_device();
+	device.waitIdle();
+
+	for (auto const &imageView : swapchain_image_views)
+		device.destroyImageView(imageView);
+};
+
+void Renderer::destroy_sync_objects()
+{
+	auto const device = vk_context->get_device();
+
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		device.destroyFence(render_fences[i]);
+		device.destroySemaphore(render_semaphores[i]);
+		device.destroySemaphore(present_semaphores[i]);
+	}
+}
+
+auto Renderer::calculate_swapchain_image_count() const -> u32
+{
+	auto const surface = vk_context->get_surface();
+
+	auto const min_image_count = surface.capabilities.minImageCount;
+	auto const max_image_count = surface.capabilities.maxImageCount;
+
+	auto const has_max_limit = max_image_count != 0;
+
+	// desired image count is in range
+	if ((!has_max_limit || max_image_count >= DESIRED_SWAPCHAIN_IMAGES) &&
+	    min_image_count <= DESIRED_SWAPCHAIN_IMAGES)
+		return DESIRED_SWAPCHAIN_IMAGES;
+
+	// fall-back to 2 if possible
+	else if (min_image_count <= 2 && max_image_count >= 2)
+		return 2;
+
+	// fall-back to min_image_count
+	else
+		return min_image_count;
+}
+
 } // namespace BINDLESSVK_NAMESPACE

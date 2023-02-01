@@ -17,16 +17,16 @@ public:
 	Renderer(VkContext *vk_context);
 
 	Renderer(Renderer &&other);
-	Renderer(const Renderer &rhs) = delete;
-
 	Renderer &operator=(Renderer &&rhs);
+
+	Renderer(const Renderer &rhs) = delete;
 	Renderer &operator=(const Renderer &rhs) = delete;
 
 	~Renderer();
 
 	void on_swapchain_invalidated();
 
-	void render_frame(RenderGraph &render_graph, void *user_pointer);
+	void render_graph(RenderGraph &render_graph, void *user_pointer);
 
 	/** @return swapchain images */
 	inline auto get_swapchain_images() const
@@ -53,16 +53,6 @@ public:
 	}
 
 private:
-	void create_sync_objects();
-	void create_descriptor_pools();
-
-	void create_swapchain();
-
-	void create_cmd_buffers();
-
-	void destroy_swapchain_resources();
-	void destroy_sync_objects();
-
 	void submit_queue(
 	    vk::Semaphore wait_semaphores,
 	    vk::Semaphore signal_semaphore,
@@ -71,6 +61,19 @@ private:
 	);
 
 	void present_frame(u32 image_index);
+
+	void create_sync_objects();
+	void create_descriptor_pools();
+
+	void create_swapchain_images();
+	void create_swapchain_image_views();
+
+	void create_cmd_buffers();
+
+	void destroy_swapchain_image_views();
+	void destroy_sync_objects();
+
+	auto calculate_swapchain_image_count() const -> u32;
 
 private:
 	VkContext *vk_context = {};
