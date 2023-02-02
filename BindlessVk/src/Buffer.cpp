@@ -66,7 +66,7 @@ void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_co
 
 void Buffer::calculate_block_size()
 {
-	const auto gpu_properties = vk_context->get_gpu().getProperties();
+	const auto gpu_properties = vk_context->get_gpu().get_properties();
 	const auto min_alignment = gpu_properties.limits.minUniformBufferOffsetAlignment;
 
 	// Round up minBlockSize to be the next multiple of minUniformBufferOffsetAlignment

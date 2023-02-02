@@ -20,20 +20,14 @@ namespace BINDLESSVK_NAMESPACE {
 class RenderGraph
 {
 public:
-	RenderGraph();
-
-	/** Initializes the render graph
-	 * @param device the bindlessvk device
-	 * @param descriptor_pool a descriptor pool
-	 * @param swaphain_images the swapchain's images
-	 * @param swapchain_iamge_views the swapchain's image views
-	 */
-	void init(
+	RenderGraph(
 	    VkContext *vk_context,
 	    vk::DescriptorPool descriptor_pool,
 	    vec<vk::Image> swapchain_images,
 	    vec<vk::ImageView> swapchain_image_views
 	);
+
+	~RenderGraph();
 
 	/** Destroys the render graph
 	 */
@@ -87,10 +81,6 @@ public:
 		buffer_inputs[hash_str(name)]->unmap();
 	}
 
-	inline operator bool() const
-	{
-		return initialized;
-	}
 
 private:
 	inline auto get_cmd(u32 pass_index, u32 frame_index, u32 thread_index) const
@@ -220,7 +210,6 @@ private:
 	    u32 recreate_resource_index
 	);
 
-
 private:
 	VkContext *vk_context = {};
 
@@ -253,8 +242,6 @@ private:
 
 	vk::DebugUtilsLabelEXT update_debug_label;
 	vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label;
-
-	bool initialized = false;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

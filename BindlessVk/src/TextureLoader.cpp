@@ -11,13 +11,13 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-TextureLoader::TextureLoader(VkContext const *vk_context): vk_context(vk_context)
+TextureLoader::TextureLoader(ref<VkContext const> const vk_context): vk_context(vk_context)
 {
 	const auto gpu = vk_context->get_gpu();
 
 	// @todo move this assertion to a proper place
 	assert_true(
-	    gpu.getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
+	    gpu.get_format_properties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
 	        vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
 	    "Texture image format(eR8G8B8A8Srgb) does not support linear blitting"
 	);
@@ -34,7 +34,7 @@ auto TextureLoader::load_from_binary(
     vk::ImageLayout const final_layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
 ) const -> Texture
 {
-	BinaryLoader loader(vk_context, staging_buffer);
+	BinaryLoader loader(vk_context.get(), staging_buffer);
 	return loader.load(name, pixels, width, height, size, type, final_layout);
 }
 
@@ -46,7 +46,7 @@ auto TextureLoader::load_from_ktx(
     vk::ImageLayout const layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
 ) const -> Texture
 {
-	KtxLoader loader(vk_context, staging_buffer);
+	KtxLoader loader(vk_context.get(), staging_buffer);
 	return loader.load(name, uri, type, layout);
 }
 

@@ -4,44 +4,15 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Renderer::Renderer(VkContext *vk_context): vk_context(vk_context)
+Renderer::Renderer(ref<VkContext const> const vk_context): vk_context(vk_context)
 {
 	create_sync_objects();
 	create_cmd_buffers();
 	on_swapchain_invalidated();
 }
 
-Renderer::Renderer(Renderer &&other)
-{
-	*this = std::move(other);
-}
-
-Renderer &Renderer::operator=(Renderer &&other)
-{
-	if (this == &other)
-		return *this;
-
-	this->vk_context = other.vk_context;
-	this->render_fences = other.render_fences;
-	this->render_semaphores = other.render_semaphores;
-	this->present_semaphores = other.present_semaphores;
-	this->swapchain_invalid = other.swapchain_invalid;
-	this->swapchain = other.swapchain;
-	this->swapchain_images = other.swapchain_images;
-	this->swapchain_image_views = other.swapchain_image_views;
-	this->cmd_buffers = other.cmd_buffers;
-	this->current_frame = other.current_frame;
-
-	other.vk_context = {};
-
-	return *this;
-}
-
 Renderer::~Renderer()
 {
-	if (!vk_context)
-		return;
-
 	auto const device = vk_context->get_device();
 
 	destroy_swapchain_image_views();
@@ -49,7 +20,7 @@ Renderer::~Renderer()
 	device.destroySwapchainKHR(swapchain);
 }
 
-void Renderer::render_graph(RenderGraph &render_graph, void *user_pointer)
+void Renderer::render_graph(RenderGraph *const render_graph, void *const user_pointer)
 {
 	auto const device = vk_context->get_device();
 
@@ -84,7 +55,7 @@ void Renderer::render_graph(RenderGraph &render_graph, void *user_pointer)
 	// Draw scene
 	auto const cmd = cmd_buffers[current_frame];
 	device.resetCommandPool(vk_context->get_cmd_pool(current_frame));
-	render_graph.update_and_render(cmd, current_frame, image_index, user_pointer);
+	render_graph->update_and_render(cmd, current_frame, image_index, user_pointer);
 
 	// Submit & present
 	auto present_semaphore = present_semaphores[current_frame];
@@ -120,7 +91,7 @@ void Renderer::submit_queue(
 	);
 }
 
-void Renderer::present_frame(u32 image_index)
+void Renderer::present_frame(u32 const image_index)
 {
 	auto const device = vk_context->get_device();
 	auto const queues = vk_context->get_queues();

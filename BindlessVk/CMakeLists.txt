@@ -4,6 +4,7 @@ add_library(
     BindlessVk
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/VkContext.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Gpu.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp

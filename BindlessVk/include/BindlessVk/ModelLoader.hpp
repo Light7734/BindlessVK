@@ -27,7 +27,7 @@ public:
 	 * @brief Main constructor
 	 * @param vk_context the vulkan context
 	 */
-	ModelLoader(VkContext const *vk_context);
+	ModelLoader(ref<VkContext const> vk_context);
 
 	/** @brief Default constructor */
 	ModelLoader() = default;
@@ -58,7 +58,8 @@ public:
 	auto load_from_obj() -> Model = delete;
 
 private:
-	VkContext const *vk_context = {};
+	ref<VkContext const> vk_context = {};
+	TextureLoader texture_loader = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

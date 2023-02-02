@@ -13,7 +13,7 @@ public:
 	 * @brief Main constructor
 	 * @param vk_context the vulkan context
 	 */
-	ShaderLoader(VkContext const *vk_context);
+	ShaderLoader(ref<VkContext const> vk_context);
 
 	/** @brief Default constructor */
 	ShaderLoader() = default;
@@ -34,7 +34,7 @@ public:
 	auto load_from_hlsl(c_str file_path) -> Shader = delete;
 
 private:
-	VkContext const *vk_context = {};
+	ref<VkContext const> vk_context = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -6,24 +6,24 @@
 using u32 = u32;
 
 inline void forward_pass_update(
-  bvk::VkContext *vk_context,
-  bvk::RenderGraph *render_graph,
-  bvk::Renderpass *render_pass,
-  u32 frame_index,
-  void *user_pointer
+  bvk::VkContext *const vk_context,
+  bvk::RenderGraph *const render_graph,
+  bvk::Renderpass *const render_pass,
+  u32 const frame_index,
+  void *const user_pointer
 )
 {
 	auto const device = vk_context->get_device();
 	auto const descriptor_set = render_pass->descriptor_sets[frame_index];
 
-	auto *scene = reinterpret_cast<Scene *>(user_pointer);
+	auto const *const scene = reinterpret_cast<Scene const *>(user_pointer);
 
 	// @todo: don't update every frame
-	auto const renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
+	auto const renderables = scene->view<const StaticMeshRendererComponent>();
 
 	auto descriptor_writes = vec<vk::WriteDescriptorSet> {};
 
-	renderables.each([&](auto const &transform_component, auto const &render_component) {
+	renderables.each([&](auto const &render_component) {
 		for (auto const *const node : render_component.model->nodes) {
 			for (const auto &primitive : node->mesh) {
 				auto const &model = render_component.model;
@@ -76,7 +76,7 @@ inline void forward_pass_update(
 }
 
 
-inline void draw_model(bvk::Model *model, vk::CommandBuffer cmd)
+inline void draw_model(bvk::Model const *const model, vk::CommandBuffer const cmd)
 {
 	auto const offset = VkDeviceSize { 0 };
 
@@ -95,24 +95,24 @@ inline void draw_model(bvk::Model *model, vk::CommandBuffer cmd)
 }
 
 inline void forward_pass_render(
-  bvk::VkContext *vk_context,
-  bvk::RenderGraph *render_graph,
-  bvk::Renderpass *render_pass,
-  vk::CommandBuffer cmd,
-  u32 frame_index,
-  u32 image_index,
-  void *user_pointer
+  bvk::VkContext *const vk_context,
+  bvk::RenderGraph *const render_graph,
+  bvk::Renderpass *const render_pass,
+  vk::CommandBuffer const cmd,
+  u32 const frame_index,
+  u32 const image_index,
+  void *const user_pointer
 )
 {
-	const auto device = vk_context->get_device();
-	const auto &surface = vk_context->get_surface();
+	auto const device = vk_context->get_device();
+	auto const &surface = vk_context->get_surface();
 
 	auto pipeline = vk::Pipeline {};
 
-	auto *const scene = reinterpret_cast<Scene *>(user_pointer);
-	auto const renderables = scene->group(entt::get<TransformComponent, StaticMeshRendererComponent>);
+	auto const *const scene = reinterpret_cast<Scene const *>(user_pointer);
+	auto const renderables = scene->view<const StaticMeshRendererComponent>();
 
-	renderables.each([&](auto const &transform_component, auto const &render_component) {
+	renderables.each([&](auto const &render_component) {
 		auto const material = render_component.material;
 		auto const effect = material->get_effect();
 		auto const new_pipeline = effect->get_pipeline();

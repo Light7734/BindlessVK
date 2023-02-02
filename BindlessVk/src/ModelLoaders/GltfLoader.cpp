@@ -10,12 +10,13 @@ namespace BINDLESSVK_NAMESPACE {
 
 GltfLoader::GltfLoader(
     VkContext const *const vk_context,
+    TextureLoader const *const texture_loader,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_texture_buffer
 )
     : vk_context(vk_context)
-    , texture_loader(TextureLoader(vk_context))
+    , texture_loader(texture_loader)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
     , staging_texture_buffer(staging_texture_buffer)
@@ -63,7 +64,7 @@ void GltfLoader::load_textures()
 
 	for (auto &image : gltf_model.images)
 	{
-		model.textures.push_back(texture_loader.load_from_binary(
+		model.textures.push_back(texture_loader->load_from_binary(
 		    image.uri.c_str(),
 		    &image.image[0],
 		    image.width,

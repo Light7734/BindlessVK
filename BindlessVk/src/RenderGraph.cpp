@@ -6,14 +6,22 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-RenderGraph::RenderGraph()
+RenderGraph::RenderGraph(
+    VkContext *vk_context,
+    vk::DescriptorPool descriptor_pool,
+    vec<vk::Image> swapchain_images,
+    vec<vk::ImageView> swapchain_image_views
+)
+    : vk_context(vk_context)
+    , descriptor_pool(descriptor_pool)
+    , swapchain_images(swapchain_images)
+    , swapchain_image_views(swapchain_image_views)
 {
 }
 
-void RenderGraph::reset()
+RenderGraph::~RenderGraph()
 {
-	if (!initialized)
-		return;
+	vk_context->log(LogLvl::eTrace, "Desstroying render-graph");
 
 	const auto device = vk_context->get_device();
 	const auto allocator = vk_context->get_allocator();
@@ -89,20 +97,6 @@ void RenderGraph::reset()
 			device.freeDescriptorSets(descriptor_pool, descriptor_set);
 		}
 	}
-}
-
-void RenderGraph::init(
-    VkContext *vk_context,
-    vk::DescriptorPool descriptor_pool,
-    vec<vk::Image> swapchain_images,
-    vec<vk::ImageView> swapchain_image_views
-)
-{
-	this->vk_context = vk_context;
-	this->descriptor_pool = descriptor_pool;
-	this->swapchain_images = swapchain_images;
-	this->swapchain_image_views = swapchain_image_views;
-	this->initialized = true;
 }
 
 void RenderGraph::build(
@@ -972,10 +966,10 @@ void RenderGraph::on_swapchain_invalidated(
 // @todo: Setup render barriers
 // @todo: Multi-threaded recording
 void RenderGraph::update_and_render(
-    vk::CommandBuffer primary_cmd,
-    u32 frame_index,
-    u32 image_index,
-    void *user_pointer
+    vk::CommandBuffer const primary_cmd,
+    u32 const frame_index,
+    u32 const image_index,
+    void *const user_pointer
 )
 {
 	const auto &queues = vk_context->get_queues();

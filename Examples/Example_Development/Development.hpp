@@ -46,13 +46,13 @@ public:
 
 		camera_controller.update();
 
-		renderer.render_graph(render_graph, &scene);
+		renderer->render_graph(render_graph.get(), &scene);
 
-		if (renderer.is_swapchain_invalid()) {
+		if (renderer->is_swapchain_invalid()) {
 			logger.log(spdlog::level::trace, "Swapchain invalidated");
 
-			vk_context.update_surface_info();
-			renderer.on_swapchain_invalidated();
+			vk_context->update_surface_info();
+			renderer->on_swapchain_invalidated();
 			camera_controller.on_window_resize(
 			  window.get_framebuffer_size().width,
 			  window.get_framebuffer_size().height
@@ -60,9 +60,9 @@ public:
 
 			load_materials();
 
-			render_graph.on_swapchain_invalidated(
-			  renderer.get_swapchain_images(),
-			  renderer.get_swapchain_image_views()
+			render_graph->on_swapchain_invalidated(
+			  renderer->get_swapchain_images(),
+			  renderer->get_swapchain_image_views()
 			);
 		}
 	}
@@ -94,7 +94,7 @@ private:
 	void load_shader_effects()
 	{
 		shader_effects[hash_str("opaque_mesh")] = bvk::ShaderEffect(
-		  &vk_context,
+		  vk_context.get(),
 		  {
 		    &shaders[hash_str("vertex")],
 		    &shaders[hash_str("pixel")],
@@ -103,7 +103,7 @@ private:
 		);
 
 		shader_effects[hash_str("skybox")] = bvk::ShaderEffect(
-		  &vk_context,
+		  vk_context.get(),
 		  {
 		    &shaders[hash_str("skybox_vertex")],
 		    &shaders[hash_str("skybox_fragment")],
@@ -144,7 +144,7 @@ private:
 			},
 			vk::PipelineMultisampleStateCreateInfo {
 			  {},
-			  vk_context.get_max_color_and_depth_samples(),
+			  vk_context->get_gpu().get_max_color_and_depth_samples(),
 			  VK_FALSE,
 			  {},
 			  VK_FALSE,
@@ -212,7 +212,7 @@ private:
 			},
 			vk::PipelineMultisampleStateCreateInfo {
 			  {},
-			  vk_context.get_max_color_and_depth_samples(),
+			  vk_context->get_gpu().get_max_color_and_depth_samples(),
 			  VK_FALSE,
 			  {},
 			  VK_FALSE,
@@ -255,12 +255,12 @@ private:
 	{
 		materials.emplace(
 		  hash_str("opaque_mesh"),
-		  bvk::Material(&vk_context, &shader_effects[hash_str("opaque_mesh")], descriptor_pool)
+		  bvk::Material(vk_context.get(), &shader_effects[hash_str("opaque_mesh")], descriptor_pool)
 		);
 
 		materials.emplace(
 		  hash_str("skybox"),
-		  bvk::Material(&vk_context, &shader_effects[hash_str("skybox")], descriptor_pool)
+		  bvk::Material(vk_context.get(), &shader_effects[hash_str("skybox")], descriptor_pool)
 		);
 	}
 
@@ -350,11 +350,11 @@ private:
 
 	void create_render_graph()
 	{
-		auto const &surface = vk_context.get_surface();
+		auto const &surface = vk_context->get_surface();
 
 		auto const color_format = surface.color_format;
-		auto const depth_format = vk_context.get_depth_format();
-		auto const sample_count = vk_context.get_max_color_and_depth_samples();
+		auto const depth_format = vk_context->get_depth_format();
+		auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
 
 		auto const *const default_texture = &textures[hash_str("default_2d")];
 		auto const *const default_texture_cube = &textures[hash_str("default_cube")];
@@ -461,7 +461,7 @@ private:
 			  render_color,
 			}),
 		};
-		render_graph.build(
+		render_graph->build(
 		  "backbuffer",
 		  {
 		    bvk::Renderpass::CreateInfo::BufferInputInfo {

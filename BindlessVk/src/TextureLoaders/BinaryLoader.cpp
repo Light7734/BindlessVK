@@ -58,8 +58,8 @@ void BinaryLoader::create_image()
 	        1u,
 	        vk::SampleCountFlagBits::e1,
 	        vk::ImageTiling::eOptimal,
-	        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc
-	            | vk::ImageUsageFlagBits::eSampled,
+	        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
+	            vk::ImageUsageFlagBits::eSampled,
 	        vk::SharingMode::eExclusive,
 	        0u,
 	        nullptr,

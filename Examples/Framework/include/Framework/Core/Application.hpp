@@ -34,11 +34,9 @@ public:
 	StagingPool staging_pool = {};
 	CameraController camera_controller = {};
 
-	vk::DescriptorPool descriptor_pool = {};
-
-	bvk::VkContext vk_context = {};
-	bvk::Renderer renderer = {};
-	bvk::RenderGraph render_graph = {};
+	ref<bvk::VkContext> vk_context = {};
+	scope<bvk::Renderer> renderer = {};
+	scope<bvk::RenderGraph> render_graph = {};
 
 	bvk::TextureLoader texture_loader = {};
 	bvk::ModelLoader model_loader = {};
@@ -50,6 +48,8 @@ public:
 	hash_map<u64, bvk::ShaderEffect> shader_effects = {};
 	hash_map<u64, bvk::ShaderEffect::Configuration> shader_effect_configurations = {};
 	hash_map<u64, bvk::Material> materials = {};
+
+	vk::DescriptorPool descriptor_pool = {};
 
 private:
 	void create_window();

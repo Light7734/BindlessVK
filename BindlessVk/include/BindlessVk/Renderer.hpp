@@ -12,21 +12,12 @@ namespace BINDLESSVK_NAMESPACE {
 class Renderer
 {
 public:
-	Renderer() = default;
-
-	Renderer(VkContext *vk_context);
-
-	Renderer(Renderer &&other);
-	Renderer &operator=(Renderer &&rhs);
-
-	Renderer(const Renderer &rhs) = delete;
-	Renderer &operator=(const Renderer &rhs) = delete;
-
+	Renderer(ref<VkContext const> vk_context);
 	~Renderer();
 
 	void on_swapchain_invalidated();
 
-	void render_graph(RenderGraph &render_graph, void *user_pointer);
+	void render_graph(RenderGraph *render_graph, void *user_pointer);
 
 	/** @return swapchain images */
 	inline auto get_swapchain_images() const
@@ -63,7 +54,6 @@ private:
 	void present_frame(u32 image_index);
 
 	void create_sync_objects();
-	void create_descriptor_pools();
 
 	void create_swapchain_images();
 	void create_swapchain_image_views();
@@ -76,7 +66,7 @@ private:
 	auto calculate_swapchain_image_count() const -> u32;
 
 private:
-	VkContext *vk_context = {};
+	ref<VkContext const> vk_context = {};
 
 	// Sync objects
 	arr<vk::Fence, BVK_MAX_FRAMES_IN_FLIGHT> render_fences = {};

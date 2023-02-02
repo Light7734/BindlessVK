@@ -18,9 +18,8 @@ Application::Application()
 
 	create_user_interface();
 
-
 	camera_controller = CameraController(&scene, &window);
-	staging_pool = StagingPool(3, (1024u * 1024u * 256u), &vk_context);
+	staging_pool = StagingPool(3, (1024u * 1024u * 256u), vk_context);
 
 	create_loaders();
 	load_default_textures();
@@ -28,10 +27,14 @@ Application::Application()
 
 Application::~Application()
 {
-	vk_context.get_device().waitIdle();
+	vk_context->get_device().waitIdle();
 
 	destroy_models();
 	destroy_user_interface();
+
+	// @todo: fix this by making a class that encapsulates descriptor_pool and keep it alive using
+	// smart pointers :)
+	render_graph.reset();
 	destroy_descriptor_pool();
 }
 
@@ -59,7 +62,7 @@ void Application::create_vk_context()
 	auto const physical_device_features = get_physical_device_features();
 	auto const device_extensions = get_device_extensions();
 
-	vk_context = bvk::VkContext(
+	vk_context = std::make_shared<bvk::VkContext>(
 	  layers,
 	  instance_extensions,
 	  device_extensions,
@@ -67,6 +70,14 @@ void Application::create_vk_context()
 
 	  [&](vk::Instance instance) { return window.create_surface(instance); },
 	  [&]() { return window.get_framebuffer_size(); },
+	  [](vec<bvk::Gpu> const gpus) {
+		  for (auto const &gpu : gpus) {
+			  if (gpu.get_properties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+				  return gpu;
+		  }
+
+		  return gpus[0];
+	  },
 
 	  vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
 	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
@@ -75,15 +86,18 @@ void Application::create_vk_context()
 
 	  vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
 	    | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-	    | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+	    | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
+	    | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding,
 
-	  &Logger::bindlessvk_callback,
-	  std::make_any<Logger const *const>(&logger)
+	  pair<fn<void(bvk::DebugCallbackSource, bvk::LogLvl, const str &, std::any)>, std::any> {
+	    &Logger::bindlessvk_callback,
+	    std::make_any<Logger const *const>(&logger),
+	  }
 	);
 }
 void Application::create_descriptor_pool()
 {
-	auto const device = vk_context.get_device();
+	auto const device = vk_context->get_device();
 
 	auto const pool_sizes = vec<vk::DescriptorPoolSize> {
 		{ vk::DescriptorType::eSampler, 8000 },
@@ -109,16 +123,16 @@ void Application::create_descriptor_pool()
 
 void Application::create_renderer()
 {
-	renderer = bvk::Renderer(&vk_context);
+	renderer = std::make_unique<bvk::Renderer>(vk_context);
 }
 
 void Application::create_render_graph()
 {
-	render_graph.init(
-	  &vk_context,
+	render_graph = std::make_unique<bvk::RenderGraph>(
+	  vk_context.get(),
 	  descriptor_pool,
-	  renderer.get_swapchain_images(),
-	  renderer.get_swapchain_image_views()
+	  renderer->get_swapchain_images(),
+	  renderer->get_swapchain_image_views()
 	);
 }
 
@@ -129,38 +143,36 @@ void Application::create_user_interface()
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
 	ImGui_ImplVulkan_InitInfo imgui_info {
-		vk_context.get_instance(),
-		vk_context.get_gpu(),
-		vk_context.get_device(),
-		vk_context.get_queues().graphics_index,
-		vk_context.get_queues().graphics,
+		vk_context->get_instance(),
+		vk_context->get_gpu(),
+		vk_context->get_device(),
+		vk_context->get_queues().graphics_index,
+		vk_context->get_queues().graphics,
 		{},
 		descriptor_pool,
 		{},
 		true,
-		static_cast<VkFormat>(vk_context.get_surface().color_format),
+		static_cast<VkFormat>(vk_context->get_surface().color_format),
 		BVK_MAX_FRAMES_IN_FLIGHT,
 		BVK_MAX_FRAMES_IN_FLIGHT,
-		static_cast<VkSampleCountFlagBits>(vk_context.get_max_color_and_depth_samples()),
+		static_cast<VkSampleCountFlagBits>(vk_context->get_gpu().get_max_color_and_depth_samples()),
 	};
 
-	auto pfn_get_vk_instance_proc_addr = vk_context.get_pfn_get_vk_instance_proc_addr();
-	auto user_data = std::make_pair(pfn_get_vk_instance_proc_addr, vk_context.get_instance());
 
 	assert_true(
 	  ImGui_ImplVulkan_LoadFunctions(
-	    [](c_str func, void *data) {
-		    auto [vkGetProcAddr, instance] = *(pair<PFN_vkGetInstanceProcAddr, vk::Instance> *)data;
-		    return vkGetProcAddr(instance, func);
+	    [](c_str proc_name, void *data) {
+		    auto const vk_context = reinterpret_cast<bvk::VkContext *>(data);
+		    return vk_context->get_instance_proc_addr(proc_name);
 	    },
-	    (void *)&user_data
+	    (void *)vk_context.get()
 	  ),
 	  "ImGui failed to load vulkan functions"
 	);
 
 	ImGui_ImplVulkan_Init(&imgui_info, VK_NULL_HANDLE);
 
-	vk_context.immediate_submit([](vk::CommandBuffer cmd) {
+	vk_context->immediate_submit([](vk::CommandBuffer cmd) {
 		ImGui_ImplVulkan_CreateFontsTexture(cmd);
 	});
 
@@ -173,9 +185,9 @@ void Application::create_user_interface()
 
 void Application::create_loaders()
 {
-	texture_loader = bvk::TextureLoader(&vk_context);
-	model_loader = bvk::ModelLoader(&vk_context);
-	shader_loader = bvk::ShaderLoader(&vk_context);
+	texture_loader = bvk::TextureLoader(vk_context);
+	model_loader = bvk::ModelLoader(vk_context);
+	shader_loader = bvk::ShaderLoader(vk_context);
 }
 
 void Application::load_default_textures()
@@ -302,7 +314,7 @@ void Application::destroy_user_interface()
 
 void Application::destroy_descriptor_pool()
 {
-	auto const device = vk_context.get_device();
+	auto const device = vk_context->get_device();
 
 	device.resetDescriptorPool(descriptor_pool);
 	device.destroyDescriptorPool(descriptor_pool);

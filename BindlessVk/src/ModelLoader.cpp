@@ -10,7 +10,9 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-ModelLoader::ModelLoader(VkContext const *const vk_context): vk_context(vk_context)
+ModelLoader::ModelLoader(ref<VkContext const> const vk_context)
+    : vk_context(vk_context)
+    , texture_loader(vk_context)
 {
 }
 
@@ -23,7 +25,8 @@ auto ModelLoader::load_from_gltf_ascii(
 ) const -> Model
 {
 	GltfLoader loader(
-	    vk_context,
+	    vk_context.get(),
+	    &texture_loader,
 	    staging_vertex_buffer,
 	    staging_index_buffer, //
 	    staging_image_buffer

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Gpu.hpp"
 
 #include <any>
 
@@ -29,16 +30,13 @@ public:
 	{
 		vk::Queue graphics;
 		vk::Queue present;
-		vk::Queue compute;
 
 		u32 graphics_index;
 		u32 present_index;
-		u32 compute_index;
 
-		// @note compute index is not considered
 		inline auto have_same_index() const
 		{
-			return graphics_index == present_index == compute_index;
+			return graphics_index == present_index;
 		}
 	};
 
@@ -57,8 +55,24 @@ public:
 		}
 	};
 
+	struct Swapchain
+	{
+		vk::SwapchainKHR swapchain_object;
+
+		vec<vk::Image> images;
+		vec<vk::ImageView> image_views;
+
+		u32 image_count;
+
+		inline operator vk::SwapchainKHR() const
+		{
+			return swapchain_object;
+		}
+	};
+
 public:
 	VkContext() = default;
+
 	VkContext(
 	    vec<c_str> layers,
 	    vec<c_str> instance_extensions,
@@ -67,17 +81,14 @@ public:
 
 	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
 	    fn<vk::Extent2D()> get_framebuffer_extent_func,
+	    fn<Gpu(vec<Gpu>)> gpu_picker_func,
 
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
 
-	    fn<void(DebugCallbackSource, LogLvl, str const &, std::any)> bindlessvk_debug_callback,
-	    std::any bindlessvk_debug_callback_user_data
+	    pair<fn<void(DebugCallbackSource, LogLvl, const str &, std::any)>, std::any>
+	        debug_callback_and_data
 	);
-
-	VkContext(VkContext &&other);
-
-	VkContext &operator=(VkContext &&other);
 
 	~VkContext();
 
@@ -111,7 +122,7 @@ public:
 	template<typename... Args>
 	inline void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args &&...args) const
 	{
-		auto [callback, data] = debug_callback_data;
+		auto const [callback, data] = debug_callback_and_data;
 
 		callback(
 		    DebugCallbackSource::eBindlessVk,
@@ -163,12 +174,12 @@ public:
 
 	inline auto get_gpu() const
 	{
-		return selected_gpu;
+		return gpu;
 	}
 
-	inline auto const &get_available_gpus() const
+	inline auto const &get_adequate_gpus() const
 	{
-		return available_gpus;
+		return adequate_gpus;
 	}
 
 	inline auto get_allocator() const
@@ -197,43 +208,41 @@ public:
 		       depth_format == vk::Format::eD24UnormS8Uint;
 	}
 
-	inline auto get_max_color_and_depth_samples() const
-	{
-		return max_color_and_depth_samples;
-	}
-
-	inline auto get_max_color_samples() const
-	{
-		return max_color_samples;
-	}
-
-	inline auto get_max_depth_samples() const
-	{
-		return max_depth_samples;
-	}
-
 	inline auto get_num_threads() const
 	{
 		return num_threads;
 	}
 
-	inline auto const get_pfn_get_vk_instance_proc_addr() const
+	inline auto get_instance_proc_addr(c_str proc_name) const
 	{
-		return pfn_vk_get_instance_proc_addr;
+		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name);
+	}
+
+	inline auto get_device_proc_addr(c_str proc_name) const
+	{
+		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr(device, proc_name);
 	}
 
 private:
+	void load_vulkan_instance_functions();
+	void load_vulkan_device_functions();
+
 	void check_layer_support();
 
-	void create_vulkan_instance(
-	    fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func,
+	void create_vulkan_instance();
+
+	void create_debug_messenger(
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types
 	);
 
-	void pick_physical_device();
+	void create_window_surface(fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func);
 
-	void create_logical_device();
+	void pick_gpu(fn<Gpu(vec<Gpu>)> gpu_picker_func);
+
+	void fetch_adequate_gpus();
+
+	void create_device(vk::PhysicalDeviceFeatures physical_device_features);
 
 	void fetch_queues();
 
@@ -243,48 +252,44 @@ private:
 
 	auto create_queues_create_info() const -> vec<vk::DeviceQueueCreateInfo>;
 
-private:
-	vk::DynamicLoader dynamic_loader;
-
-	PFN_vkGetInstanceProcAddr pfn_vk_get_instance_proc_addr;
-
-	fn<vk::Extent2D()> get_framebuffer_extent;
-
-	static pair<fn<void(DebugCallbackSource, LogLvl, str const &, std::any)>, std::any>
-	    debug_callback_data;
+	auto has_layer(c_str layer) const -> bool;
 
 private:
-	vec<c_str> layers;
+	PFN_vkGetInstanceProcAddr pfn_vk_get_instance_proc_addr = {};
 
-	vk::Instance instance;
-	vec<c_str> instance_extensions;
+	fn<vk::Extent2D()> get_framebuffer_extent = {};
 
-	vk::Device device;
-	vec<c_str> device_extensions;
+	pair<fn<void(DebugCallbackSource, LogLvl, str const &, std::any)>, std::any>
+	    debug_callback_and_data = {};
 
+private:
+	vec<c_str> layers = {};
 
-	vk::PhysicalDevice selected_gpu;
-	vec<vk::PhysicalDevice> available_gpus;
-	vk::PhysicalDeviceFeatures physical_device_features;
+	vk::Instance instance = {};
+	vec<c_str> instance_extensions = {};
 
-	vma::Allocator allocator;
+	vk::Device device = {};
+	vec<c_str> device_extensions = {};
 
-	Queues queues;
-	Surface surface;
+	vec<Gpu> adequate_gpus = {};
 
-	vk::Format depth_format;
+	vma::Allocator allocator = {};
 
-	vk::SampleCountFlagBits max_color_and_depth_samples;
-	vk::SampleCountFlagBits max_color_samples;
-	vk::SampleCountFlagBits max_depth_samples;
+	Queues queues = {};
+	Surface surface = {};
+	Swapchain swapchain = {};
+	Gpu gpu = {};
 
-	u32 num_threads;
+	vk::Format depth_format = {};
 
-	vec<vk::CommandPool> dynamic_cmd_pools;
-	vk::CommandPool immediate_cmd_pool;
+	// @todo Move the damned threading stuff out of vkcontext!!
+	u32 num_threads = 1u;
 
-	vk::CommandBuffer immediate_cmd;
-	vk::Fence immediate_fence;
+	vec<vk::CommandPool> dynamic_cmd_pools = {};
+	vk::CommandPool immediate_cmd_pool = {};
+
+	vk::CommandBuffer immediate_cmd = {};
+	vk::Fence immediate_fence = {};
 
 	vk::DebugUtilsMessengerEXT debug_util_messenger = {};
 };

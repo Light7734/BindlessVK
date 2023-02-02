@@ -13,7 +13,7 @@ public:
 	/** @brief Main constructor
 	 * @param vk_context the vulkan context
 	 */
-	TextureLoader(VkContext const *vk_context);
+	TextureLoader(ref<VkContext const> vk_context);
 
 	/** @brief Default constructor */
 	TextureLoader() = default;
@@ -57,7 +57,7 @@ public:
 	) const -> Texture;
 
 private:
-	VkContext const *vk_context = {};
+	ref<VkContext const> vk_context = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE
