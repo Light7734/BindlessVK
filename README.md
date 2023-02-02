@@ -1,7 +1,7 @@
 # BindlessVK [![forthebadge](https://forthebadge.com/images/badges/works-on-my-machine.svg)](https://forthebadge.com)
 
 <div align="center">
-<img src="https://github.com/Light7734/Vulkan-Renderer/raw/main/Branding/bindlessvk.svg"/>
+<img src="https://github.com/Light7734/bindlessvk/raw/main/Branding/bindlessvk.svg"/>
 
 <i> "Nvidia, F*** You!" </i>
 
@@ -14,9 +14,9 @@ BindlessVK is a physically based renderer(PBR) written in modern C++ using Vulka
 ## Development Guideline
 **Getting started:**
 ```
-git clone --recurse-submodules 'git@github.com:light7734/vulkan-renderer.git' vulkan-renderer
-mkdir vulkan-renderer/build
-cd vulkan-renderer/build
+git clone --recurse-submodules 'git@github.com:light7734/bindlessvk.git' bindlessvk
+mkdir bindlessvk/build
+cd bindlessvk/build
 cmake .. -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -DCMAKE_BUILD_TYPE=DEBUG
 cmake --build . -j`nproc`
 cd ..
