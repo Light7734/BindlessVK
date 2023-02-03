@@ -32,8 +32,8 @@ Application::~Application()
 	destroy_models();
 	destroy_user_interface();
 
-	// @todo: fix this by making a class that encapsulates descriptor_pool and keep it alive using
-	// smart pointers :)
+	// @todo: fix this by making a class that encapsulates descriptor_pool(s) and keep it alive
+	// using smart pointers :)
 	render_graph.reset();
 	destroy_descriptor_pool();
 }
@@ -114,8 +114,7 @@ void Application::create_descriptor_pool()
 	};
 
 	descriptor_pool = device.createDescriptorPool(vk::DescriptorPoolCreateInfo {
-	  vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind
-	    | vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+	  {},
 	  100,
 	  pool_sizes,
 	});
@@ -130,7 +129,6 @@ void Application::create_render_graph()
 {
 	render_graph = std::make_unique<bvk::RenderGraph>(
 	  vk_context.get(),
-	  descriptor_pool,
 	  renderer->get_swapchain_images(),
 	  renderer->get_swapchain_image_views()
 	);

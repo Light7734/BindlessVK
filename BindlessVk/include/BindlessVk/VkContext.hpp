@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/DescriptorAllocator.hpp"
 #include "BindlessVk/Gpu.hpp"
 
 #include <any>
@@ -95,7 +96,7 @@ public:
 	/** Updates the surface info, (to be called after swapchain-invalidation) */
 	void update_surface_info();
 
-	void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
+	inline void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
 	{
 		auto const alloc_info = vk::CommandBufferAllocateInfo {
 			immediate_cmd_pool,
@@ -147,6 +148,11 @@ public:
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
 	}
 
+	inline auto get_descriptor_pool()
+	{
+		return descriptor_pool;
+	}
+
 	inline auto get_layers() const
 	{
 		return layers;
@@ -185,6 +191,11 @@ public:
 	inline auto get_allocator() const
 	{
 		return allocator;
+	}
+
+	inline auto *get_descriptor_allocator()
+	{
+		return &descriptor_allocator;
 	}
 
 	inline auto const &get_queues() const
@@ -246,9 +257,13 @@ private:
 
 	void fetch_queues();
 
-	void create_allocator();
+	void create_memory_allocator();
+
+	void create_descriptor_allocator();
 
 	void create_command_pools();
+
+	void create_descriptor_pools();
 
 	auto create_queues_create_info() const -> vec<vk::DeviceQueueCreateInfo>;
 
@@ -274,6 +289,7 @@ private:
 	vec<Gpu> adequate_gpus = {};
 
 	vma::Allocator allocator = {};
+	DescriptorAllocator descriptor_allocator = {};
 
 	Queues queues = {};
 	Surface surface = {};
@@ -285,6 +301,8 @@ private:
 	// @todo Move the damned threading stuff out of vkcontext!!
 	u32 num_threads = 1u;
 
+	vk::DescriptorPool descriptor_pool = {};
+
 	vec<vk::CommandPool> dynamic_cmd_pools = {};
 	vk::CommandPool immediate_cmd_pool = {};
 
@@ -293,5 +311,6 @@ private:
 
 	vk::DebugUtilsMessengerEXT debug_util_messenger = {};
 };
+
 
 } // namespace BINDLESSVK_NAMESPACE

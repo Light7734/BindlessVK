@@ -4,6 +4,7 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/DescriptorAllocator.hpp"
 #include "BindlessVk/RenderPass.hpp"
 #include "BindlessVk/VkContext.hpp"
 
@@ -22,7 +23,6 @@ class RenderGraph
 public:
 	RenderGraph(
 	    VkContext *vk_context,
-	    vk::DescriptorPool descriptor_pool,
 	    vec<vk::Image> swapchain_images,
 	    vec<vk::ImageView> swapchain_image_views
 	);

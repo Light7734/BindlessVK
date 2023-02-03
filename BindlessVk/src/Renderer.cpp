@@ -280,7 +280,7 @@ auto Renderer::calculate_swapchain_image_count() const -> u32
 	    min_image_count <= DESIRED_SWAPCHAIN_IMAGES)
 		return DESIRED_SWAPCHAIN_IMAGES;
 
-	// fall-back to 2 if possible
+	// fall-back to 2 if in ange
 	else if (min_image_count <= 2 && max_image_count >= 2)
 		return 2;
 

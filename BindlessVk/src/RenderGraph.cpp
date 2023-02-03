@@ -8,12 +8,10 @@ namespace BINDLESSVK_NAMESPACE {
 
 RenderGraph::RenderGraph(
     VkContext *vk_context,
-    vk::DescriptorPool descriptor_pool,
     vec<vk::Image> swapchain_images,
     vec<vk::ImageView> swapchain_image_views
 )
     : vk_context(vk_context)
-    , descriptor_pool(descriptor_pool)
     , swapchain_images(swapchain_images)
     , swapchain_image_views(swapchain_image_views)
 {
@@ -54,11 +52,6 @@ RenderGraph::~RenderGraph()
 		}
 	}
 
-	for (const auto &descriptor_set : sets)
-	{
-		device.freeDescriptorSets(descriptor_pool, descriptor_set);
-	}
-
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		for (u32 j = 0; j < num_threads; ++j)
@@ -92,10 +85,6 @@ RenderGraph::~RenderGraph()
 
 		device.destroyDescriptorSetLayout(pass.descriptor_set_layout);
 		device.destroyPipelineLayout(pass.pipeline_layout);
-		for (auto descriptor_set : pass.descriptor_sets)
-		{
-			device.freeDescriptorSets(descriptor_pool, descriptor_set);
-		}
 	}
 }
 
@@ -441,7 +430,8 @@ void RenderGraph::build_passes_buffer_inputs()
 
 void RenderGraph::build_graph_sets()
 {
-	const auto device = vk_context->get_device();
+	auto const device = vk_context->get_device();
+	auto *descriptor_allocator = vk_context->get_descriptor_allocator();
 
 	// Create set & pipeline layout
 	vec<vk::DescriptorSetLayoutBinding> bindings;
@@ -462,14 +452,10 @@ void RenderGraph::build_graph_sets()
 	pipeline_layout = device.createPipelineLayout({ {}, 1, &descriptor_set_layout });
 
 	// Allocate sets
+	sets.resize(BVK_MAX_FRAMES_IN_FLIGHT);
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		sets.push_back(device.allocateDescriptorSets({
-		    descriptor_pool,
-		    1,
-		    &descriptor_set_layout,
-		})[0]);
-
+		sets.push_back(descriptor_allocator->allocate_descriptor_set(&descriptor_set_layout));
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eDescriptorSet,
 		    (uint64_t)(VkDescriptorSet)sets.back(),
@@ -481,6 +467,7 @@ void RenderGraph::build_graph_sets()
 void RenderGraph::build_passes_sets()
 {
 	const auto device = vk_context->get_device();
+	auto *descriptor_allocator = vk_context->get_descriptor_allocator();
 
 	for (u32 i = 0; i < renderpasses_info.size(); ++i)
 	{
@@ -521,13 +508,9 @@ void RenderGraph::build_passes_sets()
 		{
 			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
 			{
-				auto set = device.allocateDescriptorSets({
-				    descriptor_pool,
-				    1u,
-				    &pass.descriptor_set_layout,
-				})[0];
-
-				pass.descriptor_sets.push_back(set);
+				pass.descriptor_sets.push_back(
+				    descriptor_allocator->allocate_descriptor_set(&pass.descriptor_set_layout)
+				);
 
 				device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 				    vk::ObjectType::eDescriptorSet,

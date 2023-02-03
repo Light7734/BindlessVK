@@ -2,6 +2,8 @@
 
 #include "BindlessVk/VkContext.hpp"
 
+#include "vulkan/vulkan_raii.hpp"
+
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
@@ -56,7 +58,6 @@ static auto parse_message_type(VkDebugUtilsMessageTypeFlagsEXT const message_typ
 
 	if (message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
 		return "VALIDATION";
-
 
 	return "PERFORMANCE";
 }
@@ -132,7 +133,8 @@ VkContext::VkContext(
 
 	load_vulkan_device_functions();
 
-	create_allocator();
+	create_memory_allocator();
+	create_descriptor_allocator();
 
 	fetch_queues();
 	update_surface_info();
@@ -149,13 +151,14 @@ VkContext::~VkContext()
 	device.destroyFence(immediate_fence);
 	device.destroyCommandPool(immediate_cmd_pool);
 
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 		device.destroyCommandPool(dynamic_cmd_pools[i]);
 
 	allocator.destroy();
-	device.destroy(nullptr);
+	descriptor_allocator.destroy();
+	device.destroy();
 
-	instance.destroySurfaceKHR(surface, nullptr);
+	instance.destroySurfaceKHR(surface);
 	instance.destroyDebugUtilsMessengerEXT(debug_util_messenger);
 	instance.destroy();
 }
@@ -280,7 +283,7 @@ void VkContext::create_device(vk::PhysicalDeviceFeatures physical_device_feature
 	    queues_info,
 	    {},
 	    device_extensions,
-	    &physical_device_features, //
+	    &physical_device_features,
 	    &dynamic_rendering_features,
 	});
 }
@@ -297,7 +300,7 @@ void VkContext::fetch_queues()
 	assert_true(queues.present, "Failed to fetch present queue");
 }
 
-void VkContext::create_allocator()
+void VkContext::create_memory_allocator()
 {
 	auto const vulkan_funcs = vma::VulkanFunctions(
 	    VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr,
@@ -348,6 +351,11 @@ void VkContext::create_allocator()
 	);
 
 	allocator = vma::createAllocator(allocator_info);
+}
+
+void VkContext::create_descriptor_allocator()
+{
+	descriptor_allocator.init(device);
 }
 
 void VkContext::create_command_pools()
@@ -429,5 +437,6 @@ auto VkContext::create_queues_create_info() const -> vec<vk::DeviceQueueCreateIn
 
 	return create_info;
 }
+
 
 } // namespace BINDLESSVK_NAMESPACE

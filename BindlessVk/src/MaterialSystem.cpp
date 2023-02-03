@@ -5,8 +5,8 @@
 namespace BINDLESSVK_NAMESPACE {
 
 ShaderEffect::ShaderEffect(
-    VkContext* vk_context,
-    vec<Shader*> shaders,
+    VkContext *vk_context,
+    vec<Shader *> shaders,
     ShaderEffect::Configuration configuration
 )
     : vk_context(vk_context)
@@ -38,12 +38,12 @@ ShaderEffect::ShaderEffect(
 	);
 }
 
-ShaderEffect::ShaderEffect(ShaderEffect&& effect)
+ShaderEffect::ShaderEffect(ShaderEffect &&effect)
 {
 	*this = std::move(effect);
 }
 
-ShaderEffect& ShaderEffect::operator=(ShaderEffect&& effect)
+ShaderEffect &ShaderEffect::operator=(ShaderEffect &&effect)
 {
 	this->vk_context = effect.vk_context;
 	this->pipeline = effect.pipeline;
@@ -58,7 +58,6 @@ ShaderEffect& ShaderEffect::operator=(ShaderEffect&& effect)
 	return *this;
 }
 
-
 ShaderEffect::~ShaderEffect()
 {
 	if (vk_context)
@@ -72,12 +71,12 @@ ShaderEffect::~ShaderEffect()
 	}
 }
 
-void ShaderEffect::create_descriptor_sets_layout(vec<Shader*> shaders)
+void ShaderEffect::create_descriptor_sets_layout(vec<Shader *> shaders)
 {
 	const auto device = vk_context->get_device();
 	const auto sets_bindings = combine_descriptor_sets_bindings(shaders);
 
-	for (u32 i = 0u; const auto& set_bindings : sets_bindings)
+	for (u32 i = 0u; const auto &set_bindings : sets_bindings)
 	{
 		descriptor_sets_layout[i++] =
 		    device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
@@ -89,16 +88,16 @@ void ShaderEffect::create_descriptor_sets_layout(vec<Shader*> shaders)
 }
 
 arr<vec<vk::DescriptorSetLayoutBinding>, 2> ShaderEffect::combine_descriptor_sets_bindings(
-    vec<Shader*> shaders
+    vec<Shader *> shaders
 )
 {
 	auto combined_bindings = arr<vec<vk::DescriptorSetLayoutBinding>, 2> {};
 
-	for (const auto& shader : shaders)
+	for (const auto &shader : shaders)
 	{
-		for (u32 i = 0; const auto& descriptor_set_bindings : shader->descriptor_sets_bindings)
+		for (u32 i = 0; const auto &descriptor_set_bindings : shader->descriptor_sets_bindings)
 		{
-			for (const auto& descriptor_set_binding : descriptor_set_bindings)
+			for (const auto &descriptor_set_binding : descriptor_set_bindings)
 			{
 				const u32 set_index = i;
 				const u32 binding_index = descriptor_set_binding.binding;
@@ -117,13 +116,13 @@ arr<vec<vk::DescriptorSetLayoutBinding>, 2> ShaderEffect::combine_descriptor_set
 }
 
 vec<vk::PipelineShaderStageCreateInfo> ShaderEffect::create_pipeline_shader_stage_infos(
-    vec<Shader*> shaders
+    vec<Shader *> shaders
 )
 {
 	auto pipeline_shader_stage_infos = vec<vk::PipelineShaderStageCreateInfo> {};
 	pipeline_shader_stage_infos.resize(shaders.size());
 
-	for (u32 i = 0; const auto& shader : shaders)
+	for (u32 i = 0; const auto &shader : shaders)
 	{
 		pipeline_shader_stage_infos[i++] = {
 			{},
