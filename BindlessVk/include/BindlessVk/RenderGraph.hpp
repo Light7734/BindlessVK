@@ -218,7 +218,7 @@ private:
 
 	vk::PipelineLayout pipeline_layout = {};
 	vk::DescriptorSetLayout descriptor_set_layout = {};
-	vec<vk::DescriptorSet> sets = {};
+	vec<AllocatedDescriptorSet> sets = {};
 
 	void (*on_update)(VkContext *, RenderGraph *, u32, void *);
 

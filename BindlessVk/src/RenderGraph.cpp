@@ -455,10 +455,10 @@ void RenderGraph::build_graph_sets()
 	sets.resize(BVK_MAX_FRAMES_IN_FLIGHT);
 	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
-		sets.push_back(descriptor_allocator->allocate_descriptor_set(&descriptor_set_layout));
+		sets[i] = descriptor_allocator->allocate_descriptor_set(descriptor_set_layout);
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    vk::ObjectType::eDescriptorSet,
-		    (uint64_t)(VkDescriptorSet)sets.back(),
+		    (uint64_t)(VkDescriptorSet)sets[i],
 		    fmt::format("render_graph_descriptor_set_{}", i).c_str(),
 		});
 	}
@@ -509,7 +509,7 @@ void RenderGraph::build_passes_sets()
 			for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; ++j)
 			{
 				pass.descriptor_sets.push_back(
-				    descriptor_allocator->allocate_descriptor_set(&pass.descriptor_set_layout)
+				    descriptor_allocator->allocate_descriptor_set(pass.descriptor_set_layout)
 				);
 
 				device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
@@ -1022,7 +1022,7 @@ void RenderGraph::record_pass_cmds(
 	    pipeline_layout,
 	    0u,
 	    1u,
-	    &sets[frame_index],
+	    &sets[frame_index].descriptor_set,
 	    0u,
 	    {}
 	);
@@ -1035,7 +1035,7 @@ void RenderGraph::record_pass_cmds(
 		    pass.pipeline_layout,
 		    1u,
 		    1u,
-		    &pass.descriptor_sets[frame_index],
+		    &pass.descriptor_sets[frame_index].descriptor_set,
 		    0u,
 		    {}
 		);

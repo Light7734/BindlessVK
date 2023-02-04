@@ -104,7 +104,7 @@ struct Renderpass
 
 	hash_map<u64, class Buffer *> buffer_inputs;
 
-	vec<vk::DescriptorSet> descriptor_sets;
+	vec<AllocatedDescriptorSet> descriptor_sets;
 	vk::DescriptorSetLayout descriptor_set_layout;
 	vk::PipelineLayout pipeline_layout;
 
