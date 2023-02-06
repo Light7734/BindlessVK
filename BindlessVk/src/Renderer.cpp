@@ -4,110 +4,116 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Renderer::Renderer(ref<VkContext const> const vk_context): vk_context(vk_context)
+Renderer::Renderer(ref<VkContext> const vk_context): vk_context(vk_context)
 {
 	create_sync_objects();
-	create_cmd_buffers();
-	on_swapchain_invalidated();
+	allocate_cmd_buffers();
 }
 
 Renderer::~Renderer()
 {
-	auto const device = vk_context->get_device();
-
-	destroy_swapchain_image_views();
+	free_cmd_buffers();
 	destroy_sync_objects();
-	device.destroySwapchainKHR(swapchain);
 }
 
 void Renderer::render_graph(RenderGraph *const render_graph, void *const user_pointer)
 {
 	auto const device = vk_context->get_device();
 
-	// Wait for frame's fence
-	auto const render_fence = render_fences[current_frame];
-
-	assert_false(device.waitForFences(render_fence, VK_TRUE, UINT64_MAX));
-
-	device.resetFences(render_fence);
-
-	// Aquire next swapchain image
-	auto const render_semaphore = render_semaphores[current_frame];
-	auto const [result, image_index] =
-	    device.acquireNextImageKHR(swapchain, UINT64_MAX, render_semaphore, VK_NULL_HANDLE);
-
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR ||
-	    is_swapchain_invalid()) [[unlikely]]
-	{
-		device.waitIdle();
-		swapchain_invalid = true;
+	auto const [success, image_index] = aquire_next_image();
+	if (!success)
 		return;
-	}
-	else
-	{
-		assert_false(
-		    result,
-		    "VkAcqtireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or "
-		    "VK_SUBOPTIMAL_KHR"
-		);
-	}
 
-	// Draw scene
-	auto const cmd = cmd_buffers[current_frame];
 	device.resetCommandPool(vk_context->get_cmd_pool(current_frame));
-	render_graph->update_and_render(cmd, current_frame, image_index, user_pointer);
 
-	// Submit & present
-	auto present_semaphore = present_semaphores[current_frame];
-	submit_queue(render_semaphore, present_semaphore, render_fence, cmd);
+	render_graph->update(current_frame, user_pointer);
+
+	render_graph->render(cmd_buffers[current_frame], current_frame, image_index, user_pointer);
+
+	submit_queue();
 	present_frame(image_index);
 
-	// ++
 	current_frame = (current_frame + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::submit_queue(
-    vk::Semaphore wait_semaphore,
-    vk::Semaphore signal_semaphore,
-    vk::Fence signal_fence,
-    vk::CommandBuffer cmd
-)
+void Renderer::wait_for_frame_fence()
 {
-	auto const queues = vk_context->get_queues();
+	auto const device = vk_context->get_device();
+
+	assert_false(device.waitForFences(render_fences[current_frame], VK_TRUE, UINT64_MAX));
+	device.resetFences(render_fences[current_frame]);
+}
+
+auto Renderer::aquire_next_image() -> pair<bool, u32>
+{
+	auto *const swapchain = vk_context->get_swapchain();
+	auto const device = vk_context->get_device();
+
+	auto const [result, index] = device.acquireNextImageKHR(
+	    *swapchain,
+	    std::numeric_limits<u64>::max(),
+	    render_semaphores[current_frame],
+	    VK_NULL_HANDLE
+	);
+
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR ||
+	    swapchain->is_invalid()) [[unlikely]]
+	{
+		device.waitIdle();
+		swapchain->invalidate();
+		return { false, 0 };
+	}
+
+	assert_false(
+	    result,
+	    "VkAcqtireNextImage failed without returning VK_ERROR_OUT_OF_DATE_KHR or "
+	    "VK_SUBOPTIMAL_KHR"
+	);
+
+	return { true, index };
+}
+
+void Renderer::submit_queue()
+{
+	auto const graphics_queue = vk_context->get_queues().get_graphics();
+	auto const cmd = cmd_buffers[current_frame];
 
 	cmd.end();
 
 	auto const wait_stage =
 	    vk::PipelineStageFlags(vk::PipelineStageFlagBits::eColorAttachmentOutput);
 
-	queues.graphics.submit(
+	graphics_queue.submit(
 	    vk::SubmitInfo {
-	        wait_semaphore,
+	        render_semaphores[current_frame],
 	        wait_stage,
 	        cmd,
-	        signal_semaphore,
+	        present_semaphores[current_frame],
 	    },
-	    signal_fence
+	    render_fences[current_frame]
 	);
 }
 
 void Renderer::present_frame(u32 const image_index)
 {
 	auto const device = vk_context->get_device();
-	auto const queues = vk_context->get_queues();
+	auto const present_queue = vk_context->get_queues().get_present();
+	auto *const swapchain = vk_context->get_swapchain();
+	auto const swapchain_array = arr<vk::SwapchainKHR, 1> { *swapchain };
+	;
 
 	try
 	{
-		auto const result = queues.present.presentKHR({
+		auto const result = present_queue.presentKHR({
 		    present_semaphores[current_frame],
-		    swapchain,
+		    swapchain_array,
 		    image_index,
 		});
 
-		if (result == vk::Result::eSuboptimalKHR || is_swapchain_invalid())
+		if (result == vk::Result::eSuboptimalKHR || swapchain->is_invalid())
 		{
 			device.waitIdle();
-			swapchain_invalid = true;
+			swapchain->invalidate();
 			return;
 		}
 	}
@@ -115,104 +121,8 @@ void Renderer::present_frame(u32 const image_index)
 	catch (vk::OutOfDateKHRError err)
 	{
 		device.waitIdle();
-		swapchain_invalid = true;
+		swapchain->invalidate();
 		return;
-	}
-}
-
-void Renderer::on_swapchain_invalidated()
-{
-	auto const device = vk_context->get_device();
-
-	destroy_swapchain_image_views();
-	create_swapchain_images();
-	create_swapchain_image_views();
-	device.waitIdle();
-
-	swapchain_invalid = false;
-}
-
-void Renderer::create_swapchain_images()
-{
-	auto const device = vk_context->get_device();
-	auto const queues = vk_context->get_queues();
-	auto const surface = vk_context->get_surface();
-
-	auto const image_count = calculate_swapchain_image_count();
-
-	// Create swapchain
-	auto const queues_have_same_index = queues.graphics_index == queues.present_index;
-
-	auto const old_swapchain = swapchain;
-
-	auto const swapchain_info = vk::SwapchainCreateInfoKHR {
-		{},
-		surface,
-		image_count,
-		surface.color_format,
-		surface.color_space,
-		surface.framebuffer_extent,
-		1u,
-		vk::ImageUsageFlagBits::eColorAttachment,
-		queues_have_same_index ? vk::SharingMode::eExclusive : vk::SharingMode::eConcurrent,
-		queues_have_same_index ? 0u : 2u,
-		queues_have_same_index ? nullptr : &queues.graphics_index,
-		surface.capabilities.currentTransform,
-		vk::CompositeAlphaFlagBitsKHR::eOpaque,
-		surface.present_mode,
-		VK_TRUE,
-		old_swapchain,
-	};
-
-	swapchain = device.createSwapchainKHR(swapchain_info, nullptr);
-	device.destroySwapchainKHR(old_swapchain);
-
-	swapchain_images = device.getSwapchainImagesKHR(swapchain);
-}
-
-void Renderer::create_swapchain_image_views()
-{
-	auto const device = vk_context->get_device();
-	auto const queues = vk_context->get_queues();
-	auto const surface = vk_context->get_surface();
-
-	auto const image_count = swapchain_images.size();
-
-	swapchain_image_views.resize(image_count);
-
-	for (u32 i = 0; i < image_count; i++)
-	{
-		swapchain_image_views[i] = device.createImageView({
-		    {},
-		    swapchain_images[i],
-		    vk::ImageViewType::e2D,
-		    surface.color_format,
-		    vk::ComponentMapping {
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		    },
-		    vk::ImageSubresourceRange {
-		        vk::ImageAspectFlagBits::eColor,
-		        0,
-		        1,
-		        0,
-		        1,
-		    },
-		});
-
-		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-		    vk::ObjectType::eImage,
-		    (u64)(VkImage)swapchain_images[i],
-		    fmt::format("swap_chain_image_{}", i).c_str(),
-		});
-
-		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-		    vk::ObjectType::eImageView,
-		    (u64)(VkImageView)swapchain_image_views[i],
-		    fmt::format("swapchain_image_view_{}", i).c_str(),
-		});
 	}
 }
 
@@ -231,7 +141,19 @@ void Renderer::create_sync_objects()
 	}
 }
 
-void Renderer::create_cmd_buffers()
+void Renderer::destroy_sync_objects()
+{
+	auto const device = vk_context->get_device();
+
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	{
+		device.destroyFence(render_fences[i]);
+		device.destroySemaphore(render_semaphores[i]);
+		device.destroySemaphore(present_semaphores[i]);
+	}
+}
+
+void Renderer::allocate_cmd_buffers()
 {
 	auto const device = vk_context->get_device();
 
@@ -245,48 +167,13 @@ void Renderer::create_cmd_buffers()
 	}
 }
 
-void Renderer::destroy_swapchain_image_views()
+void Renderer::free_cmd_buffers()
 {
 	auto const device = vk_context->get_device();
-	device.waitIdle();
+	auto const cmd_pool = vk_context->get_cmd_pool(0, 0);
 
-	for (auto const &imageView : swapchain_image_views)
-		device.destroyImageView(imageView);
-};
-
-void Renderer::destroy_sync_objects()
-{
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
-	{
-		device.destroyFence(render_fences[i]);
-		device.destroySemaphore(render_semaphores[i]);
-		device.destroySemaphore(present_semaphores[i]);
-	}
-}
-
-auto Renderer::calculate_swapchain_image_count() const -> u32
-{
-	auto const surface = vk_context->get_surface();
-
-	auto const min_image_count = surface.capabilities.minImageCount;
-	auto const max_image_count = surface.capabilities.maxImageCount;
-
-	auto const has_max_limit = max_image_count != 0;
-
-	// desired image count is in range
-	if ((!has_max_limit || max_image_count >= DESIRED_SWAPCHAIN_IMAGES) &&
-	    min_image_count <= DESIRED_SWAPCHAIN_IMAGES)
-		return DESIRED_SWAPCHAIN_IMAGES;
-
-	// fall-back to 2 if in ange
-	else if (min_image_count <= 2 && max_image_count >= 2)
-		return 2;
-
-	// fall-back to min_image_count
-	else
-		return min_image_count;
+	for (auto cmd_buffer : cmd_buffers)
+		device.freeCommandBuffers(cmd_pool, cmd_buffer);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

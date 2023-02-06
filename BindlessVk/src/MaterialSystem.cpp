@@ -13,9 +13,10 @@ ShaderEffect::ShaderEffect(
 {
 	create_descriptor_sets_layout(shaders);
 
-	const auto device = vk_context->get_device();
-	const auto surface = vk_context->get_surface();
-	const auto pipeline_shader_stage_create_infos = create_pipeline_shader_stage_infos(shaders);
+	auto const device = vk_context->get_device();
+	auto const surface = vk_context->get_surface();
+	auto const pipeline_shader_stage_create_infos = create_pipeline_shader_stage_infos(shaders);
+	auto const surface_color_format = surface.get_color_format();
 
 	pipeline_layout = device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
 	    {},
@@ -25,9 +26,8 @@ ShaderEffect::ShaderEffect(
 
 	const auto pipeline_rendering_info = vk::PipelineRenderingCreateInfo {
 		{},
-		1u,
-		&surface.color_format,
-		vk_context->get_depth_format(), //
+		surface_color_format,
+		vk_context->get_depth_format(),
 		{},
 	};
 

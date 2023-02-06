@@ -4,19 +4,16 @@
 
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/DescriptorAllocator.hpp"
 #include "BindlessVk/RenderPass.hpp"
 #include "BindlessVk/VkContext.hpp"
 
-#ifndef MAX_FRAMES_IN_FLIGHT
-	#define MAX_FRAMES_IN_FLIGHT 3
-#endif
-
-#ifndef DESIRED_SWAPCHAIN_IMAGES
-	#define DESIRED_SWAPCHAIN_IMAGES 3
-#endif
-
 namespace BINDLESSVK_NAMESPACE {
+
+/**
+ * @tomorrow
+ * Make rendergraph a struct
+ * Have rendering resources stored somewhere else, idk
+ */
 
 class RenderGraph
 {
@@ -64,7 +61,16 @@ public:
 	    vec<vk::ImageView> swapchain_iamge_views
 	);
 
-	void update_and_render(
+	void update(u32 frame_index, void *user_pointer);
+
+	void render(
+	    vk::CommandBuffer primary_cmd,
+	    u32 frame_index,
+	    u32 image_index,
+	    void *user_pointer
+	);
+
+	void epdate_and_render(
 	    vk::CommandBuffer primary_cmd,
 	    u32 frame_index,
 	    u32 image_index,
@@ -80,7 +86,6 @@ public:
 	{
 		buffer_inputs[hash_str(name)]->unmap();
 	}
-
 
 private:
 	inline auto get_cmd(u32 pass_index, u32 frame_index, u32 thread_index) const
@@ -242,6 +247,61 @@ private:
 
 	vk::DebugUtilsLabelEXT update_debug_label;
 	vk::DebugUtilsLabelEXT backbuffer_barrier_debug_label;
+};
+
+class RenderGraphBuilder
+{
+public:
+	auto build() -> RenderGraph
+	{
+		return {};
+	}
+
+	auto set_name(c_str name) -> RenderGraphBuilder &
+	{
+		this->name = name;
+		return *this;
+	}
+
+	auto add_pass(RenderpassBlueprint blueprint) -> RenderGraphBuilder &
+	{
+		this->passes.push_back(blueprint);
+		return *this;
+	}
+
+	auto add_buffer_input(RenderpassBlueprint::BufferInput const buffer_input_info)
+	    -> RenderGraphBuilder &
+
+	{
+		this->buffer_input_infos.push_back(buffer_input_info);
+		return *this;
+	}
+
+	auto set_update_fn(void (*fn)(VkContext *, RenderGraph *, u32, void *)) -> RenderGraphBuilder &
+	{
+		this->update_fn = fn;
+		return *this;
+	}
+
+	auto set_update_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
+	{
+		this->update_label = label;
+		return *this;
+	}
+
+	auto set_present_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
+	{
+		this->present_label = label;
+		return *this;
+	}
+
+private:
+	c_str name = {};
+	vec<RenderpassBlueprint::BufferInput> buffer_input_infos = {};
+	vec<RenderpassBlueprint> passes {};
+	vk::DebugUtilsLabelEXT update_label = {};
+	vk::DebugUtilsLabelEXT present_label = {};
+	void (*update_fn)(VkContext *, RenderGraph *, u32, void *) = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

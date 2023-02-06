@@ -34,6 +34,9 @@ using str = std::string;
 template<typename T>
 using vec = std::vector<T>;
 
+template<typename T>
+using vec_it = typename std::vector<T>::iterator;
+
 template<typename T, size_t N>
 using arr = std::array<T, N>;
 
@@ -60,5 +63,6 @@ using ref = std::shared_ptr<T>;
 
 template<typename T>
 using scope = std::unique_ptr<T>;
+
 
 } // namespace BINDLESSVK_NAMESPACE

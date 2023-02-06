@@ -645,7 +645,7 @@ void RenderGraph::build_pass_cmd_buffer_begin_infos()
 		{
 			if (attachment.subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor)
 			{
-				pass.color_attachments_format.push_back(surface.color_format);
+				pass.color_attachments_format.push_back(surface.get_color_format());
 			}
 			else
 			{
@@ -702,7 +702,7 @@ void RenderGraph::create_attachment_resource(
 	// Set usage & askect masks
 	vk::ImageUsageFlags image_usage_mask;
 	vk::ImageAspectFlags image_aspect_mask;
-	if (attachment_info.format == surface.color_format)
+	if (attachment_info.format == surface.get_color_format())
 	{
 		image_usage_mask = vk::ImageUsageFlagBits::eColorAttachment;
 		image_aspect_mask = vk::ImageAspectFlagBits::eColor;
@@ -946,24 +946,15 @@ void RenderGraph::on_swapchain_invalidated(
 	}
 }
 
-// @todo: Setup render barriers
-// @todo: Multi-threaded recording
-void RenderGraph::update_and_render(
-    vk::CommandBuffer const primary_cmd,
-    u32 const frame_index,
-    u32 const image_index,
-    void *const user_pointer
-)
+void RenderGraph::update(u32 const frame_index, void *const user_pointer)
 {
-	const auto &queues = vk_context->get_queues();
-	const auto num_threads = vk_context->get_num_threads();
-	const auto thread_index = 0;
+	auto const graphics_queue = vk_context->get_queues().get_graphics();
 
 	// Update graph
 	{
-		queues.graphics.beginDebugUtilsLabelEXT(update_debug_label);
+		graphics_queue.beginDebugUtilsLabelEXT(update_debug_label);
 		on_update(vk_context, this, frame_index, user_pointer);
-		queues.graphics.endDebugUtilsLabelEXT();
+		graphics_queue.endDebugUtilsLabelEXT();
 	}
 
 	// Update passes
@@ -971,10 +962,21 @@ void RenderGraph::update_and_render(
 	{
 		auto &pass = renderpasses[i];
 
-		queues.graphics.beginDebugUtilsLabelEXT(pass.update_debug_label);
+		graphics_queue.beginDebugUtilsLabelEXT(pass.update_debug_label);
 		pass.on_update(vk_context, this, &renderpasses[i], frame_index, user_pointer);
-		queues.graphics.endDebugUtilsLabelEXT(); // pass.update_debug_label
+		graphics_queue.endDebugUtilsLabelEXT();
 	}
+}
+
+void RenderGraph::update_and_render(
+    vk::CommandBuffer const primary_cmd,
+    u32 const frame_index,
+    u32 const image_index,
+    void *const user_pointer
+)
+{
+	auto const thread_index = 0;
+	auto const num_threads = vk_context->get_num_threads();
 
 	// Render passes (record their rendering cmds to secondary cmd buffers)
 	primary_cmd.begin(vk::CommandBufferBeginInfo {});
@@ -1061,8 +1063,8 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
     u32 pass_index
 )
 {
-	const auto &queues = vk_context->get_queues();
-	const auto &surface = vk_context->get_surface();
+	auto const graphics_queue_index = vk_context->get_queues().get_graphics_index();
+	auto const &surface = vk_context->get_surface();
 
 	auto &pass = renderpasses[pass_index];
 	cmd.beginDebugUtilsLabelEXT(pass.barrier_debug_label);
@@ -1074,10 +1076,16 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 
 		auto &resource = resource_container.get_resource(image_index, frame_index);
 
-		vk::ImageMemoryBarrier image_barrier {
-			resource.src_access_mask, attachment.access_mask,       resource.src_image_layout,
-			attachment.layout,        queues.graphics_index,        queues.graphics_index,
-			resource.image,           attachment.subresource_range, nullptr,
+		auto const image_barrier = vk::ImageMemoryBarrier {
+			resource.src_access_mask,
+			attachment.access_mask,
+			resource.src_image_layout,
+			attachment.layout,
+			graphics_queue_index,
+			graphics_queue_index,
+			resource.image, //
+			attachment.subresource_range,
+			nullptr,
 		};
 
 		if ((resource.src_access_mask != attachment.access_mask ||
@@ -1145,7 +1153,7 @@ RenderGraph::PassRenderingInfo RenderGraph::apply_pass_barriers(
 		vk::RenderingFlagBits::eContentsSecondaryCommandBuffers,
 		vk::Rect2D {
 		    { 0, 0 },
-		    surface.framebuffer_extent,
+		    surface.get_framebuffer_extent(),
 		},
 		1u,
 		{},
@@ -1211,8 +1219,8 @@ vk::Extent3D RenderGraph::calculate_attachment_image_extent(
 	case Renderpass::CreateInfo::SizeType::eSwapchainRelative:
 	{
 		return {
-			static_cast<u32>(surface.framebuffer_extent.width * attachment_info.size.x),
-			static_cast<u32>(surface.framebuffer_extent.height * attachment_info.size.y),
+			static_cast<u32>(surface.get_framebuffer_extent().width * attachment_info.size.x),
+			static_cast<u32>(surface.get_framebuffer_extent().height * attachment_info.size.y),
 			1,
 		};
 	}

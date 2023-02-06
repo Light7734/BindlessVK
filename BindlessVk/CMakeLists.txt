@@ -4,7 +4,11 @@ add_library(
     BindlessVk
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/VkContext.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Gpu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/DescriptorAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Gpu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Queues.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Swapchain.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Surface.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp

@@ -121,30 +121,34 @@ VkContext::VkContext(
     , debug_callback_and_data(debug_callback_and_data)
 {
 	load_vulkan_instance_functions();
-
 	check_layer_support();
 
 	create_vulkan_instance();
 	create_debug_messenger(debug_messenger_severities, debug_messenger_types);
-	create_window_surface(create_window_surface_func);
+	surface.init_with_instance(instance, create_window_surface_func, get_framebuffer_extent);
 
 	pick_gpu(gpu_picker_func);
+	queues.init_with_gpu(gpu);
 	create_device(physical_device_features);
 
 	load_vulkan_device_functions();
 
 	create_memory_allocator();
-	create_descriptor_allocator();
+	descriptor_allocator.init(device);
 
-	fetch_queues();
-	update_surface_info();
+	queues.init_with_device(device);
+	surface.init_with_gpu(gpu);
 	create_command_pools();
+
+	swapchain.init(device, surface, queues);
 }
 
 VkContext::~VkContext()
 {
 	if (static_cast<VkDevice>(device) == VK_NULL_HANDLE)
 		return;
+
+	swapchain.destroy();
 
 	device.waitIdle();
 
@@ -158,7 +162,7 @@ VkContext::~VkContext()
 	descriptor_allocator.destroy();
 	device.destroy();
 
-	instance.destroySurfaceKHR(surface);
+	surface.destroy();
 	instance.destroyDebugUtilsMessengerEXT(debug_util_messenger);
 	instance.destroy();
 }
@@ -230,11 +234,6 @@ void VkContext::create_debug_messenger(
 	debug_util_messenger = instance.createDebugUtilsMessengerEXT(debug_messenger_create_info);
 }
 
-void VkContext::create_window_surface(fn<vk::SurfaceKHR(vk::Instance)> create_window_surface_func)
-{
-	surface.surface_object = create_window_surface_func(instance);
-}
-
 void VkContext::pick_gpu(fn<Gpu(vec<Gpu>)> const gpu_picker_func)
 {
 	fetch_adequate_gpus();
@@ -264,19 +263,16 @@ void VkContext::pick_gpu(fn<Gpu(vec<Gpu>)> const gpu_picker_func)
 void VkContext::fetch_adequate_gpus()
 {
 	for (auto const physical_device : instance.enumeratePhysicalDevices())
-	{
-		auto const gpu = Gpu(physical_device, surface, device_extensions);
-		if (gpu.is_adequate())
+		if (auto const gpu = Gpu(physical_device, surface, device_extensions); gpu.is_adequate())
 			adequate_gpus.push_back(gpu);
-	}
 
-	assert_false(adequate_gpus.empty(), "No adaquate physical device found");
+	assert_false(adequate_gpus.empty(), "No adaquate gpu found");
 }
 
 void VkContext::create_device(vk::PhysicalDeviceFeatures physical_device_features)
 {
 	auto const dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures { true };
-	auto const queues_info = create_queues_create_info();
+	auto const queues_info = queues.get_create_infos();
 
 	device = gpu.create_device(vk::DeviceCreateInfo {
 	    {},
@@ -286,18 +282,6 @@ void VkContext::create_device(vk::PhysicalDeviceFeatures physical_device_feature
 	    &physical_device_features,
 	    &dynamic_rendering_features,
 	});
-}
-
-void VkContext::fetch_queues()
-{
-	queues.graphics_index = gpu.get_graphics_queue_index();
-	queues.present_index = gpu.get_present_queue_index();
-
-	queues.graphics = device.getQueue(queues.graphics_index, 0u);
-	assert_true(queues.graphics, "Failed to fetch graphics queue");
-
-	queues.present = device.getQueue(queues.present_index, 0u);
-	assert_true(queues.present, "Failed to fetch present queue");
 }
 
 void VkContext::create_memory_allocator()
@@ -353,16 +337,11 @@ void VkContext::create_memory_allocator()
 	allocator = vma::createAllocator(allocator_info);
 }
 
-void VkContext::create_descriptor_allocator()
-{
-	descriptor_allocator.init(device);
-}
-
 void VkContext::create_command_pools()
 {
 	auto const command_pool_info = vk::CommandPoolCreateInfo {
 		{},
-		queues.graphics_index,
+		queues.get_graphics_index(),
 	};
 
 	for (u32 i = 0; i < num_threads; i++)
@@ -376,67 +355,5 @@ void VkContext::create_command_pools()
 	immediate_fence = device.createFence({});
 	immediate_cmd_pool = device.createCommandPool(command_pool_info);
 }
-
-void VkContext::update_surface_info()
-{
-	surface.capabilities = gpu.get_surface_capabilities();
-	auto const supported_formats = gpu.get_surface_formats();
-	auto const supported_present_modes = gpu.get_surface_present_modes();
-
-	// Select surface format
-	auto selected_surface_format = supported_formats[0]; // default
-	for (auto const &format : supported_formats)
-	{
-		if (format.format == vk::Format::eB8G8R8A8Srgb &&
-		    format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
-		{
-			selected_surface_format = format;
-			break;
-		}
-	}
-	surface.color_format = selected_surface_format.format;
-	surface.color_space = selected_surface_format.colorSpace;
-
-	// Select present mode
-	surface.present_mode = supported_present_modes[0]; // default
-	for (auto const &present_mode : supported_present_modes)
-	{
-		if (present_mode == vk::PresentModeKHR::eFifo)
-		{
-			surface.present_mode = present_mode;
-		}
-	}
-
-	surface.framebuffer_extent = std::clamp(
-	    get_framebuffer_extent(),
-	    surface.capabilities.minImageExtent,
-	    surface.capabilities.maxImageExtent
-	);
-}
-
-auto VkContext::create_queues_create_info() const -> vec<vk::DeviceQueueCreateInfo>
-{
-	static constexpr arr<f32, 1> queue_priority = { 1.0 };
-
-	auto create_info = vec<vk::DeviceQueueCreateInfo> {
-		{
-		    {},
-		    gpu.get_graphics_queue_index(),
-		    queue_priority,
-		},
-	};
-
-	if (queues.graphics_index != queues.present_index)
-	{
-		create_info.push_back({
-		    {},
-		    gpu.get_present_queue_index(),
-		    queue_priority,
-		});
-	}
-
-	return create_info;
-}
-
 
 } // namespace BINDLESSVK_NAMESPACE

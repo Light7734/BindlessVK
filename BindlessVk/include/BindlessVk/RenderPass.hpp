@@ -4,84 +4,17 @@
 #include "BindlessVk/Common/Common.hpp"
 
 #include <glm/glm.hpp>
+#include <type_traits>
 
 namespace BINDLESSVK_NAMESPACE {
 
+class RenderGraph;
+
 struct Renderpass
 {
-	struct CreateInfo
-	{
-	public:
-		enum class SizeType : uint8_t
-		{
-			eSwapchainRelative,
-			eRelative,
-			eAbsolute,
-
-			nCount,
-		};
-
-		struct AttachmentInfo
-		{
-			std::string name;
-			glm::vec2 size;
-			SizeType size_type;
-			vk::Format format;
-			vk::SampleCountFlagBits samples;
-
-			std::string input;
-			std::string size_relative_name;
-
-			vk::ClearValue clear_value;
-		};
-
-		struct TextureInputInfo
-		{
-			std::string name;
-			uint32_t binding;
-			uint32_t count;
-			vk::DescriptorType type;
-			vk::ShaderStageFlagBits stage_mask;
-
-			class Texture const *default_texture;
-		};
-
-		struct BufferInputInfo
-		{
-			std::string name;
-			uint32_t binding;
-			uint32_t count;
-			vk::DescriptorType type;
-			vk::ShaderStageFlagBits stage_mask;
-
-			size_t size;
-			void *initial_data;
-		};
-
-		std::string name;
-
-		void (*on_update)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
-		void (*on_render
-		)(VkContext *,
-		  class RenderGraph *,
-		  Renderpass *,
-		  vk::CommandBuffer cmd,
-		  uint32_t,
-		  uint32_t,
-		  void *);
-
-		vec<CreateInfo::AttachmentInfo> color_attachments_info;
-		CreateInfo::AttachmentInfo depth_stencil_attachment_info;
-
-		vec<CreateInfo::TextureInputInfo> texture_inputs_info;
-		vec<CreateInfo::BufferInputInfo> buffer_inputs_info;
-
-		void *user_pointer;
-
-		vk::DebugUtilsLabelEXT update_debug_label;
-		vk::DebugUtilsLabelEXT barrier_debug_label;
-		vk::DebugUtilsLabelEXT render_debug_label;
-	};
+	using UpdateFn = void (*)(VkContext *, RenderGraph *, Renderpass *, u32, void *);
+	using RenderFn =
+	    void (*)(VkContext *, RenderGraph *, Renderpass *, vk::CommandBuffer, u32, u32, void *);
 
 	struct Attachment
 	{
@@ -93,12 +26,21 @@ struct Renderpass
 		vk::AttachmentLoadOp load_op;
 		vk::AttachmentStoreOp store_op;
 
-		uint32_t resource_index;
+		u32 resource_index;
 
 		vk::ClearValue clear_value;
 	};
 
-	std::string name;
+	enum class SizeType : uint8_t
+	{
+		eSwapchainRelative,
+		eRelative,
+		eAbsolute,
+
+		nCount,
+	};
+
+	str name;
 
 	vec<Attachment> attachments;
 
@@ -108,18 +50,8 @@ struct Renderpass
 	vk::DescriptorSetLayout descriptor_set_layout;
 	vk::PipelineLayout pipeline_layout;
 
-	void (*on_begin_frame)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
-	void (*on_update)(VkContext *, class RenderGraph *, Renderpass *, uint32_t, void *);
-
-	void (*on_render
-	)(VkContext *,
-	  class RenderGraph *,
-	  Renderpass *,
-	  vk::CommandBuffer cmd,
-	  uint32_t,
-	  uint32_t,
-	  void *);
-
+	UpdateFn on_updtae;
+	RenderFn on_render;
 
 	vec<vk::Format> color_attachments_format;
 	vk::Format depth_attachment_format;
@@ -134,5 +66,127 @@ struct Renderpass
 	vk::DebugUtilsLabelEXT barrier_debug_label;
 	vk::DebugUtilsLabelEXT render_debug_label;
 };
+
+// Blueprint to be used by rendergraph builder
+class RenderpassBlueprint
+{
+private:
+	friend class RenderGraphBuilder;
+
+public:
+	struct Attachment
+	{
+		str name;
+		pair<f32, f32> size;
+		Renderpass::SizeType size_type;
+		vk::Format format;
+		vk::SampleCountFlagBits samples;
+
+		str input;
+		str size_relative_name;
+
+		vk::ClearValue clear_value;
+	};
+
+	struct TextureInput
+	{
+		str name;
+		u32 binding;
+		u32 count;
+		vk::DescriptorType type;
+		vk::ShaderStageFlagBits stage_mask;
+
+		class Texture const *default_texture;
+	};
+
+	struct BufferInput
+	{
+		str name;
+		u32 binding;
+		u32 count;
+		vk::DescriptorType type;
+		vk::ShaderStageFlagBits stage_mask;
+
+		size_t size;
+		void *initial_data;
+	};
+
+public:
+	auto set_name(c_str const name) -> RenderpassBlueprint &
+	{
+		this->name = name;
+		return *this;
+	}
+
+	auto set_update_fn(Renderpass::UpdateFn const fn) -> RenderpassBlueprint &
+	{
+		this->update_fn = fn;
+		return *this;
+	}
+
+	auto set_render_fn(Renderpass::RenderFn const fn) -> RenderpassBlueprint &
+	{
+		this->render_fn = fn;
+		return *this;
+	}
+
+	auto add_color_attachment(Attachment const attachment) -> RenderpassBlueprint &
+	{
+		this->color_attachments.push_back(attachment);
+		return *this;
+	}
+
+	auto set_depth_attachment(Attachment const attachment) -> RenderpassBlueprint &
+	{
+		this->depth_attachment = attachment;
+		return *this;
+	}
+
+	auto add_texture_input(TextureInput const input)
+	{
+		this->texture_inputs.push_back(input);
+		return *this;
+	}
+
+	auto add_buffer_input(BufferInput const input)
+	{
+		this->buffer_inputs.push_back(input);
+		return *this;
+	}
+
+	auto set_update_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
+	{
+		this->update_label = label;
+		return *this;
+	}
+
+	auto set_render_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
+	{
+		this->render_label = label;
+		return *this;
+	}
+
+	auto set_barrier_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
+	{
+		this->barrier_label = label;
+		return *this;
+	}
+
+private:
+	c_str name;
+
+	Renderpass::UpdateFn update_fn;
+	Renderpass::RenderFn render_fn;
+
+	vec<Attachment> color_attachments;
+	Attachment depth_attachment;
+	vec<TextureInput> texture_inputs;
+	vec<BufferInput> buffer_inputs;
+
+	vk::DebugUtilsLabelEXT update_label;
+	vk::DebugUtilsLabelEXT render_label;
+	vk::DebugUtilsLabelEXT barrier_label;
+};
+
 
 } // namespace BINDLESSVK_NAMESPACE

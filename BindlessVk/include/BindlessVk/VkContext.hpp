@@ -1,10 +1,17 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/DescriptorAllocator.hpp"
-#include "BindlessVk/Gpu.hpp"
+#include "BindlessVk/Context/DescriptorAllocator.hpp"
+#include "BindlessVk/Context/Gpu.hpp"
+#include "BindlessVk/Context/Queues.hpp"
+#include "BindlessVk/Context/Surface.hpp"
+#include "BindlessVk/Context/Swapchain.hpp"
 
 #include <any>
+
+#ifndef MAX_FRAMES_IN_FLIGHT
+	#define MAX_FRAMES_IN_FLIGHT 3
+#endif
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -21,56 +28,6 @@ enum class DebugCallbackSource
 // @todo compute queue
 class VkContext
 {
-public:
-	struct CreateInfo
-	{
-	};
-
-	// @warn do not reorder fields! they have to be contiguous in memory
-	struct Queues
-	{
-		vk::Queue graphics;
-		vk::Queue present;
-
-		u32 graphics_index;
-		u32 present_index;
-
-		inline auto have_same_index() const
-		{
-			return graphics_index == present_index;
-		}
-	};
-
-	struct Surface
-	{
-		vk::SurfaceKHR surface_object;
-		vk::SurfaceCapabilitiesKHR capabilities;
-		vk::Format color_format;
-		vk::ColorSpaceKHR color_space;
-		vk::PresentModeKHR present_mode;
-		vk::Extent2D framebuffer_extent;
-
-		inline operator vk::SurfaceKHR() const
-		{
-			return surface_object;
-		}
-	};
-
-	struct Swapchain
-	{
-		vk::SwapchainKHR swapchain_object;
-
-		vec<vk::Image> images;
-		vec<vk::ImageView> image_views;
-
-		u32 image_count;
-
-		inline operator vk::SwapchainKHR() const
-		{
-			return swapchain_object;
-		}
-	};
-
 public:
 	VkContext() = default;
 
@@ -93,9 +50,6 @@ public:
 
 	~VkContext();
 
-	/** Updates the surface info, (to be called after swapchain-invalidation) */
-	void update_surface_info();
-
 	inline void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
 	{
 		auto const alloc_info = vk::CommandBufferAllocateInfo {
@@ -113,7 +67,7 @@ public:
 		cmd.end();
 
 		vk::SubmitInfo submit_info { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
-		queues.graphics.submit(submit_info, immediate_fence);
+		queues.get_graphics().submit(submit_info, immediate_fence);
 
 		assert_false(device.waitForFences(immediate_fence, true, UINT_MAX));
 		device.resetFences(immediate_fence);
@@ -146,11 +100,6 @@ public:
 	inline auto get_cmd_pool(u32 const frame_index, u32 const thread_index = 0) const
 	{
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
-	}
-
-	inline auto get_descriptor_pool()
-	{
-		return descriptor_pool;
 	}
 
 	inline auto get_layers() const
@@ -191,6 +140,11 @@ public:
 	inline auto get_allocator() const
 	{
 		return allocator;
+	}
+
+	inline auto *get_swapchain()
+	{
+		return &swapchain;
 	}
 
 	inline auto *get_descriptor_allocator()
@@ -255,17 +209,11 @@ private:
 
 	void create_device(vk::PhysicalDeviceFeatures physical_device_features);
 
-	void fetch_queues();
-
 	void create_memory_allocator();
-
-	void create_descriptor_allocator();
 
 	void create_command_pools();
 
-	void create_descriptor_pools();
-
-	auto create_queues_create_info() const -> vec<vk::DeviceQueueCreateInfo>;
+	auto calculate_swapchain_image_count() const -> u32;
 
 	auto has_layer(c_str layer) const -> bool;
 
@@ -300,8 +248,6 @@ private:
 
 	// @todo Move the damned threading stuff out of vkcontext!!
 	u32 num_threads = 1u;
-
-	vk::DescriptorPool descriptor_pool = {};
 
 	vec<vk::CommandPool> dynamic_cmd_pools = {};
 	vk::CommandPool immediate_cmd_pool = {};
