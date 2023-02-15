@@ -2,10 +2,13 @@
 
 <div align="center">
 <img src="https://github.com/Light7734/bindlessvk/raw/main/Branding/bindlessvk.svg"/>
+<br/>
 
-<i> "Nvidia, F*** You!" </i>
+<i>
+"Perfection is achieved, not when there is nothing left to add but when there is nothing left to take away..."
 
--Linus Torvalds
+-Antoine de St. Exupery, Wind, Sand, and Stars, 1939
+</i>
 </div>
 
 ## What's all this?
