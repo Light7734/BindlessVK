@@ -88,11 +88,29 @@ public:
 	}
 
 	template<typename T>
-	inline void set_object_name(T object, c_str name) const
+	inline void set_object_name(T object, str name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.objectType,
 		    (u64)((typename T::NativeType)(object)),
+		    name.c_str(),
+		});
+	}
+
+	inline void set_object_name(AllocatedImage object, c_str name) const
+	{
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    object.image.objectType,
+		    (u64)((VkImage)(object.image)),
+		    name,
+		});
+	}
+
+	inline void set_object_name(AllocatedDescriptorSet object, c_str name) const
+	{
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    object.descriptor_set.objectType,
+		    (u64)((VkDescriptorSet)(object.descriptor_set)),
 		    name,
 		});
 	}

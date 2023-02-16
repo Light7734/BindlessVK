@@ -59,15 +59,15 @@ BraceWrapping:
 
 # Indentation
 UseTab: ForIndentation
-TabWidth: '2'
-IndentWidth: '2'
-ContinuationIndentWidth: '2'
-ConstructorInitializerIndentWidth: '2'
+TabWidth: '4'
+IndentWidth: '4'
+ContinuationIndentWidth: '4'
+ConstructorInitializerIndentWidth: '4'
 IndentCaseLabels: 'false'
 IndentWrappedFunctionNames: 'true'
 IndentPPDirectives: BeforeHash
 NamespaceIndentation: None
-AccessModifierOffset: '-2'
+AccessModifierOffset: '-4'
 
 # Space
 SpaceAfterCStyleCast: 'false'

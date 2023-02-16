@@ -67,8 +67,8 @@ struct Texture
 		vk::PipelineStageFlags dstStage;
 
 		// Undefined -> TRANSFER DST
-		if (current_layout == vk::ImageLayout::eUndefined
-		    && new_layout == vk::ImageLayout::eTransferDstOptimal)
+		if (current_layout == vk::ImageLayout::eUndefined &&
+		    new_layout == vk::ImageLayout::eTransferDstOptimal)
 		{
 			imageMemBarrier.srcAccessMask = {};
 			imageMemBarrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;

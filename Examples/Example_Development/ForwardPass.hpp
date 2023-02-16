@@ -3,20 +3,23 @@
 #include "BindlessVk/RenderPass.hpp"
 #include "Framework/Scene/Scene.hpp"
 
-using u32 = u32;
+constexpr u32 frame_data_buffer_index = 0;
+constexpr u32 scene_data_buffer_index = 1;
 
 inline void forward_pass_update(
-  bvk::VkContext *const vk_context,
-  bvk::RenderGraph *const render_graph,
-  bvk::Renderpass *const render_pass,
-  u32 const frame_index,
-  void *const user_pointer
+    bvk::VkContext *const vk_context,
+    bvk::RenderGraph *const render_graph,
+    bvk::Renderpass *const render_pass,
+    u32 const frame_index,
+    void *const user_pointer
 )
 {
 	auto const device = vk_context->get_device();
 	auto const descriptor_set = render_pass->descriptor_sets[frame_index];
 
 	auto const *const scene = reinterpret_cast<Scene const *>(user_pointer);
+
+	auto &buffer = render_pass->buffer_inputs[frame_data_buffer_index];
 
 	// @todo: don't update every frame
 	auto const renderables = scene->view<const StaticMeshRendererComponent>();
@@ -35,38 +38,38 @@ inline void forward_pass_update(
 
 				auto const *const albedo_texture = &model->textures[albedo_texture_index];
 				auto const *const normal_texture = &model->textures[normal_texture_index];
-				auto const *const metallic_roughness_texture = &model->textures
-				                                                  [metallic_roughness_texture_index];
+				auto const *const metallic_roughness_texture
+				    = &model->textures[metallic_roughness_texture_index];
 
 				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				  descriptor_set,
-				  0ul,
-				  albedo_texture_index,
-				  1ul,
-				  vk::DescriptorType::eCombinedImageSampler,
-				  &albedo_texture->descriptor_info,
-				  nullptr,
-				  nullptr,
+				    descriptor_set,
+				    0ul,
+				    albedo_texture_index,
+				    1ul,
+				    vk::DescriptorType::eCombinedImageSampler,
+				    &albedo_texture->descriptor_info,
+				    nullptr,
+				    nullptr,
 				});
 				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				  descriptor_set,
-				  0ul,
-				  metallic_roughness_texture_index,
-				  1ul,
-				  vk::DescriptorType::eCombinedImageSampler,
-				  &metallic_roughness_texture->descriptor_info,
-				  nullptr,
-				  nullptr,
+				    descriptor_set,
+				    0ul,
+				    metallic_roughness_texture_index,
+				    1ul,
+				    vk::DescriptorType::eCombinedImageSampler,
+				    &metallic_roughness_texture->descriptor_info,
+				    nullptr,
+				    nullptr,
 				});
 				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				  descriptor_set,
-				  0ul,
-				  normal_texture_index,
-				  1ul,
-				  vk::DescriptorType::eCombinedImageSampler,
-				  &normal_texture->descriptor_info,
-				  nullptr,
-				  nullptr,
+				    descriptor_set,
+				    0ul,
+				    normal_texture_index,
+				    1ul,
+				    vk::DescriptorType::eCombinedImageSampler,
+				    &normal_texture->descriptor_info,
+				    nullptr,
+				    nullptr,
 				});
 			};
 		}
@@ -86,22 +89,29 @@ inline void draw_model(bvk::Model const *const model, vk::CommandBuffer const cm
 
 	for (auto const *node : model->nodes) {
 		for (auto const &primitive : node->mesh) {
-			u32 texture_index = model->material_parameters[primitive.material_index].albedo_texture_index;
+			u32 texture_index = model->material_parameters[primitive.material_index]
+			                        .albedo_texture_index;
 
 			// @todo: fix this hack
-			cmd.drawIndexed(primitive.index_count, 1ull, primitive.first_index, 0ull, texture_index);
+			cmd.drawIndexed(
+			    primitive.index_count,
+			    1ull,
+			    primitive.first_index,
+			    0ull,
+			    texture_index
+			);
 		}
 	}
 }
 
 inline void forward_pass_render(
-  bvk::VkContext *const vk_context,
-  bvk::RenderGraph *const render_graph,
-  bvk::Renderpass *const render_pass,
-  vk::CommandBuffer const cmd,
-  u32 const frame_index,
-  u32 const image_index,
-  void *const user_pointer
+    bvk::VkContext *const vk_context,
+    bvk::RenderGraph *const render_graph,
+    bvk::Renderpass *const render_pass,
+    vk::CommandBuffer const cmd,
+    u32 const frame_index,
+    u32 const image_index,
+    void *const user_pointer
 )
 {
 	auto const device = vk_context->get_device();
@@ -123,19 +133,19 @@ inline void forward_pass_render(
 			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 
 			// set dynamic states
-			cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, surface.framebuffer_extent } });
+			cmd.setScissor(0, { vk::Rect2D { { 0, 0 }, surface.get_framebuffer_extent() } });
 			cmd.setViewport(
-			  0,
-			  {
-			    vk::Viewport {
-			      0.0f,
-			      0.0f,
-			      static_cast<f32>(surface.framebuffer_extent.width),
-			      static_cast<f32>(surface.framebuffer_extent.height),
-			      0.0f,
-			      1.0f,
-			    },
-			  }
+			    0,
+			    {
+			        vk::Viewport {
+			            0.0f,
+			            0.0f,
+			            static_cast<f32>(surface.get_framebuffer_extent().width),
+			            static_cast<f32>(surface.get_framebuffer_extent().height),
+			            0.0f,
+			            1.0f,
+			        },
+			    }
 			);
 		}
 

@@ -25,7 +25,7 @@ auto Queues::get_create_infos() -> vec<vk::DeviceQueueCreateInfo>
 		{ {}, graphics_index, queue_priority },
 	};
 
-	if (have_same_index())
+	if (!have_same_index())
 		create_info.push_back({ {}, present_index, queue_priority });
 
 	return create_info;

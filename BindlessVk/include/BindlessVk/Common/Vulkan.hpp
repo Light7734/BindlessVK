@@ -28,11 +28,12 @@ struct AllocatedImage
 	{
 	}
 
-	inline operator vk::Image()
+	inline operator vk::Image() const
 	{
 		return image;
 	}
-	inline operator vma::Allocation()
+
+	inline operator vma::Allocation() const
 	{
 		return allocation;
 	}

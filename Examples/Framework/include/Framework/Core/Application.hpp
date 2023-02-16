@@ -36,7 +36,7 @@ public:
 
 	ref<bvk::VkContext> vk_context = {};
 	scope<bvk::Renderer> renderer = {};
-	scope<bvk::RenderGraph> render_graph = {};
+	bvk::RenderGraph render_graph = {};
 
 	bvk::TextureLoader texture_loader = {};
 	bvk::ModelLoader model_loader = {};
@@ -58,7 +58,6 @@ private:
 	void create_user_interface();
 	void create_loaders();
 	void create_renderer();
-	void create_render_graph();
 
 	void load_default_textures();
 

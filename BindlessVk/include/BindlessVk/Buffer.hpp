@@ -19,6 +19,28 @@ public:
 	    u32 block_count
 	);
 
+	Buffer(Buffer &&other) noexcept
+	{
+		*this = std::move(other);
+	}
+
+	Buffer &operator=(Buffer &&other) noexcept
+	{
+		this->vk_context = other.vk_context;
+		this->buffer = other.buffer;
+		this->whole_size = other.whole_size;
+		this->valid_block_size = other.valid_block_size;
+		this->block_count = other.block_count;
+		this->descriptor_info = other.descriptor_info;
+
+		other.vk_context = nullptr;
+
+		return *this;
+	}
+
+	Buffer(Buffer const &other) = delete;
+	Buffer &operator=(Buffer const &other) = delete;
+
 	~Buffer();
 
 	void write_data(void const *src_data, usize src_data_size, u32 block_index);
@@ -73,9 +95,9 @@ private:
 
 	vk::DeviceSize whole_size = {};
 	vk::DeviceSize block_size = {};
-	vk::DeviceSize const valid_block_size = {};
+	vk::DeviceSize valid_block_size = {};
 
-	u32 const block_count = {};
+	u32 block_count = {};
 
 	vk::DescriptorBufferInfo descriptor_info = {};
 };

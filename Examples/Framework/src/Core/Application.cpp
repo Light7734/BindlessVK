@@ -14,7 +14,6 @@ Application::Application()
 	create_descriptor_pool();
 
 	create_renderer();
-	create_render_graph();
 
 	create_user_interface();
 
@@ -34,7 +33,6 @@ Application::~Application()
 
 	// @todo: fix this by making a class that encapsulates descriptor_pool(s) and keep it alive
 	// using smart pointers :)
-	render_graph.reset();
 	destroy_descriptor_pool();
 }
 
@@ -43,15 +41,15 @@ void Application::create_window()
 	using WindowHints = vec<pair<int, int>>;
 
 	window.init(
-	  WindowSpecs {
-	    "BindlessVk",
-	    1920u,
-	    1080u,
-	  },
-	  WindowHints {
-	    { GLFW_CLIENT_API, GLFW_NO_API },
-	    { GLFW_FLOATING, GLFW_TRUE },
-	  }
+	    WindowSpecs {
+	        "BindlessVk",
+	        1920u,
+	        1080u,
+	    },
+	    WindowHints {
+	        { GLFW_CLIENT_API, GLFW_NO_API },
+	        { GLFW_FLOATING, GLFW_TRUE },
+	    }
 	);
 }
 
@@ -63,36 +61,36 @@ void Application::create_vk_context()
 	auto const device_extensions = get_device_extensions();
 
 	vk_context = std::make_shared<bvk::VkContext>(
-	  layers,
-	  instance_extensions,
-	  device_extensions,
-	  physical_device_features,
+	    layers,
+	    instance_extensions,
+	    device_extensions,
+	    physical_device_features,
 
-	  [&](vk::Instance instance) { return window.create_surface(instance); },
-	  [&]() { return window.get_framebuffer_size(); },
-	  [](vec<bvk::Gpu> const gpus) {
-		  for (auto const &gpu : gpus) {
-			  if (gpu.get_properties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				  return gpu;
-		  }
+	    [&](vk::Instance instance) { return window.create_surface(instance); },
+	    [&]() { return window.get_framebuffer_size(); },
+	    [](vec<bvk::Gpu> const gpus) {
+		    for (auto const &gpu : gpus) {
+			    if (gpu.get_properties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+				    return gpu;
+		    }
 
-		  return gpus[0];
-	  },
+		    return gpus[0];
+	    },
 
-	  vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-	    | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+	    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+	        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+	        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+	        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
 
-	  vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
-	    | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-	    | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
-	    | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding,
+	    vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
+	        | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+	        | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
+	        | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding,
 
-	  pair<fn<void(bvk::DebugCallbackSource, bvk::LogLvl, const str &, std::any)>, std::any> {
-	    &Logger::bindlessvk_callback,
-	    std::make_any<Logger const *const>(&logger),
-	  }
+	    pair<fn<void(bvk::DebugCallbackSource, bvk::LogLvl, const str &, std::any)>, std::any> {
+	        &Logger::bindlessvk_callback,
+	        std::make_any<Logger const *const>(&logger),
+	    }
 	);
 }
 void Application::create_descriptor_pool()
@@ -114,24 +112,15 @@ void Application::create_descriptor_pool()
 	};
 
 	descriptor_pool = device.createDescriptorPool(vk::DescriptorPoolCreateInfo {
-	  {},
-	  100,
-	  pool_sizes,
+	    {},
+	    100,
+	    pool_sizes,
 	});
 }
 
 void Application::create_renderer()
 {
 	renderer = std::make_unique<bvk::Renderer>(vk_context);
-}
-
-void Application::create_render_graph()
-{
-	render_graph = std::make_unique<bvk::RenderGraph>(
-	  vk_context.get(),
-	  renderer->get_swapchain_images(),
-	  renderer->get_swapchain_image_views()
-	);
 }
 
 void Application::create_user_interface()
@@ -144,28 +133,27 @@ void Application::create_user_interface()
 		vk_context->get_instance(),
 		vk_context->get_gpu(),
 		vk_context->get_device(),
-		vk_context->get_queues().graphics_index,
-		vk_context->get_queues().graphics,
+		vk_context->get_queues().get_graphics_index(),
+		vk_context->get_queues().get_graphics(),
 		{},
 		descriptor_pool,
 		{},
 		true,
-		static_cast<VkFormat>(vk_context->get_surface().color_format),
+		static_cast<VkFormat>(vk_context->get_surface().get_color_format()),
 		BVK_MAX_FRAMES_IN_FLIGHT,
 		BVK_MAX_FRAMES_IN_FLIGHT,
 		static_cast<VkSampleCountFlagBits>(vk_context->get_gpu().get_max_color_and_depth_samples()),
 	};
 
-
 	assert_true(
-	  ImGui_ImplVulkan_LoadFunctions(
-	    [](c_str proc_name, void *data) {
-		    auto const vk_context = reinterpret_cast<bvk::VkContext *>(data);
-		    return vk_context->get_instance_proc_addr(proc_name);
-	    },
-	    (void *)vk_context.get()
-	  ),
-	  "ImGui failed to load vulkan functions"
+	    ImGui_ImplVulkan_LoadFunctions(
+	        [](c_str proc_name, void *data) {
+		        auto const vk_context = reinterpret_cast<bvk::VkContext *>(data);
+		        return vk_context->get_instance_proc_addr(proc_name);
+	        },
+	        (void *)vk_context.get()
+	    ),
+	    "ImGui failed to load vulkan functions"
 	);
 
 	ImGui_ImplVulkan_Init(&imgui_info, VK_NULL_HANDLE);
@@ -192,20 +180,20 @@ void Application::load_default_textures()
 {
 	u8 defaultTexturePixelData[] = { 255, 0, 255, 255 };
 	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
-	  "default_2d",
-	  defaultTexturePixelData,
-	  1,
-	  1,
-	  sizeof(defaultTexturePixelData),
-	  bvk::Texture::Type::e2D,
-	  staging_pool.get_by_index(0)
+	    "default_2d",
+	    defaultTexturePixelData,
+	    1,
+	    1,
+	    sizeof(defaultTexturePixelData),
+	    bvk::Texture::Type::e2D,
+	    staging_pool.get_by_index(0)
 	);
 
 	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
-	  "default_cube",
-	  "Assets/cubemap_yokohama_rgba.ktx",
-	  bvk::Texture::Type::eCubeMap,
-	  staging_pool.get_by_index(0)
+	    "default_cube",
+	    "Assets/cubemap_yokohama_rgba.ktx",
+	    bvk::Texture::Type::eCubeMap,
+	    staging_pool.get_by_index(0)
 	);
 }
 

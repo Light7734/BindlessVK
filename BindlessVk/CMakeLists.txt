@@ -10,9 +10,11 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Swapchain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Surface.cpp
 
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderResources.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoaders/GltfLoader.cpp
