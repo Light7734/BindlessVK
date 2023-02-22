@@ -5,11 +5,13 @@
 namespace BINDLESSVK_NAMESPACE {
 
 ShaderEffect::ShaderEffect(
-    VkContext *vk_context,
-    vec<Shader *> shaders,
-    ShaderEffect::Configuration configuration
+    VkContext *const vk_context,
+    vec<Shader *> const &shaders,
+    ShaderEffect::Configuration const configuration,
+    c_str const debug_name /* = "" */
 )
     : vk_context(vk_context)
+    , debug_name(debug_name)
 {
 	create_descriptor_sets_layout(shaders);
 
@@ -23,6 +25,10 @@ ShaderEffect::ShaderEffect(
 	    static_cast<u32>(descriptor_sets_layout.size()),
 	    descriptor_sets_layout.data(),
 	});
+	vk_context->set_object_name(
+	    pipeline_layout,
+	    fmt::format("{}_pipeline_layout", this->debug_name)
+	);
 
 	const auto pipeline_rendering_info = vk::PipelineRenderingCreateInfo {
 		{},
@@ -36,6 +42,8 @@ ShaderEffect::ShaderEffect(
 	    pipeline_rendering_info,
 	    configuration
 	);
+
+	vk_context->set_object_name(pipeline, fmt::format("{}_pipeline", this->debug_name));
 }
 
 ShaderEffect::ShaderEffect(ShaderEffect &&effect)
@@ -71,29 +79,35 @@ ShaderEffect::~ShaderEffect()
 	}
 }
 
-void ShaderEffect::create_descriptor_sets_layout(vec<Shader *> shaders)
+void ShaderEffect::create_descriptor_sets_layout(vec<Shader *> const &shaders)
 {
 	const auto device = vk_context->get_device();
 	const auto sets_bindings = combine_descriptor_sets_bindings(shaders);
 
 	for (u32 i = 0u; const auto &set_bindings : sets_bindings)
 	{
-		descriptor_sets_layout[i++] =
+		descriptor_sets_layout[i] =
 		    device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
 		        {},
 		        static_cast<u32>(set_bindings.size()),
 		        set_bindings.data(),
 		    });
+		vk_context->set_object_name(
+		    descriptor_sets_layout[i],
+		    fmt::format("{}_descriptor_set_layout_{}", debug_name, i)
+		);
+
+		i++;
 	}
 }
 
 arr<vec<vk::DescriptorSetLayoutBinding>, 2> ShaderEffect::combine_descriptor_sets_bindings(
-    vec<Shader *> shaders
+    vec<Shader *> const &shaders
 )
 {
 	auto combined_bindings = arr<vec<vk::DescriptorSetLayoutBinding>, 2> {};
 
-	for (const auto &shader : shaders)
+	for (Shader *const shader : shaders)
 	{
 		for (u32 i = 0; const auto &descriptor_set_bindings : shader->descriptor_sets_bindings)
 		{

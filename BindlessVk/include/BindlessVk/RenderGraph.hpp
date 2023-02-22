@@ -31,7 +31,6 @@ struct RenderGraph
 	vk::DebugUtilsLabelEXT present_barriers_label;
 };
 
-
 /**
  * @todo use vk_context->set_object_name
  * @todo: Validate graph before build
@@ -50,12 +49,6 @@ public:
 	inline auto set_resources(RenderResources *resources) -> RenderGraphBuilder &
 	{
 		this->resources = resources;
-		return *this;
-	}
-
-	inline auto set_backbuffer_attachment_key(u64 key) -> RenderGraphBuilder &
-	{
-		this->backbuffer_attachment_key = key;
 		return *this;
 	}
 

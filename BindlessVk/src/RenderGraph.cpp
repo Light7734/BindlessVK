@@ -3,11 +3,13 @@
 #include "BindlessVk/Texture.hpp"
 
 #include <fmt/format.h>
+#include <ranges>
 
 namespace BINDLESSVK_NAMESPACE {
 
 auto RenderGraphBuilder::build() -> RenderGraph
 {
+	backbuffer_attachment_key = pass_blueprints.back().color_attachments.back().hash;
 	resources->add_key_to_attachment_index(backbuffer_attachment_key, 0);
 
 	graph.passes.resize(pass_blueprints.size());
@@ -16,9 +18,10 @@ auto RenderGraphBuilder::build() -> RenderGraph
 	build_graph_input_descriptors();
 	initialize_graph_input_descriptors();
 
-	for (u32 i = 0; auto const &blueprint : pass_blueprints)
+	for (u32 i = pass_blueprints.size(); i-- > 0;)
 	{
-		auto &pass = graph.passes[i++];
+		auto const &blueprint = pass_blueprints[i];
+		auto &pass = graph.passes[i];
 
 		pass.name = blueprint.name;
 		pass.on_update = blueprint.update_fn;
@@ -79,7 +82,16 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 		);
 
 	graph.descriptor_set_layout = device.createDescriptorSetLayout({ {}, bindings });
+	vk_context->set_object_name(
+	    graph.descriptor_set_layout,
+	    fmt::format("graph_descriptor_set_layout").c_str()
+	);
+
 	graph.pipeline_layout = device.createPipelineLayout({ {}, graph.descriptor_set_layout });
+	vk_context->set_object_name(
+	    graph.pipeline_layout,
+	    fmt::format("graph_pipeline_layout").c_str()
+	);
 
 	if (!bindings.empty())
 	{
@@ -92,7 +104,7 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 
 			vk_context->set_object_name(
 			    graph.descriptor_sets.back(),
-			    fmt::format("render_graph_descriptor_set_{}", i).c_str()
+			    fmt::format("graph_descriptor_set_{}", i).c_str()
 			);
 		}
 	}
@@ -156,25 +168,51 @@ void RenderGraphBuilder::build_pass_color_attachments(
 		attachment.store_op = vk::AttachmentStoreOp::eStore;
 		attachment.clear_value = blueprint_attachment.clear_value;
 
-		auto const has_input = !blueprint_attachment.input.empty();
+		auto const has_input = !!blueprint_attachment.input_hash;
 		attachment.load_op = has_input ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear;
 
 		attachment.resource_index =
-		    resources->try_get_attachment_index(hash_str(blueprint_attachment.name.c_str()));
+		    resources->try_get_attachment_index(blueprint_attachment.hash);
 
 		if (attachment.resource_index == std::numeric_limits<u32>::max())
 		{
 			resources->create_color_attachment(blueprint_attachment, pass.sample_count);
+
 			attachment.resource_index =
-			    resources->try_get_attachment_index(hash_str(blueprint_attachment.name.c_str()));
+			    resources->try_get_attachment_index(blueprint_attachment.hash);
+
 			assert_false(attachment.resource_index == std::numeric_limits<u32>::max());
 		}
 		else
-		{
 			resources->add_key_to_attachment_index(
-			    attachment.resource_index,
-			    hash_str(blueprint_attachment.input.c_str())
+			    blueprint_attachment.input_hash,
+			    attachment.resource_index
 			);
+
+		if (pass.is_multisampled())
+		{
+			attachment.transient_resolve_moode = vk::ResolveModeFlagBits::eAverage;
+
+			attachment.transient_resource_index =
+			    resources->try_get_suitable_transient_attachment_index(
+			        blueprint_attachment,
+			        pass.sample_count
+			    );
+
+			if (attachment.transient_resource_index == std::numeric_limits<u32>::max())
+			{
+				resources->create_transient_attachment(blueprint_attachment, pass.sample_count);
+
+				attachment.transient_resource_index =
+				    resources->try_get_suitable_transient_attachment_index(
+				        blueprint_attachment,
+				        pass.sample_count
+				    );
+
+				assert_false(
+				    attachment.transient_resource_index == std::numeric_limits<u32>::max()
+				);
+			}
 		}
 	}
 }
@@ -201,30 +239,27 @@ void RenderGraphBuilder::build_pass_depth_attachment(
 		vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, 0, 1, 0, 1,
 	};
 
-	auto const has_input = !blueprint_attachment.input.empty();
+	auto const has_input = !!blueprint_attachment.input_hash;
 	attachment.load_op = has_input ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear;
 	attachment.store_op = vk::AttachmentStoreOp::eStore;
+	attachment.clear_value = blueprint_attachment.clear_value;
 
-	attachment.resource_index =
-	    resources->try_get_attachment_index(hash_str(blueprint_attachment.name.c_str()));
+	attachment.resource_index = resources->try_get_attachment_index(blueprint_attachment.hash);
 
 	if (attachment.resource_index == std::numeric_limits<u32>::max())
 	{
 		resources->create_depth_attachment(blueprint_attachment, pass.sample_count);
-		attachment.resource_index =
-		    resources->try_get_attachment_index(hash_str(blueprint_attachment.name.c_str()));
+
+		attachment.resource_index = resources->try_get_attachment_index(blueprint_attachment.hash);
+
 		assert_false(attachment.resource_index == std::numeric_limits<u32>::max());
 	}
 
 	else
-	{
 		resources->add_key_to_attachment_index(
 		    attachment.resource_index,
-		    hash_str(blueprint_attachment.input.c_str())
+		    blueprint_attachment.input_hash
 		);
-	}
-
-	attachment.resource_index;
 }
 
 void RenderGraphBuilder::build_pass_buffer_inputs(
@@ -288,13 +323,23 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 		);
 
 	pass.descriptor_set_layout = device.createDescriptorSetLayout({ {}, bindings });
+	vk_context->set_object_name(
+	    pass.descriptor_set_layout,
+	    fmt::format("{}_descriptor_set_layout", pass.name).c_str()
+	);
 
 	auto const layouts = arr<vk::DescriptorSetLayout, 2> {
 		graph.descriptor_set_layout,
 		pass.descriptor_set_layout,
 	};
 
+	// @todo: for some reason, when I use vk_context->set_object_name things break...
 	pass.pipeline_layout = device.createPipelineLayout({ {}, layouts });
+	device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+	    pass.pipeline_layout.objectType,
+	    (u64)((VkPipelineLayout)(pass.pipeline_layout)),
+	    fmt::format("{}_pipeline_layout", pass.name).c_str(),
+	});
 
 	if (!bindings.empty())
 	{
@@ -405,7 +450,7 @@ void RenderGraphBuilder::build_pass_cmd_buffer_begin_infos(Renderpass &pass)
 
 auto RenderResources::calculate_attachment_image_extent(
     RenderpassBlueprint::Attachment const &blueprint_attachment
-) -> vk::Extent3D
+) const -> vk::Extent3D
 {
 	const auto surface = vk_context->get_surface();
 

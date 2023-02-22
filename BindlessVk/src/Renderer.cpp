@@ -28,6 +28,7 @@ void Renderer::render_graph(RenderGraph *const graph, void *const user_data)
 	device.resetCommandPool(vk_context->get_cmd_pool(frame_index));
 	auto const cmd = cmd_buffers[frame_index];
 
+
 	graph->on_update(vk_context.get(), graph, frame_index, user_data);
 	for (u32 i = 0; i < graph->passes.size(); ++i)
 		update_pass(graph, &graph->passes[i], user_data);
@@ -36,9 +37,11 @@ void Renderer::render_graph(RenderGraph *const graph, void *const user_data)
 
 	for (u32 i = 0; i < graph->passes.size(); ++i)
 	{
-		auto const pass_rendering_info = apply_pass_barriers(&graph->passes[i], image_index);
+		dynamic_pass_info[frame_index].color_attachments.clear();
+		dynamic_pass_info[frame_index].depth_attachment = vk::RenderingAttachmentInfo {};
+		apply_pass_barriers(&graph->passes[i], image_index);
 
-		cmd.beginRendering(pass_rendering_info);
+		cmd.beginRendering(dynamic_pass_info[frame_index]);
 		render_pass(graph, &graph->passes[i], user_data, image_index);
 		cmd.endRendering();
 	}
@@ -48,6 +51,8 @@ void Renderer::render_graph(RenderGraph *const graph, void *const user_data)
 	submit_queue();
 	present_frame(image_index);
 
+	reset_used_attachment_states();
+
 	frame_index = (frame_index + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
 }
 
@@ -56,14 +61,13 @@ void Renderer::update_pass(RenderGraph *const graph, Renderpass *const pass, voi
 	pass->on_update(vk_context.get(), graph, pass, frame_index, user_data);
 }
 
-auto Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index) -> DynamicPassInfo
+void Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index)
 {
 	auto const &queues = vk_context->get_queues();
 	auto const &surface = vk_context->get_surface();
 	auto const cmd = cmd_buffers[frame_index];
 
 	cmd.beginDebugUtilsLabelEXT(pass->barrier_label);
-	DynamicPassInfo dynamic_pass_info;
 	for (auto &attachment_slot : pass->attachments)
 	{
 		auto *const attachment_container =
@@ -72,8 +76,15 @@ auto Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index) -> Dynamic
 		auto *const attachment =
 		    resources.get_attachment(attachment_slot.resource_index, image_index, frame_index);
 
-		if (attachment->access_mask != attachment_slot.access_mask &&
-		    attachment->stage_mask != attachment_slot.stage_mask &&
+
+		used_attachment_indices.push_back({
+		    attachment_slot.resource_index,
+		    image_index,
+		    frame_index,
+		});
+
+		if (attachment->access_mask != attachment_slot.access_mask ||
+		    attachment->stage_mask != attachment_slot.stage_mask ||
 		    attachment->image_layout != attachment_slot.image_layout)
 		{
 			cmd.pipelineBarrier(
@@ -99,76 +110,85 @@ auto Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index) -> Dynamic
 			attachment->image_layout = attachment_slot.image_layout;
 		}
 
+
 		auto rendering_attachment_info = vk::RenderingAttachmentInfo {};
-		if (pass->is_multisampled())
+		if (attachment_slot.is_color_attachment())
 		{
-			if (attachment_slot.is_color_attachment())
-				dynamic_pass_info.color_attachments.emplace_back(vk::RenderingAttachmentInfo {
-				    attachment_container->ms_attachment.image_view,
-				    attachment_slot.image_layout,
-				    attachment_container->ms_resolve_mode,
-				    attachment->image_view,
-				    attachment_slot.image_layout,
-				    attachment_slot.load_op,
-				    attachment_slot.store_op,
-				    attachment_slot.clear_value,
-				});
-			else
-				dynamic_pass_info.depth_attachment = vk::RenderingAttachmentInfo {
-					attachment->image_view,
-					attachment->image_layout,
-					vk::ResolveModeFlagBits::eNone,
-					{},
-					{},
-					attachment_slot.load_op,
-					attachment_slot.store_op,
-					attachment_slot.clear_value,
-				};
+			auto const transient_attachment =
+			    resources.get_transient_attachment(attachment_slot.transient_resource_index);
+
+			dynamic_pass_info[frame_index].color_attachments.emplace_back(
+			    vk::RenderingAttachmentInfo {
+			        transient_attachment.image_view,
+			        attachment->image_layout,
+			        attachment_slot.transient_resolve_moode,
+			        attachment->image_view,
+			        attachment_slot.image_layout,
+			        attachment_slot.load_op,
+			        attachment_slot.store_op,
+			        attachment_slot.clear_value,
+			    }
+			);
 		}
 		else
 		{
-			if (attachment_slot.is_color_attachment())
-				dynamic_pass_info.color_attachments.emplace_back(vk::RenderingAttachmentInfo {
-				    attachment->image_view,
-				    attachment->image_layout,
-				    vk::ResolveModeFlagBits::eNone,
-				    {},
-				    {},
-				    attachment_slot.load_op,
-				    attachment_slot.store_op,
-				    attachment_slot.clear_value,
-				});
-			else
-				dynamic_pass_info.depth_attachment = vk::RenderingAttachmentInfo {
-					attachment->image_view,
-					attachment->image_layout,
-					vk::ResolveModeFlagBits::eNone,
-					{},
-					{},
-					attachment_slot.load_op,
-					attachment_slot.store_op,
-					attachment_slot.clear_value,
-				};
+			dynamic_pass_info[frame_index].depth_attachment = vk::RenderingAttachmentInfo {
+				attachment->image_view,
+				attachment->image_layout,
+				vk::ResolveModeFlagBits::eNone,
+				{},
+				{},
+				attachment_slot.load_op,
+				attachment_slot.store_op,
+				attachment_slot.clear_value,
+			};
 		}
-
-		dynamic_pass_info.rendering_info = vk::RenderingInfo {
-			{},
-			vk::Rect2D {
-			    { 0, 0 },
-			    surface.get_framebuffer_extent(),
-			},
-			1,
-			{},
-			static_cast<u32>(dynamic_pass_info.color_attachments.size()),
-			dynamic_pass_info.color_attachments.data(),
-			dynamic_pass_info.depth_attachment.imageView ? &dynamic_pass_info.depth_attachment :
-			                                               nullptr,
-			{},
-		};
+		// }
+		// else
+		// {
+		// 	if (attachment_slot.is_color_attachment())
+		// 		dynamic_pass_info[frame_index].color_attachments.emplace_back(
+		// 		    vk::RenderingAttachmentInfo {
+		// 		        attachment->image_view,
+		// 		        attachment->image_layout,
+		// 		        vk::ResolveModeFlagBits::eNone,
+		// 		        {},
+		// 		        {},
+		// 		        attachment_slot.load_op,
+		// 		        attachment_slot.store_op,
+		// 		        attachment_slot.clear_value,
+		// 		    }
+		// 		);
+		// 	else
+		// 		dynamic_pass_info[frame_index].depth_attachment = vk::RenderingAttachmentInfo {
+		// 			attachment->image_view,
+		// 			attachment->image_layout,
+		// 			vk::ResolveModeFlagBits::eNone,
+		// 			{},
+		// 			{},
+		// 			attachment_slot.load_op,
+		// 			attachment_slot.store_op,
+		// 			attachment_slot.clear_value,
+		// 		};
+		// }
 	}
-	cmd.endDebugUtilsLabelEXT();
 
-	return dynamic_pass_info;
+	dynamic_pass_info[frame_index].rendering_info = vk::RenderingInfo {
+		{},
+		vk::Rect2D {
+		    { 0, 0 },
+		    surface.get_framebuffer_extent(),
+		},
+		1,
+		{},
+		static_cast<u32>(dynamic_pass_info[frame_index].color_attachments.size()),
+		dynamic_pass_info[frame_index].color_attachments.data(),
+		dynamic_pass_info[frame_index].depth_attachment.imageView ?
+		    &dynamic_pass_info[frame_index].depth_attachment :
+		    nullptr,
+		{},
+	};
+	cmd.endDebugUtilsLabelEXT();
 }
 
 void Renderer::apply_present_barriers(RenderGraph *const graph, u32 const image_index)
@@ -176,21 +196,23 @@ void Renderer::apply_present_barriers(RenderGraph *const graph, u32 const image_
 	auto const cmd = cmd_buffers[frame_index];
 	cmd.beginDebugUtilsLabelEXT(graph->present_barriers_label);
 
-	auto *backbuffer = resources.get_backbuffer_attachment(image_index);
+	auto *const backbuffer_container = resources.get_attachment_container(0);
+	auto *const backbuffer_attachment = backbuffer_container->get_attachment(image_index, 0);
+
 	cmd.pipelineBarrier(
-	    backbuffer->stage_mask,
+	    backbuffer_attachment->stage_mask,
 	    vk::PipelineStageFlagBits::eBottomOfPipe,
 	    {},
 	    {},
 	    {},
 	    vk::ImageMemoryBarrier {
-	        backbuffer->access_mask,
+	        backbuffer_attachment->access_mask,
 	        {},
-	        backbuffer->image_layout,
+	        backbuffer_attachment->image_layout,
 	        vk::ImageLayout::ePresentSrcKHR,
 	        {},
 	        {},
-	        backbuffer->image,
+	        backbuffer_attachment->image,
 	        vk::ImageSubresourceRange {
 	            vk::ImageAspectFlagBits::eColor,
 	            0,
@@ -201,9 +223,9 @@ void Renderer::apply_present_barriers(RenderGraph *const graph, u32 const image_
 	    }
 	);
 
-	backbuffer->stage_mask = vk::PipelineStageFlagBits::eTopOfPipe;
-	backbuffer->image_layout = vk::ImageLayout::ePresentSrcKHR;
-	backbuffer->access_mask = {};
+	backbuffer_attachment->stage_mask = vk::PipelineStageFlagBits::eTopOfPipe;
+	backbuffer_attachment->image_layout = vk::ImageLayout::eUndefined;
+	backbuffer_attachment->access_mask = {};
 
 	cmd.endDebugUtilsLabelEXT();
 }
@@ -331,18 +353,35 @@ void Renderer::present_frame(u32 const image_index)
 	}
 }
 
+void Renderer::reset_used_attachment_states()
+{
+	for (auto const &[container_index, image_index, frame_index] : used_attachment_indices)
+	{
+		auto *const container = resources.get_attachment_container(container_index);
+		auto *const attachment = container->get_attachment(image_index, frame_index);
+
+		attachment->access_mask = {};
+		attachment->image_layout = vk::ImageLayout::eUndefined;
+		attachment->stage_mask = vk::PipelineStageFlagBits::eTopOfPipe;
+	}
+}
+
 void Renderer::create_sync_objects()
 {
 	auto const device = vk_context->get_device();
 
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		render_fences[i] = device.createFence({
 		    vk::FenceCreateFlagBits::eSignaled,
 		});
+		vk_context->set_object_name(render_fences[i], fmt::format("render_fence_{}", i));
 
 		render_semaphores[i] = device.createSemaphore({});
+		vk_context->set_object_name(render_semaphores[i], fmt::format("render_semaphore_{}", i));
+
 		present_semaphores[i] = device.createSemaphore({});
+		vk_context->set_object_name(present_semaphores[i], fmt::format("present_semaphore_{}", i));
 	}
 }
 
@@ -369,6 +408,8 @@ void Renderer::allocate_cmd_buffers()
 		    vk::CommandBufferLevel::ePrimary,
 		    1u,
 		})[0]);
+
+		vk_context->set_object_name(cmd_buffers[i], fmt::format("renderer_cmd_buffer_{}", i));
 	}
 }
 
@@ -379,6 +420,8 @@ void Renderer::free_cmd_buffers()
 
 	for (auto cmd_buffer : cmd_buffers)
 		device.freeCommandBuffers(cmd_pool, cmd_buffer);
+
+	cmd_buffers.clear();
 }
 
 } // namespace BINDLESSVK_NAMESPACE

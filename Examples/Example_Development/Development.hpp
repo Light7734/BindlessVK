@@ -52,22 +52,6 @@ public:
 
 		if (swapchain->is_invalid()) {
 			assert_fail("swapchain-recreation is currently nuked");
-
-			// logger.log(spdlog::level::trace, "Swapchain invalidated");
-			//
-			// vk_context->update_surface_info();
-			//
-			// camera_controller.on_window_resize(
-			//     window.get_framebuffer_size().width,
-			//     window.get_framebuffer_size().height
-			// );
-			//
-			// load_materials();
-			//
-			// render_graph->on_swapchain_invalidated(
-			//     swapchain->get_images(),
-			//     swapchain->get_image_views()
-			// );
 		}
 	}
 
@@ -79,7 +63,7 @@ public:
 private:
 	void load_shaders()
 	{
-		c_str DIRECTORY = "Shaders/";
+		c_str constexpr DIRECTORY = "Shaders/";
 
 		for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY)) {
 			const str path(shader_file.path().c_str());
@@ -103,7 +87,8 @@ private:
 		        &shaders[hash_str("vertex")],
 		        &shaders[hash_str("pixel")],
 		    },
-		    shader_effect_configurations[hash_str("opaque_mesh")]
+		    shader_effect_configurations[hash_str("opaque_mesh")],
+		    "opaque_mesh"
 		);
 
 		shader_effects[hash_str("skybox")] = bvk::ShaderEffect(
@@ -112,7 +97,8 @@ private:
 		        &shaders[hash_str("skybox_vertex")],
 		        &shaders[hash_str("skybox_fragment")],
 		    },
-		    shader_effect_configurations[hash_str("skybox")]
+		    shader_effect_configurations[hash_str("skybox")],
+		    "skybox"
 		);
 	}
 
@@ -167,8 +153,8 @@ private:
 			    1.0,
 			},
 			vk::PipelineColorBlendStateCreateInfo {},
-			std::vector<vk::PipelineColorBlendAttachmentState> {
-			    {
+			vec<vk::PipelineColorBlendAttachmentState> {
+			    vk::PipelineColorBlendAttachmentState {
 			        VK_FALSE,
 			        vk::BlendFactor::eSrcAlpha,
 			        vk::BlendFactor::eOneMinusSrcAlpha,
@@ -180,7 +166,7 @@ private:
 			            | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
 			    },
 			},
-			std::vector<vk::DynamicState> {
+			vec<vk::DynamicState> {
 			    vk::DynamicState::eViewport,
 			    vk::DynamicState::eScissor,
 			},
@@ -235,8 +221,8 @@ private:
 			    1.0,
 			},
 			vk::PipelineColorBlendStateCreateInfo {},
-			std::vector<vk::PipelineColorBlendAttachmentState> {
-			    {
+			vec<vk::PipelineColorBlendAttachmentState> {
+			    vk::PipelineColorBlendAttachmentState {
 			        VK_FALSE,
 			        vk::BlendFactor::eSrcAlpha,
 			        vk::BlendFactor::eOneMinusSrcAlpha,
@@ -248,7 +234,7 @@ private:
 			            | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
 			    },
 			},
-			std::vector<vk::DynamicState> {
+			vec<vk::DynamicState> {
 			    vk::DynamicState::eViewport,
 			    vk::DynamicState::eScissor,
 			},
@@ -377,6 +363,9 @@ private:
 		auto const *const default_texture = &textures[hash_str("default_2d")];
 		auto const *const default_texture_cube = &textures[hash_str("default_cube")];
 
+		auto const color_output_hash = hash_str("forward_color_out");
+		auto const depth_attachment_hash = hash_str("forward_depth");
+
 		auto blueprint = bvk::RenderpassBlueprint {};
 		blueprint.set_name("forwardpass")
 		    .set_sample_count(sample_count)
@@ -385,23 +374,25 @@ private:
 		    .set_update_label({ "forwardpass_update", update_color })
 		    .set_render_label({ "forwardpass_render", render_color })
 		    .set_barrier_label({ "forwardpass_barrier", barrier_color })
-		    .add_color_attachment({
-		        "forwardpass",
+		    .add_color_output({
+		        color_output_hash,
+		        {},
+		        {},
 		        { 1.0, 1.0 },
 		        bvk::Renderpass::SizeType::eSwapchainRelative,
 		        color_format,
-		        "",
-		        "",
 		        vk::ClearColorValue { 0.3f, 0.5f, 0.8f, 1.0f },
+		        "forwardpass_depth",
 		    })
 		    .set_depth_attachment({
-		        "forward_depth",
+		        depth_attachment_hash,
+		        {},
+		        {},
 		        { 1.0, 1.0 },
 		        bvk::Renderpass::SizeType::eSwapchainRelative,
 		        depth_format,
-		        "",
-		        "",
 		        vk::ClearDepthStencilValue { 1.0, 0 },
+		        "forwardpass_depth",
 		    })
 		    .add_texture_input({
 		        "texture_2ds",
@@ -434,6 +425,9 @@ private:
 		auto const color_format = surface.get_color_format();
 		auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
 
+		auto const color_output_hash = hash_str("uipass_color_out");
+		auto const color_output_input_hash = hash_str("forward_color_out");
+
 		auto blueprint = bvk::RenderpassBlueprint {};
 		blueprint.set_name("uipass")
 		    .set_sample_count(sample_count)
@@ -442,12 +436,15 @@ private:
 		    .set_update_label({ "uipass_update", update_color })
 		    .set_render_label({ "uipass_render", render_color })
 		    .set_barrier_label({ "uipass_barrier", barrier_color })
-		    .add_color_attachment({
-		        "uipass_out",
+		    .add_color_output({
+		        color_output_hash,
+		        color_output_input_hash,
+		        {},
 		        { 1.0, 1.0 },
 		        bvk::Renderpass::SizeType::eSwapchainRelative,
 		        color_format,
-		        "forwardpass",
+		        {},
+		        "uipass_color",
 		    });
 
 		return blueprint;
@@ -462,13 +459,11 @@ private:
 		auto const ui_pass_blueprint = create_ui_pass_blueprint();
 
 		auto builder = bvk::RenderGraphBuilder { vk_context.get() };
+
 		builder.set_resources(renderer->get_resources())
-		    .set_backbuffer_attachment_key(hash_str("uipass_out"))
 		    .set_update_fn(&render_graph_update)
 		    .set_update_label({ "graph_update", update_color })
 		    .set_present_barriers_label({ "graph_present_barriers", present_color })
-		    .add_pass(forwrard_pass_blueprint)
-		    .add_pass(ui_pass_blueprint)
 		    .add_buffer_input({
 		        "frame_data",
 		        0,
@@ -486,7 +481,9 @@ private:
 		        vk::ShaderStageFlagBits::eVertex,
 		        sizeof(glm::vec4),
 		        nullptr,
-		    });
+		    })
+		    .add_pass(forwrard_pass_blueprint)
+		    .add_pass(ui_pass_blueprint);
 
 		render_graph = builder.build();
 	}

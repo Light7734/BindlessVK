@@ -25,7 +25,10 @@ struct Renderpass
 		vk::AttachmentLoadOp load_op;
 		vk::AttachmentStoreOp store_op;
 
+		vk::ResolveModeFlagBits transient_resolve_moode;
+
 		u32 resource_index;
+		u32 transient_resource_index;
 
 		vk::ClearValue clear_value;
 
@@ -90,20 +93,22 @@ private:
 public:
 	struct Attachment
 	{
-		str name;
+		u64 hash;
+		u64 input_hash;
+		u64 size_relative_hash;
+
 		pair<f32, f32> size;
 		Renderpass::SizeType size_type;
 		vk::Format format;
 
-		str input;
-		str size_relative_name;
-
 		vk::ClearValue clear_value;
 
+		str debug_name = "";
+
+		// @todo: return validity in a better way?
 		inline operator bool() const
 		{
-			// @todo: return validity in a better way?
-			return !name.empty();
+			return !!hash;
 		}
 	};
 
@@ -149,7 +154,7 @@ public:
 		return *this;
 	}
 
-	auto add_color_attachment(Attachment const attachment) -> RenderpassBlueprint &
+	auto add_color_output(Attachment const attachment) -> RenderpassBlueprint &
 	{
 		this->color_attachments.push_back(attachment);
 		return *this;
@@ -173,7 +178,7 @@ public:
 		return *this;
 	}
 
-	auto set_sample_count(vk::SampleCountFlagBits sample_count) -> RenderpassBlueprint&
+	auto set_sample_count(vk::SampleCountFlagBits sample_count) -> RenderpassBlueprint &
 	{
 		this->sample_count = sample_count;
 		return *this;

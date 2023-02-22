@@ -43,19 +43,20 @@ public:
 
 public:
 	ShaderEffect(
-	    VkContext* vk_context,
-	    vec<Shader*> shaders,
-	    ShaderEffect::Configuration configuration
+	    VkContext *vk_context,
+	    vec<Shader *> const &shaders,
+	    ShaderEffect::Configuration configuration,
+	    c_str debug_name = ""
 	);
 	~ShaderEffect();
 
-	ShaderEffect(ShaderEffect&&);
-	ShaderEffect& operator=(ShaderEffect&&);
+	ShaderEffect(ShaderEffect &&);
+	ShaderEffect &operator=(ShaderEffect &&);
 
 	ShaderEffect() = default;
-	ShaderEffect(const ShaderEffect&) = delete;
+	ShaderEffect(const ShaderEffect &) = delete;
 
-	ShaderEffect& operator=(const ShaderEffect&) = delete;
+	ShaderEffect &operator=(const ShaderEffect &) = delete;
 
 	inline vk::Pipeline get_pipeline() const
 	{
@@ -67,32 +68,33 @@ public:
 		return pipeline_layout;
 	}
 
-	inline const arr<vk::DescriptorSetLayout, 2>& get_descriptor_set_layouts() const
+	inline const arr<vk::DescriptorSetLayout, 2> &get_descriptor_set_layouts() const
 	{
 		return descriptor_sets_layout;
 	}
 
 private:
-	ShaderEffect& move(ShaderEffect&& effect);
+	ShaderEffect &move(ShaderEffect &&effect);
 
-	void create_descriptor_sets_layout(vec<Shader*> shaders);
+	void create_descriptor_sets_layout(vec<Shader *> const &shaders);
 
-	arr<vec<vk::DescriptorSetLayoutBinding>, 2> combine_descriptor_sets_bindings(
-	    vec<Shader*> shaders
-	);
+	auto combine_descriptor_sets_bindings(vec<Shader *> const &shaders)
+	    -> arr<vec<vk::DescriptorSetLayoutBinding>, 2>;
 
-	vk::PipelineLayout create_pipeline_layout();
+	auto create_pipeline_layout() -> vk::PipelineLayout;
 
-	vec<vk::PipelineShaderStageCreateInfo> create_pipeline_shader_stage_infos(vec<Shader*> shaders);
+	auto create_pipeline_shader_stage_infos(vec<Shader *> shaders)
+	    -> vec<vk::PipelineShaderStageCreateInfo>;
 
-	vk::Pipeline create_graphics_pipeline(
+	auto create_graphics_pipeline(
 	    vec<vk::PipelineShaderStageCreateInfo> shader_stage_create_infos,
 	    vk::PipelineRenderingCreateInfoKHR rendering_info,
 	    ShaderEffect::Configuration configuration
-	);
+	) -> vk::Pipeline;
 
 private:
-	VkContext* vk_context = {};
+	VkContext *vk_context = {};
+	str debug_name;
 
 	vk::Pipeline pipeline = {};
 	vk::PipelineLayout pipeline_layout = {};
@@ -104,7 +106,7 @@ private:
 class Material
 {
 public:
-	Material(VkContext* vk_context, ShaderEffect* effect, vk::DescriptorPool descriptor_pool)
+	Material(VkContext *vk_context, ShaderEffect *effect, vk::DescriptorPool descriptor_pool)
 	    : effect(effect)
 	{
 		vk::DescriptorSetAllocateInfo allocate_info {
@@ -118,15 +120,15 @@ public:
 	}
 
 	Material() = default;
-	Material(const Material&) = default;
-	Material(Material&&) = default;
+	Material(const Material &) = default;
+	Material(Material &&) = default;
 
-	Material& operator=(const Material&) = default;
-	Material& operator=(Material&&) = default;
+	Material &operator=(const Material &) = default;
+	Material &operator=(Material &&) = default;
 
 	~Material() = default;
 
-	inline ShaderEffect* get_effect() const
+	inline ShaderEffect *get_effect() const
 	{
 		return effect;
 	}
@@ -137,7 +139,7 @@ public:
 	}
 
 private:
-	ShaderEffect* effect = {};
+	ShaderEffect *effect = {};
 	vk::DescriptorSet descriptor_set = {};
 };
 

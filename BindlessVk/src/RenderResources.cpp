@@ -15,13 +15,11 @@ RenderResources::RenderResources(ref<VkContext> const vk_context): vk_context(vk
 	container.size_type = Renderpass::SizeType::eSwapchainRelative;
 	container.size = { 1.0, 1.0 };
 	container.relative_size_name = "";
-
-	container.ms_attachment = {};
-	container.ms_resolve_mode = vk::ResolveModeFlagBits::eNone;
+	container.type = AttachmentContainer::Type::ePerImage;
 
 	auto const images = swapchain->get_images();
 	auto const image_views = swapchain->get_image_views();
-	for (u32 i = 0; i < images.size(); i++)
+	for (u32 i = 0; i < images.size(); ++i)
 	{
 		container.attachments.push_back(Attachment {
 		    vk::AccessFlagBits::eNone,
@@ -45,12 +43,8 @@ auto RenderResources::try_get_attachment_index(u64 const key) -> u32
 
 void RenderResources::add_key_to_attachment_index(u64 const key, u32 const attachment_index)
 {
-	if (attachment_index == 0)
-		backbuffer_keys.push_back(key);
-
 	attachment_indices[key] = attachment_index;
 }
-
 
 void RenderResources::create_color_attachment(
     RenderpassBlueprint::Attachment const &blueprint_attachment,
@@ -90,7 +84,7 @@ void RenderResources::create_color_attachment(
 	};
 	vk_context->set_object_name(
 	    image,
-	    fmt::format("{}_image (single)", blueprint_attachment.name).c_str()
+	    fmt::format("{}_image (single)", blueprint_attachment.debug_name).c_str()
 	);
 
 	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
@@ -109,76 +103,10 @@ void RenderResources::create_color_attachment(
 
 	vk_context->set_object_name(
 	    image_view,
-	    fmt::format("{}_image_view (single)", blueprint_attachment.name).c_str()
+	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name).c_str()
 	);
 
-	// create multi-sample transient image
-	auto transient_ms_attachment = TransientMsAttachment {};
-	auto const is_multisampled = sample_count != vk::SampleCountFlagBits::e1;
-	if (is_multisampled)
-	{
-		auto const image = AllocatedImage(allocator.createImage(
-		    vk::ImageCreateInfo {
-		        {},
-		        vk::ImageType::e2D,
-		        blueprint_attachment.format,
-		        extent,
-		        1u,
-		        1u,
-		        sample_count,
-		        vk::ImageTiling::eOptimal,
-		        vk::ImageUsageFlagBits::eColorAttachment |
-		            vk::ImageUsageFlagBits::eTransientAttachment,
-		        vk::SharingMode::eExclusive,
-		        0u,
-		        nullptr,
-		        vk::ImageLayout::eUndefined,
-		    },
-		    {
-		        {},
-		        vma::MemoryUsage::eGpuOnly,
-		        vk::MemoryPropertyFlagBits::eDeviceLocal,
-		    }
-		));
-
-		vk_context->set_object_name(
-		    image,
-		    fmt::format("{}_transient_ms_image", blueprint_attachment.name).c_str()
-		);
-
-		auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
-		    {},
-		    image,
-		    vk::ImageViewType::e2D,
-		    blueprint_attachment.format,
-
-		    vk::ComponentMapping {
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		    },
-
-		    vk::ImageSubresourceRange {
-		        vk::ImageAspectFlagBits::eColor,
-		        0u,
-		        1u,
-		        0u,
-		        1u,
-		    },
-		});
-
-		vk_context->set_object_name(
-		    image_view,
-		    fmt::format("{}transient_image_view", blueprint_attachment.name).c_str()
-		);
-
-		transient_ms_attachment.image = image;
-		transient_ms_attachment.image_view = image_view;
-	}
-
-	auto const key = hash_str(blueprint_attachment.name.c_str());
-	attachment_indices[key] = containers.size();
+	attachment_indices[blueprint_attachment.hash] = containers.size();
 
 	containers.push_back(AttachmentContainer {
 	    AttachmentContainer::Type::eSingle,
@@ -194,15 +122,13 @@ void RenderResources::create_color_attachment(
 	    },
 	    Renderpass::SizeType::eSwapchainRelative,
 	    "",
-	    transient_ms_attachment,
-	    is_multisampled ? vk::ResolveModeFlagBits::eAverage : vk::ResolveModeFlagBits::eNone,
 	    vec<Attachment> {
 	        Attachment {
-	            .access_mask = {},
-	            .image_layout = vk::ImageLayout::eUndefined,
-	            .stage_mask = vk::PipelineStageFlagBits::eTopOfPipe,
-	            .image = image,
-	            .image_view = image_view,
+	            {},
+	            vk::ImageLayout::eUndefined,
+	            vk::PipelineStageFlagBits::eTopOfPipe,
+	            image,
+	            image_view,
 	        },
 	    },
 	});
@@ -243,7 +169,7 @@ void RenderResources::create_depth_attachment(
 
 	vk_context->set_object_name(
 	    image,
-	    fmt::format("{}_image (single)", blueprint_attachment.name).c_str()
+	    fmt::format("{}_depth_image", blueprint_attachment.debug_name).c_str()
 	);
 
 	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
@@ -266,78 +192,12 @@ void RenderResources::create_depth_attachment(
 	    },
 	});
 
-	// create multi-sample transient image
-	auto transient_ms_attachment = TransientMsAttachment {};
-	auto const is_multisampled = false; // sample_count != vk::SampleCountFlagBits::e1;
-	if (false)
-	{
-		auto const image = AllocatedImage(allocator.createImage(
-		    vk::ImageCreateInfo {
-		        {},
-		        vk::ImageType::e2D,
-		        blueprint_attachment.format,
-		        extent,
-		        1u,
-		        1u,
-		        sample_count,
-		        vk::ImageTiling::eOptimal,
-		        vk::ImageUsageFlagBits::eDepthStencilAttachment |
-		            vk::ImageUsageFlagBits::eTransientAttachment,
-		        vk::SharingMode::eExclusive,
-		        0u,
-		        nullptr,
-		        vk::ImageLayout::eUndefined,
-		    },
-		    vma::AllocationCreateInfo {
-		        {},
-		        vma::MemoryUsage::eGpuOnly,
-		        vk::MemoryPropertyFlagBits::eDeviceLocal,
-		    }
-		));
-
-		vk_context->set_object_name(
-		    image,
-		    fmt::format("{}_transient_ms_image", blueprint_attachment.name).c_str()
-		);
-
-		auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
-		    {},
-		    image,
-		    vk::ImageViewType::e2D,
-		    blueprint_attachment.format,
-
-		    vk::ComponentMapping {
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		        vk::ComponentSwizzle::eIdentity,
-		    },
-
-		    vk::ImageSubresourceRange {
-		        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
-		        0u,
-		        1u,
-		        0u,
-		        1u,
-		    },
-		});
-
-		vk_context->set_object_name(
-		    image_view,
-		    fmt::format("{}transient_image_view", blueprint_attachment.name).c_str()
-		);
-
-		transient_ms_attachment.image = image;
-		transient_ms_attachment.image_view = image_view;
-	}
-
 	vk_context->set_object_name(
 	    image_view,
-	    fmt::format("{}_image_view (single)", blueprint_attachment.name).c_str()
+	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name).c_str()
 	);
 
-	auto const key = hash_str(blueprint_attachment.name.c_str());
-	attachment_indices[key] = containers.size();
+	attachment_indices[blueprint_attachment.hash] = containers.size();
 
 	containers.push_back(AttachmentContainer {
 	    AttachmentContainer::Type::eSingle,
@@ -349,17 +209,89 @@ void RenderResources::create_depth_attachment(
 	    },
 	    Renderpass::SizeType::eSwapchainRelative,
 	    "",
-	    TransientMsAttachment {},
-	    vk::ResolveModeFlagBits::eNone,
 	    vec<Attachment> {
 	        Attachment {
-	            .access_mask = {},
-	            .image_layout = vk::ImageLayout::eUndefined,
-	            .stage_mask = vk::PipelineStageFlagBits::eTopOfPipe,
-	            .image = image,
-	            .image_view = image_view,
+	            {},
+	            vk::ImageLayout::eUndefined,
+	            vk::PipelineStageFlagBits::eTopOfPipe,
+	            image,
+	            image_view,
 	        },
 	    },
+	});
+}
+
+void RenderResources::create_transient_attachment(
+    RenderpassBlueprint::Attachment const &blueprint_attachment,
+    vk::SampleCountFlagBits sample_count
+)
+{
+	auto const device = vk_context->get_device();
+	auto const allocator = vk_context->get_allocator();
+	auto const framebuffer_extent = vk_context->get_surface().get_framebuffer_extent();
+	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
+
+	auto const image = AllocatedImage(allocator.createImage(
+	    vk::ImageCreateInfo {
+	        {},
+	        vk::ImageType::e2D,
+	        blueprint_attachment.format,
+	        extent,
+	        1u,
+	        1u,
+	        sample_count,
+	        vk::ImageTiling::eOptimal,
+	        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
+	        vk::SharingMode::eExclusive,
+	        0u,
+	        nullptr,
+	        vk::ImageLayout::eUndefined,
+	    },
+	    vma::AllocationCreateInfo {
+	        {},
+	        vma::MemoryUsage::eGpuOnly,
+	        vk::MemoryPropertyFlagBits::eDeviceLocal,
+	    }
+	));
+
+	vk_context->set_object_name(
+	    image,
+	    fmt::format("{}_transient_image", blueprint_attachment.debug_name).c_str()
+	);
+
+	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
+	    {},
+	    image,
+	    vk::ImageViewType::e2D,
+	    blueprint_attachment.format,
+
+	    vk::ComponentMapping {
+	        vk::ComponentSwizzle::eIdentity,
+	        vk::ComponentSwizzle::eIdentity,
+	        vk::ComponentSwizzle::eIdentity,
+	        vk::ComponentSwizzle::eIdentity,
+	    },
+
+	    vk::ImageSubresourceRange {
+	        vk::ImageAspectFlagBits::eColor,
+	        0u,
+	        1u,
+	        0u,
+	        1u,
+	    },
+	});
+
+	vk_context->set_object_name(
+	    image_view,
+	    fmt::format("{}_transient_image_view", blueprint_attachment.debug_name).c_str()
+	);
+
+	transient_attachments.emplace_back(TransientAttachment {
+	    image,
+	    image_view,
+	    sample_count,
+	    blueprint_attachment.format,
+	    extent,
 	});
 }
 

@@ -15,14 +15,14 @@ class CameraController
 public:
 	struct CreateInfo
 	{
-		Scene* scene;
-		Window* window;
+		Scene *scene;
+		Window *window;
 	};
 
 public:
 	CameraController() = default;
 
-	CameraController(Scene* scene, Window* window): window(window), scene(scene)
+	CameraController(Scene *scene, Window *window): window(window), scene(scene)
 	{
 	}
 
@@ -73,53 +73,57 @@ public:
 	void on_window_resize(int width, int height)
 	{
 		scene->group(entt::get<TransformComponent, CameraComponent>)
-		  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-			  cameraComp.width        = width;
-			  cameraComp.aspect_ratio = width / (float)height;
-		  });
+		    .each([&](TransformComponent &transformComp, CameraComponent &cameraComp) {
+			    cameraComp.width = width;
+			    cameraComp.aspect_ratio = width / (float)height;
+		    });
 	}
 
 private:
 	void move(float delta_time, float delta_x, float delta_y)
 	{
 		scene->group(entt::get<TransformComponent, CameraComponent>)
-		  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-			  if (delta_x == 0.0 && delta_y == 0.0f) {
-				  return;
-			  }
+		    .each([&](TransformComponent &transformComp, CameraComponent &cameraComp) {
+			    if (delta_x == 0.0 && delta_y == 0.0f) {
+				    return;
+			    }
 
-			  glm::vec2 speed = cameraComp.speed * delta_time
-			                    * glm::normalize(glm::vec2(delta_x, delta_y));
+			    glm::vec2 speed = cameraComp.speed * delta_time
+			                      * glm::normalize(glm::vec2(delta_x, delta_y));
 
-			  transformComp.translation += speed.y * cameraComp.front;
-			  transformComp.translation += speed.x
-			                               * glm::normalize(glm::cross(cameraComp.front, cameraComp.up));
-		  });
+			    transformComp.translation += speed.y * cameraComp.front;
+			    transformComp.translation += speed.x
+			                                 * glm::normalize(
+			                                     glm::cross(cameraComp.front, cameraComp.up)
+			                                 );
+		    });
 	}
 
 	void look(double delta_x, double delta_y)
 	{
 		scene->group(entt::get<TransformComponent, CameraComponent>)
-		  .each([&](TransformComponent& transformComp, CameraComponent& cameraComp) {
-			  delta_x *= 0.1;
-			  delta_y *= -0.1;
+		    .each([&](TransformComponent &transformComp, CameraComponent &cameraComp) {
+			    delta_x *= 0.1;
+			    delta_y *= -0.1;
 
-			  cameraComp.yaw += delta_x;
-			  cameraComp.pitch += delta_y;
+			    cameraComp.yaw += delta_x;
+			    cameraComp.pitch += delta_y;
 
-			  cameraComp.pitch = std::clamp(cameraComp.pitch, -89.0, 89.0);
+			    cameraComp.pitch = std::clamp(cameraComp.pitch, -89.0, 89.0);
 
-			  cameraComp.front = glm::normalize(glm::vec3(
-			    glm::sin(glm::radians(cameraComp.yaw)) * glm::cos(glm::radians(cameraComp.pitch)),
-			    glm::sin(glm::radians(cameraComp.pitch)),
-			    glm::cos(glm::radians(cameraComp.yaw)) * glm::cos(glm::radians(cameraComp.pitch))
-			  ));
-		  });
+			    cameraComp.front = glm::normalize(glm::vec3(
+			        glm::sin(glm::radians(cameraComp.yaw))
+			            * glm::cos(glm::radians(cameraComp.pitch)),
+			        glm::sin(glm::radians(cameraComp.pitch)),
+			        glm::cos(glm::radians(cameraComp.yaw))
+			            * glm::cos(glm::radians(cameraComp.pitch))
+			    ));
+		    });
 	}
 
 private:
-	Window* window      = {};
-	Scene* scene        = {};
+	Window *window = {};
+	Scene *scene = {};
 	double last_mouse_x = std::numeric_limits<double>::max();
 	double last_mouse_y = std::numeric_limits<double>::max();
 

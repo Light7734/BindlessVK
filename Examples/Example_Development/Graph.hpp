@@ -38,17 +38,19 @@ inline void render_graph_update(
 
 	auto *const frame_data = reinterpret_cast<CameraData *>(frame_data_buffer.map_block(frame_index)
 	);
+
 	auto *const scene_data = reinterpret_cast<SceneData *>(scene_data_buffer.map_block(frame_index)
 	);
 
 	scene->group(entt::get<TransformComponent, CameraComponent>)
-	    .each([&](TransformComponent &transformComp, CameraComponent &cameraComp) {
+	    .each([&](TransformComponent &transform_comp, CameraComponent &camera_comp) {
 		    *frame_data = {
-			    .projection = cameraComp.GetProjection(),
-			    .view = cameraComp.GetView(transformComp.translation),
-			    .viewPos = glm::vec4(transformComp.translation, 1.0f),
+			    .projection = camera_comp.get_projection(),
+			    .view = camera_comp.get_view(transform_comp.translation),
+			    .viewPos = glm::vec4(transform_comp.translation, 1.0f),
 		    };
 	    });
+
 
 	scene->group(entt::get<TransformComponent, LightComponent>)
 	    .each([&](TransformComponent &trasnformComp, LightComponent &lightComp) {

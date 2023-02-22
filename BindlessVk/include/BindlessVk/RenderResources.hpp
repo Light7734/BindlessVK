@@ -20,10 +20,13 @@ private:
 		vk::ImageView image_view;
 	};
 
-	struct TransientMsAttachment
+	struct TransientAttachment
 	{
 		AllocatedImage image;
 		vk::ImageView image_view;
+		vk::SampleCountFlagBits sample_count;
+		vk::Format format;
+		vk::Extent3D extent;
 	};
 
 	struct AttachmentContainer
@@ -42,11 +45,6 @@ private:
 		Renderpass::SizeType size_type;
 		str relative_size_name;
 
-		// Transient multi-sampled images
-		TransientMsAttachment ms_attachment;
-		vk::ResolveModeFlagBits ms_resolve_mode;
-
-		// Required for aliasing Read-Modify-Write attachments
 		vec<Attachment> attachments;
 
 		inline auto get_attachment(u32 image_index, u32 frame_index) -> Attachment *
@@ -60,19 +58,43 @@ private:
 public:
 	RenderResources(ref<VkContext> vk_context);
 
-	inline auto get_attachment_container(u32 resource_index) -> AttachmentContainer *
+	inline auto get_attachment_container(u32 resource_index)
 	{
 		return &containers[resource_index];
 	}
 
-	inline auto get_backbuffer_attachment(u32 image_index) -> Attachment *
+	inline auto get_backbuffer_attachment(u32 image_index)
 	{
 		return containers[0].get_attachment(image_index, 0);
 	}
 
-	inline auto get_attachment(u32 resource_index, u32 image_index, u32 frame_index) -> Attachment *
+	inline auto get_attachment(u32 resource_index, u32 image_index, u32 frame_index)
 	{
 		return containers[resource_index].get_attachment(image_index, frame_index);
+	}
+
+	inline auto get_transient_attachment(u32 resource_index) const
+	{
+		return transient_attachments[resource_index];
+	}
+
+	inline auto try_get_suitable_transient_attachment_index(
+	    RenderpassBlueprint::Attachment const &blueprint_attachment,
+	    vk::SampleCountFlagBits sample_count
+	) const
+	{
+		for (u32 i = 0; auto const &transient_attachment : transient_attachments)
+		{
+			if (transient_attachment.sample_count == sample_count &&
+			    transient_attachment.format == blueprint_attachment.format &&
+			    transient_attachment.extent ==
+			        calculate_attachment_image_extent(blueprint_attachment))
+				return i;
+
+			i++;
+		}
+
+		return std::numeric_limits<u32>::max();
 	}
 
 	auto try_get_attachment_index(u64 const key) -> u32;
@@ -82,7 +104,13 @@ public:
 	    RenderpassBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	);
+
 	void create_depth_attachment(
+	    RenderpassBlueprint::Attachment const &blueprint_attachment,
+	    vk::SampleCountFlagBits sample_count
+	);
+
+	void create_transient_attachment(
 	    RenderpassBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	);
@@ -90,13 +118,13 @@ public:
 private:
 	auto calculate_attachment_image_extent(
 	    RenderpassBlueprint::Attachment const &blueprint_attachment
-	) -> vk::Extent3D;
+	) const -> vk::Extent3D;
 
 private:
 	ref<VkContext> const vk_context;
 	vec<AttachmentContainer> containers;
 	hash_map<u64, u32> attachment_indices;
-	vec<u64> backbuffer_keys;
+	vec<TransientAttachment> transient_attachments;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

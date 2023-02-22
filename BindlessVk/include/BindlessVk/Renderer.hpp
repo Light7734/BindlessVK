@@ -44,8 +44,10 @@ private:
 
 	void present_frame(u32 image_index);
 
+	void reset_used_attachment_states();
+
 	void update_pass(RenderGraph *graph, Renderpass *pass, void *user_data);
-	auto apply_pass_barriers(Renderpass *pass, u32 image_index) -> DynamicPassInfo;
+	void apply_pass_barriers(Renderpass *pass, u32 image_index);
 	void apply_present_barriers(RenderGraph *graph, u32 image_index);
 	void render_pass(RenderGraph *graph, Renderpass *pass, void *user_data, u32 image_index);
 
@@ -57,7 +59,10 @@ private:
 
 private:
 	ref<VkContext> vk_context = {};
+	vec<tuple<u32, u32, u32>> used_attachment_indices = {};
+
 	RenderResources resources;
+	arr<DynamicPassInfo, BVK_MAX_FRAMES_IN_FLIGHT> dynamic_pass_info;
 
 	arr<vk::Fence, BVK_MAX_FRAMES_IN_FLIGHT> render_fences = {};
 	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> render_semaphores = {};
@@ -65,7 +70,7 @@ private:
 
 	vec<vk::CommandBuffer> cmd_buffers = {};
 
-	u32 frame_index = 0ul;
+	u32 frame_index = 0;
 };
 
 } // namespace BINDLESSVK_NAMESPACE
