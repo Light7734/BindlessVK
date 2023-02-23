@@ -16,7 +16,7 @@ Renderer::~Renderer()
 	destroy_sync_objects();
 }
 
-void Renderer::render_graph(RenderGraph *const graph, void *const user_data)
+void Renderer::render_graph(Rendergraph *const graph)
 {
 	wait_for_frame_fence();
 
@@ -29,20 +29,22 @@ void Renderer::render_graph(RenderGraph *const graph, void *const user_data)
 	auto const cmd = cmd_buffers[frame_index];
 
 
-	graph->on_update(vk_context.get(), graph, frame_index, user_data);
-	for (u32 i = 0; i < graph->passes.size(); ++i)
-		update_pass(graph, &graph->passes[i], user_data);
+	cmd.beginDebugUtilsLabelEXT(graph->get_update_label());
+	graph->on_update(frame_index, image_index);
+    cmd.endDebugUtilsLabelEXT();
+
+	for (auto *const pass : graph->get_passes())
+		pass->on_update(frame_index, image_index);
 
 	cmd.begin(vk::CommandBufferBeginInfo {});
 
-	for (u32 i = 0; i < graph->passes.size(); ++i)
+	for (u32 i = 0; i < graph->get_passes().size(); ++i)
 	{
 		dynamic_pass_info[frame_index].color_attachments.clear();
 		dynamic_pass_info[frame_index].depth_attachment = vk::RenderingAttachmentInfo {};
-		apply_pass_barriers(&graph->passes[i], image_index);
-
+		apply_pass_barriers(graph->get_passes()[i], image_index);
 		cmd.beginRendering(dynamic_pass_info[frame_index]);
-		render_pass(graph, &graph->passes[i], user_data, image_index);
+		render_pass(graph, graph->get_passes()[i], image_index);
 		cmd.endRendering();
 	}
 
@@ -56,9 +58,9 @@ void Renderer::render_graph(RenderGraph *const graph, void *const user_data)
 	frame_index = (frame_index + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::update_pass(RenderGraph *const graph, Renderpass *const pass, void *const user_data)
+void Renderer::update_pass(Renderpass *const pass, u32 image_index)
 {
-	pass->on_update(vk_context.get(), graph, pass, frame_index, user_data);
+	pass->on_update(frame_index, image_index);
 }
 
 void Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index)
@@ -67,8 +69,8 @@ void Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index)
 	auto const &surface = vk_context->get_surface();
 	auto const cmd = cmd_buffers[frame_index];
 
-	cmd.beginDebugUtilsLabelEXT(pass->barrier_label);
-	for (auto &attachment_slot : pass->attachments)
+	cmd.beginDebugUtilsLabelEXT(pass->get_barrier_label());
+	for (auto const &attachment_slot : pass->get_attachments())
 	{
 		auto *const attachment_container =
 		    resources.get_attachment_container(attachment_slot.resource_index);
@@ -191,10 +193,10 @@ void Renderer::apply_pass_barriers(Renderpass *pass, u32 image_index)
 	cmd.endDebugUtilsLabelEXT();
 }
 
-void Renderer::apply_present_barriers(RenderGraph *const graph, u32 const image_index)
+void Renderer::apply_present_barriers(Rendergraph *const graph, u32 const image_index)
 {
 	auto const cmd = cmd_buffers[frame_index];
-	cmd.beginDebugUtilsLabelEXT(graph->present_barriers_label);
+	cmd.beginDebugUtilsLabelEXT(graph->get_present_barrier_label());
 
 	auto *const backbuffer_container = resources.get_attachment_container(0);
 	auto *const backbuffer_attachment = backbuffer_container->get_attachment(image_index, 0);
@@ -230,37 +232,32 @@ void Renderer::apply_present_barriers(RenderGraph *const graph, u32 const image_
 	cmd.endDebugUtilsLabelEXT();
 }
 
-void Renderer ::render_pass(
-    RenderGraph *const graph,
-    Renderpass *const pass,
-    void *const user_data,
-    u32 const image_index
-)
+void Renderer ::render_pass(Rendergraph *const graph, Renderpass *const pass, u32 const image_index)
 {
 	auto const cmd = cmd_buffers[frame_index];
-	cmd.beginDebugUtilsLabelEXT(pass->render_label);
+	cmd.beginDebugUtilsLabelEXT(pass->get_render_label());
 	cmd.bindDescriptorSets(
 	    vk::PipelineBindPoint::eGraphics,
-	    graph->pipeline_layout,
+	    graph->get_pipeline_layout(),
 	    0,
 	    1,
-	    &graph->descriptor_sets[frame_index].descriptor_set,
+	    &graph->get_descriptor_sets()[frame_index].descriptor_set,
 	    0,
 	    {}
 	);
-
-	if (!pass->descriptor_sets.empty())
+	auto const &descriptor_sets = pass->get_descriptor_sets();
+	if (!descriptor_sets.empty())
 		cmd.bindDescriptorSets(
 		    vk::PipelineBindPoint::eGraphics,
-		    pass->pipeline_layout,
+		    pass->get_pipeline_layout(),
 		    1,
 		    1,
-		    &pass->descriptor_sets[frame_index].descriptor_set,
+		    &descriptor_sets[frame_index].descriptor_set,
 		    0,
 		    {}
 		);
 
-	pass->on_render(vk_context.get(), graph, pass, cmd, frame_index, image_index, user_data);
+	pass->on_render(cmd, frame_index, image_index);
 	cmd.endDebugUtilsLabelEXT();
 }
 

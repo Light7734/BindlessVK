@@ -13,18 +13,18 @@ Logger::~Logger()
 
 
 void Logger::bindlessvk_callback(
-  bvk::DebugCallbackSource const source,
-  bvk::LogLvl const severity,
-  str const &message,
-  std::any const user_data
+    bvk::DebugCallbackSource const source,
+    bvk::LogLvl const severity,
+    str const &message,
+    std::any const user_data
 )
 {
-	auto const *const logger = std::any_cast<Logger const *const>(user_data);
+	auto const *const logger = any_cast<Logger const *const>(user_data);
 
 	auto const source_str = //
-	  source == bvk::DebugCallbackSource::eBindlessVk       ? "BindlessVk" :
-	  source == bvk::DebugCallbackSource::eValidationLayers ? "Validation Layers" :
-	                                                          "Memory Allocator";
+	    source == bvk::DebugCallbackSource::eBindlessVk       ? "BindlessVk" :
+	    source == bvk::DebugCallbackSource::eValidationLayers ? "Validation Layers" :
+	                                                            "Memory Allocator";
 
 
 	logger->log((spdlog::level::level_enum)(int)severity, "[{}]: {}", source_str, message);

@@ -28,7 +28,7 @@ public:
 	Renderer(ref<VkContext> vk_context);
 	~Renderer();
 
-	void render_graph(RenderGraph *render_graph, void *user_data);
+	void render_graph(Rendergraph *render_graph);
 
 	inline auto get_resources()
 	{
@@ -46,10 +46,10 @@ private:
 
 	void reset_used_attachment_states();
 
-	void update_pass(RenderGraph *graph, Renderpass *pass, void *user_data);
+	void update_pass(Renderpass *pass, u32 image_index);
 	void apply_pass_barriers(Renderpass *pass, u32 image_index);
-	void apply_present_barriers(RenderGraph *graph, u32 image_index);
-	void render_pass(RenderGraph *graph, Renderpass *pass, void *user_data, u32 image_index);
+	void apply_present_barriers(Rendergraph *graph, u32 image_index);
+	void render_pass(Rendergraph *graph, Renderpass *pass, u32 image_index);
 
 	void create_sync_objects();
 	void destroy_sync_objects();

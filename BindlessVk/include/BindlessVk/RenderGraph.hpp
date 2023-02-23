@@ -10,25 +10,66 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-struct RenderGraph
+class Rendergraph
 {
-	using UpdateFn = void (*)(VkContext *, RenderGraph *, u32, void *);
+public:
+	friend class RenderGraphBuilder;
+
+public:
+	Rendergraph(ref<VkContext> vk_context): vk_context(vk_context)
+	{
+	}
+
+	virtual ~Rendergraph()
+	{
+		for (auto *pass : passes)
+			delete pass;
+	}
+
+	virtual void on_update(u32 frame_index, u32 image_index) = 0;
+
+	inline auto const &get_passes() const
+	{
+		return passes;
+	}
+
+	inline auto const &get_pipeline_layout() const
+	{
+		return pipeline_layout;
+	}
+
+	inline auto const &get_descriptor_sets() const
+	{
+		return descriptor_sets;
+	}
+
+	inline auto const &get_update_label() const
+	{
+		return update_label;
+	}
+
+	inline auto const &get_present_barrier_label() const
+	{
+		return present_barrier_label;
+	}
+
+protected:
+	ref<VkContext> vk_context;
 
 	class RenderResources *resources;
 
-	vec<Renderpass> passes;
+	std::any user_data;
 
-	UpdateFn on_update;
+	vec<Renderpass *> passes;
+
 	vec<Buffer> buffer_inputs;
 
 	vk::PipelineLayout pipeline_layout;
 	vk::DescriptorSetLayout descriptor_set_layout;
 	vec<AllocatedDescriptorSet> descriptor_sets;
 
-	vk::SampleCountFlagBits sample_count;
-
 	vk::DebugUtilsLabelEXT update_label;
-	vk::DebugUtilsLabelEXT present_barriers_label;
+	vk::DebugUtilsLabelEXT present_barrier_label;
 };
 
 /**
@@ -40,11 +81,24 @@ struct RenderGraph
 class RenderGraphBuilder
 {
 public:
-	RenderGraphBuilder(VkContext *vk_context): vk_context(vk_context)
+	RenderGraphBuilder(ref<VkContext> vk_context);
+
+	auto build_graph() -> Rendergraph *;
+
+	template<typename T>
+	inline auto set_type() -> RenderGraphBuilder &
 	{
+		graph = new T(vk_context);
+		return *this;
 	}
 
-	auto build() -> RenderGraph;
+	template<typename T>
+	inline auto add_pass(RenderpassBlueprint blueprint) -> RenderGraphBuilder &
+	{
+		this->pass_blueprints.push_back(blueprint);
+		this->graph->passes.push_back(new T(vk_context.get()));
+		return *this;
+	}
 
 	inline auto set_resources(RenderResources *resources) -> RenderGraphBuilder &
 	{
@@ -52,9 +106,9 @@ public:
 		return *this;
 	}
 
-	inline auto add_pass(RenderpassBlueprint blueprint) -> RenderGraphBuilder &
+	inline auto set_user_data(std::any data) -> RenderGraphBuilder &
 	{
-		this->pass_blueprints.push_back(blueprint);
+		this->graph->user_data = data;
 		return *this;
 	}
 
@@ -66,22 +120,15 @@ public:
 		return *this;
 	}
 
-	inline auto set_update_fn(void (*fn)(VkContext *, RenderGraph *, u32, void *))
-	    -> RenderGraphBuilder &
-	{
-		this->graph.on_update = fn;
-		return *this;
-	}
-
 	inline auto set_update_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
 	{
-		this->graph.update_label = label;
+		this->graph->update_label = label;
 		return *this;
 	}
 
-	inline auto set_present_barriers_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
+	inline auto set_present_barrier_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
 	{
-		this->graph.present_barriers_label = label;
+		this->graph->present_barrier_label = label;
 		return *this;
 	}
 
@@ -92,44 +139,44 @@ private:
 	void initialize_graph_input_descriptors();
 
 	void build_pass_color_attachments(
-	    Renderpass &pass,
+	    Renderpass *pass,
 	    vec<RenderpassBlueprint::Attachment> const &blueprint_attachments
 	);
 
 	void build_pass_depth_attachment(
-	    Renderpass &pass,
+	    Renderpass *pass,
 	    RenderpassBlueprint::Attachment const &blueprint_attachment
 	);
 
 	void build_pass_buffer_inputs(
-	    Renderpass &pass,
+	    Renderpass *pass,
 	    vec<RenderpassBlueprint::BufferInput> const &blueprint_buffer_inputs
 	);
 
 	void build_pass_texture_inputs(
-	    Renderpass &pass,
+	    Renderpass *pass,
 	    vec<RenderpassBlueprint::TextureInput> const &blueprint_texture_inputs
 	);
 
 	void build_pass_input_descriptors(
-	    Renderpass &pass,
+	    Renderpass *pass,
 	    vec<RenderpassBlueprint::BufferInput> const &blueprint_buffer_inputs,
 	    vec<RenderpassBlueprint::TextureInput> const &blueprint_texture_inputs
 	);
 
-	void build_pass_cmd_buffer_begin_infos(Renderpass &pass);
-
+	void build_pass_cmd_buffer_begin_infos(Renderpass *pass);
 
 	void initialize_pass_input_descriptors(
-	    Renderpass &pass,
+	    Renderpass *pass,
 	    RenderpassBlueprint const &pass_blueprint
 	);
 
 private:
-	VkContext *const vk_context = {};
-	RenderResources *resources = {};
+	ref<VkContext> const vk_context = {};
 
-	RenderGraph graph = {};
+	Rendergraph *graph = {};
+
+	RenderResources *resources = {};
 
 	u64 backbuffer_attachment_key = {};
 

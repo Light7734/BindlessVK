@@ -1,27 +1,8 @@
-#pragma once
+#include "Development/Development.hpp"
 
-#include "BindlessVk/RenderGraph.hpp"
-#include "BindlessVk/RenderPass.hpp"
-#include "BindlessVk/Renderer.hpp"
-#include "BindlessVk/VkContext.hpp"
-#include "Framework/Common/Common.hpp"
-//
-#include "Framework/Core/Application.hpp"
-#include "Framework/Core/Window.hpp"
-#include "Framework/Scene/CameraController.hpp"
-#include "Framework/Scene/Scene.hpp"
-#include "Framework/Utils/Timer.hpp"
 
-// passes
-#include "ForwardPass.hpp"
-#include "Graph.hpp"
-#include "UserInterfacePass.hpp"
 
-// @todo: load stuff from files
-class DevelopmentExampleApplication: public Application
-{
-public:
-	DevelopmentExampleApplication(): Application()
+DevelopmentExampleApplication::DevelopmentExampleApplication()
 	{
 		load_shaders();
 		load_pipeline_configuration();
@@ -35,11 +16,11 @@ public:
 		create_render_graph();
 	}
 
-	~DevelopmentExampleApplication()
-	{
-	}
+DevelopmentExampleApplication::~DevelopmentExampleApplication()
+{
+}
 
-	virtual void on_tick(f64 const delta_time) override
+ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	{
 		ImGui::ShowDemoWindow();
 		CVar::draw_imgui_editor();
@@ -48,20 +29,14 @@ public:
 
 		auto *const swapchain = vk_context->get_swapchain();
 
-		renderer->render_graph(&render_graph, &scene);
+		renderer->render_graph(render_graph.get());
 
 		if (swapchain->is_invalid()) {
 			assert_fail("swapchain-recreation is currently nuked");
 		}
 	}
 
-	virtual void on_swapchain_recreate() override
-	{
-		assert_fail("Swapchain recreation not supported (yet)");
-	}
-
-private:
-	void load_shaders()
+	void DevelopmentExampleApplication::load_shaders()
 	{
 		c_str constexpr DIRECTORY = "Shaders/";
 
@@ -79,7 +54,7 @@ private:
 		}
 	}
 
-	void load_shader_effects()
+	void DevelopmentExampleApplication::load_shader_effects()
 	{
 		shader_effects[hash_str("opaque_mesh")] = bvk::ShaderEffect(
 		    vk_context.get(),
@@ -102,7 +77,7 @@ private:
 		);
 	}
 
-	void load_pipeline_configuration()
+	void DevelopmentExampleApplication::load_pipeline_configuration()
 	{
 		shader_effect_configurations[hash_str("opaque_mesh")] = bvk::ShaderEffect::Configuration {
 			bvk::Model::Vertex::get_vertex_input_state(),
@@ -241,7 +216,7 @@ private:
 		};
 	}
 
-	void load_materials()
+	void DevelopmentExampleApplication::load_materials()
 	{
 		materials.emplace(
 		    hash_str("opaque_mesh"),
@@ -258,7 +233,7 @@ private:
 		);
 	}
 
-	void load_models()
+	void DevelopmentExampleApplication::load_models()
 	{
 		models.emplace(
 		    hash_str("flight_helmet"),
@@ -284,7 +259,7 @@ private:
 	}
 
 	// @todo: Load from files instead of hard-coding
-	void load_entities()
+	void DevelopmentExampleApplication::load_entities()
 	{
 		auto const test_model_entity = scene.create();
 
@@ -348,7 +323,7 @@ private:
 		scene.emplace<LightComponent>(light_entity, 12);
 	}
 
-	auto create_forward_pass_blueprint() -> bvk::RenderpassBlueprint
+	auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::RenderpassBlueprint
 	{
 		auto const &surface = vk_context->get_surface();
 
@@ -368,9 +343,8 @@ private:
 
 		auto blueprint = bvk::RenderpassBlueprint {};
 		blueprint.set_name("forwardpass")
+		    .set_user_data(&scene)
 		    .set_sample_count(sample_count)
-		    .set_update_fn(&forward_pass_update)
-		    .set_render_fn(&forward_pass_render)
 		    .set_update_label({ "forwardpass_update", update_color })
 		    .set_render_label({ "forwardpass_render", render_color })
 		    .set_barrier_label({ "forwardpass_barrier", barrier_color })
@@ -414,7 +388,7 @@ private:
 		return blueprint;
 	}
 
-	auto create_ui_pass_blueprint() -> bvk::RenderpassBlueprint
+	auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::RenderpassBlueprint
 	{
 		auto const &surface = vk_context->get_surface();
 
@@ -430,9 +404,8 @@ private:
 
 		auto blueprint = bvk::RenderpassBlueprint {};
 		blueprint.set_name("uipass")
+		    .set_user_data(&scene)
 		    .set_sample_count(sample_count)
-		    .set_update_fn(&user_interface_pass_update)
-		    .set_render_fn(&user_interface_pass_render)
 		    .set_update_label({ "uipass_update", update_color })
 		    .set_render_label({ "uipass_render", render_color })
 		    .set_barrier_label({ "uipass_barrier", barrier_color })
@@ -450,7 +423,7 @@ private:
 		return blueprint;
 	}
 
-	void create_render_graph()
+	void DevelopmentExampleApplication::create_render_graph()
 	{
 		auto const update_color = arr<f32, 4> { 1.0, 0.8, 0.8, 1.0 };
 		auto const present_color = arr<f32, 4> { 0.8, 1.0, 0.8, 1.0 };
@@ -458,19 +431,20 @@ private:
 		auto const forwrard_pass_blueprint = create_forward_pass_blueprint();
 		auto const ui_pass_blueprint = create_ui_pass_blueprint();
 
-		auto builder = bvk::RenderGraphBuilder { vk_context.get() };
+		auto builder = bvk::RenderGraphBuilder { vk_context };
 
-		builder.set_resources(renderer->get_resources())
-		    .set_update_fn(&render_graph_update)
+		builder.set_type<BasicRendergraph>()
+            .set_resources(renderer->get_resources())
+		    .set_user_data(&scene)
 		    .set_update_label({ "graph_update", update_color })
-		    .set_present_barriers_label({ "graph_present_barriers", present_color })
+		    .set_present_barrier_label({ "graph_present_barriers", present_color })
 		    .add_buffer_input({
 		        "frame_data",
 		        0,
 		        1,
 		        vk::DescriptorType::eUniformBuffer,
 		        vk::ShaderStageFlagBits::eVertex,
-		        (sizeof(glm::mat4) * 2) + (sizeof(glm::vec4)),
+		        sizeof(BasicRendergraph::FrameData),
 		        nullptr,
 		    })
 		    .add_buffer_input({
@@ -479,12 +453,11 @@ private:
 		        1,
 		        vk::DescriptorType::eUniformBuffer,
 		        vk::ShaderStageFlagBits::eVertex,
-		        sizeof(glm::vec4),
+		        sizeof(BasicRendergraph::SceneData),
 		        nullptr,
 		    })
-		    .add_pass(forwrard_pass_blueprint)
-		    .add_pass(ui_pass_blueprint);
+		    .add_pass<Forwardpass>(forwrard_pass_blueprint)
+		    .add_pass<UserInterfacePass>(ui_pass_blueprint);
 
-		render_graph = builder.build();
+		render_graph = scope<bvk::Rendergraph>(builder.build_graph());
 	}
-};

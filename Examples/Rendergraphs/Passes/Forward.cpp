@@ -1,25 +1,15 @@
-#pragma once
+#include "Rendergraphs/Passes/Forward.hpp"
 
-#include "BindlessVk/RenderPass.hpp"
-#include "Framework/Scene/Scene.hpp"
+Forwardpass::Forwardpass(bvk::VkContext *const vk_context): bvk::Renderpass(vk_context)
+{
+}
 
-constexpr u32 frame_data_buffer_index = 0;
-constexpr u32 scene_data_buffer_index = 1;
-
-inline void forward_pass_update(
-    bvk::VkContext *const vk_context,
-    bvk::RenderGraph *const render_graph,
-    bvk::Renderpass *const render_pass,
-    u32 const frame_index,
-    void *const user_pointer
-)
+void Forwardpass::on_update(u32 frame_index, u32 image_index)
 {
 	auto const device = vk_context->get_device();
-	auto const descriptor_set = render_pass->descriptor_sets[frame_index];
+	auto const descriptor_set = descriptor_sets[frame_index];
 
-	auto const *const scene = reinterpret_cast<Scene const *>(user_pointer);
-
-	auto &buffer = render_pass->buffer_inputs[frame_data_buffer_index];
+	auto const *const scene = any_cast<Scene *>(user_data);
 
 	// @todo: don't update every frame
 	auto const renderables = scene->view<const StaticMeshRendererComponent>();
@@ -78,40 +68,10 @@ inline void forward_pass_update(
 	device.updateDescriptorSets(descriptor_writes, 0);
 }
 
-
-inline void draw_model(bvk::Model const *const model, vk::CommandBuffer const cmd)
-{
-	auto const offset = VkDeviceSize { 0 };
-
-	// bind buffers
-	cmd.bindVertexBuffers(0, 1, model->vertex_buffer->get_buffer(), &offset);
-	cmd.bindIndexBuffer(*(model->index_buffer->get_buffer()), 0u, vk::IndexType::eUint32);
-
-	for (auto const *node : model->nodes) {
-		for (auto const &primitive : node->mesh) {
-			u32 texture_index = model->material_parameters[primitive.material_index]
-			                        .albedo_texture_index;
-
-			// @todo: fix this hack
-			cmd.drawIndexed(
-			    primitive.index_count,
-			    1ull,
-			    primitive.first_index,
-			    0ull,
-			    texture_index
-			);
-		}
-	}
-}
-
-inline void forward_pass_render(
-    bvk::VkContext *const vk_context,
-    bvk::RenderGraph *const render_graph,
-    bvk::Renderpass *const render_pass,
+void Forwardpass::on_render(
     vk::CommandBuffer const cmd,
     u32 const frame_index,
-    u32 const image_index,
-    void *const user_pointer
+    u32 const image_index
 )
 {
 	auto const device = vk_context->get_device();
@@ -119,7 +79,7 @@ inline void forward_pass_render(
 
 	auto pipeline = vk::Pipeline {};
 
-	auto const *const scene = reinterpret_cast<Scene const *>(user_pointer);
+	auto const *const scene = any_cast<Scene *>(user_data);
 	auto const renderables = scene->view<const StaticMeshRendererComponent>();
 
 	renderables.each([&](auto const &render_component) {
@@ -151,4 +111,29 @@ inline void forward_pass_render(
 
 		draw_model(render_component.model, cmd);
 	});
+}
+
+void Forwardpass::draw_model(bvk::Model const *const model, vk::CommandBuffer const cmd)
+{
+	auto const offset = VkDeviceSize { 0 };
+
+	// bind buffers
+	cmd.bindVertexBuffers(0, 1, model->vertex_buffer->get_buffer(), &offset);
+	cmd.bindIndexBuffer(*(model->index_buffer->get_buffer()), 0u, vk::IndexType::eUint32);
+
+	for (auto const *node : model->nodes) {
+		for (auto const &primitive : node->mesh) {
+			u32 texture_index = model->material_parameters[primitive.material_index]
+			                        .albedo_texture_index;
+
+			// @todo: fix this hack
+			cmd.drawIndexed(
+			    primitive.index_count,
+			    1ull,
+			    primitive.first_index,
+			    0ull,
+			    texture_index
+			);
+		}
+	}
 }

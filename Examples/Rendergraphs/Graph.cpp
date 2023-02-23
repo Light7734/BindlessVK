@@ -1,4 +1,4 @@
-#pragma once
+#include "Rendergraphs/Graph.hpp"
 
 #include "BindlessVk/RenderGraph.hpp"
 #include "BindlessVk/RenderPass.hpp"
@@ -6,37 +6,21 @@
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
 
-u32 constexpr const graph_frame_data_set_index = 0;
-u32 constexpr const graph_scene_data_set_index = 1;
-
-struct CameraData
+BasicRendergraph::BasicRendergraph(ref<bvk::VkContext> const vk_context)
+: bvk::Rendergraph(vk_context)
 {
-	glm::mat4 projection;
-	glm::mat4 view;
-	glm::vec4 viewPos;
-};
+}
 
-// @todo:
-struct SceneData
-{
-	glm::vec4 light_pos;
-};
-
-inline void render_graph_update(
-    bvk::VkContext *vk_context,
-    bvk::RenderGraph *render_graph,
-    uint32_t frame_index,
-    void *user_pointer
-)
+void  BasicRendergraph::on_update(u32 const frame_index, u32 const image_index)
 {
 	auto const device = vk_context->get_device();
 
-	auto *scene = reinterpret_cast<Scene *>(user_pointer);
+	auto *scene = any_cast<Scene *>(user_data);
 
-	auto &frame_data_buffer = render_graph->buffer_inputs[graph_frame_data_set_index];
-	auto &scene_data_buffer = render_graph->buffer_inputs[graph_scene_data_set_index];
+	auto &frame_data_buffer = buffer_inputs[FrameData::binding];
+	auto &scene_data_buffer = buffer_inputs[SceneData::binding];
 
-	auto *const frame_data = reinterpret_cast<CameraData *>(frame_data_buffer.map_block(frame_index)
+	auto *const frame_data = reinterpret_cast<FrameData *>(frame_data_buffer.map_block(frame_index)
 	);
 
 	auto *const scene_data = reinterpret_cast<SceneData *>(scene_data_buffer.map_block(frame_index)

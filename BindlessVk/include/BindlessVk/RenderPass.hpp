@@ -3,17 +3,25 @@
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 
+#include <any>
 #include <glm/glm.hpp>
 
 namespace BINDLESSVK_NAMESPACE {
 
-class RenderGraph;
+class Rendergraph;
 
-struct Renderpass
+class Renderpass
 {
-	using UpdateFn = void (*)(VkContext *, RenderGraph *, Renderpass *, u32, void *);
-	using RenderFn =
-	    void (*)(VkContext *, RenderGraph *, Renderpass *, vk::CommandBuffer, u32, u32, void *);
+public:
+	friend class RenderGraphBuilder;
+	friend class RenderpassBlueprint;
+
+public:
+	Renderpass(VkContext* vk_context): vk_context(vk_context)
+	{
+	}
+
+    virtual ~Renderpass() = default;
 
 	struct Attachment
 	{
@@ -52,15 +60,56 @@ struct Renderpass
 		nCount,
 	};
 
+public:
+	virtual void on_update(u32 frame_index, u32 image_index) = 0;
+	virtual void on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+
+	inline auto const &get_update_label() const
+	{
+		return update_label;
+	}
+
+	inline auto const &get_barrier_label() const
+	{
+		return barrier_label;
+	}
+
+	inline auto const &get_render_label() const
+	{
+		return render_label;
+	}
+
+	inline auto const &get_attachments() const
+	{
+		return attachments;
+	}
+
+	inline auto const &get_descriptor_sets() const
+	{
+		return descriptor_sets;
+	}
+
+	inline auto const &get_pipeline_layout() const
+	{
+		return pipeline_layout;
+	}
+
+	inline auto const &get_buffer_inputs() const
+	{
+		return buffer_inputs;
+	}
+
 	inline auto is_multisampled() const
 	{
 		return sample_count != vk::SampleCountFlagBits::e1;
 	}
 
+protected:
+	VkContext* vk_context;
+
 	str name;
 
-	UpdateFn on_update;
-	RenderFn on_render;
+	std::any user_data;
 
 	vec<Attachment> attachments;
 
@@ -142,18 +191,6 @@ public:
 		return *this;
 	}
 
-	auto set_update_fn(Renderpass::UpdateFn const fn) -> RenderpassBlueprint &
-	{
-		this->update_fn = fn;
-		return *this;
-	}
-
-	auto set_render_fn(Renderpass::RenderFn const fn) -> RenderpassBlueprint &
-	{
-		this->render_fn = fn;
-		return *this;
-	}
-
 	auto add_color_output(Attachment const attachment) -> RenderpassBlueprint &
 	{
 		this->color_attachments.push_back(attachment);
@@ -175,6 +212,12 @@ public:
 	auto add_buffer_input(BufferInput const input) -> RenderpassBlueprint &
 	{
 		this->buffer_inputs.push_back(input);
+		return *this;
+	}
+
+	auto set_user_data(std::any data) -> RenderpassBlueprint &
+	{
+		this->user_data = data;
 		return *this;
 	}
 
@@ -205,8 +248,7 @@ public:
 private:
 	str name;
 
-	Renderpass::UpdateFn update_fn = {};
-	Renderpass::RenderFn render_fn = {};
+	std::any user_data;
 
 	vec<Attachment> color_attachments = {};
 	Attachment depth_attachment = {};
