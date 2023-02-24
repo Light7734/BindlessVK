@@ -39,10 +39,4 @@ enum class LogLvl : u8
 	nCount,
 };
 
-// simple hash function
-u64 constexpr hash_str(c_str value)
-{
-	return *value ? static_cast<u64>(*value) + 33 * hash_str(value + 1) : 5381;
-}
-
 } // namespace BINDLESSVK_NAMESPACE
