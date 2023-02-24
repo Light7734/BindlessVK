@@ -267,7 +267,7 @@ void DevelopmentExampleApplication::load_entities()
 	scene.emplace<StaticMeshRendererComponent>(
 	    test_model_entity,
 	    &materials.at(hash_str("opaque_mesh")),
-	    &models[bvk::hash_str("flight_helmet")]
+	    &models.at(hash_str("flight_helmet"))
 	);
 
 	auto const skybox_entity = scene.create();
@@ -280,8 +280,8 @@ void DevelopmentExampleApplication::load_entities()
 
 	scene.emplace<StaticMeshRendererComponent>(
 	    skybox_entity,
-	    &materials[hash_str("skybox")],
-	    &models[bvk::hash_str("skybox")]
+	    &materials.at(hash_str("skybox")),
+	    &models.at(hash_str("skybox"))
 	);
 
 	auto const light_entity = scene.create();
