@@ -3,7 +3,7 @@
 #include <Framework/Common/Common.hpp>
 #include <iostream>
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
 	try {
 		DevelopmentExampleApplication application = DevelopmentExampleApplication();

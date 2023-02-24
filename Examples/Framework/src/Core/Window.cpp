@@ -13,23 +13,18 @@ void Window::init(WindowSpecs specs, vec<pair<int, int>> hints)
 	// Initialzie glfw
 	assert_true(glfwInit(), "Failed to initalize glfw");
 
-	// Hint glfw about the window
-	for (auto hint : hints) {
+	for (auto hint : hints)
 		glfwWindowHint(hint.first, hint.second);
-		LOG(trace, "{} ==> {}", hint.first, hint.second);
-	}
 
-	// Create window
 	glfw_window_handle = glfwCreateWindow(
-	  specs.width,
-	  specs.height,
-	  specs.title.c_str(),
-	  nullptr,
-	  nullptr
+	    specs.width,
+	    specs.height,
+	    specs.title.c_str(),
+	    nullptr,
+	    nullptr
 	);
 	assert_true(glfw_window_handle, "Failed to create glfw window");
 
-	// Setup callbacks & userpointer
 	glfwSetWindowUserPointer(glfw_window_handle, &this->specs);
 	bind_callbacks();
 }

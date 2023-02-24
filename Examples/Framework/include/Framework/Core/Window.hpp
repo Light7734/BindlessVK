@@ -6,8 +6,8 @@ struct GLFWwindow;
 
 struct WindowSpecs
 {
-	std::string title;
-	uint32_t width, height;
+	str title;
+	u32 width, height;
 };
 
 class Window
@@ -26,7 +26,7 @@ public:
 	vk::SurfaceKHR create_surface(vk::Instance instance);
 	vk::Extent2D get_framebuffer_size();
 
-	inline GLFWwindow *get_glfw_handle()
+	inline auto *get_glfw_handle()
 	{
 		return glfw_window_handle;
 	}
