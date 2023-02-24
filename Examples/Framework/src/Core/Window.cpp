@@ -7,10 +7,10 @@
 void Window::init(WindowSpecs specs, vec<pair<int, int>> hints)
 {
 	this->specs = specs;
+	glfwSetErrorCallback([](int code, char const *str) {
+		fmt::print(stdout, "glfw error ({}): {}\n", code, str);
+	});
 
-	glfwSetErrorCallback([](int code, char const *str) { LOG(critical, str); });
-
-	// Initialzie glfw
 	assert_true(glfwInit(), "Failed to initalize glfw");
 
 	for (auto hint : hints)

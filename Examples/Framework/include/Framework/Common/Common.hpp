@@ -6,8 +6,6 @@
 #include <BindlessVk/Common/Common.hpp>
 #include <exception>
 
-#define LOG(logLevel, ...)
-
 // simple hash function
 u64 constexpr hash_str(c_str value)
 {
