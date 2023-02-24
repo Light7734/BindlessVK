@@ -3,29 +3,29 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     BindlessVk
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/VkContext.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/DescriptorAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/DescriptorAllocator.cpp
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Gpu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Queues.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Swapchain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Surface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Swapchain.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/VkContext.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/ModelLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/Loaders/GltfLoader.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/Renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/Rendergraph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/RenderResources.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/ShaderLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Loaders/SpvLoader.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/TextureLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/KtxLoader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/BinaryLoader.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderGraph.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/RenderResources.cpp
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ModelLoaders/GltfLoader.cpp
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/KtxLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/TextureLoaders/BinaryLoader.cpp
-
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderLoader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/ShaderLoaders/SpvLoader.cpp
-
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
 )
 

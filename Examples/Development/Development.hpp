@@ -1,16 +1,15 @@
 #pragma once
 
-#include "BindlessVk/RenderGraph.hpp"
-#include "BindlessVk/RenderPass.hpp"
-#include "BindlessVk/Renderer.hpp"
-#include "BindlessVk/VkContext.hpp"
+#include "BindlessVk/Context/VkContext.hpp"
+#include "BindlessVk/Renderer/Renderer.hpp"
+#include "BindlessVk/Renderer/Rendergraph.hpp"
+#include "BindlessVk/Renderer/Renderpass.hpp"
 #include "Framework/Common/Common.hpp"
 #include "Framework/Core/Application.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Scene/CameraController.hpp"
 #include "Framework/Scene/Scene.hpp"
 #include "Framework/Utils/Timer.hpp"
-
 #include "Rendergraphs/Graph.hpp"
 #include "Rendergraphs/Passes/Forward.hpp"
 #include "Rendergraphs/Passes/UserInterface.hpp"

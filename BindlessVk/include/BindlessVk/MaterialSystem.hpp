@@ -2,8 +2,8 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Shader.hpp"
-#include "BindlessVk/VkContext.hpp"
+#include "BindlessVk/Shader/Shader.hpp"
+#include "BindlessVk/Context/VkContext.hpp"
 
 #include <glm/glm.hpp>
 

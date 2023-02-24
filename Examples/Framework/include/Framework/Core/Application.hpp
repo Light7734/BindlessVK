@@ -4,11 +4,11 @@
 //
 
 #include "BindlessVk/MaterialSystem.hpp"
-#include "BindlessVk/ModelLoader.hpp"
-#include "BindlessVk/Renderer.hpp"
-#include "BindlessVk/Shader.hpp"
-#include "BindlessVk/ShaderLoader.hpp"
-#include "BindlessVk/Texture.hpp"
+#include "BindlessVk/Model/ModelLoader.hpp"
+#include "BindlessVk/Renderer/Renderer.hpp"
+#include "BindlessVk/Shader/Shader.hpp"
+#include "BindlessVk/Shader/ShaderLoader.hpp"
+#include "BindlessVk/Texture/Texture.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Pools/StagingPool.hpp"
 #include "Framework/Scene/CameraController.hpp"

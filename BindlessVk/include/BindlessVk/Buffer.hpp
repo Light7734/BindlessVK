@@ -1,7 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/VkContext.hpp"
+#include "BindlessVk/Context/VkContext.hpp"
 
 #include <vulkan/vulkan.hpp>
 

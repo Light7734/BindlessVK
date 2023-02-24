@@ -1,17 +1,17 @@
 #include "Rendergraphs/Graph.hpp"
 
-#include "BindlessVk/RenderGraph.hpp"
-#include "BindlessVk/RenderPass.hpp"
+#include "BindlessVk/Renderer/Rendergraph.hpp"
+#include "BindlessVk/Renderer/Renderpass.hpp"
 #include "Framework/Common/Common.hpp"
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
 
 BasicRendergraph::BasicRendergraph(ref<bvk::VkContext> const vk_context)
-: bvk::Rendergraph(vk_context)
+    : bvk::Rendergraph(vk_context)
 {
 }
 
-void  BasicRendergraph::on_update(u32 const frame_index, u32 const image_index)
+void BasicRendergraph::on_update(u32 const frame_index, u32 const image_index)
 {
 	auto const device = vk_context->get_device();
 
