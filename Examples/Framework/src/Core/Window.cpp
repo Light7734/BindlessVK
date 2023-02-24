@@ -59,10 +59,10 @@ vk::SurfaceKHR Window::create_surface(vk::Instance instance)
 	VkSurfaceKHR surface = VK_NULL_HANDLE;
 
 	VkResult result = glfwCreateWindowSurface(
-	  instance,
-	  glfw_window_handle,
-	  nullptr,
-	  &surface
+	    instance,
+	    glfw_window_handle,
+	    nullptr,
+	    &surface
 
 	);
 
@@ -81,21 +81,20 @@ void Window::bind_callbacks()
 {
 	// @todo: callbacks
 	glfwSetKeyCallback(
-	  glfw_window_handle,
-	  [](GLFWwindow *window, int key, int scanCode, int action, int mods) {
-		  if (key == GLFW_KEY_ESCAPE)
-			  glfwSetWindowShouldClose(window, true);
-		  if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
-			  if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
-				  int width, height;
-				  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-			  }
-			  else {
-				  glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			  }
-		  }
-		  LOG(trace, "Key pressed: {}", key);
-	  }
+	    glfw_window_handle,
+	    [](GLFWwindow *window, int key, int scanCode, int action, int mods) {
+		    if (key == GLFW_KEY_ESCAPE)
+			    glfwSetWindowShouldClose(window, true);
+		    if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
+			    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
+				    int width, height;
+				    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			    }
+			    else {
+				    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			    }
+		    }
+	    }
 	);
 
 	glfwSetWindowSizeCallback(glfw_window_handle, [](GLFWwindow *window, int width, int height) {

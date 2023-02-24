@@ -1,7 +1,5 @@
 #pragma once
 
-//
-//
 #include "Framework/Common/Common.hpp"
 
 #include <BindlessVk/Common/Common.hpp>
