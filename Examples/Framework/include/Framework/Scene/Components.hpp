@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BindlessVk/MaterialSystem.hpp"
+#include "BindlessVk/Material/MaterialSystem.hpp"
 #include "BindlessVk/Model/Model.hpp"
 #include "Framework/Common/Common.hpp"
 

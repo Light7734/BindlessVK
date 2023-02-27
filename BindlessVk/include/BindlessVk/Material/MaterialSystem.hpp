@@ -1,24 +1,13 @@
-
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Shader/Shader.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
+#include "BindlessVk/Shader/Shader.hpp"
 
 #include <glm/glm.hpp>
 
 namespace BINDLESSVK_NAMESPACE {
 /// @todo
-struct MaterialParameters
-{
-	glm::vec4 base_color_factor;
-	glm::vec4 emissive_factor;
-	glm::vec4 diffuse_factor;
-	glm::vec4 specular_factor;
-	float metallic_factor;
-	float roughness_factor;
-};
-
 /** @brief Shaders and pipeline layout for creating ShaderPasses
  * usually a pair of vertex and fragment shaders
  */
@@ -106,40 +95,34 @@ private:
 class Material
 {
 public:
-	Material(VkContext *vk_context, ShaderEffect *effect, vk::DescriptorPool descriptor_pool)
-	    : effect(effect)
+	struct Parameters
 	{
-		vk::DescriptorSetAllocateInfo allocate_info {
-			descriptor_pool,
-			1,
-			&effect->get_descriptor_set_layouts().back(),
-		};
+		arr<f32, 4> albedo;
+		arr<f32, 4> emissive;
+		arr<f32, 4> diffuse;
+		arr<f32, 4> specular;
+		f32 metallic;
+		f32 roughness;
+	};
 
-		const auto device = vk_context->get_device();
-		assert_false(device.allocateDescriptorSets(&allocate_info, &descriptor_set));
-	}
-
-	Material() = default;
-	Material(const Material &) = default;
-	Material(Material &&) = default;
-
-	Material &operator=(const Material &) = default;
-	Material &operator=(Material &&) = default;
+public:
+	Material(VkContext *vk_context, ShaderEffect *effect, vk::DescriptorPool descriptor_pool);
 
 	~Material() = default;
 
-	inline ShaderEffect *get_effect() const
+	inline auto *get_effect() const
 	{
 		return effect;
 	}
 
-	inline vk::DescriptorSet get_descriptor_set() const
+	inline auto get_descriptor_set() const
 	{
 		return descriptor_set;
 	}
 
 private:
 	ShaderEffect *effect = {};
+	Parameters parametes = {};
 	vk::DescriptorSet descriptor_set = {};
 };
 

@@ -11,6 +11,9 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Swapchain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/VkContext.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Material/MaterialSystem.cpp
+
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/ModelLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/Loaders/GltfLoader.cpp
 
@@ -26,7 +29,6 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/BinaryLoader.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MaterialSystem.cpp
 )
 
 set_target_properties(
