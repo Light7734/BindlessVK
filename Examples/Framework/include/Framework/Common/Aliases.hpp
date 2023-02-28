@@ -18,6 +18,7 @@ using c_str = char const *;
 
 // standard type aliases
 using str = std::string;
+using str_view = std::string_view;
 
 template<typename T>
 using vec = std::vector<T>;
@@ -45,7 +46,6 @@ using pair = std::pair<T1, T2>;
 
 template<typename T>
 using ref = std::shared_ptr<T>;
-
 
 template<typename T>
 using scope = std::unique_ptr<T>;

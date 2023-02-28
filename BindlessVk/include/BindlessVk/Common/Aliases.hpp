@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -31,6 +32,7 @@ using c_str = char const *;
 
 // standard type aliases
 using str = std::string;
+using str_view = std::string_view;
 
 template<typename T>
 using vec = std::vector<T>;
@@ -61,7 +63,6 @@ using pair = std::pair<T1, T2>;
 
 template<typename... Ts>
 using tuple = std::tuple<Ts...>;
-
 
 template<typename T>
 using ref = std::shared_ptr<T>;
