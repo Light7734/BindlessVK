@@ -54,30 +54,38 @@ void DevelopmentExampleApplication::load_shaders()
 
 void DevelopmentExampleApplication::load_shader_effects()
 {
-	shader_effects[hash_str("opaque_mesh")] = bvk::ShaderEffect(
-	    vk_context.get(),
-	    {
-	        &shaders[hash_str("vertex")],
-	        &shaders[hash_str("pixel")],
-	    },
-	    shader_effect_configurations[hash_str("opaque_mesh")],
-	    "opaque_mesh"
+	shader_pipelines.emplace(
+	    hash_str("opaque_mesh"),
+
+	    bvk::ShaderPipeline(
+	        vk_context.get(),
+	        {
+	            &shaders[hash_str("vertex")],
+	            &shaders[hash_str("pixel")],
+	        },
+	        shader_effect_configurations[hash_str("opaque_mesh")],
+	        "opaque_mesh"
+	    )
 	);
 
-	shader_effects[hash_str("skybox")] = bvk::ShaderEffect(
-	    vk_context.get(),
-	    {
-	        &shaders[hash_str("skybox_vertex")],
-	        &shaders[hash_str("skybox_fragment")],
-	    },
-	    shader_effect_configurations[hash_str("skybox")],
-	    "skybox"
+	shader_pipelines.emplace(
+	    hash_str("skybox"),
+
+	    bvk::ShaderPipeline(
+	        vk_context.get(),
+	        {
+	            &shaders[hash_str("skybox_vertex")],
+	            &shaders[hash_str("skybox_fragment")],
+	        },
+	        shader_effect_configurations[hash_str("skybox")],
+	        "skybox"
+	    )
 	);
 }
 
 void DevelopmentExampleApplication::load_pipeline_configuration()
 {
-	shader_effect_configurations[hash_str("opaque_mesh")] = bvk::ShaderEffect::Configuration {
+	shader_effect_configurations[hash_str("opaque_mesh")] = bvk::ShaderPipeline::Configuration {
 		bvk::Model::Vertex::get_vertex_input_state(),
 		vk::PipelineInputAssemblyStateCreateInfo {
 		    {},
@@ -145,7 +153,7 @@ void DevelopmentExampleApplication::load_pipeline_configuration()
 		},
 	};
 
-	shader_effect_configurations[hash_str("skybox")] = bvk::ShaderEffect::Configuration {
+	shader_effect_configurations[hash_str("skybox")] = bvk::ShaderPipeline::Configuration {
 		bvk::Model::Vertex::get_vertex_input_state(),
 		vk::PipelineInputAssemblyStateCreateInfo {
 		    {},
@@ -218,12 +226,16 @@ void DevelopmentExampleApplication::load_materials()
 {
 	materials.emplace(
 	    hash_str("opaque_mesh"),
-	    bvk::Material(vk_context.get(), &shader_effects[hash_str("opaque_mesh")], descriptor_pool)
+	    bvk::Material(
+	        vk_context.get(),
+	        &shader_pipelines.at(hash_str("opaque_mesh")),
+	        descriptor_pool
+	    )
 	);
 
 	materials.emplace(
 	    hash_str("skybox"),
-	    bvk::Material(vk_context.get(), &shader_effects[hash_str("skybox")], descriptor_pool)
+	    bvk::Material(vk_context.get(), &shader_pipelines.at(hash_str("skybox")), descriptor_pool)
 	);
 }
 

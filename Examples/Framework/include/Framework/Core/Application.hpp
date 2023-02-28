@@ -43,8 +43,8 @@ public:
 	hash_map<u64, bvk::Model> models = {};
 	hash_map<u64, bvk::Texture> textures = {};
 	hash_map<u64, bvk::Shader> shaders = {};
-	hash_map<u64, bvk::ShaderEffect> shader_effects = {};
-	hash_map<u64, bvk::ShaderEffect::Configuration> shader_effect_configurations = {};
+	hash_map<u64, bvk::ShaderPipeline> shader_pipelines = {};
+	hash_map<u64, bvk::ShaderPipeline::Configuration> shader_effect_configurations = {};
 	hash_map<u64, bvk::Material> materials = {};
 
 	vk::DescriptorPool descriptor_pool = {};

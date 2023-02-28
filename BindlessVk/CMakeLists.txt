@@ -21,6 +21,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/Rendergraph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/RenderResources.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/ShaderLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Loaders/SpvLoader.cpp
 
