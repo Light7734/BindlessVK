@@ -24,7 +24,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-c_str constexpr default_debug_name = "unnamed";
+str_view constexpr default_debug_name = "unnamed\0";
 
 enum class LogLvl : u8
 {

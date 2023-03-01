@@ -3,21 +3,23 @@
 namespace BINDLESSVK_NAMESPACE {
 
 Buffer::Buffer(
-    c_str const debug_name,
     VkContext const *const vk_context,
     vk::BufferUsageFlags const buffer_usage,
     vma::AllocationCreateInfo const &vma_info,
     vk::DeviceSize const desired_block_size,
-    u32 const block_count
+    u32 const block_count,
+    str_view const debug_name /* = default_debug_name */
 )
     : vk_context(vk_context)
     , block_count(block_count)
     , valid_block_size(desired_block_size)
-{
-	calculate_block_size();
+    , debug_name(debug_name)
 
+{
 	const auto device = vk_context->get_device();
 	const auto allocator = vk_context->get_allocator();
+
+	calculate_block_size();
 
 	buffer = allocator.createBuffer(
 	    {
@@ -35,8 +37,8 @@ Buffer::Buffer(
 		VK_WHOLE_SIZE,
 	};
 
-	allocator.setAllocationName(buffer.allocation, debug_name);
-	vk_context->set_object_name(buffer.buffer, debug_name);
+	allocator.setAllocationName(buffer.allocation, this->debug_name.c_str());
+	vk_context->set_object_name(buffer.buffer, this->debug_name);
 }
 
 Buffer::~Buffer()

@@ -122,7 +122,7 @@ struct Model
 	};
 
 	/// @todo: Support textures with different samplers
-	const char *name;
+	str debug_name;
 	std::vector<Texture> textures;
 	std::vector<MaterialParameters> material_parameters;
 	std::vector<Node *> nodes;

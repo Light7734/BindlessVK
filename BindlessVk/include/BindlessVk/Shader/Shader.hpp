@@ -3,8 +3,6 @@
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 
-#include <string_view>
-
 namespace BINDLESSVK_NAMESPACE {
 
 struct Shader
@@ -38,7 +36,7 @@ public:
 	    VkContext *vk_context,
 	    vec<Shader *> const &shaders,
 	    ShaderPipeline::Configuration configuration,
-	    c_str debug_name = ""
+	    str_view debug_name = ""
 	);
 
 	~ShaderPipeline();
@@ -51,7 +49,7 @@ public:
 
 	inline auto get_name() const
 	{
-		return std::string_view(debug_name);
+		return str_view(debug_name);
 	}
 
 	inline auto get_pipeline() const

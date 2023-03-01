@@ -18,10 +18,10 @@ class SpvLoader
 public:
 	SpvLoader(VkContext const *vk_context);
 
-	Shader load(c_str path);
+	Shader load(str_view path);
 
 private:
-	void load_code(c_str path);
+	void load_code(str_view path);
 	void reflect_code();
 	void create_vulkan_shader_module();
 

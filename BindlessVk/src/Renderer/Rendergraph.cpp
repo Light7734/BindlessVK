@@ -49,7 +49,6 @@ void RenderGraphBuilder::build_graph_buffer_inputs()
 	graph->buffer_inputs.reserve(blueprint_buffer_inputs.size());
 	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
 		graph->buffer_inputs.emplace_back(
-		    blueprint_buffer_input.name.c_str(),
 		    vk_context.get(),
 		    blueprint_buffer_input.type == vk::DescriptorType::eUniformBuffer ?
 		        vk::BufferUsageFlagBits::eUniformBuffer :
@@ -59,7 +58,8 @@ void RenderGraphBuilder::build_graph_buffer_inputs()
 		        vma::MemoryUsage::eAutoPreferDevice,
 		    },
 		    blueprint_buffer_input.size,
-		    BVK_MAX_FRAMES_IN_FLIGHT
+		    BVK_MAX_FRAMES_IN_FLIGHT,
+		    blueprint_buffer_input.name
 		);
 }
 
@@ -86,14 +86,11 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 	graph->descriptor_set_layout = device.createDescriptorSetLayout({ {}, bindings });
 	vk_context->set_object_name(
 	    graph->descriptor_set_layout,
-	    fmt::format("graph_descriptor_set_layout").c_str()
+	    fmt::format("graph_descriptor_set_layout")
 	);
 
 	graph->pipeline_layout = device.createPipelineLayout({ {}, graph->descriptor_set_layout });
-	vk_context->set_object_name(
-	    graph->pipeline_layout,
-	    fmt::format("graph_pipeline_layout").c_str()
-	);
+	vk_context->set_object_name(graph->pipeline_layout, fmt::format("graph_pipeline_layout"));
 
 	if (!bindings.empty())
 	{
@@ -106,7 +103,7 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 
 			vk_context->set_object_name(
 			    graph->descriptor_sets.back(),
-			    fmt::format("graph_descriptor_set_{}", i).c_str()
+			    fmt::format("graph_descriptor_set_{}", i)
 			);
 		}
 	}
@@ -272,7 +269,6 @@ void RenderGraphBuilder::build_pass_buffer_inputs(
 
 	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
 		pass->buffer_inputs.emplace_back(
-		    blueprint_buffer_input.name.c_str(),
 		    vk_context.get(),
 		    blueprint_buffer_input.type == vk::DescriptorType::eUniformBuffer ?
 		        vk::BufferUsageFlagBits::eUniformBuffer :
@@ -284,7 +280,8 @@ void RenderGraphBuilder::build_pass_buffer_inputs(
 		    },
 
 		    blueprint_buffer_input.size,
-		    BVK_MAX_FRAMES_IN_FLIGHT
+		    BVK_MAX_FRAMES_IN_FLIGHT,
+		    blueprint_buffer_input.name
 		);
 }
 
@@ -326,7 +323,7 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 	pass->descriptor_set_layout = device.createDescriptorSetLayout({ {}, bindings });
 	vk_context->set_object_name(
 	    pass->descriptor_set_layout,
-	    fmt::format("{}_descriptor_set_layout", pass->name).c_str()
+	    fmt::format("{}_descriptor_set_layout", pass->name)
 	);
 
 	auto const layouts = arr<vk::DescriptorSetLayout, 2> {
@@ -353,7 +350,7 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 
 			vk_context->set_object_name(
 			    pass->descriptor_sets.back(),
-			    fmt::format("{}_descriptor_set_{}", pass->name, i).c_str()
+			    fmt::format("{}_descriptor_set_{}", pass->name, i)
 			);
 		}
 	}

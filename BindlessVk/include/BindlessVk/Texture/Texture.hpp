@@ -18,9 +18,6 @@ struct Texture
 		eCubeMap
 	};
 
-
-	c_str name;
-
 	// @todo: should we delete sampler,image_view,current_layout because of this?
 	vk::DescriptorImageInfo descriptor_info;
 
@@ -35,6 +32,8 @@ struct Texture
 	vk::ImageLayout current_layout;
 
 	AllocatedImage image;
+
+	str debug_name;
 
 	inline void transition_layout(
 	    VkContext const *const vk_context,

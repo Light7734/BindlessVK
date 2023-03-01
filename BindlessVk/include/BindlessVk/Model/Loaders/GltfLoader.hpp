@@ -28,12 +28,12 @@ public:
 	GltfLoader() = default;
 	~GltfLoader() = default;
 
-	auto load_from_ascii(c_str debug_name, c_str file_path) -> Model;
-	auto load_from_binary(c_str debug_name, c_str file_path) -> Model = delete;
+	auto load_from_ascii(str_view file_path, str_view debug_name) -> Model;
+	auto load_from_binary(str_view file_path, str_view debug_name) -> Model = delete;
 
 private:
-	void load_gltf_model_from_ascii(c_str file_path);
-	void load_gltf_model_from_binary(c_str file_path) = delete;
+	void load_gltf_model_from_ascii(str_view file_path);
+	void load_gltf_model_from_binary(str_view file_path) = delete;
 
 	void load_textures();
 	void load_material_parameters();
@@ -53,7 +53,7 @@ private:
 
 	auto get_primitive_attribute_buffer(
 	    const tinygltf::Primitive &gltf_primitive,
-	    const char *attribute_name
+	    str_view attribute_name
 	) -> const f32 *;
 
 	auto get_primitive_vertex_count(tinygltf::Primitive const &gltf_primitive) -> usize;

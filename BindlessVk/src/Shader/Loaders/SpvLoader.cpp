@@ -6,7 +6,7 @@ SpvLoader::SpvLoader(VkContext const *const vk_context): vk_context(vk_context)
 {
 }
 
-Shader SpvLoader::load(c_str const path)
+Shader SpvLoader::load(str_view const path)
 {
 	load_code(path);
 	reflect_code();
@@ -16,9 +16,9 @@ Shader SpvLoader::load(c_str const path)
 	return shader;
 }
 
-void SpvLoader::load_code(c_str const path)
+void SpvLoader::load_code(str_view const path)
 {
-	auto file_stream = std::ifstream(path, std::ios::ate);
+	auto file_stream = std::ifstream(path.data(), std::ios::ate);
 	usize const file_size = file_stream.tellg();
 	code.resize(file_size / sizeof(u32));
 

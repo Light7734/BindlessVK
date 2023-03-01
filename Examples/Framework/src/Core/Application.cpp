@@ -180,20 +180,22 @@ void Application::load_default_textures()
 {
 	u8 defaultTexturePixelData[] = { 255, 0, 255, 255 };
 	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
-	    "default_2d",
 	    defaultTexturePixelData,
 	    1,
 	    1,
 	    sizeof(defaultTexturePixelData),
 	    bvk::Texture::Type::e2D,
-	    staging_pool.get_by_index(0)
+	    staging_pool.get_by_index(0),
+	    vk::ImageLayout::eShaderReadOnlyOptimal,
+	    "default_2d"
 	);
 
 	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
-	    "default_cube",
 	    "Assets/cubemap_yokohama_rgba.ktx",
 	    bvk::Texture::Type::eCubeMap,
-	    staging_pool.get_by_index(0)
+	    staging_pool.get_by_index(0),
+	    vk::ImageLayout::eShaderReadOnlyOptimal,
+	    "default_cube"
 	);
 }
 

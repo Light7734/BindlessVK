@@ -13,13 +13,13 @@ public:
 	BinaryLoader(VkContext const *const vk_context, Buffer *staging_buffer);
 
 	Texture load(
-	    c_str name,
 	    u8 const *const pixels,
 	    u32 width,
 	    u32 height,
 	    vk::DeviceSize size,
 	    Texture::Type type,
-	    vk::ImageLayout final_layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    vk::ImageLayout final_layout,
+	    str_view debug_name
 	);
 
 private:

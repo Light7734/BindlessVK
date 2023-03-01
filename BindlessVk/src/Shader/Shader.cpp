@@ -5,7 +5,7 @@ ShaderPipeline::ShaderPipeline(
     VkContext *const vk_context,
     vec<Shader *> const &shaders,
     ShaderPipeline::Configuration const configuration,
-    c_str const debug_name /* = "" */
+    str_view const debug_name /* = "" */
 )
     : vk_context(vk_context)
     , debug_name(debug_name)
@@ -132,7 +132,8 @@ void ShaderPipeline::create_pipeline(
 		&pipeline_rendering_info,
 	};
 
-	auto const [result, graphics_pipeline] = device.createGraphicsPipeline({}, graphics_pipeline_info);
+	auto const [result, graphics_pipeline] =
+	    device.createGraphicsPipeline({}, graphics_pipeline_info);
 
 	assert_false(result);
 	pipeline = graphics_pipeline;

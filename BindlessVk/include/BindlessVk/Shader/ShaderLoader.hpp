@@ -25,13 +25,13 @@ public:
 	 * @brief Loads a shader from spv file
 	 * @param file_path path to the spv shader file
 	 */
-	auto load_from_spv(c_str file_path) -> Shader;
+	auto load_from_spv(str_view file_path) -> Shader;
 
 	/** @todo Implement */
-	auto load_from_glsl(c_str file_path) -> Shader = delete;
+	auto load_from_glsl(str_view file_path) -> Shader = delete;
 
 	/** @todo Implement  */
-	auto load_from_hlsl(c_str file_path) -> Shader = delete;
+	auto load_from_hlsl(str_view file_path) -> Shader = delete;
 
 private:
 	ref<VkContext const> vk_context = {};

@@ -22,15 +22,10 @@ public:
 	KtxLoader() = default;
 	~KtxLoader() = default;
 
-	Texture load(
-	    c_str name,
-	    c_str path,
-	    Texture::Type type,
-	    vk::ImageLayout final_layout = vk::ImageLayout::eShaderReadOnlyOptimal
-	);
+	Texture load(str_view path, Texture::Type type, vk::ImageLayout final_layout, str_view name);
 
 private:
-	void load_ktx_texture(str const &path);
+	void load_ktx_texture(str_view path);
 	void destroy_ktx_texture();
 
 	void stage_texture_data();

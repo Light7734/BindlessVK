@@ -8,7 +8,7 @@ ShaderLoader::ShaderLoader(ref<VkContext const> const vk_context): vk_context(vk
 {
 }
 
-auto ShaderLoader::load_from_spv(c_str const file_path) -> Shader
+auto ShaderLoader::load_from_spv(str_view const file_path) -> Shader
 {
 	SpvLoader loader(vk_context.get());
 	return loader.load(file_path);

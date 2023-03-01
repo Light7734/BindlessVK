@@ -88,30 +88,30 @@ public:
 	}
 
 	template<typename T>
-	inline void set_object_name(T object, str name) const
+	inline void set_object_name(T object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.objectType,
 		    (u64)((typename T::NativeType)(object)),
-		    name.c_str(),
+		    name.data(),
 		});
 	}
 
-	inline void set_object_name(AllocatedImage object, c_str name) const
+	inline void set_object_name(AllocatedImage object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.image.objectType,
 		    (u64)((VkImage)(object.image)),
-		    name,
+		    name.data(),
 		});
 	}
 
-	inline void set_object_name(AllocatedDescriptorSet object, c_str name) const
+	inline void set_object_name(AllocatedDescriptorSet object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.descriptor_set.objectType,
 		    (u64)((VkDescriptorSet)(object.descriptor_set)),
-		    name,
+		    name.data(),
 		});
 	}
 
@@ -196,14 +196,14 @@ public:
 		return num_threads;
 	}
 
-	inline auto get_instance_proc_addr(c_str proc_name) const
+	inline auto get_instance_proc_addr(str_view proc_name) const
 	{
-		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name);
+		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name.data());
 	}
 
-	inline auto get_device_proc_addr(c_str proc_name) const
+	inline auto get_device_proc_addr(str_view proc_name) const
 	{
-		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr(device, proc_name);
+		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr(device, proc_name.data());
 	}
 
 private:

@@ -17,11 +17,11 @@ ModelLoader::ModelLoader(ref<VkContext const> const vk_context)
 }
 
 auto ModelLoader::load_from_gltf_ascii(
-    c_str name,
-    c_str file_path,
+    str_view file_path,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
-    Buffer *const staging_image_buffer
+    Buffer *const staging_image_buffer,
+    str_view debug_name /* = default_debug_name */
 ) const -> Model
 {
 	GltfLoader loader(
@@ -31,7 +31,8 @@ auto ModelLoader::load_from_gltf_ascii(
 	    staging_index_buffer, //
 	    staging_image_buffer
 	);
-	return loader.load_from_ascii(name, file_path);
+
+	return loader.load_from_ascii(file_path, debug_name);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

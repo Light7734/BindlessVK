@@ -36,18 +36,17 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 
 void DevelopmentExampleApplication::load_shaders()
 {
-	c_str constexpr DIRECTORY = "Shaders/";
+	auto constexpr DIRECTORY = "Shaders/";
 
 	for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY)) {
-		const str path(shader_file.path().c_str());
-		const str name(shader_file.path().filename().replace_extension().c_str());
-		const str extension(shader_file.path().extension().c_str());
+		str const path(shader_file.path().c_str());
+		str const extension(shader_file.path().extension().c_str());
+		str const name(shader_file.path().filename().replace_extension());
 
-		if (strcmp(extension.c_str(), ".spv")) {
+		if (strcmp(extension.c_str(), ".spv"))
 			continue;
-		}
 
-		shaders[hash_str(name.c_str())] = shader_loader.load_from_spv(path.c_str());
+		shaders[hash_str(name)] = shader_loader.load_from_spv(path);
 		logger.log(spdlog::level::trace, "Loaded shader {}", name);
 	}
 }
@@ -244,22 +243,22 @@ void DevelopmentExampleApplication::load_models()
 	models.emplace(
 	    hash_str("flight_helmet"),
 	    model_loader.load_from_gltf_ascii(
-	        "flight_helmet",
 	        "Assets/FlightHelmet/FlightHelmet.gltf",
 	        staging_pool.get_by_index(0u),
 	        staging_pool.get_by_index(1u),
-	        staging_pool.get_by_index(2u)
+	        staging_pool.get_by_index(2u),
+	        "flight_helmet"
 	    )
 	);
 
 	models.emplace(
 	    hash_str("skybox"),
 	    model_loader.load_from_gltf_ascii(
-	        "skybox",
 	        "Assets/Cube/Cube.gltf",
 	        staging_pool.get_by_index(0u),
 	        staging_pool.get_by_index(1u),
-	        staging_pool.get_by_index(2u)
+	        staging_pool.get_by_index(2u),
+	        "skybox"
 	    )
 	);
 }

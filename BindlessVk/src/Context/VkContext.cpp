@@ -208,10 +208,8 @@ void VkContext::create_vulkan_instance()
 	auto const instance_info = vk::InstanceCreateInfo {
 		{},
 		&application_info,
-		static_cast<u32>(layers.size()),
-		layers.data(),
-		static_cast<u32>(instance_extensions.size()),
-		instance_extensions.data(),
+		layers,
+		instance_extensions,
 	};
 
 	assert_false(vk::createInstance(&instance_info, nullptr, &instance));
@@ -345,12 +343,8 @@ void VkContext::create_command_pools()
 	};
 
 	for (u32 i = 0; i < num_threads; i++)
-	{
 		for (u32 j = 0; j < BVK_MAX_FRAMES_IN_FLIGHT; j++)
-		{
 			dynamic_cmd_pools.push_back(device.createCommandPool(command_pool_info));
-		}
-	}
 
 	immediate_fence = device.createFence({});
 	immediate_cmd_pool = device.createCommandPool(command_pool_info);

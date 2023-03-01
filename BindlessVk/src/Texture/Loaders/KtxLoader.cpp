@@ -10,13 +10,13 @@ KtxLoader::KtxLoader(VkContext const *const vk_context, Buffer *const staging_bu
 }
 
 Texture KtxLoader::load(
-    c_str const name,
-    c_str const path,
+    str_view const path,
     Texture::Type const type,
-    vk::ImageLayout const final_layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
+    vk::ImageLayout const final_layout,
+    str_view const debug_name
 )
 {
-	texture = { name };
+	texture = Texture { .debug_name = str(debug_name) };
 
 	load_ktx_texture(path);
 
@@ -32,16 +32,16 @@ Texture KtxLoader::load(
 	return texture;
 }
 
-void KtxLoader::load_ktx_texture(str const &path)
+void KtxLoader::load_ktx_texture(str_view const path)
 {
 	assert_false(
 	    ktxTexture_CreateFromNamedFile(
-	        path.c_str(),
+	        path.data(),
 	        KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT,
 	        &ktx_texture
 	    ),
 	    "Failed to load ktx file: \nname: {}\npath: {}",
-	    texture.name,
+	    texture.debug_name,
 	    path
 	);
 

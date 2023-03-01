@@ -5,7 +5,7 @@
 #include <map>
 #include <variant>
 
-enum class CVarType : uint8_t
+enum class CVarType : u8
 {
 	Boolean,
 	Float,
@@ -21,17 +21,17 @@ public:
 		value = value;
 	}
 
-	CVarVal(float value)
+	CVarVal(f32 value)
 	{
 		value = value;
 	}
 
-	CVarVal(int value)
+	CVarVal(i32 value)
 	{
 		value = value;
 	}
 
-	CVarVal(std::string value)
+	CVarVal(str value)
 	{
 		value = value;
 	}
@@ -41,70 +41,70 @@ public:
 		return std::get<bool>(value);
 	}
 
-	inline operator bool*()
+	inline operator bool *()
 	{
 		return std::get_if<bool>(&value);
 	}
 
-	inline operator float() const
+	inline operator f32() const
 	{
-		return std::get<float>(value);
+		return std::get<f32>(value);
 	}
 
-	inline operator float*()
+	inline operator f32 *()
 	{
-		return std::get_if<float>(&value);
+		return std::get_if<f32>(&value);
 	}
 
-	inline operator int() const
+	inline operator i32() const
 	{
-		return std::get<int>(value);
+		return std::get<i32>(value);
 	}
 
-	inline operator int*()
+	inline operator i32 *()
 	{
-		return std::get_if<int>(&value);
+		return std::get_if<i32>(&value);
 	}
 
-	inline operator std::string() const
+	inline operator str() const
 	{
-		return std::get<std::string>(value);
+		return std::get<str>(value);
 	}
 
-	inline operator std::string*()
+	inline operator str *()
 	{
-		return std::get_if<std::string>(&value);
+		return std::get_if<str>(&value);
 	}
 
 private:
-	std::variant<bool, int, float, std::string> value;
+	std::variant<bool, i32, f32, str> value;
 };
 
 class CVar
 {
 public:
 	static inline void create(
-	  CVarType type,
-	  const char* name,
-	  const char* description,
-	  CVarVal default_value,
-	  CVarVal current_value
+	    CVarType type,
+	    str_view name,
+	    str_view description,
+	    CVarVal default_value,
+	    CVarVal current_value
 	)
 	{
 		get_instance()->create_impl(type, name, description, default_value, current_value);
 	}
 
-	static inline void set(const char* name, CVarVal value)
+	static inline void set(str_view name, CVarVal value)
 	{
 		get_instance()->set_impl(name, value);
 	}
 
-	static inline void reset(const char* name)
+	static inline void reset(str_view name)
 	{
 		get_instance()->reset_impl(name);
 	}
 
-	static inline CVarVal get(const char* name)
+	static inline CVarVal get(str_view name)
 	{
 		return get_instance()->get_impl(name);
 	}
@@ -115,21 +115,21 @@ public:
 	}
 
 private:
-	static CVar* get_instance();
+	static CVar *get_instance();
 
 	void create_impl(
-	  CVarType type,
-	  const char* name,
-	  const char* description,
-	  CVarVal default_value,
-	  CVarVal current_value
+	    CVarType type,
+	    str_view name,
+	    str_view description,
+	    CVarVal default_value,
+	    CVarVal current_value
 	);
 
-	void set_impl(const char* name, CVarVal value);
+	void set_impl(str_view name, CVarVal value);
 
-	void reset_impl(const char* name);
+	void reset_impl(str_view name);
 
-	CVarVal get_impl(const char* name);
+	CVarVal get_impl(str_view name);
 
 	void draw_imgui_editor_impl();
 
@@ -140,30 +140,41 @@ private:
 		{
 		}
 
-		CVarEntry(CVarType type, CVarVal current_value, CVarVal default_value)
-		  : type(type)
-		  , current_value(current_value)
-		  , default_value(default_value)
+		CVarEntry(
+		    str_view name,
+		    str_view description,
+		    CVarType type,
+		    CVarVal current_value,
+		    CVarVal default_value
+		)
+		    : name(name)
+		    , description(description)
+		    , type(type)
+		    , current_value(current_value)
+		    , default_value(default_value)
 		{
 		}
+
+		str name;
+		str description;
 
 		CVarType type;
 		CVarVal current_value;
 		CVarVal default_value;
 	};
 
-	std::map<std::string, CVarEntry> vars;
+	hash_map<u64, CVarEntry> vars;
 };
 
 class AutoCVar
 {
 public:
 	AutoCVar(
-	  CVarType type,
-	  const char* name,
-	  const char* description,
-	  CVarVal default_value,
-	  CVarVal current_value
+	    CVarType type,
+	    str_view name,
+	    str_view description,
+	    CVarVal default_value,
+	    CVarVal current_value
 	)
 	{
 		CVar::create(type, name, description, default_value, current_value);

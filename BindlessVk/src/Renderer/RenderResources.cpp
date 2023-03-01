@@ -84,7 +84,7 @@ void RenderResources::create_color_attachment(
 	};
 	vk_context->set_object_name(
 	    image,
-	    fmt::format("{}_image (single)", blueprint_attachment.debug_name).c_str()
+	    fmt::format("{}_image (single)", blueprint_attachment.debug_name)
 	);
 
 	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
@@ -103,7 +103,7 @@ void RenderResources::create_color_attachment(
 
 	vk_context->set_object_name(
 	    image_view,
-	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name).c_str()
+	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name)
 	);
 
 	attachment_indices[blueprint_attachment.hash] = containers.size();
@@ -169,7 +169,7 @@ void RenderResources::create_depth_attachment(
 
 	vk_context->set_object_name(
 	    image,
-	    fmt::format("{}_depth_image", blueprint_attachment.debug_name).c_str()
+	    fmt::format("{}_depth_image", blueprint_attachment.debug_name)
 	);
 
 	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
@@ -194,7 +194,7 @@ void RenderResources::create_depth_attachment(
 
 	vk_context->set_object_name(
 	    image_view,
-	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name).c_str()
+	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name)
 	);
 
 	attachment_indices[blueprint_attachment.hash] = containers.size();
@@ -256,7 +256,7 @@ void RenderResources::create_transient_attachment(
 
 	vk_context->set_object_name(
 	    image,
-	    fmt::format("{}_transient_image", blueprint_attachment.debug_name).c_str()
+	    fmt::format("{}_transient_image", blueprint_attachment.debug_name)
 	);
 
 	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
@@ -283,7 +283,7 @@ void RenderResources::create_transient_attachment(
 
 	vk_context->set_object_name(
 	    image_view,
-	    fmt::format("{}_transient_image_view", blueprint_attachment.debug_name).c_str()
+	    fmt::format("{}_transient_image_view", blueprint_attachment.debug_name)
 	);
 
 	transient_attachments.emplace_back(TransientAttachment {

@@ -24,30 +24,30 @@ TextureLoader::TextureLoader(ref<VkContext const> const vk_context): vk_context(
 }
 
 auto TextureLoader::load_from_binary(
-    c_str const name,
     u8 const *const pixels,
     i32 const width,
     i32 const height,
     vk::DeviceSize const size,
     Texture::Type const type,
     Buffer *const staging_buffer,
-    vk::ImageLayout const final_layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
+    vk::ImageLayout const final_layout, /* = vk::ImageLayout::eShaderReadOnlyOptimal */
+    str_view const debug_name           /* = default_debug_name */
 ) const -> Texture
 {
 	BinaryLoader loader(vk_context.get(), staging_buffer);
-	return loader.load(name, pixels, width, height, size, type, final_layout);
+	return loader.load(pixels, width, height, size, type, final_layout, debug_name);
 }
 
 auto TextureLoader::load_from_ktx(
-    c_str const name,
-    c_str const uri,
+    str_view const uri,
     Texture::Type const type,
     Buffer *const staging_buffer,
-    vk::ImageLayout const layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
+    vk::ImageLayout const layout, /* = vk::ImageLayout::eShaderReadOnlyOptimal */
+    str_view const debug_name     /* = default_debug_name */
 ) const -> Texture
 {
 	KtxLoader loader(vk_context.get(), staging_buffer);
-	return loader.load(name, uri, type, layout);
+	return loader.load(uri, type, layout, debug_name);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

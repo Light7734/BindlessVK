@@ -41,11 +41,11 @@ public:
 	 * @param file_path path to the gltf model file
 	 */
 	auto load_from_gltf_ascii(
-	    c_str debug_name,
-	    c_str file_path,
+	    str_view file_path,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
-	    Buffer *staging_image_buffer
+	    Buffer *staging_image_buffer,
+	    str_view debug_name = default_debug_name
 	) const -> Model;
 
 	/** @todo Implement */

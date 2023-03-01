@@ -11,12 +11,12 @@ class Buffer
 {
 public:
 	Buffer(
-	    c_str debug_name,
 	    VkContext const *vk_context,
 	    vk::BufferUsageFlags buffer_usage,
 	    vma::AllocationCreateInfo const &vma_info,
 	    vk::DeviceSize min_block_size,
-	    u32 block_count
+	    u32 block_count,
+	    str_view debug_name = default_debug_name
 	);
 
 	Buffer(Buffer &&other) noexcept
@@ -100,6 +100,8 @@ private:
 	u32 block_count = {};
 
 	vk::DescriptorBufferInfo descriptor_info = {};
+
+	str debug_name = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

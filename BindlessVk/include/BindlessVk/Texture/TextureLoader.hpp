@@ -32,14 +32,14 @@ public:
 	 * @param layout final layout of the created texture
 	 */
 	auto load_from_binary(
-	    c_str name,
 	    u8 const *pixels,
 	    i32 width,
 	    i32 height,
 	    vk::DeviceSize size,
 	    Texture::Type type,
 	    Buffer *staging_buffer,
-	    vk::ImageLayout final_layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    vk::ImageLayout final_layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+	    str_view debug_name = default_debug_name
 	) const -> Texture;
 
 	/** @brief Loads a texture from a ktx(khronos texture) file
@@ -49,11 +49,11 @@ public:
 	 * @param layout final layout of the created texture
 	 */
 	auto load_from_ktx(
-	    c_str name,
-	    c_str uri,
+	    str_view uri,
 	    Texture::Type type,
 	    Buffer *staging_buffer,
-	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal
+	    vk::ImageLayout layout = vk::ImageLayout::eShaderReadOnlyOptimal,
+	    str_view debug_name = default_debug_name
 	) const -> Texture;
 
 private:

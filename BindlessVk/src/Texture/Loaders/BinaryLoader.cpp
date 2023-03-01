@@ -9,17 +9,16 @@ BinaryLoader::BinaryLoader(VkContext const *const vk_context, Buffer *staging_bu
 }
 
 Texture BinaryLoader::load(
-    c_str name,
     u8 const *const pixels,
     u32 width,
     u32 height,
     vk::DeviceSize size,
     Texture::Type type,
-    vk::ImageLayout final_layout /* = vk::ImageLayout::eShaderReadOnlyOptimal */
+    vk::ImageLayout final_layout,
+    str_view const debug_name
 )
 {
 	texture = Texture {
-		name,
 		{},
 		width,
 		height,
@@ -30,6 +29,7 @@ Texture BinaryLoader::load(
 		{},
 		vk::ImageLayout::eUndefined,
 		{},
+		str(debug_name),
 	};
 
 	create_image();
