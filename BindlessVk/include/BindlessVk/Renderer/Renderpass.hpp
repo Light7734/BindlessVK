@@ -3,9 +3,6 @@
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 
-#include <any>
-#include <glm/glm.hpp>
-
 namespace BINDLESSVK_NAMESPACE {
 
 class Rendergraph;
@@ -17,11 +14,11 @@ public:
 	friend class RenderpassBlueprint;
 
 public:
-	Renderpass(VkContext* vk_context): vk_context(vk_context)
+	Renderpass(VkContext *vk_context): vk_context(vk_context)
 	{
 	}
 
-    virtual ~Renderpass() = default;
+	virtual ~Renderpass() = default;
 
 	struct Attachment
 	{
@@ -105,7 +102,7 @@ public:
 	}
 
 protected:
-	VkContext* vk_context;
+	VkContext *vk_context;
 
 	str name;
 

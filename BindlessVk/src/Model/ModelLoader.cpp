@@ -3,11 +3,6 @@
 #include "BindlessVk/Buffer.hpp"
 #include "BindlessVk/Model/Loaders/GltfLoader.hpp"
 
-#include <fmt/format.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <tiny_gltf.h>
-
 namespace BINDLESSVK_NAMESPACE {
 
 ModelLoader::ModelLoader(ref<VkContext const> const vk_context)
@@ -17,11 +12,11 @@ ModelLoader::ModelLoader(ref<VkContext const> const vk_context)
 }
 
 auto ModelLoader::load_from_gltf_ascii(
-    str_view file_path,
+    str_view const file_path,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_image_buffer,
-    str_view debug_name /* = default_debug_name */
+    str_view const debug_name /* = default_debug_name */
 ) const -> Model
 {
 	GltfLoader loader(

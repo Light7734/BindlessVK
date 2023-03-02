@@ -5,11 +5,6 @@
 #include "BindlessVk/Model/Model.hpp"
 #include "BindlessVk/Texture/TextureLoader.hpp"
 
-#include <glm/glm.hpp>
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
-
 namespace BINDLESSVK_NAMESPACE {
 
 /**

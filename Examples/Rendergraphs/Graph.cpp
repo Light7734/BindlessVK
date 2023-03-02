@@ -31,7 +31,10 @@ void BasicRendergraph::on_update(u32 const frame_index, u32 const image_index)
 		    *frame_data = {
 			    .projection = camera_comp.get_projection(),
 			    .view = camera_comp.get_view(transform_comp.translation),
-			    .viewPos = glm::vec4(transform_comp.translation, 1.0f),
+			    .viewPos = glm::vec4 { transform_comp.translation.x,
+			                           transform_comp.translation.y,
+			                           transform_comp.translation.z,
+			                           1.0f },
 		    };
 	    });
 

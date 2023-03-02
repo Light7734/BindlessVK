@@ -4,8 +4,6 @@
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Shader/Shader.hpp"
 
-#include <glm/glm.hpp>
-
 namespace BINDLESSVK_NAMESPACE {
 /// @todo
 /** @brief Shaders and pipeline layout for creating ShaderPasses

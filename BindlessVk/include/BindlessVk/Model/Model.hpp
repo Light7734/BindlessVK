@@ -3,7 +3,6 @@
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Texture/Texture.hpp"
 
-#include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
 namespace BINDLESSVK_NAMESPACE {
@@ -12,19 +11,19 @@ struct Model
 {
 	struct Vertex
 	{
-		glm::vec3 position;
-		glm::vec3 normal;
-		glm::vec3 tangent;
-		glm::vec2 uv;
-		glm::vec3 color;
+		vec3 position;
+		vec3 normal;
+		vec3 tangent;
+		vec2 uv;
+		vec3 color;
 
 		static constexpr std::array<vk::VertexInputBindingDescription, 1> get_bindings()
 		{
 			return {
 				vk::VertexInputBindingDescription {
-				    0u,                                           // binding
-				    static_cast<uint32_t>(sizeof(Model::Vertex)), // stride
-				    vk::VertexInputRate::eVertex,                 // inputRate
+				    0u,                                      // binding
+				    static_cast<u32>(sizeof(Model::Vertex)), // stride
+				    vk::VertexInputRate::eVertex,            // inputRate
 				},
 			};
 		}
@@ -75,10 +74,10 @@ struct Model
 
 			return vk::PipelineVertexInputStateCreateInfo {
 				{},
-				static_cast<uint32_t>(bindings.size()),
+				static_cast<u32>(bindings.size()),
 				bindings.data(),
 
-				static_cast<uint32_t>(attributes.size()),
+				static_cast<u32>(attributes.size()),
 				attributes.data(),
 			};
 		}
@@ -86,9 +85,9 @@ struct Model
 
 	struct Primitive
 	{
-		uint32_t first_index;
-		uint32_t index_count;
-		int32_t material_index;
+		u32 first_index;
+		u32 index_count;
+		i32 material_index;
 	};
 
 	struct Node
@@ -104,28 +103,28 @@ struct Model
 		}
 
 		Node *parent;
-		std::vector<Node *> children;
+		vec<Node *> children;
 
-		std::vector<Primitive> mesh;
-		glm::mat4 transform;
+		vec<Primitive> mesh;
+		mat4f transform;
 	};
 
 	struct MaterialParameters
 	{
-		glm::vec3 albedo_factor = glm::vec4(1.0f);
-		glm::vec3 diffuse_factor = glm::vec4(1.0f);
-		glm::vec3 specular_factor = glm::vec4(1.0f);
+		vec3 albedo_factor = vec3(1.0f);
+		vec3 diffuse_factor = vec3(1.0f);
+		vec3 specular_factor = vec3(1.0f);
 
-		int32_t albedo_texture_index;
-		int32_t normal_texture_index;
-		int32_t metallic_roughness_texture_index;
+		i32 albedo_texture_index;
+		i32 normal_texture_index;
+		i32 metallic_roughness_texture_index;
 	};
 
 	/// @todo: Support textures with different samplers
 	str debug_name;
-	std::vector<Texture> textures;
-	std::vector<MaterialParameters> material_parameters;
-	std::vector<Node *> nodes;
+	vec<Texture> textures;
+	vec<MaterialParameters> material_parameters;
+	vec<Node *> nodes;
 
 	class Buffer *vertex_buffer;
 	class Buffer *index_buffer;

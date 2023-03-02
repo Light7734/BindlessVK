@@ -6,7 +6,6 @@
 #include "BindlessVk/Model/Model.hpp"
 #include "BindlessVk/Texture/TextureLoader.hpp"
 
-#include <glm/glm.hpp>
 #include <tiny_gltf.h>
 
 namespace BINDLESSVK_NAMESPACE {
