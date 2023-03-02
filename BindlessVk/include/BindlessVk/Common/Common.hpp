@@ -1,16 +1,6 @@
 #pragma once
+
 #ifndef BINDLESSVK_NAMESPACE
-	#define BINDLESSVK_NAMESPACE bvk
-#endif
-
-#include "BindlessVk/Common/Aliases.hpp"
-#include "BindlessVk/Common/Assertions.hpp"
-#include "BindlessVk/Common/Vulkan.hpp"
-
-#include <exception>
-#include <fmt/format.h>
-
-#if !defined(BINDLESSVK_NAMESPACE)
 	#define BINDLESSVK_NAMESPACE bvk
 #endif
 
@@ -21,6 +11,17 @@
 #ifndef BVK_DESIRED_SWAPCHAIN_IMAGES
 	#define BVK_DESIRED_SWAPCHAIN_IMAGES 3
 #endif
+
+#include "BindlessVk/Common/Aliases.hpp"
+#include "BindlessVk/Common/Assertions.hpp"
+#include "BindlessVk/Common/Types/Mat.hpp"
+#include "BindlessVk/Common/Types/Vec2.hpp"
+#include "BindlessVk/Common/Types/Vec3.hpp"
+#include "BindlessVk/Common/Types/Vec4.hpp"
+#include "BindlessVk/Common/Vulkan.hpp"
+
+#include <exception>
+#include <fmt/format.h>
 
 namespace BINDLESSVK_NAMESPACE {
 
