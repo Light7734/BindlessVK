@@ -1,0 +1,97 @@
+#include "BindlessVk/Model/Model.hpp"
+
+#include "BindlessVk/Buffer.hpp"
+
+namespace BINDLESSVK_NAMESPACE {
+
+Model::Model(Model &&other)
+{
+	*this = std::move(other);
+}
+
+Model &Model::operator=(Model &&other)
+{
+	this->nodes = other.nodes;
+	this->textures = other.textures;
+	this->debug_name = other.debug_name;
+	this->index_buffer = other.index_buffer;
+	this->vertex_buffer = other.vertex_buffer;
+	this->material_parameters = other.material_parameters;
+
+	other.nodes.clear();
+
+	return *this;
+}
+
+Model::~Model()
+{
+	if (nodes.empty())
+		return;
+
+	for (auto *node : nodes)
+		delete node;
+
+	delete index_buffer;
+	delete vertex_buffer;
+}
+
+auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription, 5>
+{
+	return arr<vk::VertexInputAttributeDescription, 5> {
+		vk::VertexInputAttributeDescription {
+		    0u,
+		    0u,
+		    vk::Format::eR32G32B32Sfloat,
+		    offsetof(Model::Vertex, position),
+		},
+		vk::VertexInputAttributeDescription {
+		    1u,
+		    0u,
+		    vk::Format::eR32G32B32Sfloat,
+		    offsetof(Model::Vertex, normal),
+		},
+		vk::VertexInputAttributeDescription {
+		    2u,
+		    0u,
+		    vk::Format::eR32G32B32Sfloat,
+		    offsetof(Model::Vertex, tangent),
+		},
+		vk::VertexInputAttributeDescription {
+		    3u,
+		    0u,
+		    vk::Format::eR32G32Sfloat,
+		    offsetof(Model::Vertex, uv),
+		},
+		vk::VertexInputAttributeDescription {
+		    4u,
+		    0u,
+		    vk::Format::eR32G32B32Sfloat,
+		    offsetof(Model::Vertex, color),
+		},
+	};
+}
+
+auto Model::Vertex::get_bindings() -> arr<vk::VertexInputBindingDescription, 1>
+{
+	return arr<vk::VertexInputBindingDescription, 1> {
+		vk::VertexInputBindingDescription {
+		    0u,
+		    static_cast<u32>(sizeof(Model::Vertex)),
+		    vk::VertexInputRate::eVertex,
+		},
+	};
+}
+
+auto Model::Vertex::get_vertex_input_state() -> vk::PipelineVertexInputStateCreateInfo
+{
+	auto static const attributes = get_attributes();
+	auto static const bindings = get_bindings();
+
+	return vk::PipelineVertexInputStateCreateInfo {
+		{},
+		bindings,
+		attributes,
+	};
+}
+
+} // namespace BINDLESSVK_NAMESPACE

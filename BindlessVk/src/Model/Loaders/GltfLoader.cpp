@@ -23,7 +23,7 @@ GltfLoader::GltfLoader(
 
 auto GltfLoader::load_from_ascii(str_view const file_path, str_view const debug_name) -> Model
 {
-	model = { debug_name.data() };
+	model.debug_name = debug_name;
 
 	load_gltf_model_from_ascii(file_path);
 
@@ -34,7 +34,7 @@ auto GltfLoader::load_from_ascii(str_view const file_path, str_view const debug_
 	stage_mesh_data();
 	write_mesh_data_to_gpu();
 
-	return model;
+	return std::move(model);
 }
 
 void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
@@ -85,8 +85,10 @@ void GltfLoader::load_material_parameters()
 		);
 
 		model.material_parameters.push_back({
-		    .albedo_factor = vec3(1.0),
-		    .albedo_texture_index = material.values.at("baseColorTexture").TextureIndex(),
+		    vec3(1.0),
+		    vec3(1.0),
+		    vec3(1.0),
+		    material.values.at("baseColorTexture").TextureIndex(),
 		});
 	}
 }

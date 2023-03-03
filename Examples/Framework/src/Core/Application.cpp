@@ -28,7 +28,7 @@ Application::~Application()
 {
 	vk_context->get_device().waitIdle();
 
-	destroy_models();
+	models.clear();
 	destroy_user_interface();
 
 	// @todo: fix this by making a class that encapsulates descriptor_pool(s) and keep it alive
@@ -281,16 +281,6 @@ auto Application::get_physical_device_features() const -> vk::PhysicalDeviceFeat
 		VK_FALSE, // variableMultisampleRate
 		VK_FALSE, // inheritedQueries
 	};
-}
-
-void Application::destroy_models()
-{
-	for (auto &[key, val] : models) {
-		delete val.vertex_buffer;
-		delete val.index_buffer;
-	}
-
-	models.clear();
 }
 
 void Application::destroy_user_interface()

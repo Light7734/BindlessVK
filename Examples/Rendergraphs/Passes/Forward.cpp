@@ -17,19 +17,21 @@ void Forwardpass::on_update(u32 frame_index, u32 image_index)
 	auto descriptor_writes = vec<vk::WriteDescriptorSet> {};
 
 	renderables.each([&](auto const &render_component) {
-		for (auto const *const node : render_component.model->nodes) {
+		for (auto const *const node : render_component.model->get_nodes()) {
 			for (const auto &primitive : node->mesh) {
 				auto const &model = render_component.model;
-				auto const &material = model->material_parameters[primitive.material_index];
+				auto const &material = model->get_material_parameters()[primitive.material_index];
 
-				u32 albedo_texture_index = material.albedo_texture_index;
-				u32 normal_texture_index = material.normal_texture_index;
-				u32 metallic_roughness_texture_index = material.metallic_roughness_texture_index;
+				auto const albedo_texture_index = material.albedo_texture_index;
+				auto const normal_texture_index = material.normal_texture_index;
+				auto const metallic_roughness_texture_index = material
+				                                                  .metallic_roughness_texture_index;
 
-				auto const *const albedo_texture = &model->textures[albedo_texture_index];
-				auto const *const normal_texture = &model->textures[normal_texture_index];
+				auto const &textures = model->get_textures();
+				auto const *const albedo_texture = &textures[albedo_texture_index];
+				auto const *const normal_texture = &textures[normal_texture_index];
 				auto const *const metallic_roughness_texture
-				    = &model->textures[metallic_roughness_texture_index];
+				    = &textures[metallic_roughness_texture_index];
 
 				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
 				    descriptor_set,
@@ -118,13 +120,14 @@ void Forwardpass::draw_model(bvk::Model const *const model, vk::CommandBuffer co
 	auto const offset = VkDeviceSize { 0 };
 
 	// bind buffers
-	cmd.bindVertexBuffers(0, 1, model->vertex_buffer->get_buffer(), &offset);
-	cmd.bindIndexBuffer(*(model->index_buffer->get_buffer()), 0u, vk::IndexType::eUint32);
+	cmd.bindVertexBuffers(0, 1, model->get_vertex_buffer()->get_buffer(), &offset);
+	cmd.bindIndexBuffer(*(model->get_index_buffer()->get_buffer()), 0u, vk::IndexType::eUint32);
 
-	for (auto const *node : model->nodes) {
+	for (auto const *node : model->get_nodes()) {
 		for (auto const &primitive : node->mesh) {
-			u32 texture_index = model->material_parameters[primitive.material_index]
-			                        .albedo_texture_index;
+			auto const &material_parameters = model->get_material_parameters();
+			auto const texture_index = material_parameters[primitive.material_index]
+			                               .albedo_texture_index;
 
 			// @todo: fix this hack
 			cmd.drawIndexed(

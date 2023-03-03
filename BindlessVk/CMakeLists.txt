@@ -14,6 +14,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Material/MaterialSystem.cpp
 
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/Model.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/ModelLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/Loaders/GltfLoader.cpp
 

@@ -27,7 +27,7 @@ auto ModelLoader::load_from_gltf_ascii(
 	    staging_image_buffer
 	);
 
-	return loader.load_from_ascii(file_path, debug_name);
+	return std::move(loader.load_from_ascii(file_path, debug_name));
 }
 
 } // namespace BINDLESSVK_NAMESPACE
