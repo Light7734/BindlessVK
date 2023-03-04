@@ -340,8 +340,8 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	auto const depth_format = vk_context->get_depth_format();
 	auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
 
-	auto const *const default_texture = &textures[hash_str("default_2d")];
-	auto const *const default_texture_cube = &textures[hash_str("default_cube")];
+	auto const *const default_texture = &textures.at(hash_str("default_2d"));
+	auto const *const default_texture_cube = &textures.at(hash_str("default_cube"));
 
 	auto const color_output_hash = hash_str("forward_color_out");
 	auto const depth_attachment_hash = hash_str("forward_depth");

@@ -16,7 +16,8 @@ Texture KtxLoader::load(
     str_view const debug_name
 )
 {
-	texture = Texture { .debug_name = str(debug_name) };
+	texture.vk_context = vk_context;
+	texture.debug_name = debug_name;
 
 	load_ktx_texture(path);
 
@@ -29,7 +30,7 @@ Texture KtxLoader::load(
 
 	destroy_ktx_texture();
 
-	return texture;
+	return std::move(texture);
 }
 
 void KtxLoader::load_ktx_texture(str_view const path)
@@ -45,11 +46,10 @@ void KtxLoader::load_ktx_texture(str_view const path)
 	    path
 	);
 
-	texture.width = ktx_texture->baseWidth;
-	texture.height = ktx_texture->baseHeight;
+	texture.size = { ktx_texture->baseWidth, ktx_texture->baseHeight };
 	texture.format = vk::Format::eB8G8R8A8Srgb;
 	texture.mip_levels = ktx_texture->numLevels;
-	texture.size = ktxTexture_GetSize(ktx_texture);
+	texture.device_size = ktxTexture_GetSize(ktx_texture);
 	texture.current_layout = vk::ImageLayout::eUndefined;
 }
 
@@ -61,6 +61,7 @@ void KtxLoader::destroy_ktx_texture()
 void KtxLoader::create_image()
 {
 	auto const allocator = vk_context->get_allocator();
+	auto const [width, height] = texture.size;
 
 	texture.image = allocator.createImage(
 	    vk::ImageCreateInfo {
@@ -68,8 +69,8 @@ void KtxLoader::create_image()
 	        vk::ImageType::e2D,
 	        texture.format,
 	        vk::Extent3D {
-	            texture.width,
-	            texture.height,
+	            width,
+	            height,
 	            1u,
 	        },
 	        texture.mip_levels,
@@ -144,8 +145,9 @@ void KtxLoader::create_sampler()
 
 void KtxLoader::stage_texture_data()
 {
-	u8 const *const data = ktxTexture_GetData(ktx_texture);
-	memcpy(staging_buffer->map_block(0), reinterpret_cast<const void *const>(data), texture.size);
+	auto const *const src = ktxTexture_GetData(ktx_texture);
+	auto *const dst = staging_buffer->map_block(0);
+	memcpy(dst, reinterpret_cast<void const *>(src), texture.device_size);
 	staging_buffer->unmap();
 }
 
@@ -179,6 +181,8 @@ void KtxLoader::write_texture_data_to_gpu(vk::ImageLayout const final_layout)
 
 vec<vk::BufferImageCopy> KtxLoader::create_texture_face_buffer_copies()
 {
+	auto const [width, height] = texture.size;
+
 	auto buffer_copies = vec<vk::BufferImageCopy> {};
 
 	for (u32 face = 0u; face < 6u; ++face)
@@ -203,8 +207,8 @@ vec<vk::BufferImageCopy> KtxLoader::create_texture_face_buffer_copies()
 			    },
 			    {},
 			    {
-			        texture.width >> level,
-			        texture.height >> level,
+			        width >> level,
+			        height >> level,
 			        1u,
 			    },
 			});

@@ -11,14 +11,12 @@ Model::Model(Model &&other)
 
 Model &Model::operator=(Model &&other)
 {
-	this->nodes = other.nodes;
-	this->textures = other.textures;
-	this->debug_name = other.debug_name;
-	this->index_buffer = other.index_buffer;
+	this->nodes = std::move(other.nodes);
+	this->textures = std::move(other.textures);
+	this->material_parameters = std::move(other.material_parameters);
 	this->vertex_buffer = other.vertex_buffer;
-	this->material_parameters = other.material_parameters;
-
-	other.nodes.clear();
+	this->index_buffer = other.index_buffer;
+	this->debug_name = other.debug_name;
 
 	return *this;
 }

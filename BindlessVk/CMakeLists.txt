@@ -26,6 +26,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/ShaderLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Loaders/SpvLoader.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/TextureLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/KtxLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/BinaryLoader.cpp

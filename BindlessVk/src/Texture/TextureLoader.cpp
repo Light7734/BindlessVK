@@ -35,7 +35,7 @@ auto TextureLoader::load_from_binary(
 ) const -> Texture
 {
 	BinaryLoader loader(vk_context.get(), staging_buffer);
-	return loader.load(pixels, width, height, size, type, final_layout, debug_name);
+	return std::move(loader.load(pixels, width, height, size, type, final_layout, debug_name));
 }
 
 auto TextureLoader::load_from_ktx(
@@ -47,7 +47,7 @@ auto TextureLoader::load_from_ktx(
 ) const -> Texture
 {
 	KtxLoader loader(vk_context.get(), staging_buffer);
-	return loader.load(uri, type, layout, debug_name);
+	return std::move(loader.load(uri, type, layout, debug_name));
 }
 
 } // namespace BINDLESSVK_NAMESPACE

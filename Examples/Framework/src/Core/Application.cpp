@@ -29,6 +29,8 @@ Application::~Application()
 	vk_context->get_device().waitIdle();
 
 	models.clear();
+	textures.clear();
+
 	destroy_user_interface();
 
 	// @todo: fix this by making a class that encapsulates descriptor_pool(s) and keep it alive
@@ -179,23 +181,29 @@ void Application::create_loaders()
 void Application::load_default_textures()
 {
 	u8 defaultTexturePixelData[] = { 255, 0, 255, 255 };
-	textures[hash_str("default_2d")] = texture_loader.load_from_binary(
-	    defaultTexturePixelData,
-	    1,
-	    1,
-	    sizeof(defaultTexturePixelData),
-	    bvk::Texture::Type::e2D,
-	    staging_pool.get_by_index(0),
-	    vk::ImageLayout::eShaderReadOnlyOptimal,
-	    "default_2d"
+	textures.emplace(
+	    hash_str("default_2d"),
+	    texture_loader.load_from_binary(
+	        defaultTexturePixelData,
+	        1,
+	        1,
+	        sizeof(defaultTexturePixelData),
+	        bvk::Texture::Type::e2D,
+	        staging_pool.get_by_index(0),
+	        vk::ImageLayout::eShaderReadOnlyOptimal,
+	        "default_2d"
+	    )
 	);
 
-	textures[hash_str("default_cube")] = texture_loader.load_from_ktx(
-	    "Assets/cubemap_yokohama_rgba.ktx",
-	    bvk::Texture::Type::eCubeMap,
-	    staging_pool.get_by_index(0),
-	    vk::ImageLayout::eShaderReadOnlyOptimal,
-	    "default_cube"
+	textures.emplace(
+	    hash_str("default_cube"),
+	    texture_loader.load_from_ktx(
+	        "Assets/cubemap_yokohama_rgba.ktx",
+	        bvk::Texture::Type::eCubeMap,
+	        staging_pool.get_by_index(0),
+	        vk::ImageLayout::eShaderReadOnlyOptimal,
+	        "default_cube"
+	    )
 	);
 }
 

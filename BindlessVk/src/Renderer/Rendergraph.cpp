@@ -399,15 +399,14 @@ void RenderGraphBuilder::initialize_pass_input_descriptors(
 		{
 			for (u32 j = 0; j < texture_input_info.count; ++j)
 			{
-				writes.emplace_back(
+				writes.emplace_back(vk::WriteDescriptorSet(
 				    pass->descriptor_sets[i],
 				    texture_input_info.binding,
 				    j,
-				    1u,
+				    1,
 				    texture_input_info.type,
-				    &texture_input_info.default_texture->descriptor_info,
-				    nullptr
-				);
+				    texture_input_info.default_texture->get_descriptor_info()
+				));
 			}
 		}
 	}

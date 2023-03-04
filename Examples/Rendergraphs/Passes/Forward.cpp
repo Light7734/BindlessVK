@@ -21,48 +21,50 @@ void Forwardpass::on_update(u32 frame_index, u32 image_index)
 			for (const auto &primitive : node->mesh) {
 				auto const &model = render_component.model;
 				auto const &material = model->get_material_parameters()[primitive.material_index];
+				auto const &textures = model->get_textures();
 
 				auto const albedo_texture_index = material.albedo_texture_index;
 				auto const normal_texture_index = material.normal_texture_index;
 				auto const metallic_roughness_texture_index = material
 				                                                  .metallic_roughness_texture_index;
 
-				auto const &textures = model->get_textures();
-				auto const *const albedo_texture = &textures[albedo_texture_index];
-				auto const *const normal_texture = &textures[normal_texture_index];
-				auto const *const metallic_roughness_texture
-				    = &textures[metallic_roughness_texture_index];
 
-				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				    descriptor_set,
-				    0ul,
-				    albedo_texture_index,
-				    1ul,
-				    vk::DescriptorType::eCombinedImageSampler,
-				    &albedo_texture->descriptor_info,
-				    nullptr,
-				    nullptr,
-				});
-				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				    descriptor_set,
-				    0ul,
-				    metallic_roughness_texture_index,
-				    1ul,
-				    vk::DescriptorType::eCombinedImageSampler,
-				    &metallic_roughness_texture->descriptor_info,
-				    nullptr,
-				    nullptr,
-				});
-				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				    descriptor_set,
-				    0ul,
-				    normal_texture_index,
-				    1ul,
-				    vk::DescriptorType::eCombinedImageSampler,
-				    &normal_texture->descriptor_info,
-				    nullptr,
-				    nullptr,
-				});
+				if (albedo_texture_index != -1) {
+					auto const *const albedo_texture = &textures[albedo_texture_index];
+					descriptor_writes.emplace_back(
+					    descriptor_set,
+					    0,
+					    albedo_texture_index,
+					    1,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    albedo_texture->get_descriptor_info()
+					);
+				}
+
+				if (metallic_roughness_texture_index != -1) {
+					auto const *const metallic_roughness_texture
+					    = &textures[metallic_roughness_texture_index];
+					descriptor_writes.emplace_back(vk::WriteDescriptorSet {
+					    descriptor_set,
+					    0,
+					    metallic_roughness_texture_index,
+					    1,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    metallic_roughness_texture->get_descriptor_info(),
+					});
+				}
+
+				if (normal_texture_index != -1) {
+					auto const *const normal_texture = &textures[normal_texture_index];
+					descriptor_writes.emplace_back(vk::WriteDescriptorSet {
+					    descriptor_set,
+					    0,
+					    normal_texture_index,
+					    1,
+					    vk::DescriptorType::eCombinedImageSampler,
+					    normal_texture->get_descriptor_info(),
+					});
+				}
 			};
 		}
 	});

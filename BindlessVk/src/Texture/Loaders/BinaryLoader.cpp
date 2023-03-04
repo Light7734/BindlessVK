@@ -18,19 +18,12 @@ Texture BinaryLoader::load(
     str_view const debug_name
 )
 {
-	texture = Texture {
-		{},
-		width,
-		height,
-		vk::Format::eR8G8B8A8Srgb,
-		static_cast<u32>(std::floor(std::log2(std::max(width, height))) + 1),
-		size,
-		{},
-		{},
-		vk::ImageLayout::eUndefined,
-		{},
-		str(debug_name),
-	};
+	texture.vk_context = vk_context;
+	texture.size = { width, height };
+	texture.format = vk::Format::eR8G8B8A8Srgb;
+	texture.mip_levels = std::floor(std::log2(std::max(width, height))) + 1;
+	texture.device_size = size;
+	texture.debug_name = debug_name;
 
 	create_image();
 	create_image_view();
@@ -39,19 +32,21 @@ Texture BinaryLoader::load(
 	stage_texture_data(pixels, size);
 	write_texture_data_to_gpu();
 
-	return texture;
+	return std::move(texture);
 }
 
 void BinaryLoader::create_image()
 {
+	auto const [width, height] = texture.size;
+
 	texture.image = vk_context->get_allocator().createImage(
 	    vk::ImageCreateInfo {
 	        {},
 	        vk::ImageType::e2D,
 	        vk::Format::eR8G8B8A8Srgb,
 	        vk::Extent3D {
-	            texture.width,
-	            texture.height,
+	            width,
+	            height,
 	            1u,
 	        },
 	        texture.mip_levels,
@@ -132,6 +127,8 @@ void BinaryLoader::stage_texture_data(u8 const *const pixels, vk::DeviceSize siz
 void BinaryLoader::write_texture_data_to_gpu()
 {
 	vk_context->immediate_submit([&](vk::CommandBuffer cmd) {
+		auto const [width, height] = texture.size;
+
 		texture.transition_layout(
 		    vk_context,
 		    cmd,
@@ -157,7 +154,7 @@ void BinaryLoader::write_texture_data_to_gpu()
 		            1u,
 		        },
 		        vk::Offset3D { 0, 0, 0 },
-		        vk::Extent3D { texture.width, texture.height, 1u },
+		        vk::Extent3D { width, height, 1u },
 		    }
 		);
 
@@ -180,7 +177,7 @@ void BinaryLoader::write_texture_data_to_gpu()
 
 void BinaryLoader::create_mipmaps(vk::CommandBuffer cmd)
 {
-	auto mip_size = std::make_pair(texture.width, texture.height);
+	auto [mip_width, mip_height] = texture.size;
 
 	for (u32 i = 1u; i < texture.mip_levels; ++i)
 	{
@@ -195,7 +192,10 @@ void BinaryLoader::create_mipmaps(vk::CommandBuffer cmd)
 		    vk::ImageLayout::eTransferSrcOptimal
 		);
 
-		mip_size = texture.blit(cmd, i, mip_size);
+		texture.blit(cmd, i, { mip_width, mip_height });
+
+		mip_width = mip_width > 1 ? mip_width / 2.0 : mip_width;
+		mip_height = mip_height > 1 ? mip_height / 2.0 : mip_height;
 
 		texture.transition_layout(
 		    vk_context,
