@@ -88,7 +88,9 @@ void GltfLoader::load_material_parameters()
 		    vec3(1.0),
 		    vec3(1.0),
 		    vec3(1.0),
-		    material.values.at("baseColorTexture").TextureIndex(),
+		    material.values["baseColorTexture"].TextureIndex(),
+		    material.values["normalTexture"].TextureIndex(),
+		    material.values["metallicRoughnessTexture"].TextureIndex(),
 		});
 	}
 }
