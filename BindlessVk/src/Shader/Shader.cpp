@@ -35,15 +35,14 @@ ShaderPipeline &ShaderPipeline::operator=(ShaderPipeline &&effect)
 
 ShaderPipeline::~ShaderPipeline()
 {
-	if (vk_context)
-	{
-		const auto device = vk_context->get_device();
+	if (!vk_context)
+		return;
 
-		device.destroyPipeline(pipeline);
-		device.destroyPipelineLayout(pipeline_layout);
-		device.destroyDescriptorSetLayout(descriptor_set_layouts[0]);
-		device.destroyDescriptorSetLayout(descriptor_set_layouts[1]);
-	}
+	const auto device = vk_context->get_device();
+	device.destroyPipeline(pipeline);
+	device.destroyPipelineLayout(pipeline_layout);
+	device.destroyDescriptorSetLayout(descriptor_set_layouts[0]);
+	device.destroyDescriptorSetLayout(descriptor_set_layouts[1]);
 }
 
 void ShaderPipeline::create_descriptor_sets_layout(vec<Shader *> const &shaders)

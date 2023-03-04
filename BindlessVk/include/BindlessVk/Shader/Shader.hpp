@@ -36,7 +36,7 @@ public:
 	    VkContext *vk_context,
 	    vec<Shader *> const &shaders,
 	    ShaderPipeline::Configuration configuration,
-	    str_view debug_name = ""
+	    str_view debug_name = default_debug_name
 	);
 
 	~ShaderPipeline();

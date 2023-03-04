@@ -26,16 +26,16 @@ Application::Application()
 
 Application::~Application()
 {
-	vk_context->get_device().waitIdle();
+	auto const device = vk_context->get_device();
+
+	device.waitIdle();
 
 	models.clear();
 	textures.clear();
 
 	destroy_user_interface();
 
-	// @todo: fix this by making a class that encapsulates descriptor_pool(s) and keep it alive
-	// using smart pointers :)
-	destroy_descriptor_pool();
+	device.destroyDescriptorPool(descriptor_pool);
 }
 
 void Application::create_window()
@@ -296,12 +296,4 @@ void Application::destroy_user_interface()
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-}
-
-void Application::destroy_descriptor_pool()
-{
-	auto const device = vk_context->get_device();
-
-	device.resetDescriptorPool(descriptor_pool);
-	device.destroyDescriptorPool(descriptor_pool);
 }

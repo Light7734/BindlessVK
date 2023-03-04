@@ -64,7 +64,5 @@ private:
 	auto get_device_extensions() const -> vec<c_str>;
 	auto get_physical_device_features() const -> vk::PhysicalDeviceFeatures;
 
-	void destroy_models();
 	void destroy_user_interface();
-	void destroy_descriptor_pool();
 };
