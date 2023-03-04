@@ -4,7 +4,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-struct vec2
+struct Vec2f
 {
 	union {
 		f32 values[2];
@@ -20,31 +20,31 @@ struct vec2
 		};
 	};
 
-	vec2() = default;
+	Vec2f() = default;
 
-	vec2(f32 const xy): x(xy), y(xy)
+	Vec2f(f32 const xy): x(xy), y(xy)
 	{
 	}
 
-	vec2(f32 const x, f32 const y): x(x), y(y)
+	Vec2f(f32 const x, f32 const y): x(x), y(y)
 	{
 	}
 
-	vec2(f32 const *const ptr)
+	Vec2f(f32 const *const ptr)
 	{
-		memcpy(this, ptr, sizeof(vec2));
+		memcpy(this, ptr, sizeof(Vec2f));
 	}
 
-	vec2(f64 const *const ptr)
+	Vec2f(f64 const *const ptr)
 	{
 		x = ptr[0];
 		y = ptr[1];
 	}
 
-	inline vec2 unit() const
+	inline Vec2f unit() const
 	{
 		auto const mag = sqrt(x * x + y * y);
-		return vec2(x / mag, y / mag);
+		return Vec2f(x / mag, y / mag);
 	}
 
 	inline f32 &operator[](usize const index)
@@ -57,27 +57,27 @@ struct vec2
 		return values[index];
 	}
 
-	inline vec2 operator+(vec2 const &rhs) const
+	inline Vec2f operator+(Vec2f const &rhs) const
 	{
-		return vec2(x + rhs.x, y + rhs.y);
+		return Vec2f(x + rhs.x, y + rhs.y);
 	}
 
-	inline vec2 operator*(vec2 const &rhs) const
+	inline Vec2f operator*(Vec2f const &rhs) const
 	{
-		return vec2(x * rhs.x, y * rhs.y);
+		return Vec2f(x * rhs.x, y * rhs.y);
 	}
 
-	inline vec2 operator*(f32 const scalar) const
+	inline Vec2f operator*(f32 const scalar) const
 	{
-		return vec2(x * scalar, y * scalar);
+		return Vec2f(x * scalar, y * scalar);
 	}
 
-	inline void operator+=(vec2 const &rhs)
+	inline void operator+=(Vec2f const &rhs)
 	{
 		*this = *this + rhs;
 	}
 
-	inline void operator*=(vec2 const &rhs)
+	inline void operator*=(Vec2f const &rhs)
 	{
 		*this = *this * rhs;
 	}
@@ -88,9 +88,9 @@ struct vec2
 	}
 
 // Define additional constructors and implicit cast operators to convert back and forth between
-// your math types and vec2
-#ifdef BINDLESSVK_VEC2_EXTRA
-	BINDLESSVK_VEC2_EXTRA
+// your math types and Vec2f
+#ifdef BINDLESSVK_Vec2f_EXTRA
+	BINDLESSVK_Vec2f_EXTRA
 #endif
 };
 

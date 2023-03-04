@@ -16,11 +16,11 @@ public:
 public:
 	struct Vertex
 	{
-		vec3 position;
-		vec3 normal;
-		vec3 tangent;
-		vec2 uv;
-		vec3 color;
+		Vec3f position;
+		Vec3f normal;
+		Vec3f tangent;
+		Vec2f uv;
+		Vec3f color;
 
 		auto static get_attributes() -> arr<vk::VertexInputAttributeDescription, 5>;
 		auto static get_bindings() -> arr<vk::VertexInputBindingDescription, 1>;
@@ -50,14 +50,14 @@ public:
 		vec<Node *> children;
 
 		vec<Primitive> mesh;
-		mat4f transform;
+		Mat4f transform;
 	};
 
 	struct MaterialParameters
 	{
-		vec3 albedo = vec3(1.0f);
-		vec3 diffuse = vec3(1.0f);
-		vec3 specular = vec3(1.0f);
+		Vec3f albedo = Vec3f(1.0f);
+		Vec3f diffuse = Vec3f(1.0f);
+		Vec3f specular = Vec3f(1.0f);
 
 		i32 albedo_texture_index;
 		i32 normal_texture_index;

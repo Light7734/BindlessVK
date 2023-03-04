@@ -6,7 +6,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-struct vec4
+struct Vec4f
 {
 	union {
 		f32 values[4];
@@ -22,30 +22,30 @@ struct vec4
 		};
 	};
 
-	vec4() = default;
+	Vec4f() = default;
 
-	vec4(f32 const xyzw): x(xyzw), y(xyzw), z(xyzw), w(xyzw)
+	Vec4f(f32 const xyzw): x(xyzw), y(xyzw), z(xyzw), w(xyzw)
 	{
 	}
 
-	vec4(f32 const x, f32 const y, f32 const z, f32 const w): x(x), y(y), z(z), w(w)
+	Vec4f(f32 const x, f32 const y, f32 const z, f32 const w): x(x), y(y), z(z), w(w)
 	{
 	}
 
-	vec4(vec2 const &xy, vec2 const &zw): x(xy.x), y(xy.y), z(zw.x), w(zw.y)
+	Vec4f(Vec4f const &xy, Vec4f const &zw): x(xy.x), y(xy.y), z(zw.x), w(zw.y)
 	{
 	}
 
-	vec4(vec3 const &xyz, f32 const w): x(xyz.x), y(xyz.y), z(xyz.z), w(w)
+	Vec4f(Vec4f const &xyz, f32 const w): x(xyz.x), y(xyz.y), z(xyz.z), w(w)
 	{
 	}
 
-	vec4(f32 const *const ptr)
+	Vec4f(f32 const *const ptr)
 	{
-		memcpy(this, ptr, sizeof(vec4));
+		memcpy(this, ptr, sizeof(Vec4f));
 	}
 
-	vec4(f64 const *const ptr)
+	Vec4f(f64 const *const ptr)
 	{
 		x = ptr[0];
 		y = ptr[1];
@@ -53,10 +53,10 @@ struct vec4
 		w = ptr[3];
 	}
 
-	inline vec4 unit() const
+	inline Vec4f unit() const
 	{
 		auto const mag = sqrt(x * x + y * y + z * z + w * w);
-		return vec4(x / mag, y / mag, z / mag, w / mag);
+		return Vec4f(x / mag, y / mag, z / mag, w / mag);
 	}
 
 	inline f32 &operator[](usize const index)
@@ -69,27 +69,27 @@ struct vec4
 		return values[index];
 	}
 
-	inline vec4 operator+(vec4 const &rhs) const
+	inline Vec4f operator+(Vec4f const &rhs) const
 	{
-		return vec4(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w);
+		return Vec4f(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w);
 	}
 
-	inline vec4 operator*(vec4 const &rhs) const
+	inline Vec4f operator*(Vec4f const &rhs) const
 	{
-		return vec4(x * rhs.x, y * rhs.y, z * rhs.z, w * rhs.w);
+		return Vec4f(x * rhs.x, y * rhs.y, z * rhs.z, w * rhs.w);
 	}
 
-	inline vec4 operator*(f32 const scalar) const
+	inline Vec4f operator*(f32 const scalar) const
 	{
-		return vec4(x * scalar, y * scalar, z * scalar, w * scalar);
+		return Vec4f(x * scalar, y * scalar, z * scalar, w * scalar);
 	}
 
-	inline void operator+=(vec4 const &rhs)
+	inline void operator+=(Vec4f const &rhs)
 	{
 		*this = *this + rhs;
 	}
 
-	inline void operator*=(vec4 const &rhs)
+	inline void operator*=(Vec4f const &rhs)
 	{
 		*this = *this * rhs;
 	}

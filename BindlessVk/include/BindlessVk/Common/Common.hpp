@@ -14,7 +14,7 @@
 
 #include "BindlessVk/Common/Aliases.hpp"
 #include "BindlessVk/Common/Assertions.hpp"
-#include "BindlessVk/Common/Types/Mat.hpp"
+#include "BindlessVk/Common/Types/Mat4.hpp"
 #include "BindlessVk/Common/Types/Vec2.hpp"
 #include "BindlessVk/Common/Types/Vec3.hpp"
 #include "BindlessVk/Common/Types/Vec4.hpp"

@@ -85,9 +85,9 @@ void GltfLoader::load_material_parameters()
 		);
 
 		model.material_parameters.push_back({
-		    vec3(1.0),
-		    vec3(1.0),
-		    vec3(1.0),
+		    Vec3f(1.0),
+		    Vec3f(1.0),
+		    Vec3f(1.0),
 		    material.values["baseColorTexture"].TextureIndex(),
 		    material.values["normalTexture"].TextureIndex(),
 		    material.values["metallicRoughnessTexture"].TextureIndex(),
@@ -218,11 +218,11 @@ void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_pr
 	for (auto v = 0; v < primitive_vertex_count; ++v)
 	{
 		vertex_map[vertex_count] = {
-			vec3(&position_buffer[v * 3]),
-			normal_buffer ? vec3(normal_buffer[v * 3]) : vec3(0.0f),
-			tangent_buffer ? vec3(&tangent_buffer[v * 3]).unit() : vec3(0.0f),
-			uv_buffer ? vec2(&uv_buffer[v * 2]) : vec2(0.0f),
-			vec3(1.0),
+			Vec3f(&position_buffer[v * 3]),
+			normal_buffer ? Vec3f(normal_buffer[v * 3]) : Vec3f(0.0f),
+			tangent_buffer ? Vec3f(&tangent_buffer[v * 3]).unit() : Vec3f(0.0f),
+			uv_buffer ? Vec2f(&uv_buffer[v * 2]) : Vec2f(0.0f),
+			Vec3f(1.0),
 		};
 
 		vertex_count++;
@@ -317,18 +317,18 @@ auto GltfLoader::get_primitive_index_count(const tinygltf::Primitive &gltf_primi
 void GltfLoader::set_initial_node_transform(const tinygltf::Node &gltf_node, Model::Node *node)
 {
 	if (!gltf_node.matrix.empty())
-		node->transform = mat4f(gltf_node.matrix.data());
+		node->transform = Mat4f(gltf_node.matrix.data());
 
 	else
 	{
 		if (!gltf_node.translation.empty())
-			node->transform.translate(vec3(gltf_node.translation.data()));
+			node->transform.translate(Vec3f(gltf_node.translation.data()));
 
 		if (!gltf_node.rotation.empty())
-			node->transform *= mat4f(vec4(gltf_node.rotation.data()));
+			node->transform *= Mat4f(Vec4f(gltf_node.rotation.data()));
 
 		if (!gltf_node.scale.empty())
-			node->transform.scale(vec3(gltf_node.scale.data()));
+			node->transform.scale(Vec3f(gltf_node.scale.data()));
 	}
 }
 

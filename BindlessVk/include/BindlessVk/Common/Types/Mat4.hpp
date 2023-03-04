@@ -5,7 +5,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-struct mat4f
+struct Mat4f
 {
 	union {
 		struct
@@ -15,26 +15,26 @@ struct mat4f
 
 		struct
 		{
-			vec4 rows[4];
+			Vec4f rows[4];
 		};
 	};
 
-	mat4f() = default;
+	Mat4f() = default;
 
-	mat4f(f32 const *const ptr)
+	Mat4f(f32 const *const ptr)
 	{
-		memcpy(this, ptr, sizeof(mat4f));
+		memcpy(this, ptr, sizeof(Mat4f));
 	}
 
-	mat4f(f64 const *const ptr)
+	Mat4f(f64 const *const ptr)
 	{
 		for (usize i = 0; i < 4 * 4; ++i)
 			elements[i] = ptr[i];
 	}
 
-	mat4f(vec4 const &q)
+	Mat4f(Vec4f const &q)
 	{
-		*this = mat4f(1.0f);
+		*this = Mat4f(1.0f);
 		f32 qxx(q.x * q.x);
 		f32 qyy(q.y * q.y);
 		f32 qzz(q.z * q.z);
@@ -58,23 +58,23 @@ struct mat4f
 		rows[2][2] = f32(1) - f32(2) * (qxx + qyy);
 	}
 
-	inline void translate(vec3 const &v)
+	inline void translate(Vec3f const &v)
 	{
 		rows[3] += ((rows[0]) * (v[0])) + (rows[1] * v[1]) + (rows[2] * v[2]);
 	}
 
-	inline void rotate(vec3 const &v)
+	inline void rotate(Vec3f const &v)
 	{
 	}
 
-	inline void scale(vec3 const &v)
+	inline void scale(Vec3f const &v)
 	{
 		rows[0] *= v[0];
 		rows[1] *= v[1];
 		rows[2] *= v[2];
 	}
 
-	inline void operator*=(mat4f const &rhs)
+	inline void operator*=(Mat4f const &rhs)
 	{
 		auto const SrcA0 = rows[0];
 		auto const SrcA1 = rows[1];
