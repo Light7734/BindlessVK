@@ -26,7 +26,7 @@ public:
 public:
 	Material(VkContext *vk_context, ShaderPipeline *effect, vk::DescriptorPool descriptor_pool);
 
-	~Material() = default;
+	~Material();
 
 	inline auto *get_effect() const
 	{
@@ -39,9 +39,10 @@ public:
 	}
 
 private:
+	VkContext *vk_context;
 	ShaderPipeline *effect = {};
 	Parameters parametes = {};
-	vk::DescriptorSet descriptor_set = {};
+	AllocatedDescriptorSet descriptor_set = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE
