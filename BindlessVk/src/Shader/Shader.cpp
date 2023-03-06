@@ -38,7 +38,7 @@ ShaderPipeline::~ShaderPipeline()
 	if (!vk_context)
 		return;
 
-	const auto device = vk_context->get_device();
+	auto const device = vk_context->get_device();
 	device.destroyPipeline(pipeline);
 	device.destroyPipelineLayout(pipeline_layout);
 	device.destroyDescriptorSetLayout(descriptor_set_layouts[0]);
@@ -50,7 +50,7 @@ void ShaderPipeline::create_descriptor_sets_layout(vec<Shader *> const &shaders)
 	auto const device = vk_context->get_device();
 	auto const sets_bindings = combine_descriptor_sets_bindings(shaders);
 
-	for (u32 i = 0u; const auto &set_bindings : sets_bindings)
+	for (u32 i = 0u; auto const &set_bindings : sets_bindings)
 	{
 		descriptor_set_layouts[i] =
 		    device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
@@ -146,9 +146,9 @@ auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shade
 	auto combined_bindings = arr<vec<vk::DescriptorSetLayoutBinding>, 2> {};
 
 	for (Shader *const shader : shaders)
-		for (u32 i = 0; const auto &descriptor_set_bindings : shader->descriptor_sets_bindings)
+		for (u32 i = 0; auto const &descriptor_set_bindings : shader->descriptor_sets_bindings)
 		{
-			for (const auto &descriptor_set_binding : descriptor_set_bindings)
+			for (auto const &descriptor_set_binding : descriptor_set_bindings)
 			{
 				const u32 binding_index = descriptor_set_binding.binding;
 
@@ -171,7 +171,7 @@ auto ShaderPipeline::create_shader_stage_create_infos(vec<Shader *> const &shade
 	auto shader_stage_create_infos = vec<vk::PipelineShaderStageCreateInfo> {};
 	shader_stage_create_infos.resize(shaders.size());
 
-	for (u32 i = 0; const auto &shader : shaders)
+	for (u32 i = 0; auto const &shader : shaders)
 	{
 		shader_stage_create_infos[i++] = {
 			{},

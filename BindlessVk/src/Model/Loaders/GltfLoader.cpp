@@ -102,7 +102,7 @@ void GltfLoader::stage_mesh_data()
 
 	for (auto gltf_node_index : gltf_model.scenes[0].nodes)
 	{
-		const auto &gltf_node = gltf_model.nodes[gltf_node_index];
+		auto const &gltf_node = gltf_model.nodes[gltf_node_index];
 		model.nodes.push_back(load_node(gltf_node, nullptr));
 	}
 }
@@ -122,14 +122,14 @@ Model::Node *GltfLoader::load_node(const tinygltf::Node &gltf_node, Model::Node 
 	{
 		for (auto gltf_node_index : gltf_node.children)
 		{
-			const auto &child_gltf_node = gltf_model.nodes[gltf_node_index];
+			auto const &child_gltf_node = gltf_model.nodes[gltf_node_index];
 			load_node(child_gltf_node, node);
 		}
 	}
 
 	if (node_has_any_mesh(gltf_node))
 	{
-		const auto &gltf_mesh = gltf_model.meshes[gltf_node.mesh];
+		auto const &gltf_mesh = gltf_model.meshes[gltf_node.mesh];
 		load_mesh_primitives(gltf_mesh, node);
 	}
 
@@ -190,7 +190,7 @@ void GltfLoader::write_index_buffer_to_gpu()
 
 void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::Node *node)
 {
-	for (const auto &gltf_primitive : gltf_mesh.primitives)
+	for (auto const &gltf_primitive : gltf_mesh.primitives)
 	{
 		auto first_index = index_count;
 		auto index_count = get_primitive_index_count(gltf_primitive);
@@ -208,10 +208,10 @@ void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::No
 
 void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_primitive)
 {
-	const auto *position_buffer = get_primitive_attribute_buffer(gltf_primitive, "POSITION");
-	const auto *normal_buffer = get_primitive_attribute_buffer(gltf_primitive, "NORMAL");
-	const auto *tangent_buffer = get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
-	const auto *uv_buffer = get_primitive_attribute_buffer(gltf_primitive, "TEXCOORD_0");
+	auto const *position_buffer = get_primitive_attribute_buffer(gltf_primitive, "POSITION");
+	auto const *normal_buffer = get_primitive_attribute_buffer(gltf_primitive, "NORMAL");
+	auto const *tangent_buffer = get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
+	auto const *uv_buffer = get_primitive_attribute_buffer(gltf_primitive, "TEXCOORD_0");
 
 	auto primitive_vertex_count = get_primitive_vertex_count(gltf_primitive);
 
@@ -231,9 +231,9 @@ void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_pr
 
 auto GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive &gltf_primitive) -> u32
 {
-	const auto &accessor = gltf_model.accessors[gltf_primitive.indices];
-	const auto &buffer_view = gltf_model.bufferViews[accessor.bufferView];
-	const auto &buffer = gltf_model.buffers[buffer_view.buffer];
+	auto const &accessor = gltf_model.accessors[gltf_primitive.indices];
+	auto const &buffer_view = gltf_model.bufferViews[accessor.bufferView];
+	auto const &buffer = gltf_model.buffers[buffer_view.buffer];
 
 	switch (accessor.componentType)
 	{
@@ -283,14 +283,14 @@ auto GltfLoader::get_primitive_attribute_buffer(
     str_view const attribute_name
 ) -> const f32 *
 {
-	const auto &it = gltf_primitive.attributes.find(attribute_name.data());
+	auto const &it = gltf_primitive.attributes.find(attribute_name.data());
 	if (it == gltf_primitive.attributes.end())
 	{
 		return nullptr;
 	}
 
-	const auto &accessor = gltf_model.accessors[it->second];
-	const auto &view = gltf_model.bufferViews[accessor.bufferView];
+	auto const &accessor = gltf_model.accessors[it->second];
+	auto const &view = gltf_model.bufferViews[accessor.bufferView];
 
 	return reinterpret_cast<const f32 *>(
 	    &(gltf_model.buffers[view.buffer].data[accessor.byteOffset + view.byteOffset])
@@ -299,7 +299,7 @@ auto GltfLoader::get_primitive_attribute_buffer(
 
 auto GltfLoader::get_primitive_vertex_count(const tinygltf::Primitive &gltf_primitive) -> usize
 {
-	const auto &it = gltf_primitive.attributes.find("POSITION");
+	auto const &it = gltf_primitive.attributes.find("POSITION");
 	if (it == gltf_primitive.attributes.end())
 	{
 		return 0u;

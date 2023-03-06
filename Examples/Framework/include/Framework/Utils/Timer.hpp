@@ -21,7 +21,7 @@ public:
 	// Returns the elapsed time in seconds
 	inline float elapsed_time()
 	{
-		const auto end = std::chrono::steady_clock::now();
+		auto const end = std::chrono::steady_clock::now();
 		return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0f;
 	}
 

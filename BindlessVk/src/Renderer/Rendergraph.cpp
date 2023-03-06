@@ -416,7 +416,7 @@ void RenderGraphBuilder::initialize_pass_input_descriptors(
 }
 void RenderGraphBuilder::build_pass_cmd_buffer_begin_infos(Renderpass *pass)
 {
-	const auto surface = vk_context->get_surface();
+	auto const surface = vk_context->get_surface();
 
 	pass->cmd_buffer_inheritance_rendering_info = {
 		{},
@@ -449,7 +449,7 @@ auto RenderResources::calculate_attachment_image_extent(
     RenderpassBlueprint::Attachment const &blueprint_attachment
 ) const -> vk::Extent3D
 {
-	const auto surface = vk_context->get_surface();
+	auto const surface = vk_context->get_surface();
 
 	switch (blueprint_attachment.size_type)
 	{

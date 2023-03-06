@@ -76,7 +76,7 @@ auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *c
 
 	for (u32 i_binding = 0; i_binding < spv_set->binding_count; ++i_binding)
 	{
-		const auto &spv_binding = *spv_set->bindings[i_binding];
+		auto const &spv_binding = *spv_set->bindings[i_binding];
 		if (bindings.size() < spv_binding.binding + 1u)
 			bindings.resize(spv_binding.binding + 1u);
 

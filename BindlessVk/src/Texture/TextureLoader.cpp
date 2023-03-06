@@ -13,7 +13,7 @@ namespace BINDLESSVK_NAMESPACE {
 
 TextureLoader::TextureLoader(ref<VkContext const> const vk_context): vk_context(vk_context)
 {
-	const auto gpu = vk_context->get_gpu();
+	auto const gpu = vk_context->get_gpu();
 
 	// @todo move this assertion to a proper place
 	assert_true(

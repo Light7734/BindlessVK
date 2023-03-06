@@ -18,7 +18,7 @@ void Forwardpass::on_update(u32 frame_index, u32 image_index)
 
 	renderables.each([&](auto const &render_component) {
 		for (auto const *const node : render_component.model->get_nodes()) {
-			for (const auto &primitive : node->mesh) {
+			for (auto const &primitive : node->mesh) {
 				auto const &model = render_component.model;
 				auto const &material = model->get_material_parameters()[primitive.material_index];
 				auto const &textures = model->get_textures();
