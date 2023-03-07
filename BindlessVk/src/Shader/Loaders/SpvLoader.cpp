@@ -104,6 +104,10 @@ auto SpvLoader::extract_descriptor_set_binding(SpvReflectDescriptorBinding const
 	for (u32 i_dim = 0; i_dim < binding->array.dims_count; ++i_dim)
 		set_binding.descriptorCount *= binding->array.dims[i_dim];
 
+	// runtime array
+	if (set_binding.descriptorCount == 0)
+		set_binding.descriptorCount = 10'000;
+
 	return set_binding;
 }
 

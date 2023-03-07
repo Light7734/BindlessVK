@@ -95,9 +95,11 @@ void DescriptorAllocator::create_new_pools()
 		{ vk::DescriptorType::eInputAttachment, 8000 },
 	};
 
-	free_pools.emplace_back(device.createDescriptorPool({ {}, 100, pool_sizes }));
-	free_pools.emplace_back(device.createDescriptorPool({ {}, 100, pool_sizes }));
-	free_pools.emplace_back(device.createDescriptorPool({ {}, 100, pool_sizes }));
+	auto const flags = vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind;
+
+	free_pools.emplace_back(device.createDescriptorPool({ flags, 100, pool_sizes }));
+	free_pools.emplace_back(device.createDescriptorPool({ flags, 100, pool_sizes }));
+	free_pools.emplace_back(device.createDescriptorPool({ flags, 100, pool_sizes }));
 }
 
 void DescriptorAllocator::destroy_pool(vec_it<Pool> pool)

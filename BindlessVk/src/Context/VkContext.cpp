@@ -269,7 +269,11 @@ void VkContext::fetch_adequate_gpus()
 
 void VkContext::create_device(vk::PhysicalDeviceFeatures physical_device_features)
 {
-	auto const dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures { true };
+	auto indexing_features = vk::PhysicalDeviceDescriptorIndexingFeaturesEXT {};
+	indexing_features.descriptorBindingPartiallyBound = true;
+	indexing_features.runtimeDescriptorArray = true;
+	auto const dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures { true , &indexing_features,};
+
 	auto const queues_info = queues.get_create_infos();
 
 	device = gpu.create_device(vk::DeviceCreateInfo {

@@ -33,7 +33,7 @@ void Forwardpass::on_update(u32 frame_index, u32 image_index)
 					auto const *const albedo_texture = &textures[albedo_texture_index];
 					descriptor_writes.emplace_back(
 					    descriptor_set,
-					    0,
+					    1,
 					    albedo_texture_index,
 					    1,
 					    vk::DescriptorType::eCombinedImageSampler,
@@ -46,7 +46,7 @@ void Forwardpass::on_update(u32 frame_index, u32 image_index)
 					    = &textures[metallic_roughness_texture_index];
 					descriptor_writes.emplace_back(vk::WriteDescriptorSet {
 					    descriptor_set,
-					    0,
+					    1,
 					    metallic_roughness_texture_index,
 					    1,
 					    vk::DescriptorType::eCombinedImageSampler,
@@ -58,7 +58,7 @@ void Forwardpass::on_update(u32 frame_index, u32 image_index)
 					auto const *const normal_texture = &textures[normal_texture_index];
 					descriptor_writes.emplace_back(vk::WriteDescriptorSet {
 					    descriptor_set,
-					    0,
+					    1,
 					    normal_texture_index,
 					    1,
 					    vk::DescriptorType::eCombinedImageSampler,
@@ -132,13 +132,7 @@ void Forwardpass::draw_model(bvk::Model const *const model, vk::CommandBuffer co
 			                               .albedo_texture_index;
 
 			// @todo: fix this hack
-			cmd.drawIndexed(
-			    primitive.index_count,
-			    1ull,
-			    primitive.first_index,
-			    0ull,
-			    texture_index
-			);
+			cmd.drawIndexed(primitive.index_count, 1, primitive.first_index, 0, texture_index);
 		}
 	}
 }

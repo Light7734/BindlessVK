@@ -375,15 +375,15 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	    })
 	    .add_texture_input({
 	        "texture_2ds",
-	        0,
-	        32,
+	        1,
+	        10'000,
 	        vk::DescriptorType::eCombinedImageSampler,
 	        vk::ShaderStageFlagBits::eFragment,
 	        default_texture,
 	    })
 	    .add_texture_input({
 	        "texture_cubes",
-	        1,
+	        0,
 	        8u,
 	        vk::DescriptorType::eCombinedImageSampler,
 	        vk::ShaderStageFlagBits::eFragment,

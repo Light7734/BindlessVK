@@ -52,18 +52,24 @@ void ShaderPipeline::create_descriptor_sets_layout(vec<Shader *> const &shaders)
 
 	for (u32 i = 0u; auto const &set_bindings : sets_bindings)
 	{
+		auto const flags = vec<vk::DescriptorBindingFlags>(
+		    set_bindings.size(),
+		    vk::DescriptorBindingFlagBits::ePartiallyBound
+		);
+		auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+
 		descriptor_set_layouts[i] =
 		    device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
 		        {},
-		        static_cast<u32>(set_bindings.size()),
-		        set_bindings.data(),
+		        set_bindings,
+		        &extended_info,
 		    });
 		vk_context->set_object_name(
 		    descriptor_set_layouts[i],
 		    fmt::format("{}_descriptor_set_layout_{}", debug_name, i)
 		);
 
-		i++;
+		++i;
 	}
 }
 

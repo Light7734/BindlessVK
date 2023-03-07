@@ -72,18 +72,31 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 	auto const device = vk_context->get_device();
 	auto *const descriptor_allocator = vk_context->get_descriptor_allocator();
 
-	vec<vk::DescriptorSetLayoutBinding> bindings;
-	bindings.reserve(blueprint_buffer_inputs.size());
+	auto const bindings_count = blueprint_buffer_inputs.size();
+
+	auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
+	auto flags = vec<vk::DescriptorBindingFlags> {};
+
+	bindings.reserve(bindings_count);
+	flags.reserve(bindings_count);
 
 	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
+	{
 		bindings.emplace_back(
 		    blueprint_buffer_input.binding,
 		    blueprint_buffer_input.type,
 		    blueprint_buffer_input.count,
 		    blueprint_buffer_input.stage_mask
 		);
+		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+	}
 
-	graph->descriptor_set_layout = device.createDescriptorSetLayout({ {}, bindings });
+	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+	graph->descriptor_set_layout = device.createDescriptorSetLayout({
+	    {},
+	    bindings,
+	    &extended_info,
+	});
 	vk_context->set_object_name(
 	    graph->descriptor_set_layout,
 	    fmt::format("graph_descriptor_set_layout")
@@ -123,28 +136,28 @@ void RenderGraphBuilder::initialize_graph_input_descriptors()
 
 		for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 		{
-			buffer_infos.push_back({
+			buffer_infos.emplace_back(
 			    *buffer_input.get_buffer(),
 			    buffer_input.get_block_size() * i,
-			    buffer_input.get_block_size(),
-			});
+			    buffer_input.get_block_size()
+			);
 
 			for (u32 j = 0; j < blueprint_buffer.count; ++j)
 			{
-				writes.push_back(vk::WriteDescriptorSet {
+				writes.emplace_back(
 				    graph->descriptor_sets[i],
 				    blueprint_buffer.binding,
 				    j,
 				    1u,
 				    blueprint_buffer.type,
 				    nullptr,
-				    &buffer_infos.back(),
-				});
+				    &buffer_infos.back()
+				);
 			}
 		}
 
-		device.updateDescriptorSets(writes.size(), writes.data(), 0u, nullptr);
-		device.waitIdle(); // @todo should we wait idle?
+		device.updateDescriptorSets(writes, {});
+		device.waitIdle();
 	}
 }
 
@@ -158,7 +171,7 @@ void RenderGraphBuilder::build_pass_color_attachments(
 	for (auto const &blueprint_attachment : blueprint_attachments)
 	{
 		auto &attachment = pass->attachments[i++];
-		pass->color_attachment_formats.push_back(blueprint_attachment.format);
+		pass->color_attachment_formats.emplace_back(blueprint_attachment.format);
 
 		attachment.stage_mask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 		attachment.access_mask = vk::AccessFlagBits::eColorAttachmentWrite;
@@ -225,9 +238,7 @@ void RenderGraphBuilder::build_pass_depth_attachment(
 
 	pass->depth_attachment_format = blueprint_attachment.format;
 
-	pass->attachments.push_back({});
-	auto &attachment = pass->attachments.back();
-
+	auto &attachment = pass->attachments.emplace_back();
 
 	attachment.stage_mask = vk::PipelineStageFlagBits::eEarlyFragmentTests;
 	attachment.access_mask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
@@ -301,26 +312,42 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 	auto const device = vk_context->get_device();
 	auto *const descriptor_allocator = vk_context->get_descriptor_allocator();
 
+	auto const bindings_count = blueprint_buffer_inputs.size() + blueprint_texture_inputs.size();
+
 	auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
-	bindings.reserve(blueprint_buffer_inputs.size() + blueprint_texture_inputs.size());
+	auto flags = vec<vk::DescriptorBindingFlags> {};
+
+	bindings.reserve(bindings_count);
+	flags.reserve(bindings_count);
 
 	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
+	{
 		bindings.emplace_back(
 		    blueprint_buffer_input.binding,
 		    blueprint_buffer_input.type,
 		    blueprint_buffer_input.count,
 		    blueprint_buffer_input.stage_mask
 		);
+		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+	}
 
 	for (auto const &blueprint_texture_input : blueprint_texture_inputs)
+	{
 		bindings.emplace_back(
 		    blueprint_texture_input.binding,
 		    blueprint_texture_input.type,
 		    blueprint_texture_input.count,
 		    blueprint_texture_input.stage_mask
 		);
+		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+	}
 
-	pass->descriptor_set_layout = device.createDescriptorSetLayout({ {}, bindings });
+	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+	pass->descriptor_set_layout = device.createDescriptorSetLayout({
+	    {},
+	    bindings,
+	    &extended_info,
+	});
 	vk_context->set_object_name(
 	    pass->descriptor_set_layout,
 	    fmt::format("{}_descriptor_set_layout", pass->name)
@@ -412,7 +439,7 @@ void RenderGraphBuilder::initialize_pass_input_descriptors(
 	}
 
 	device.updateDescriptorSets(writes, {});
-	device.waitIdle(); // @todo should we wait idle?
+	device.waitIdle();
 }
 void RenderGraphBuilder::build_pass_cmd_buffer_begin_infos(Renderpass *pass)
 {

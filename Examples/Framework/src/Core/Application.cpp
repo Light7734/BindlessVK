@@ -113,7 +113,7 @@ void Application::create_descriptor_pool()
 	};
 
 	descriptor_pool = device.createDescriptorPool(vk::DescriptorPoolCreateInfo {
-	    {},
+	    vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
 	    100,
 	    pool_sizes,
 	});
