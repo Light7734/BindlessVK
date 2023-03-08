@@ -1,8 +1,9 @@
 #include "Framework/Core/Application.hpp"
 
+#include "Framework/UserInterface/ImguiVulkanBackend.hpp"
+
 #include <any>
 #include <backends/imgui_impl_glfw.h>
-#include <backends/imgui_impl_vulkan.h>
 #include <cassert>
 #include <imgui.h>
 #include <utility>
@@ -138,8 +139,6 @@ void Application::create_user_interface()
 		vk_context->get_queues().get_graphics(),
 		{},
 		descriptor_pool,
-		{},
-		true,
 		static_cast<VkFormat>(vk_context->get_surface().get_color_format()),
 		BVK_MAX_FRAMES_IN_FLIGHT,
 		BVK_MAX_FRAMES_IN_FLIGHT,
@@ -157,7 +156,7 @@ void Application::create_user_interface()
 	    "ImGui failed to load vulkan functions"
 	);
 
-	ImGui_ImplVulkan_Init(&imgui_info, VK_NULL_HANDLE);
+	ImGui_ImplVulkan_Init(&imgui_info);
 
 	vk_context->immediate_submit([](vk::CommandBuffer cmd) {
 		ImGui_ImplVulkan_CreateFontsTexture(cmd);

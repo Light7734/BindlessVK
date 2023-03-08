@@ -27,24 +27,16 @@ add_library(
 )
 
 # Imgui does not provide a CMakeLists.txt so we do it ourselves here
-
 add_library(
     imgui SHARED 
 
-    # Imgui
     ${CMAKE_SOURCE_DIR}/Vendor/imgui/imgui.cpp
     ${CMAKE_SOURCE_DIR}/Vendor/imgui/imgui_demo.cpp
     ${CMAKE_SOURCE_DIR}/Vendor/imgui/imgui_draw.cpp
     ${CMAKE_SOURCE_DIR}/Vendor/imgui/imgui_tables.cpp
     ${CMAKE_SOURCE_DIR}/Vendor/imgui/imgui_widgets.cpp
 
-    # Backends
-    ${CMAKE_SOURCE_DIR}/Vendor/imgui/backends/imgui_impl_vulkan.cpp
-    ${CMAKE_SOURCE_DIR}/Vendor/imgui/backends/imgui_impl_glfw.cpp
-
-    # Misc
     ${CMAKE_SOURCE_DIR}/Vendor/imgui/misc/cpp/imgui_stdlib.cpp
-
 )
 
 target_include_directories(

@@ -1,5 +1,11 @@
 #include "Rendergraphs/Passes/UserInterface.hpp"
 
+#include "Framework/UserInterface/ImguiGlfwBackend.hpp"
+#include "Framework/UserInterface/ImguiVulkanBackend.hpp"
+
+#include <imgui.h>
+
+
 UserInterfacePass::UserInterfacePass(bvk::VkContext *const vk_context): bvk::Renderpass(vk_context)
 {
 }

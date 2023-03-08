@@ -4,17 +4,18 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     Framework
 
-    # Core
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Application.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Core/Window.cpp
 
-    # Utils
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Utils/CVar.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Utils/Logger.cpp
 
-    # Pools
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Pools/ThreadPool.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/Pools/StagingPool.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/UserInterface/ImguiVulkanBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Framework/src/UserInterface/ImguiGlfwBackend.cpp
+
 )
 
 set_target_properties(
