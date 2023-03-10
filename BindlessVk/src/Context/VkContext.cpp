@@ -135,6 +135,7 @@ VkContext::VkContext(
 
 	create_memory_allocator();
 	descriptor_allocator.init(device);
+	layout_allocator.init(device);
 
 	queues.init_with_device(device);
 	surface.init_with_gpu(gpu);
@@ -160,6 +161,8 @@ VkContext::~VkContext()
 
 	allocator.destroy();
 	descriptor_allocator.destroy();
+	layout_allocator.destroy();
+
 	device.destroy();
 
 	surface.destroy();
@@ -272,7 +275,10 @@ void VkContext::create_device(vk::PhysicalDeviceFeatures physical_device_feature
 	auto indexing_features = vk::PhysicalDeviceDescriptorIndexingFeaturesEXT {};
 	indexing_features.descriptorBindingPartiallyBound = true;
 	indexing_features.runtimeDescriptorArray = true;
-	auto const dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures { true , &indexing_features,};
+	auto const dynamic_rendering_features = vk::PhysicalDeviceDynamicRenderingFeatures {
+		true,
+		&indexing_features,
+	};
 
 	auto const queues_info = queues.get_create_infos();
 

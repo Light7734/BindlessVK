@@ -4,6 +4,7 @@ add_library(
     BindlessVk
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/DescriptorAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/LayoutAllocator.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Gpu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Queues.cpp
@@ -12,7 +13,6 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/VkContext.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Material/MaterialSystem.cpp
-
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/Model.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/ModelLoader.cpp

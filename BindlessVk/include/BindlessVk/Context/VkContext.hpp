@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Allocators/DescriptorAllocator.hpp"
+#include "BindlessVk/Allocators/LayoutAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/Gpu.hpp"
 #include "BindlessVk/Context/Queues.hpp"
@@ -115,6 +116,15 @@ public:
 		});
 	}
 
+	inline void set_object_name(DescriptorSetLayoutWithHash object, str_view name) const
+	{
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    object.descriptor_set_layout.objectType,
+		    (u64)((VkDescriptorSetLayout)(object.descriptor_set_layout)),
+		    name.data(),
+		});
+	}
+
 	inline auto get_cmd_pool(u32 const frame_index, u32 const thread_index = 0) const
 	{
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
@@ -153,6 +163,11 @@ public:
 	inline auto const &get_adequate_gpus() const
 	{
 		return adequate_gpus;
+	}
+
+	inline auto *get_layout_allocator()
+	{
+		return &layout_allocator;
 	}
 
 	inline auto get_allocator() const
@@ -256,6 +271,7 @@ private:
 
 	vma::Allocator allocator = {};
 	DescriptorAllocator descriptor_allocator = {};
+	LayoutAllocator layout_allocator = {};
 
 	Queues queues = {};
 	Surface surface = {};
@@ -264,7 +280,6 @@ private:
 
 	vk::Format depth_format = {};
 
-	// @todo Move the damned threading stuff out of vkcontext!!
 	u32 num_threads = 1u;
 
 	vec<vk::CommandPool> dynamic_cmd_pools = {};
