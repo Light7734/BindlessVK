@@ -40,4 +40,11 @@ enum class LogLvl : u8
 	nCount,
 };
 
+template<typename T>
+u64 hash_t(u64 s, T const &v)
+{
+	std::hash<T> h;
+	return h(v) + 0x9e37779b9 + (s << 6) + (s >> 2);
+}
+
 } // namespace BINDLESSVK_NAMESPACE
