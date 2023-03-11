@@ -50,37 +50,37 @@ public:
 
 	void unmap();
 
-	inline auto *get_buffer()
+	auto get_buffer()
 	{
 		return &buffer.buffer;
 	}
 
-	inline auto *get_descriptor_info()
+	auto get_descriptor_info()
 	{
 		return &descriptor_info;
 	}
 
-	inline auto get_whole_size() const
+	auto get_whole_size() const
 	{
 		return whole_size;
 	}
 
-	inline auto get_block_size() const
+	auto get_block_size() const
 	{
 		return block_size;
 	}
 
-	inline auto get_block_valid_size() const
+	auto get_block_valid_size() const
 	{
 		return valid_block_size;
 	}
 
-	inline auto get_block_padding_size() const
+	auto get_block_padding_size() const
 	{
 		return block_size - valid_block_size;
 	}
 
-	inline auto get_block_count() const
+	auto get_block_count() const
 	{
 		return block_count;
 	}

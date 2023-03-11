@@ -19,32 +19,32 @@ public:
 
 	void destroy();
 
-	inline auto get_capabilities() const
+	auto get_capabilities() const
 	{
 		return capabilities;
 	}
 
-	inline auto get_color_format() const
+	auto get_color_format() const
 	{
 		return color_format;
 	}
 
-	inline auto get_color_space() const
+	auto get_color_space() const
 	{
 		return color_space;
 	}
 
-	inline auto get_present_mode() const
+	auto get_present_mode() const
 	{
 		return present_mode;
 	}
 
-	inline auto get_framebuffer_extent() const
+	auto get_framebuffer_extent() const
 	{
 		return framebuffer_extent;
 	}
 
-	inline operator vk::SurfaceKHR() const
+	operator vk::SurfaceKHR() const
 	{
 		return surface;
 	}

@@ -20,7 +20,7 @@ public:
 
 	void destroy_buffers();
 
-	inline bvk::Buffer *get_by_index(u32 index)
+	auto get_by_index(u32 index)
 	{
 		assert_true(staging_buffers.size() > index);
 		return &staging_buffers[index];

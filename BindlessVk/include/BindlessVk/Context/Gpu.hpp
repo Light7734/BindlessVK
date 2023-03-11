@@ -15,77 +15,74 @@ public:
 
 	~Gpu() = default;
 
-	inline vk::Device create_device(vk::DeviceCreateInfo const &info) const
-	{
-		return physical_device.createDevice(info);
-	}
+	auto create_device(vk::DeviceCreateInfo const &info) const -> vk::Device;
 
-	inline auto is_adequate() const
+	auto is_adequate() const
 	{
 		return adequate;
 	}
 
-	inline auto get_properties() const
+	auto get_properties() const
 	{
 		return physical_device.getProperties();
 	}
 
-	inline auto get_features() const
+	auto get_features() const
 	{
 		return physical_device.getFeatures();
 	}
 
-	inline auto get_surface_capabilities() const
+	auto get_surface_capabilities() const
 	{
 		return physical_device.getSurfaceCapabilitiesKHR(surface);
 	}
 
-	inline auto get_surface_formats() const
+	auto get_surface_formats() const
 	{
 		return physical_device.getSurfaceFormatsKHR(surface);
 	}
 
-	inline auto get_surface_present_modes() const
+	auto get_surface_present_modes() const
 	{
 		return physical_device.getSurfacePresentModesKHR(surface);
 	}
 
-	inline auto get_graphics_queue_index() const
+	auto get_graphics_queue_index() const
 	{
 		return graphics_index;
 	}
 
-	inline auto get_present_queue_index() const
+	auto get_present_queue_index() const
 	{
 		return present_index;
 	}
 
-	inline auto get_format_properties(vk::Format const format) const
+	auto get_format_properties(vk::Format const format) const
 	{
 		return physical_device.getFormatProperties(format);
 	}
 
-	inline auto get_max_color_samples() const
+	auto get_max_color_samples() const
 	{
 		return max_color_samples;
 	}
 
-	inline auto get_max_depth_samples() const
+	auto get_max_depth_samples() const
 	{
 		return max_depth_samples;
 	}
 
-	inline auto get_max_color_and_depth_samples() const
+	auto get_max_color_and_depth_samples() const
 	{
 		return max_color_and_depth_samples;
 	}
 
-	inline operator vk::PhysicalDevice() const
+	operator vk::PhysicalDevice() const
 	{
 		return physical_device;
 	}
 
-	inline operator VkPhysicalDevice() const
+	operator VkPhysicalDevice() const
 	{
 		return static_cast<VkPhysicalDevice>(physical_device);
 	}

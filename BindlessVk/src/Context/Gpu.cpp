@@ -15,6 +15,11 @@ Gpu::Gpu(
 	check_adequacy(required_extensions);
 }
 
+auto Gpu::create_device(vk::DeviceCreateInfo const &info) const -> vk::Device
+{
+	return physical_device.createDevice(info);
+}
+
 void Gpu::calculate_max_sample_counts()
 {
 	auto const limits = get_properties().limits;

@@ -9,17 +9,17 @@ struct AllocatedDescriptorSet
 	vk::DescriptorSet descriptor_set;
 	vk::DescriptorPool descriptor_pool;
 
-	inline operator vk::DescriptorSet() const
+	operator vk::DescriptorSet() const
 	{
 		return descriptor_set;
 	}
 
-	inline operator VkDescriptorSet() const
+	operator VkDescriptorSet() const
 	{
 		return static_cast<VkDescriptorSet>(descriptor_set);
 	}
 
-	inline operator bool() const
+	operator bool() const
 	{
 		return descriptor_pool && descriptor_set;
 	}
@@ -41,24 +41,24 @@ private:
 		u32 set_count;
 		bool out_of_memory;
 
-		inline auto is_eligable_for_destruction() const -> bool
+		auto is_eligable_for_destruction() const -> bool
 		{
 			return set_count == 0 && out_of_memory;
 		}
 
-		inline operator vk::DescriptorPool() const
-		{
-			return pool_object;
-		}
-
-		inline auto operator==(Pool const other) const -> bool
+		auto operator==(Pool const other) const -> bool
 		{
 			return this->pool_object == other.pool_object;
 		}
 
-		inline auto operator==(vk::DescriptorPool const other) const -> bool
+		auto operator==(vk::DescriptorPool const other) const -> bool
 		{
 			return this->pool_object == other;
+		}
+
+		operator vk::DescriptorPool() const
+		{
+			return pool_object;
 		}
 	};
 

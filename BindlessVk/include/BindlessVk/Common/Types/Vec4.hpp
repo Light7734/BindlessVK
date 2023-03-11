@@ -53,48 +53,48 @@ struct Vec4f
 		w = ptr[3];
 	}
 
-	inline Vec4f unit() const
+	auto unit() const
 	{
 		auto const mag = sqrt(x * x + y * y + z * z + w * w);
 		return Vec4f(x / mag, y / mag, z / mag, w / mag);
 	}
 
-	inline f32 &operator[](usize const index)
+	auto &operator[](usize const index)
 	{
 		return values[index];
 	}
 
-	inline f32 operator[](usize const index) const
+	auto operator[](usize const index) const
 	{
 		return values[index];
 	}
 
-	inline Vec4f operator+(Vec4f const &rhs) const
+	auto operator+(Vec4f const &rhs) const
 	{
 		return Vec4f(x + rhs.x, y + rhs.y, z + rhs.z, w + rhs.w);
 	}
 
-	inline Vec4f operator*(Vec4f const &rhs) const
+	auto operator*(Vec4f const &rhs) const
 	{
 		return Vec4f(x * rhs.x, y * rhs.y, z * rhs.z, w * rhs.w);
 	}
 
-	inline Vec4f operator*(f32 const scalar) const
+	auto operator*(f32 const scalar) const
 	{
 		return Vec4f(x * scalar, y * scalar, z * scalar, w * scalar);
 	}
 
-	inline void operator+=(Vec4f const &rhs)
+	void operator+=(Vec4f const &rhs)
 	{
 		*this = *this + rhs;
 	}
 
-	inline void operator*=(Vec4f const &rhs)
+	void operator*=(Vec4f const &rhs)
 	{
 		*this = *this * rhs;
 	}
 
-	inline void operator*=(f32 const scalar)
+	void operator*=(f32 const scalar)
 	{
 		*this = *this * scalar;
 	}

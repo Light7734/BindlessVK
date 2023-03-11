@@ -36,42 +36,42 @@ public:
 		value = value;
 	}
 
-	inline operator bool() const
+	operator bool() const
 	{
 		return std::get<bool>(value);
 	}
 
-	inline operator bool *()
+	operator bool *()
 	{
 		return std::get_if<bool>(&value);
 	}
 
-	inline operator f32() const
+	operator f32() const
 	{
 		return std::get<f32>(value);
 	}
 
-	inline operator f32 *()
+	operator f32 *()
 	{
 		return std::get_if<f32>(&value);
 	}
 
-	inline operator i32() const
+	operator i32() const
 	{
 		return std::get<i32>(value);
 	}
 
-	inline operator i32 *()
+	operator i32 *()
 	{
 		return std::get_if<i32>(&value);
 	}
 
-	inline operator str() const
+	operator str() const
 	{
 		return std::get<str>(value);
 	}
 
-	inline operator str *()
+	operator str *()
 	{
 		return std::get_if<str>(&value);
 	}
@@ -83,7 +83,7 @@ private:
 class CVar
 {
 public:
-	static inline void create(
+	void static create(
 	    CVarType type,
 	    str_view name,
 	    str_view description,
@@ -94,28 +94,28 @@ public:
 		get_instance()->create_impl(type, name, description, default_value, current_value);
 	}
 
-	static inline void set(str_view name, CVarVal value)
+	void static set(str_view name, CVarVal value)
 	{
 		get_instance()->set_impl(name, value);
 	}
 
-	static inline void reset(str_view name)
+	void static reset(str_view name)
 	{
 		get_instance()->reset_impl(name);
 	}
 
-	static inline CVarVal get(str_view name)
+	auto static get(str_view name) -> CVarVal
 	{
 		return get_instance()->get_impl(name);
 	}
 
-	static inline void draw_imgui_editor()
+	void static draw_imgui_editor()
 	{
 		get_instance()->draw_imgui_editor_impl();
 	}
 
 private:
-	static CVar *get_instance();
+	auto static get_instance() -> CVar *;
 
 	void create_impl(
 	    CVarType type,
@@ -129,7 +129,7 @@ private:
 
 	void reset_impl(str_view name);
 
-	CVarVal get_impl(str_view name);
+	auto get_impl(str_view name) -> CVarVal;
 
 	void draw_imgui_editor_impl();
 

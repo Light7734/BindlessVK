@@ -2,10 +2,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Texture::Texture(Texture &&other)
-{
-	*this = std::move(other);
-}
+Texture::Texture(Texture &&other) { *this = std::move(other); }
 
 Texture &Texture::operator=(Texture &&other)
 {

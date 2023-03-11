@@ -7,11 +7,11 @@ namespace BINDLESSVK_NAMESPACE {
 
 struct BindlessVkException: std::exception
 {
-	BindlessVkException(const str& what): msg(what)
+	BindlessVkException(str const &what): msg(what)
 	{
 	}
 
-	virtual c_str what() const noexcept
+	auto virtual what() const noexcept -> c_str
 	{
 		return msg.c_str();
 	}
@@ -20,7 +20,7 @@ struct BindlessVkException: std::exception
 };
 
 template<typename Expr, typename... Args>
-inline void assert_true(const Expr& expr, fmt::format_string<Args...> fmt = "", Args&&... args)
+void inline assert_true(const Expr &expr, fmt::format_string<Args...> fmt = "", Args &&...args)
 {
 	if (!static_cast<bool>(expr)) [[unlikely]]
 	{
@@ -29,13 +29,13 @@ inline void assert_true(const Expr& expr, fmt::format_string<Args...> fmt = "", 
 }
 
 template<typename T, typename... Args>
-inline void assert_false(const T& expr, fmt::format_string<Args...> fmt = "", Args&&... args)
+void inline assert_false(const T &expr, fmt::format_string<Args...> fmt = "", Args &&...args)
 {
 	assert_true(!static_cast<bool>(expr), fmt, std::forward<Args>(args)...);
 }
 
 template<typename... Args>
-inline void assert_fail(fmt::format_string<Args...> fmt = "", Args&&... args)
+void inline assert_fail(fmt::format_string<Args...> fmt = "", Args &&...args)
 {
 	throw BindlessVkException(fmt::format(fmt, std::forward<Args>(args)...));
 }

@@ -23,9 +23,9 @@ public:
 	DevelopmentExampleApplication();
 	~DevelopmentExampleApplication();
 
-	virtual void on_tick(f64 delta_time) override;
+	void on_tick(f64 delta_time) final;
 
-	virtual void on_swapchain_recreate() override
+	void on_swapchain_recreate() final
 	{
 		assert_fail("Swapchain recreation not supported (yet)");
 	}

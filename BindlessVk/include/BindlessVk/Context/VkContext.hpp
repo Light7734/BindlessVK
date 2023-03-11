@@ -25,8 +25,6 @@ enum class DebugCallbackSource
 	nCount
 };
 
-// @todo move cmd pool management and thread stuff to a dedicated class
-// @todo compute queue
 class VkContext
 {
 public:
@@ -51,7 +49,7 @@ public:
 
 	~VkContext();
 
-	inline void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
+	void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
 	{
 		auto const alloc_info = vk::CommandBufferAllocateInfo {
 			immediate_cmd_pool,
@@ -76,7 +74,7 @@ public:
 	}
 
 	template<typename... Args>
-	inline void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args &&...args) const
+	void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args &&...args) const
 	{
 		auto const [callback, data] = debug_callback_and_data;
 
@@ -89,7 +87,7 @@ public:
 	}
 
 	template<typename T>
-	inline void set_object_name(T object, str_view name) const
+	void set_object_name(T object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.objectType,
@@ -98,7 +96,7 @@ public:
 		});
 	}
 
-	inline void set_object_name(AllocatedImage object, str_view name) const
+	void set_object_name(AllocatedImage object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.image.objectType,
@@ -107,7 +105,7 @@ public:
 		});
 	}
 
-	inline void set_object_name(AllocatedDescriptorSet object, str_view name) const
+	void set_object_name(AllocatedDescriptorSet object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.descriptor_set.objectType,
@@ -116,7 +114,7 @@ public:
 		});
 	}
 
-	inline void set_object_name(DescriptorSetLayoutWithHash object, str_view name) const
+	void set_object_name(DescriptorSetLayoutWithHash object, str_view name) const
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
 		    object.descriptor_set_layout.objectType,
@@ -125,98 +123,98 @@ public:
 		});
 	}
 
-	inline auto get_cmd_pool(u32 const frame_index, u32 const thread_index = 0) const
+	auto get_cmd_pool(u32 const frame_index, u32 const thread_index = 0) const
 	{
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
 	}
 
-	inline auto get_layers() const
+	auto get_layers() const
 	{
 		return layers;
 	}
 
-	inline auto get_instance_extensions() const
+	auto get_instance_extensions() const
 	{
 		return instance_extensions;
 	}
 
-	inline auto get_device_extensions() const
+	auto get_device_extensions() const
 	{
 		return device_extensions;
 	}
 
-	inline auto get_instance() const
+	auto get_instance() const
 	{
 		return instance;
 	}
 
-	inline auto get_device() const
+	auto get_device() const
 	{
 		return device;
 	}
 
-	inline auto get_gpu() const
+	auto get_gpu() const
 	{
 		return gpu;
 	}
 
-	inline auto const &get_adequate_gpus() const
+	auto &get_adequate_gpus() const
 	{
 		return adequate_gpus;
 	}
 
-	inline auto *get_layout_allocator()
+	auto get_layout_allocator()
 	{
 		return &layout_allocator;
 	}
 
-	inline auto get_allocator() const
+	auto get_allocator() const
 	{
 		return allocator;
 	}
 
-	inline auto *get_swapchain()
+	auto get_swapchain()
 	{
 		return &swapchain;
 	}
 
-	inline auto *get_descriptor_allocator()
+	auto get_descriptor_allocator()
 	{
 		return &descriptor_allocator;
 	}
 
-	inline auto const &get_queues() const
+	auto &get_queues() const
 	{
 		return queues;
 	}
 
-	inline auto const &get_surface() const
+	auto &get_surface() const
 	{
 		return surface;
 	}
 
-	inline auto get_depth_format() const
+	auto get_depth_format() const
 	{
 		return depth_format;
 	}
 
-	inline auto get_depth_format_has_stencil() const
+	auto get_depth_format_has_stencil() const
 	{
 		return depth_format == vk::Format::eD32SfloatS8Uint ||
 		       depth_format == vk::Format::eD24UnormS8Uint;
 	}
 
-	inline auto get_num_threads() const
+	auto get_num_threads() const
 	{
 		return num_threads;
 	}
 
-	inline auto get_instance_proc_addr(str_view proc_name) const
+	auto get_instance_proc_addr(str_view proc_name) const
 	{
 		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name.data());
 	}
 
-	inline auto get_device_proc_addr(str_view proc_name) const
+	auto get_device_proc_addr(str_view proc_name) const
 	{
 		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr(device, proc_name.data());
 	}

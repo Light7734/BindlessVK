@@ -8,8 +8,7 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
 
-/// Callback function called after successful vkAllocateMemory.
-static void vma_allocate_device_memory_callback(
+void static vma_allocate_device_memory_callback(
     VmaAllocator const VMA_NOT_NULL allocator,
     u32 const memory_type,
     VkDeviceMemory const VMA_NOT_NULL_NON_DISPATCHABLE memory,
@@ -30,8 +29,7 @@ static void vma_allocate_device_memory_callback(
 	);
 }
 
-// @todo Send a more thorough string
-static void vma_free_device_memory_callback(
+void static vma_free_device_memory_callback(
     VmaAllocator const VMA_NOT_NULL allocator,
     u32 const memory_type,
     VkDeviceMemory const VMA_NOT_NULL_NON_DISPATCHABLE memory,
@@ -47,7 +45,7 @@ static void vma_free_device_memory_callback(
 	callback(DebugCallbackSource::eVma, LogLvl::eTrace, fmt::format("Free: {}", size), user_data);
 }
 
-static auto parse_message_type(VkDebugUtilsMessageTypeFlagsEXT const message_types) -> c_str
+auto static parse_message_type(VkDebugUtilsMessageTypeFlagsEXT const message_types) -> c_str
 {
 	if (message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
 		return "GENERAL";
@@ -62,7 +60,7 @@ static auto parse_message_type(VkDebugUtilsMessageTypeFlagsEXT const message_typ
 	return "PERFORMANCE";
 }
 
-static auto parse_message_severity(VkDebugUtilsMessageSeverityFlagBitsEXT const message_severity)
+auto static parse_message_severity(VkDebugUtilsMessageSeverityFlagBitsEXT const message_severity)
     -> LogLvl
 {
 	switch (message_severity)
@@ -77,12 +75,12 @@ static auto parse_message_severity(VkDebugUtilsMessageSeverityFlagBitsEXT const 
 	return {};
 }
 
-static VkBool32 vulkan_debug_message_callback(
+auto static vulkan_debug_message_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT const message_severity,
     VkDebugUtilsMessageTypeFlagsEXT const message_types,
     VkDebugUtilsMessengerCallbackDataEXT const *const callback_data,
     void *const vulkan_user_data
-)
+) -> VkBool32
 {
 	auto const [callback, user_data] = *static_cast<
 	    pair<fn<void(DebugCallbackSource, LogLvl, str const &, std::any)>, std::any> *>(

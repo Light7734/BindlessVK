@@ -28,12 +28,12 @@ public:
 
 	~Material();
 
-	inline auto *get_effect() const
+	auto *get_effect() const
 	{
 		return effect;
 	}
 
-	inline auto get_descriptor_set() const
+	auto get_descriptor_set() const
 	{
 		return descriptor_set;
 	}

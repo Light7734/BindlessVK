@@ -28,20 +28,22 @@ public:
 public:
 	BasicRendergraph(ref<bvk::VkContext> vk_context);
 
-	static auto get_descriptor_set_bindings()
+	~BasicRendergraph() = default;
+
+	void on_update(u32 frame_index, u32 image_index) final;
+
+	auto static get_descriptor_set_bindings()
 	    -> pair<arr<vk::DescriptorSetLayoutBinding, 4>, arr<vk::DescriptorBindingFlags, 4>>;
 
-	auto static inline consteval get_update_label()
+	auto static consteval get_update_label()
 	{
 		return vk::DebugUtilsLabelEXT { "graph_update", { 1.0, 1.0, 1.0, 1.0 } };
 	}
 
-	auto static inline consteval get_barrier_label()
+	auto static consteval get_barrier_label()
 	{
 		return vk::DebugUtilsLabelEXT { "graph_barrier", { 1.0, 1.0, 1.0, 1.0 } };
 	}
-
-	void virtual on_update(u32 frame_index, u32 image_index) override;
 
 private:
 	void update_descriptor_sets();

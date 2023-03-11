@@ -19,7 +19,7 @@ void Queues::init_with_device(vk::Device device)
 
 auto Queues::get_create_infos() -> vec<vk::DeviceQueueCreateInfo>
 {
-	static constexpr arr<f32, 1> queue_priority = { 1.0 };
+	auto static constexpr queue_priority = arr<f32, 1> { 1.0 };
 
 	auto create_info = vec<vk::DeviceQueueCreateInfo> {
 		{ {}, graphics_index, queue_priority },

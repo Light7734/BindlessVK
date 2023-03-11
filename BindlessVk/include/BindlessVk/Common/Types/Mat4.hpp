@@ -58,23 +58,23 @@ struct Mat4f
 		rows[2][2] = f32(1) - f32(2) * (qxx + qyy);
 	}
 
-	inline void translate(Vec3f const &v)
+	void translate(Vec3f const &v)
 	{
 		rows[3] += ((rows[0]) * (v[0])) + (rows[1] * v[1]) + (rows[2] * v[2]);
 	}
 
-	inline void rotate(Vec3f const &v)
+	void rotate(Vec3f const &v)
 	{
 	}
 
-	inline void scale(Vec3f const &v)
+	void scale(Vec3f const &v)
 	{
 		rows[0] *= v[0];
 		rows[1] *= v[1];
 		rows[2] *= v[2];
 	}
 
-	inline void operator*=(Mat4f const &rhs)
+	void operator*=(Mat4f const &rhs)
 	{
 		auto const SrcA0 = rows[0];
 		auto const SrcA1 = rows[1];

@@ -37,12 +37,12 @@ public:
 
 		vk::ClearValue clear_value;
 
-		inline auto is_color_attachment() const
+		auto is_color_attachment() const
 		{
 			return subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor;
 		}
 
-		inline auto is_depth_attachment() const
+		auto is_depth_attachment() const
 		{
 			return subresource_range.aspectMask & vk::ImageAspectFlagBits::eDepth;
 		}
@@ -58,45 +58,45 @@ public:
 	};
 
 public:
-	virtual void on_update(u32 frame_index, u32 image_index) = 0;
-	virtual void on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+	void virtual on_update(u32 frame_index, u32 image_index) = 0;
+	void virtual on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
 
-	inline auto const &get_update_label() const
+	auto &get_update_label() const
 	{
 		return update_label;
 	}
 
-	inline auto const &get_barrier_label() const
+	auto &get_barrier_label() const
 	{
 		return barrier_label;
 	}
 
-	inline auto const &get_render_label() const
+	auto &get_render_label() const
 	{
 		return render_label;
 	}
 
-	inline auto const &get_attachments() const
+	auto &get_attachments() const
 	{
 		return attachments;
 	}
 
-	inline auto const &get_descriptor_sets() const
+	auto &get_descriptor_sets() const
 	{
 		return descriptor_sets;
 	}
 
-	inline auto const &get_pipeline_layout() const
+	auto &get_pipeline_layout() const
 	{
 		return pipeline_layout;
 	}
 
-	inline auto const &get_buffer_inputs() const
+	auto &get_buffer_inputs() const
 	{
 		return buffer_inputs;
 	}
 
-	inline auto is_multisampled() const
+	auto is_multisampled() const
 	{
 		return sample_count != vk::SampleCountFlagBits::e1;
 	}
@@ -130,7 +130,6 @@ protected:
 	vk::DebugUtilsLabelEXT render_label;
 };
 
-// Blueprint to be used by rendergraph builder
 class RenderpassBlueprint
 {
 private:
@@ -151,8 +150,8 @@ public:
 
 		str debug_name = "";
 
-		// @todo: return validity in a better way?
-		inline operator bool() const
+		// @warn this isn't the best way to check for validity...
+		operator bool() const
 		{
 			return !!hash;
 		}

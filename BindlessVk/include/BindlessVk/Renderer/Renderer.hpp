@@ -18,7 +18,7 @@ private:
 		vk::RenderingAttachmentInfo depth_attachment;
 		vk::RenderingInfo rendering_info;
 
-		inline operator vk::RenderingInfo() const
+		operator vk::RenderingInfo() const
 		{
 			return rendering_info;
 		}
@@ -30,7 +30,7 @@ public:
 
 	void render_graph(Rendergraph *render_graph);
 
-	inline auto get_resources()
+	auto get_resources()
 	{
 		return &resources;
 	}

@@ -73,32 +73,32 @@ public:
 	Model(const Model &) = delete;
 	Model &operator=(const Model &) = delete;
 
-	inline auto get_name() const
+	auto get_name() const
 	{
 		return str_view(debug_name);
 	}
 
-	inline auto &get_nodes() const
+	auto &get_nodes() const
 	{
 		return nodes;
 	}
 
-	inline auto &get_textures() const
+	auto &get_textures() const
 	{
 		return textures;
 	}
 
-	inline auto &get_material_parameters() const
+	auto &get_material_parameters() const
 	{
 		return material_parameters;
 	}
 
-	inline auto *get_vertex_buffer() const
+	auto get_vertex_buffer() const
 	{
 		return vertex_buffer;
 	}
 
-	inline auto *get_index_buffer() const
+	auto get_index_buffer() const
 	{
 		return index_buffer;
 	}

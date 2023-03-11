@@ -7,27 +7,27 @@ class Forwardpass: public bvk::Renderpass
 {
 public:
 	Forwardpass(bvk::VkContext *vk_context);
-	~Forwardpass()
-	{
-	}
 
-	auto static inline consteval get_update_label()
+	~Forwardpass() = default;
+
+	void on_update(u32 frame_index, u32 image_index);
+
+	void on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
+
+	auto static consteval get_update_label()
 	{
 		return vk::DebugUtilsLabelEXT { "fowardpass_update", { 1.0, 0.5, 0.5, 1.0 } };
 	}
 
-	auto static inline consteval get_render_label()
+	auto static consteval get_render_label()
 	{
 		return vk::DebugUtilsLabelEXT { "forwardpass_render", { 1.0, 0.5, 0.5, 1.0 } };
 	}
 
-	auto static inline consteval get_barrier_label()
+	auto static consteval get_barrier_label()
 	{
 		return vk::DebugUtilsLabelEXT { "forwardpass_barrier", { 1.0, 0.5, 0.5, 1.0 } };
 	}
-
-	virtual void on_update(u32 frame_index, u32 image_index) override;
-	virtual void on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) override;
 
 private:
 	void render_static_meshes();

@@ -9,12 +9,12 @@ struct DescriptorSetLayoutWithHash
 	vk::DescriptorSetLayout descriptor_set_layout;
 	u64 hash;
 
-	inline operator vk::DescriptorSetLayout() const
+	operator vk::DescriptorSetLayout() const
 	{
 		return descriptor_set_layout;
 	}
 
-	inline operator bool() const
+	operator bool() const
 	{
 		return !!descriptor_set_layout;
 	}

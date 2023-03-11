@@ -47,48 +47,48 @@ struct Vec3f
 		z = ptr[2];
 	}
 
-	inline Vec3f unit() const
+	auto unit() const
 	{
 		auto const mag = sqrt(x * x + y * y + z * z);
 		return Vec3f(x / mag, y / mag, z / mag);
 	}
 
-	inline f32 &operator[](usize const index)
+	auto &operator[](usize const index)
 	{
 		return values[index];
 	}
 
-	inline f32 operator[](usize const index) const
+	auto operator[](usize const index) const
 	{
 		return values[index];
 	}
 
-	inline Vec3f operator+(Vec3f const &rhs)
+	auto operator+(Vec3f const &rhs)
 	{
 		return Vec3f(x + rhs.x, y + rhs.y, z + rhs.z);
 	}
 
-	inline Vec3f operator*(Vec3f const &rhs)
+	auto operator*(Vec3f const &rhs)
 	{
 		return Vec3f(x * rhs.x, y * rhs.y, z * rhs.z);
 	}
 
-	inline Vec3f operator*(f32 const scalar)
+	auto operator*(f32 const scalar)
 	{
 		return Vec3f(x * scalar, y * scalar, z * scalar);
 	}
 
-	inline void operator+=(Vec3f const &rhs)
+	void operator+=(Vec3f const &rhs)
 	{
 		*this = *this + rhs;
 	}
 
-	inline void operator*=(Vec3f const &rhs)
+	void operator*=(Vec3f const &rhs)
 	{
 		*this = *this * rhs;
 	}
 
-	inline void operator*=(f32 const scalar)
+	void operator*=(f32 const scalar)
 	{
 		*this = *this * scalar;
 	}

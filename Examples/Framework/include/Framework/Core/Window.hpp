@@ -26,7 +26,7 @@ public:
 	vk::SurfaceKHR create_surface(vk::Instance instance);
 	vk::Extent2D get_framebuffer_size();
 
-	inline auto *get_glfw_handle()
+	auto get_glfw_handle()
 	{
 		return glfw_window_handle;
 	}

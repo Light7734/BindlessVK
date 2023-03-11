@@ -7,6 +7,16 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+Rendergraph::Rendergraph(ref<VkContext> vk_context): vk_context(vk_context)
+{
+}
+
+Rendergraph::~Rendergraph()
+{
+	for (auto *pass : passes)
+		delete pass;
+}
+
 RenderGraphBuilder::RenderGraphBuilder(ref<VkContext> const vk_context): vk_context(vk_context)
 {
 }

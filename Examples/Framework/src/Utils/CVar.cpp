@@ -3,9 +3,9 @@
 #include <imgui.h>
 #include <misc/cpp/imgui_stdlib.h>
 
-CVar *CVar::get_instance()
+auto CVar::get_instance() -> CVar *
 {
-	static CVar instance;
+	auto static instance = CVar {};
 	return &instance;
 }
 
@@ -32,7 +32,7 @@ void CVar::reset_impl(str_view const name)
 	vars[hash_str(name)].current_value = vars[hash_str(name)].default_value;
 }
 
-CVarVal CVar::get_impl(str_view const name)
+auto CVar::get_impl(str_view const name) -> CVarVal
 {
 	return vars[hash_str(name)].current_value;
 }
@@ -42,8 +42,10 @@ void CVar::draw_imgui_editor_impl()
 	ImGui::Begin("Console Variables");
 	ImGui::Text("%lu", vars.size());
 
-	for (auto &[key, var] : vars) {
-		switch (var.type) {
+	for (auto &[key, var] : vars)
+	{
+		switch (var.type)
+		{
 		case CVarType::Int:
 			ImGui::DragInt(var.name.c_str(), static_cast<i32 *>(var.current_value));
 			break;

@@ -47,7 +47,7 @@ private:
 
 		vec<Attachment> attachments;
 
-		inline auto get_attachment(u32 image_index, u32 frame_index) -> Attachment *
+		auto get_attachment(u32 image_index, u32 frame_index) -> Attachment *
 		{
 			return type == Type::ePerImage ? &attachments[image_index] :
 			       type == Type::ePerFrame ? &attachments[frame_index] :
@@ -58,27 +58,27 @@ private:
 public:
 	RenderResources(ref<VkContext> vk_context);
 
-	inline auto get_attachment_container(u32 resource_index)
+	auto get_attachment_container(u32 resource_index)
 	{
 		return &containers[resource_index];
 	}
 
-	inline auto get_backbuffer_attachment(u32 image_index)
+	auto get_backbuffer_attachment(u32 image_index)
 	{
 		return containers[0].get_attachment(image_index, 0);
 	}
 
-	inline auto get_attachment(u32 resource_index, u32 image_index, u32 frame_index)
+	auto get_attachment(u32 resource_index, u32 image_index, u32 frame_index)
 	{
 		return containers[resource_index].get_attachment(image_index, frame_index);
 	}
 
-	inline auto get_transient_attachment(u32 resource_index) const
+	auto get_transient_attachment(u32 resource_index) const
 	{
 		return transient_attachments[resource_index];
 	}
 
-	inline auto try_get_suitable_transient_attachment_index(
+	auto try_get_suitable_transient_attachment_index(
 	    RenderpassBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	) const
@@ -98,6 +98,7 @@ public:
 	}
 
 	auto try_get_attachment_index(u64 const key) -> u32;
+
 	void add_key_to_attachment_index(u64 const key, u32 const attachment_index);
 
 	void create_color_attachment(

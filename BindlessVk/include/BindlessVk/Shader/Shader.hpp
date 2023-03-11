@@ -49,27 +49,27 @@ public:
 	ShaderPipeline(const ShaderPipeline &) = delete;
 	ShaderPipeline &operator=(const ShaderPipeline &) = delete;
 
-	inline auto get_name() const
+	auto get_name() const
 	{
 		return str_view(debug_name);
 	}
 
-	inline auto get_pipeline() const
+	auto get_pipeline() const
 	{
 		return pipeline;
 	}
 
-	inline auto get_pipeline_layout() const
+	auto get_pipeline_layout() const
 	{
 		return pipeline_layout;
 	}
 
-	inline auto get_descriptor_set_layout() const
+	auto get_descriptor_set_layout() const
 	{
 		return descriptor_set_layout;
 	}
 
-	inline auto uses_shader_descriptor_set_slot() const
+	auto uses_shader_descriptor_set_slot() const
 	{
 		return !!descriptor_set_layout;
 	}

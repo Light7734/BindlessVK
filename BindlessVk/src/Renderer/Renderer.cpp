@@ -232,7 +232,7 @@ void Renderer::apply_present_barriers(Rendergraph *const graph, u32 const image_
 	cmd.endDebugUtilsLabelEXT();
 }
 
-void Renderer ::render_pass(Rendergraph *const graph, Renderpass *const pass, u32 const image_index)
+void Renderer::render_pass(Rendergraph *const graph, Renderpass *const pass, u32 const image_index)
 {
 	auto const cmd = cmd_buffers[frame_index];
 	cmd.beginDebugUtilsLabelEXT(pass->get_render_label());

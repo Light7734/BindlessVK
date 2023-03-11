@@ -14,32 +14,32 @@ public:
 	void init(vk::Device device, Surface surface, Queues queues);
 	void destroy();
 
-	inline void invalidate()
+	void invalidate()
 	{
 		invalid = true;
 	}
 
-	inline auto get_images() const
+	auto get_images() const
 	{
 		return images;
 	}
 
-	inline auto get_image_views() const
+	auto get_image_views() const
 	{
 		return image_views;
 	}
 
-	inline auto get_image_count() const
+	auto get_image_count() const
 	{
 		return images.size();
 	}
 
-	inline auto is_invalid() const
+	auto is_invalid() const
 	{
 		return invalid;
 	}
 
-	inline operator vk::SwapchainKHR() const
+	operator vk::SwapchainKHR() const
 	{
 		return swapchain;
 	}

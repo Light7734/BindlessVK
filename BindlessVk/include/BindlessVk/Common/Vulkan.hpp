@@ -28,17 +28,17 @@ struct AllocatedImage
 	{
 	}
 
-	inline operator vk::Image() const
+	operator vk::Image() const
 	{
 		return image;
 	}
 
-	inline operator vma::Allocation() const
+	operator vma::Allocation() const
 	{
 		return allocation;
 	}
 
-	inline bool has_allocation() const
+	bool has_allocation() const
 	{
 		return !!allocation;
 	}
@@ -57,12 +57,12 @@ struct AllocatedBuffer
 	{
 	}
 
-	inline operator vk::Buffer()
+	operator vk::Buffer()
 	{
 		return buffer;
 	}
 
-	inline operator vma::Allocation()
+	operator vma::Allocation()
 	{
 		return allocation;
 	}
