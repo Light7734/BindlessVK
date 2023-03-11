@@ -65,8 +65,14 @@ void SpvLoader::reflect_descriptor_sets()
 	    "spvReflectEnumerateDescriptorSets failed"
 	);
 
-	for (auto const &spv_set : descriptor_sets_reflection)
-		shader.descriptor_sets_bindings[spv_set->set] = reflect_descriptor_set_bindings(spv_set);
+	// shader uses (set = 2) descriptor set, which is the per-shader set slot
+	// set = 1 -> per pass
+	// set = 0 -> per graph(frame)
+	if (descriptor_sets_reflection.size() >= 2)
+	{
+		auto const *const spv_set = descriptor_sets_reflection[2];
+		shader.descriptor_set_bindings = reflect_descriptor_set_bindings(spv_set);
+	}
 }
 
 auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *const spv_set)

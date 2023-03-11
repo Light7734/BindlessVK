@@ -20,6 +20,7 @@ struct DescriptorSetLayoutWithHash
 	}
 };
 
+/** @warn currently we don't de-allocate any layouts before destruction... */
 class LayoutAllocator
 {
 public:

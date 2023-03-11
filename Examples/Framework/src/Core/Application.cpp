@@ -14,7 +14,7 @@ Application::Application()
 	create_vk_context();
 	create_descriptor_pool();
 
-	create_renderer();
+	renderer = std::make_unique<bvk::Renderer>(vk_context);
 
 	create_user_interface();
 
@@ -120,11 +120,6 @@ void Application::create_descriptor_pool()
 	});
 }
 
-void Application::create_renderer()
-{
-	renderer = std::make_unique<bvk::Renderer>(vk_context);
-}
-
 void Application::create_user_interface()
 {
 	ImGui::CreateContext();
@@ -180,7 +175,7 @@ void Application::load_default_textures()
 {
 	u8 defaultTexturePixelData[] = { 255, 0, 255, 255 };
 	textures.emplace(
-	    hash_str("default_2d"),
+	    hash_str("default_texture"),
 	    texture_loader.load_from_binary(
 	        defaultTexturePixelData,
 	        1,
@@ -189,18 +184,18 @@ void Application::load_default_textures()
 	        bvk::Texture::Type::e2D,
 	        staging_pool.get_by_index(0),
 	        vk::ImageLayout::eShaderReadOnlyOptimal,
-	        "default_2d"
+	        "default_texture"
 	    )
 	);
 
 	textures.emplace(
-	    hash_str("default_cube"),
+	    hash_str("default_texture_cube"),
 	    texture_loader.load_from_ktx(
 	        "Assets/cubemap_yokohama_rgba.ktx",
 	        bvk::Texture::Type::eCubeMap,
 	        staging_pool.get_by_index(0),
 	        vk::ImageLayout::eShaderReadOnlyOptimal,
-	        "default_cube"
+	        "default_texture_cube"
 	    )
 	);
 }

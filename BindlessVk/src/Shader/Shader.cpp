@@ -1,17 +1,25 @@
 #include "BindlessVk/Shader/Shader.hpp"
 
+template<typename T>
+void build_layout()
+{
+	auto const bindings = T::get_descriptor_set_bindings();
+}
+
 namespace BINDLESSVK_NAMESPACE {
 ShaderPipeline::ShaderPipeline(
     VkContext *const vk_context,
     vec<Shader *> const &shaders,
-    ShaderPipeline::Configuration const configuration,
+    ShaderPipeline::Configuration const &configuration,
+    DescriptorSetLayoutWithHash graph_descriptor_set_layout,
+    DescriptorSetLayoutWithHash pass_descriptor_set_layout,
     str_view const debug_name /* = "" */
 )
     : vk_context(vk_context)
     , debug_name(debug_name)
 {
-	create_descriptor_sets_layout(shaders);
-	create_pipeline_layout();
+	create_descriptor_set_layout(shaders);
+	create_pipeline_layout(graph_descriptor_set_layout, pass_descriptor_set_layout);
 
 	create_pipeline(shaders, configuration);
 }
@@ -26,7 +34,7 @@ ShaderPipeline &ShaderPipeline::operator=(ShaderPipeline &&effect)
 	this->vk_context = effect.vk_context;
 	this->pipeline = effect.pipeline;
 	this->pipeline_layout = effect.pipeline_layout;
-	this->descriptor_set_layouts = effect.descriptor_set_layouts;
+	this->descriptor_set_layout = effect.descriptor_set_layout;
 
 	effect.vk_context = {};
 
@@ -39,48 +47,46 @@ ShaderPipeline::~ShaderPipeline()
 		return;
 
 	auto const device = vk_context->get_device();
+
 	device.destroyPipeline(pipeline);
-	device.destroyPipelineLayout(pipeline_layout);
-	device.destroyDescriptorSetLayout(descriptor_set_layouts[0]);
-	device.destroyDescriptorSetLayout(descriptor_set_layouts[1]);
 }
 
-void ShaderPipeline::create_descriptor_sets_layout(vec<Shader *> const &shaders)
+void ShaderPipeline::create_descriptor_set_layout(vec<Shader *> const &shaders)
 {
-	auto const device = vk_context->get_device();
-	auto const sets_bindings = combine_descriptor_sets_bindings(shaders);
+	auto *const layout_allocator = vk_context->get_layout_allocator();
 
-	for (u32 i = 0u; auto const &set_bindings : sets_bindings)
-	{
-		auto const flags = vec<vk::DescriptorBindingFlags>(
-		    set_bindings.size(),
-		    vk::DescriptorBindingFlagBits::ePartiallyBound
-		);
-		auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+	auto const shader_set_bindings = combine_descriptor_sets_bindings(shaders);
 
-		descriptor_set_layouts[i] =
-		    device.createDescriptorSetLayout(vk::DescriptorSetLayoutCreateInfo {
-		        {},
-		        set_bindings,
-		        &extended_info,
-		    });
-		vk_context->set_object_name(
-		    descriptor_set_layouts[i],
-		    fmt::format("{}_descriptor_set_layout_{}", debug_name, i)
-		);
+	if (shader_set_bindings.empty())
+		return;
 
-		++i;
-	}
-}
-
-void ShaderPipeline::create_pipeline_layout()
-{
-	auto const device = vk_context->get_device();
-	pipeline_layout = device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	descriptor_set_layout = layout_allocator->goc_descriptor_set_layout(
 	    {},
-	    static_cast<u32>(descriptor_set_layouts.size()),
-	    descriptor_set_layouts.data(),
-	});
+	    shader_set_bindings,
+	    vec<vk::DescriptorBindingFlags>(
+	        shader_set_bindings.size(),
+	        vk::DescriptorBindingFlagBits::ePartiallyBound
+	    )
+	);
+	vk_context->set_object_name(
+	    descriptor_set_layout,
+	    fmt::format("{}_descriptor_set_layout", debug_name)
+	);
+}
+
+void ShaderPipeline::create_pipeline_layout(
+    DescriptorSetLayoutWithHash graph_descriptor_set_layout,
+    DescriptorSetLayoutWithHash pass_descriptor_set_layout
+)
+{
+	auto *layout_allocator = vk_context->get_layout_allocator();
+	pipeline_layout = layout_allocator->goc_pipeline_layout(
+	    {},
+	    graph_descriptor_set_layout, // set = 0 -> per graph(frame)
+	    pass_descriptor_set_layout,  // set = 1 -> per pass
+	    this->descriptor_set_layout  // set = 2 -> per shader
+	);
+
 	vk_context->set_object_name(pipeline_layout, fmt::format("{}_pipeline_layout", debug_name));
 }
 
@@ -147,29 +153,23 @@ void ShaderPipeline::create_pipeline(
 }
 
 auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const
-    -> arr<vec<vk::DescriptorSetLayoutBinding>, 2>
+    -> vec<vk::DescriptorSetLayoutBinding>
 {
-	auto combined_bindings = arr<vec<vk::DescriptorSetLayoutBinding>, 2> {};
+	auto combined_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 
 	for (Shader *const shader : shaders)
-		for (u32 i = 0; auto const &descriptor_set_bindings : shader->descriptor_sets_bindings)
+		for (auto const &descriptor_set_binding : shader->descriptor_set_bindings)
 		{
-			for (auto const &descriptor_set_binding : descriptor_set_bindings)
-			{
-				const u32 binding_index = descriptor_set_binding.binding;
+			auto const binding_index = descriptor_set_binding.binding;
 
-				if (combined_bindings[i].size() <= binding_index)
-					combined_bindings[i].resize(binding_index + 1);
+			if (combined_bindings.size() <= binding_index)
+				combined_bindings.resize(binding_index + 1);
 
-				combined_bindings[i][binding_index] = descriptor_set_binding;
-			}
-
-			i++;
+			combined_bindings[binding_index] = descriptor_set_binding;
 		}
 
 	return combined_bindings;
 }
-
 
 auto ShaderPipeline::create_shader_stage_create_infos(vec<Shader *> const &shaders) const
     -> vec<vk::PipelineShaderStageCreateInfo>
@@ -178,17 +178,14 @@ auto ShaderPipeline::create_shader_stage_create_infos(vec<Shader *> const &shade
 	shader_stage_create_infos.resize(shaders.size());
 
 	for (u32 i = 0; auto const &shader : shaders)
-	{
 		shader_stage_create_infos[i++] = {
 			{},
 			shader->stage,
 			shader->module,
 			"main",
 		};
-	}
 
 	return shader_stage_create_infos;
 }
-
 
 } // namespace BINDLESSVK_NAMESPACE

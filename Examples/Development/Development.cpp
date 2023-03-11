@@ -1,5 +1,7 @@
 #include "Development/Development.hpp"
 
+#include <span>
+
 DevelopmentExampleApplication::DevelopmentExampleApplication()
 {
 	load_shaders();
@@ -24,21 +26,18 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	CVar::draw_imgui_editor();
 
 	camera_controller.update();
-
-	auto *const swapchain = vk_context->get_swapchain();
-
 	renderer->render_graph(render_graph.get());
 
-	if (swapchain->is_invalid()) {
+	if (vk_context->get_swapchain()->is_invalid())
 		assert_fail("swapchain-recreation is currently nuked");
-	}
 }
 
 void DevelopmentExampleApplication::load_shaders()
 {
 	auto constexpr DIRECTORY = "Shaders/";
 
-	for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY)) {
+	for (auto const &shader_file : std::filesystem::directory_iterator(DIRECTORY))
+	{
 		str const path(shader_file.path().c_str());
 		str const extension(shader_file.path().extension().c_str());
 		str const name(shader_file.path().filename().replace_extension());
@@ -53,6 +52,14 @@ void DevelopmentExampleApplication::load_shaders()
 
 void DevelopmentExampleApplication::load_shader_effects()
 {
+	auto const device = vk_context->get_device();
+
+	auto const descriptor_set_bindings = BasicRendergraph::get_descriptor_set_bindings();
+	auto const layout_allocator = vk_context->get_layout_allocator();
+
+	auto const [bindings, flags] = BasicRendergraph::get_descriptor_set_bindings();
+	auto const graph_set_layout = layout_allocator->goc_descriptor_set_layout({}, bindings, flags);
+
 	shader_pipelines.emplace(
 	    hash_str("opaque_mesh"),
 
@@ -63,6 +70,8 @@ void DevelopmentExampleApplication::load_shader_effects()
 	            &shaders[hash_str("pixel")],
 	        },
 	        shader_effect_configurations[hash_str("opaque_mesh")],
+	        graph_set_layout,
+	        {},
 	        "opaque_mesh"
 	    )
 	);
@@ -77,6 +86,8 @@ void DevelopmentExampleApplication::load_shader_effects()
 	            &shaders[hash_str("skybox_fragment")],
 	        },
 	        shader_effect_configurations[hash_str("skybox")],
+	        graph_set_layout,
+	        {},
 	        "skybox"
 	    )
 	);
@@ -289,9 +300,10 @@ void DevelopmentExampleApplication::load_entities()
 	    glm::vec3(0.0f, 0.0, 0.0)
 	);
 
-	scene.emplace<StaticMeshRendererComponent>(
+	scene.emplace<SkyboxComponent>(
 	    skybox_entity,
 	    &materials.at(hash_str("skybox")),
+	    &textures.at(hash_str("default_texture_cube")),
 	    &models.at(hash_str("skybox"))
 	);
 
@@ -332,16 +344,9 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 {
 	auto const &surface = vk_context->get_surface();
 
-	auto const update_color = arr<f32, 4> { 1.0, 0.8, 0.8, 1.0 };
-	auto const render_color = arr<f32, 4> { 0.8, 0.8, 1.0, 1.0 };
-	auto const barrier_color = arr<f32, 4> { 0.8, 1.0, 0.8, 1.0 };
-
 	auto const color_format = surface.get_color_format();
 	auto const depth_format = vk_context->get_depth_format();
 	auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
-
-	auto const *const default_texture = &textures.at(hash_str("default_2d"));
-	auto const *const default_texture_cube = &textures.at(hash_str("default_cube"));
 
 	auto const color_output_hash = hash_str("forward_color_out");
 	auto const depth_attachment_hash = hash_str("forward_depth");
@@ -350,9 +355,9 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	blueprint.set_name("forwardpass")
 	    .set_user_data(&scene)
 	    .set_sample_count(sample_count)
-	    .set_update_label({ "forwardpass_update", update_color })
-	    .set_render_label({ "forwardpass_render", render_color })
-	    .set_barrier_label({ "forwardpass_barrier", barrier_color })
+	    .set_update_label(Forwardpass::get_update_label())
+	    .set_render_label(Forwardpass::get_render_label())
+	    .set_barrier_label(Forwardpass::get_barrier_label())
 	    .add_color_output({
 	        color_output_hash,
 	        {},
@@ -372,22 +377,6 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	        depth_format,
 	        vk::ClearDepthStencilValue { 1.0, 0 },
 	        "forwardpass_depth",
-	    })
-	    .add_texture_input({
-	        "texture_2ds",
-	        1,
-	        10'000,
-	        vk::DescriptorType::eCombinedImageSampler,
-	        vk::ShaderStageFlagBits::eFragment,
-	        default_texture,
-	    })
-	    .add_texture_input({
-	        "texture_cubes",
-	        0,
-	        8u,
-	        vk::DescriptorType::eCombinedImageSampler,
-	        vk::ShaderStageFlagBits::eFragment,
-	        default_texture_cube,
 	    });
 
 	return blueprint;
@@ -396,10 +385,6 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::RenderpassBlueprint
 {
 	auto const &surface = vk_context->get_surface();
-
-	auto const update_color = arr<f32, 4> { 1.0, 0.8, 0.8, 1.0 };
-	auto const render_color = arr<f32, 4> { 0.8, 0.8, 1.0, 1.0 };
-	auto const barrier_color = arr<f32, 4> { 0.8, 1.0, 0.8, 1.0 };
 
 	auto const color_format = surface.get_color_format();
 	auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
@@ -411,9 +396,9 @@ auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::Renderpas
 	blueprint.set_name("uipass")
 	    .set_user_data(&scene)
 	    .set_sample_count(sample_count)
-	    .set_update_label({ "uipass_update", update_color })
-	    .set_render_label({ "uipass_render", render_color })
-	    .set_barrier_label({ "uipass_barrier", barrier_color })
+	    .set_update_label(UserInterfacePass::get_update_label())
+	    .set_render_label(UserInterfacePass::get_render_label())
+	    .set_barrier_label(UserInterfacePass::get_barrier_label())
 	    .add_color_output({
 	        color_output_hash,
 	        color_output_input_hash,
@@ -430,9 +415,6 @@ auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::Renderpas
 
 void DevelopmentExampleApplication::create_render_graph()
 {
-	auto const update_color = arr<f32, 4> { 1.0, 0.8, 0.8, 1.0 };
-	auto const present_color = arr<f32, 4> { 0.8, 1.0, 0.8, 1.0 };
-
 	auto const forwrard_pass_blueprint = create_forward_pass_blueprint();
 	auto const ui_pass_blueprint = create_ui_pass_blueprint();
 
@@ -441,8 +423,8 @@ void DevelopmentExampleApplication::create_render_graph()
 	builder.set_type<BasicRendergraph>()
 	    .set_resources(renderer->get_resources())
 	    .set_user_data(&scene)
-	    .set_update_label({ "graph_update", update_color })
-	    .set_present_barrier_label({ "graph_present_barriers", present_color })
+	    .set_update_label(BasicRendergraph::get_update_label())
+	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
 	    .add_buffer_input({
 	        "frame_data",
 	        0,
@@ -450,7 +432,6 @@ void DevelopmentExampleApplication::create_render_graph()
 	        vk::DescriptorType::eUniformBuffer,
 	        vk::ShaderStageFlagBits::eVertex,
 	        sizeof(BasicRendergraph::FrameData),
-	        nullptr,
 	    })
 	    .add_buffer_input({
 	        "scene_data",
@@ -459,7 +440,20 @@ void DevelopmentExampleApplication::create_render_graph()
 	        vk::DescriptorType::eUniformBuffer,
 	        vk::ShaderStageFlagBits::eVertex,
 	        sizeof(BasicRendergraph::SceneData),
-	        nullptr,
+	    })
+	    .add_texture_input({
+	        "textures",
+	        2,
+	        10'000,
+	        vk::DescriptorType::eCombinedImageSampler,
+	        vk::ShaderStageFlagBits::eFragment,
+	    })
+	    .add_texture_input({
+	        "texture_cubes",
+	        3,
+	        1'000,
+	        vk::DescriptorType::eCombinedImageSampler,
+	        vk::ShaderStageFlagBits::eFragment,
 	    })
 	    .add_pass<Forwardpass>(forwrard_pass_blueprint)
 	    .add_pass<UserInterfacePass>(ui_pass_blueprint);

@@ -13,9 +13,12 @@ Material::Material(
     , effect(effect)
 {
 	auto *const descriptor_allocator = vk_context->get_descriptor_allocator();
-	auto const descriptor_set_layout = effect->get_descriptor_set_layouts().back();
 
-	descriptor_set = descriptor_allocator->allocate_descriptor_set(descriptor_set_layout);
+	if (effect->uses_shader_descriptor_set_slot())
+	{
+		auto const descriptor_set_layout = effect->get_descriptor_set_layout();
+		descriptor_set = descriptor_allocator->allocate_descriptor_set(descriptor_set_layout);
+	}
 }
 
 Material::~Material()

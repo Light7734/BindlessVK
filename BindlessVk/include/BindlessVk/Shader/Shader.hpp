@@ -9,7 +9,7 @@ struct Shader
 {
 	vk::ShaderModule module;
 	vk::ShaderStageFlagBits stage;
-	arr<vec<vk::DescriptorSetLayoutBinding>, 2> descriptor_sets_bindings;
+	vec<vk::DescriptorSetLayoutBinding> descriptor_set_bindings;
 };
 
 class ShaderPipeline
@@ -35,7 +35,9 @@ public:
 	ShaderPipeline(
 	    VkContext *vk_context,
 	    vec<Shader *> const &shaders,
-	    ShaderPipeline::Configuration configuration,
+	    ShaderPipeline::Configuration const &configuration,
+	    DescriptorSetLayoutWithHash graph_set_bindings,
+	    DescriptorSetLayoutWithHash pass_set_bindings,
 	    str_view debug_name = default_debug_name
 	);
 
@@ -62,20 +64,28 @@ public:
 		return pipeline_layout;
 	}
 
-	inline auto &get_descriptor_set_layouts() const
+	inline auto get_descriptor_set_layout() const
 	{
-		return descriptor_set_layouts;
+		return descriptor_set_layout;
+	}
+
+	inline auto uses_shader_descriptor_set_slot() const
+	{
+		return !!descriptor_set_layout;
 	}
 
 private:
-	void create_descriptor_sets_layout(vec<Shader *> const &shaders);
+	void create_descriptor_set_layout(vec<Shader *> const &shaders);
 
-	void create_pipeline_layout();
+	void create_pipeline_layout(
+	    DescriptorSetLayoutWithHash graph_descriptor_set_layout,
+	    DescriptorSetLayoutWithHash pass_descriptor_set_layout
+	);
 
 	void create_pipeline(vec<Shader *> const &shaders, ShaderPipeline::Configuration configuration);
 
 	auto combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const
-	    -> arr<vec<vk::DescriptorSetLayoutBinding>, 2>;
+	    -> vec<vk::DescriptorSetLayoutBinding>;
 
 	auto create_shader_stage_create_infos(vec<Shader *> const &shaders) const
 	    -> vec<vk::PipelineShaderStageCreateInfo>;
@@ -86,9 +96,10 @@ private:
 
 	vk::Pipeline pipeline = {};
 	vk::PipelineLayout pipeline_layout = {};
-	arr<vk::DescriptorSetLayout, 2> descriptor_set_layouts = {};
+	DescriptorSetLayoutWithHash descriptor_set_layout = {};
 
 	str debug_name = {};
 };
+
 
 } // namespace BINDLESSVK_NAMESPACE

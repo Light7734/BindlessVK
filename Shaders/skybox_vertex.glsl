@@ -1,29 +1,30 @@
 #version 450 core
 #pragma shader_stage(vertex)
 
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec3 inTangent;
-layout(location = 3) in vec2 inUV;
-layout(location = 4) in vec3 inColor;
+layout(location = 0) in vec3 in_position;
+layout(location = 1) in vec3 in_normal;
+layout(location = 2) in vec3 in_tangent;
+layout(location = 3) in vec2 in_uv;
+layout(location = 4) in vec3 in_color;
 
-layout(location = 0) out vec3 outUVW;
+layout(location = 0) out vec3 out_uvw;
 
-layout(std140, set = 0, binding = 0) uniform FrameData {
+layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
-    vec4 viewPos;
-} U_FrameData;
+    vec4 view_position;
+} u_camera;
 
 
-layout(std140, set = 0, binding = 1) uniform SceneData {
-    vec4 lightPos;
-} U_SceneData;
-
+layout(set = 0, binding = 1) uniform Lights{
+    vec4 light_position;
+} u_lights;
 
 void main()
 {
-    outUVW = inPosition;
-    vec4 pos = U_FrameData.projection * mat4(mat3(U_FrameData.view)) * vec4(inPosition.xyz, 1.0);
+    out_uvw = in_position;
+    mat4 view = mat4(mat3(u_camera.view));
+    vec4 pos = u_camera.projection * view * vec4(in_position.xyz, 1.0);
+
     gl_Position = pos.xyww;
 }

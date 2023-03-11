@@ -3,19 +3,14 @@
 
 #extension GL_EXT_nonuniform_qualifier:enable
 
-layout(location = 0) in vec3 inUVW;
+layout(location = 0) in vec3 in_uvw;
 
-layout(location = 0) out vec4 outColor;
+layout(location = 0) out vec4 out_color;
 
-layout(set = 1, binding = 0) uniform samplerCube cubeTexSamplers[8];
-layout(set = 1, binding = 1) uniform sampler2D texSamplers[];
+layout(set = 0, binding = 3) uniform samplerCube u_texture_cubes[];
 
 void main()
 {
-    // @note We need this for SPV-Reflect to detect
-    // that texSampler has runtime array dimension...
-    texSamplers[int(inUVW.x)]; 
-
-    outColor = texture(cubeTexSamplers[0], inUVW);
+    out_color = texture(u_texture_cubes[0],  in_uvw);
 }
 

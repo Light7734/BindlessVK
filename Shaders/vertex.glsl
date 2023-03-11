@@ -1,51 +1,51 @@
 #version 450 core
 #pragma shader_stage(vertex)
 
-layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inNormal;
-layout(location = 2) in vec3 inTangent;
-layout(location = 3) in vec2 inUV;
-layout(location = 4) in vec3 inColor;
+layout(location = 0) in vec3 in_position;
+layout(location = 1) in vec3 in_normal;
+layout(location = 2) in vec3 in_tangent;
+layout(location = 3) in vec2 in_uv;
+layout(location = 4) in vec3 in_color;
 
-layout(location = 0) out vec3 outNormal;
-layout(location = 1) out vec3 outColor;
-layout(location = 2) out vec2 outUV;
-layout(location = 3) out vec3 outViewVec;
-layout(location = 4) out vec3 outLightVec;
-layout(location = 5) out vec3 outFragPos;
-layout(location = 6) out flat int outTexIndex;
-layout(location = 7) out mat3 outTBN;
+layout(location = 0) out vec3 out_normal;
+layout(location = 1) out vec3 out_color;
+layout(location = 2) out vec2 out_uv;
+layout(location = 3) out vec3 out_view_vec;
+layout(location = 4) out vec3 out_light_vec;
+layout(location = 5) out vec3 out_fragment_position;
+layout(location = 6) out flat int out_texture_index;
+layout(location = 7) out mat3 out_tbn;
 
-layout(std140, set = 0, binding = 0) uniform FrameData {
+layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
     mat4 view;
     vec4 viewPos;
-} U_FrameData;
+} u_camera;
 
-layout(std140, set = 0, binding = 1) uniform SceneData {
-    vec4 lightPos;
-} U_SceneData;
-
+layout(set = 0, binding = 1) uniform Lights {
+    vec4 light_position;
+} u_lights;
 
 void main() 
 {
-    gl_Position = U_FrameData.projection * U_FrameData.view *  mat4(1.0) * vec4(inPosition, 1.0);
+    mat4 view_proj = u_camera.projection * u_camera.view;
+    gl_Position =  view_proj *  mat4(1.0) * vec4(in_position, 1.0);
 
-    outFragPos = (mat4(1.0) * vec4(inPosition, 1.0)).xyz;
-    outNormal = inNormal;
-    outUV = inUV;
-    outColor = inColor;
+    out_fragment_position = (mat4(1.0) * vec4(in_position, 1.0)).xyz;
+    out_normal = in_normal;
+    out_uv = in_uv;
+    out_color = in_color;
 
-    vec3 T = normalize(vec3(mat4(1.0) * vec4(inTangent, 0.0)));
-    vec3 N = normalize(vec3(mat4(1.0) * vec4(inNormal, 0.0)));
+    vec3 T = normalize(vec3(mat4(1.0) * vec4(in_tangent, 0.0)));
+    vec3 N = normalize(vec3(mat4(1.0) * vec4(in_normal, 0.0)));
     vec3 B = cross(N, T);
-    outTBN = mat3(T, B, N);
+    out_tbn = mat3(T, B, N);
 
-    outNormal = mat3(U_FrameData.view) * inNormal;
+    out_normal = mat3(u_camera.view) * in_normal;
 
-    outLightVec = U_SceneData.lightPos.xyz;
-    outViewVec = U_FrameData.viewPos.xyz;
+    out_light_vec = u_lights.light_position.xyz;
+    out_view_vec = u_camera.viewPos.xyz;
 
-    outTexIndex = gl_InstanceIndex;
+    out_texture_index = gl_InstanceIndex;
 }
 

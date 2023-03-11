@@ -11,9 +11,36 @@ public:
 	{
 	}
 
+	auto static inline consteval get_update_label()
+	{
+		return vk::DebugUtilsLabelEXT { "fowardpass_update", { 1.0, 0.5, 0.5, 1.0 } };
+	}
+
+	auto static inline consteval get_render_label()
+	{
+		return vk::DebugUtilsLabelEXT { "forwardpass_render", { 1.0, 0.5, 0.5, 1.0 } };
+	}
+
+	auto static inline consteval get_barrier_label()
+	{
+		return vk::DebugUtilsLabelEXT { "forwardpass_barrier", { 1.0, 0.5, 0.5, 1.0 } };
+	}
+
 	virtual void on_update(u32 frame_index, u32 image_index) override;
 	virtual void on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) override;
 
 private:
-	void draw_model(bvk::Model const *model, vk::CommandBuffer cmd);
+	void render_static_meshes();
+	void render_skyboxes();
+
+	void render_static_mesh(StaticMeshRendererComponent const &static_mesh);
+	void render_skybox(SkyboxComponent const &skybox);
+
+	void draw_model(bvk::Model const *model);
+	void switch_pipeline(vk::Pipeline pipeline);
+
+private:
+	Scene *scene = {};
+	vk::Pipeline current_pipeline = {};
+	vk::CommandBuffer cmd;
 };

@@ -54,6 +54,24 @@ struct StaticMeshRendererComponent
 	bvk::Model *model;
 };
 
+
+struct SkyboxComponent
+{
+	SkyboxComponent(const SkyboxComponent &) = default;
+
+	SkyboxComponent(bvk::Material *material, bvk::Texture *texture, bvk::Model *model)
+	    : material(material)
+	    , texture(texture)
+	    , model(model)
+	{
+	}
+
+	bvk::Material *material;
+	bvk::Texture *texture;
+	bvk::Model *model;
+};
+
+
 struct CameraComponent
 {
 	CameraComponent(const CameraComponent &) = default;

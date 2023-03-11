@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <map>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -39,6 +40,9 @@ using vec = std::vector<T>;
 
 template<typename T>
 using vec_it = typename std::vector<T>::iterator;
+
+template<typename T>
+using span = std::span<T>;
 
 template<typename T, size_t N>
 using arr = std::array<T, N>;

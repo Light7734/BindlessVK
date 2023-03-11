@@ -120,6 +120,13 @@ public:
 		return *this;
 	}
 
+	inline auto add_texture_input(RenderpassBlueprint::TextureInput const input)
+	    -> RenderGraphBuilder &
+	{
+		this->blueprint_texture_inputs.push_back(input);
+		return *this;
+	}
+
 	inline auto set_update_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
 	{
 		this->graph->update_label = label;
@@ -181,7 +188,9 @@ private:
 	u64 backbuffer_attachment_key = {};
 
 	vec<RenderpassBlueprint> pass_blueprints {};
+
 	vec<RenderpassBlueprint::BufferInput> blueprint_buffer_inputs = {};
+	vec<RenderpassBlueprint::TextureInput> blueprint_texture_inputs = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

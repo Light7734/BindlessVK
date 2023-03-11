@@ -91,6 +91,17 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
 	}
 
+	for (auto const &blueprint_texture_input : blueprint_texture_inputs)
+	{
+		bindings.emplace_back(
+		    blueprint_texture_input.binding,
+		    blueprint_texture_input.type,
+		    blueprint_texture_input.count,
+		    blueprint_texture_input.stage_mask
+		);
+		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+	}
+
 	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
 	graph->descriptor_set_layout = device.createDescriptorSetLayout({
 	    {},
@@ -128,11 +139,11 @@ void RenderGraphBuilder::initialize_graph_input_descriptors()
 
 	auto buffer_infos = vec<vk::DescriptorBufferInfo> {};
 	buffer_infos.reserve(blueprint_buffer_inputs.size() * BVK_MAX_FRAMES_IN_FLIGHT);
+	auto writes = vec<vk::WriteDescriptorSet> {};
 
 	for (u32 k = 0; auto &buffer_input : graph->buffer_inputs)
 	{
 		auto const &blueprint_buffer = blueprint_buffer_inputs[k++];
-		auto writes = vec<vk::WriteDescriptorSet> {};
 
 		for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
 		{
@@ -155,10 +166,31 @@ void RenderGraphBuilder::initialize_graph_input_descriptors()
 				);
 			}
 		}
-
-		device.updateDescriptorSets(writes, {});
-		device.waitIdle();
 	}
+
+	for (auto const &texture_input_info : blueprint_texture_inputs)
+	{
+		if (!texture_input_info.default_texture)
+			continue;
+
+		for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
+		{
+			for (u32 j = 0; j < texture_input_info.count; ++j)
+			{
+				writes.emplace_back(vk::WriteDescriptorSet(
+				    graph->descriptor_sets[i],
+				    texture_input_info.binding,
+				    j,
+				    1,
+				    texture_input_info.type,
+				    texture_input_info.default_texture->get_descriptor_info()
+				));
+			}
+		}
+	}
+
+	device.updateDescriptorSets(writes, {});
+	device.waitIdle();
 }
 
 void RenderGraphBuilder::build_pass_color_attachments(
@@ -358,13 +390,11 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 		pass->descriptor_set_layout,
 	};
 
-	// @todo: for some reason, when I use vk_context->set_object_name things break...
 	pass->pipeline_layout = device.createPipelineLayout({ {}, layouts });
-	device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
-	    pass->pipeline_layout.objectType,
-	    (u64)((VkPipelineLayout)(pass->pipeline_layout)),
-	    fmt::format("{}_pipeline_layout", pass->name).c_str(),
-	});
+	vk_context->set_object_name(
+	    pass->pipeline_layout,
+	    fmt::format("{}_pipeline_layout", pass->name).c_str()
+	);
 
 	if (!bindings.empty())
 	{
