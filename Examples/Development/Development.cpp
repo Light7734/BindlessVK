@@ -310,7 +310,7 @@ void DevelopmentExampleApplication::load_entities()
 	auto const light_entity = scene.create();
 	scene.emplace<TransformComponent>(
 	    light_entity,
-	    glm::vec3(2.0f, 2.0f, 1.0f),
+	    glm::vec3(50.0f, 50.0f, 1.0f),
 	    glm::vec3(1.0f),
 	    glm::vec3(0.0f, 0.0, 0.0)
 	);
@@ -427,7 +427,7 @@ void DevelopmentExampleApplication::create_render_graph()
 	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
 	    .add_buffer_input({
 	        "frame_data",
-	        0,
+	        BasicRendergraph::FrameData::binding,
 	        1,
 	        vk::DescriptorType::eUniformBuffer,
 	        vk::ShaderStageFlagBits::eVertex,
@@ -435,22 +435,30 @@ void DevelopmentExampleApplication::create_render_graph()
 	    })
 	    .add_buffer_input({
 	        "scene_data",
-	        1,
+	        BasicRendergraph::SceneData::binding,
 	        1,
 	        vk::DescriptorType::eUniformBuffer,
 	        vk::ShaderStageFlagBits::eVertex,
 	        sizeof(BasicRendergraph::SceneData),
 	    })
+	    .add_buffer_input({
+	        "object_data",
+	        BasicRendergraph::ObjectData::binding,
+	        1,
+	        vk::DescriptorType::eStorageBuffer,
+	        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+	        sizeof(BasicRendergraph::ObjectData) * 1000,
+	    })
 	    .add_texture_input({
 	        "textures",
-	        2,
+	        3,
 	        10'000,
 	        vk::DescriptorType::eCombinedImageSampler,
 	        vk::ShaderStageFlagBits::eFragment,
 	    })
 	    .add_texture_input({
 	        "texture_cubes",
-	        3,
+	        4,
 	        1'000,
 	        vk::DescriptorType::eCombinedImageSampler,
 	        vk::ShaderStageFlagBits::eFragment,

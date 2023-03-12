@@ -20,6 +20,19 @@ layout(set = 0, binding = 1) uniform Lights{
     vec4 light_position;
 } u_lights;
 
+struct ObjectData {
+    int albedo_texture_index;
+    int normal_texture_index;
+    int metallic_roughness_texture_index;
+    int _;
+    mat4 model;
+};
+
+layout(set = 0, binding = 2) readonly buffer Objects{
+    ObjectData data[];
+} ub_objects;
+
+
 void main()
 {
     out_uvw = in_position;

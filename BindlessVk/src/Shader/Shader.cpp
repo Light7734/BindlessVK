@@ -18,6 +18,7 @@ ShaderPipeline::ShaderPipeline(
     : vk_context(vk_context)
     , debug_name(debug_name)
 {
+	vk_context->log(LogLvl::eTrace, "creating pipeline: {}", debug_name);
 	create_descriptor_set_layout(shaders);
 	create_pipeline_layout(graph_descriptor_set_layout, pass_descriptor_set_layout);
 

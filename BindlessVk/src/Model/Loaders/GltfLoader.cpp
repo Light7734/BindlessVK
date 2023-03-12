@@ -51,16 +51,14 @@ void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 	);
 
 	if (!warn.empty())
-	{
 		vk_context->log(LogLvl::eWarn, "gltf warning -> ", warn);
-	}
 }
 
 void GltfLoader::load_textures()
 {
 	model.textures.reserve(gltf_model.images.size());
 
-	for (auto &image : gltf_model.images)
+	for (u32 i = 0; auto &image : gltf_model.images)
 	{
 		model.textures.push_back(texture_loader->load_from_binary(
 		    &image.image[0],
@@ -77,6 +75,7 @@ void GltfLoader::load_textures()
 
 void GltfLoader::load_material_parameters()
 {
+	auto t = gltf_model.materials.begin();
 	for (auto &material : gltf_model.materials)
 	{
 		assert_false(
@@ -89,7 +88,7 @@ void GltfLoader::load_material_parameters()
 		    Vec3f(1.0),
 		    Vec3f(1.0),
 		    material.values["baseColorTexture"].TextureIndex(),
-		    material.values["normalTexture"].TextureIndex(),
+		    material.normalTexture.index,
 		    material.values["metallicRoughnessTexture"].TextureIndex(),
 		});
 	}

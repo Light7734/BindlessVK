@@ -26,8 +26,10 @@ void Forwardpass::on_render(
 
 void Forwardpass::render_static_meshes()
 {
+	auto i = u32 { 0 };
 	auto const static_meshes = scene->view<StaticMeshRendererComponent const>();
-	static_meshes.each([this](auto const &static_mesh) { render_static_mesh(static_mesh); });
+
+	static_meshes.each([this, &i](auto const &static_mesh) { render_static_mesh(static_mesh, i); });
 }
 
 void Forwardpass::render_skyboxes()
@@ -36,14 +38,14 @@ void Forwardpass::render_skyboxes()
 	skyboxes.each([this](auto const &skybox) { render_skybox(skybox); });
 }
 
-void Forwardpass::render_static_mesh(StaticMeshRendererComponent const &static_mesh)
+void Forwardpass::render_static_mesh(StaticMeshRendererComponent const &static_mesh, u32 &index)
 {
 	auto const new_pipeline = static_mesh.material->get_effect()->get_pipeline();
 
 	if (current_pipeline != new_pipeline)
 		switch_pipeline(new_pipeline);
 
-	draw_model(static_mesh.model);
+	draw_model(static_mesh.model, index);
 }
 
 void Forwardpass::render_skybox(SkyboxComponent const &skybox)
@@ -53,7 +55,8 @@ void Forwardpass::render_skybox(SkyboxComponent const &skybox)
 	if (current_pipeline != new_pipeline)
 		switch_pipeline(new_pipeline);
 
-	draw_model(skybox.model);
+	u32 a = 0;
+	draw_model(skybox.model, a);
 }
 
 void Forwardpass::switch_pipeline(vk::Pipeline pipeline)
@@ -68,7 +71,7 @@ void Forwardpass::switch_pipeline(vk::Pipeline pipeline)
 	cmd.setViewport(0, vk::Viewport { 0.0f, 0.0f, f32(width), f32(height), 0.0f, 1.0f });
 }
 
-void Forwardpass::draw_model(bvk::Model const *const model)
+void Forwardpass::draw_model(bvk::Model const *const model, u32 &primitive_index)
 {
 	auto const offset = VkDeviceSize { 0 };
 
@@ -77,11 +80,5 @@ void Forwardpass::draw_model(bvk::Model const *const model)
 
 	for (auto const *node : model->get_nodes())
 		for (auto const &primitive : node->mesh)
-		{
-			auto const &material_parameters = model->get_material_parameters();
-			auto const texture_index = material_parameters[primitive.material_index]
-			                               .albedo_texture_index;
-
-			cmd.drawIndexed(primitive.index_count, 1, primitive.first_index, 0, texture_index);
-		}
+			cmd.drawIndexed(primitive.index_count, 1, primitive.first_index, 0, primitive_index++);
 }

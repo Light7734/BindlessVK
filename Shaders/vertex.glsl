@@ -7,14 +7,12 @@ layout(location = 2) in vec3 in_tangent;
 layout(location = 3) in vec2 in_uv;
 layout(location = 4) in vec3 in_color;
 
-layout(location = 0) out vec3 out_normal;
-layout(location = 1) out vec3 out_color;
-layout(location = 2) out vec2 out_uv;
-layout(location = 3) out vec3 out_view_vec;
-layout(location = 4) out vec3 out_light_vec;
-layout(location = 5) out vec3 out_fragment_position;
-layout(location = 6) out flat int out_texture_index;
-layout(location = 7) out mat3 out_tbn;
+layout(location = 0) out vec3 out_fragment_position;
+layout(location = 1) out vec2 out_uv;
+layout(location = 2) out vec3 out_tangent_light_position;
+layout(location = 3) out vec3 out_tangent_view_position;
+layout(location = 4) out vec3 out_tangent_fragment_position;
+layout(location = 5) out flat int out_instance_index;
 
 layout(set = 0, binding = 0) uniform Camera {
     mat4 projection;
@@ -26,26 +24,43 @@ layout(set = 0, binding = 1) uniform Lights {
     vec4 light_position;
 } u_lights;
 
+
+struct ObjectData {
+    int albedo_texture_index;
+    int normal_texture_index;
+    int metallic_roughness_texture_index;
+    int pad;
+    mat4 model;
+};
+
+layout(set = 0, binding = 2) readonly buffer Objects{
+    ObjectData data[];
+} ub_objects;
+
 void main() 
 {
-    mat4 view_proj = u_camera.projection * u_camera.view;
-    gl_Position =  view_proj *  mat4(1.0) * vec4(in_position, 1.0);
+    vec3 light_position = vec3(40.0, 40.0, 2.0);
 
-    out_fragment_position = (mat4(1.0) * vec4(in_position, 1.0)).xyz;
-    out_normal = in_normal;
+    ObjectData object_data = ub_objects.data[gl_InstanceIndex];
+    mat4 model = object_data.model;
+
+    out_fragment_position = vec3(model * vec4(in_position, 1.0));
     out_uv = in_uv;
-    out_color = in_color;
 
-    vec3 T = normalize(vec3(mat4(1.0) * vec4(in_tangent, 0.0)));
-    vec3 N = normalize(vec3(mat4(1.0) * vec4(in_normal, 0.0)));
+    mat3 normal_matrix = transpose(inverse(mat3(model)));
+    vec3 T = normalize(normal_matrix * in_tangent);
+    vec3 N = normalize(normal_matrix * in_normal);
+    T = normalize(T - dot(T, N) * N);
     vec3 B = cross(N, T);
-    out_tbn = mat3(T, B, N);
+    mat3 TBN = transpose(mat3(T, B, N));    
 
-    out_normal = mat3(u_camera.view) * in_normal;
+    out_tangent_light_position = TBN * light_position;
+    out_tangent_view_position = TBN * vec3(u_camera.viewPos);
+    out_tangent_fragment_position = TBN * out_fragment_position;
 
-    out_light_vec = u_lights.light_position.xyz;
-    out_view_vec = u_camera.viewPos.xyz;
+    out_instance_index = gl_InstanceIndex;
 
-    out_texture_index = gl_InstanceIndex;
+    gl_Position =  u_camera.projection * u_camera.view * model * vec4(in_position, 1.0);
 }
+
 

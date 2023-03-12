@@ -174,7 +174,7 @@ public:
 		u32 binding;
 		u32 count;
 		vk::DescriptorType type;
-		vk::ShaderStageFlagBits stage_mask;
+		vk::ShaderStageFlags stage_mask;
 
 		size_t size;
 		void *initial_data;

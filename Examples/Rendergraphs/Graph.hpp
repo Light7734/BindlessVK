@@ -25,15 +25,37 @@ public:
 		auto static constexpr binding = usize { 1 };
 	};
 
+	struct ObjectData
+	{
+		int albedo_texture_index;
+		int normal_texture_index;
+		int metallic_roughness_texture_index;
+		int _;
+		glm::mat4 model;
+
+		auto static constexpr binding = usize { 2 };
+	};
+
+	struct U_Textures
+	{
+		auto static constexpr binding = usize { 3 };
+	};
+
+	struct U_TextureCubes
+	{
+		auto static constexpr binding = usize { 4 };
+	};
+
 public:
 	BasicRendergraph(ref<bvk::VkContext> vk_context);
 
 	~BasicRendergraph() = default;
 
+
 	void on_update(u32 frame_index, u32 image_index) final;
 
 	auto static get_descriptor_set_bindings()
-	    -> pair<arr<vk::DescriptorSetLayoutBinding, 4>, arr<vk::DescriptorBindingFlags, 4>>;
+	    -> pair<arr<vk::DescriptorSetLayoutBinding, 5>, arr<vk::DescriptorBindingFlags, 5>>;
 
 	auto static consteval get_update_label()
 	{
@@ -48,6 +70,7 @@ public:
 private:
 	void update_descriptor_sets();
 
+	void test();
 	void update_for_cameras();
 	void update_for_lights();
 	void update_for_meshes();
@@ -55,7 +78,11 @@ private:
 
 	void update_for_camera(TransformComponent const &transform, CameraComponent const &camera);
 	void update_for_light(TransformComponent const &transform, LightComponent const &camera);
-	void update_for_mesh(StaticMeshRendererComponent const &static_mesh);
+	void update_for_mesh(
+	    TransformComponent const &transform,
+	    StaticMeshRendererComponent const &static_mesh,
+	    u32 &primitive_index
+	);
 	void update_for_skybox(SkyboxComponent const &skybox);
 
 private:

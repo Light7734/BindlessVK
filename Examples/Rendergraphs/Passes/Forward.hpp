@@ -33,10 +33,10 @@ private:
 	void render_static_meshes();
 	void render_skyboxes();
 
-	void render_static_mesh(StaticMeshRendererComponent const &static_mesh);
+	void render_static_mesh(StaticMeshRendererComponent const &static_mesh, u32 &primitive_index);
 	void render_skybox(SkyboxComponent const &skybox);
 
-	void draw_model(bvk::Model const *model);
+	void draw_model(bvk::Model const *model, u32 &primitive_index);
 	void switch_pipeline(vk::Pipeline pipeline);
 
 private:
