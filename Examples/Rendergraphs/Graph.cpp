@@ -64,22 +64,12 @@ void BasicRendergraph::on_update(u32 const frame_index, u32 const image_index)
 	scene = any_cast<Scene *>(user_data);
 
 	// These calls can accumulate descriptor_writes
-	test();
 	update_for_cameras();
 	update_for_lights();
 	update_for_meshes();
 	update_for_skyboxes();
 
 	update_descriptor_sets();
-}
-
-void BasicRendergraph::test()
-{
-	auto const static_meshes = scene->view<TransformComponent, StaticMeshRendererComponent const>();
-
-	static_meshes.each([this](auto &transform, auto const &mesh) {
-		// transform.rotation.y += 0.05;
-	});
 }
 
 void BasicRendergraph::update_descriptor_sets()

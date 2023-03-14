@@ -70,7 +70,6 @@ public:
 private:
 	void update_descriptor_sets();
 
-	void test();
 	void update_for_cameras();
 	void update_for_lights();
 	void update_for_meshes();
