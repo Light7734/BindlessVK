@@ -33,9 +33,9 @@ Model::~Model()
 	delete vertex_buffer;
 }
 
-auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription, 5>
+auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription, 4>
 {
-	return arr<vk::VertexInputAttributeDescription, 5> {
+	return arr<vk::VertexInputAttributeDescription, 4> {
 		vk::VertexInputAttributeDescription {
 		    0u,
 		    0u,
@@ -59,12 +59,6 @@ auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription,
 		    0u,
 		    vk::Format::eR32G32Sfloat,
 		    offsetof(Model::Vertex, uv),
-		},
-		vk::VertexInputAttributeDescription {
-		    4u,
-		    0u,
-		    vk::Format::eR32G32B32Sfloat,
-		    offsetof(Model::Vertex, color),
 		},
 	};
 }

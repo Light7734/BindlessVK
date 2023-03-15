@@ -221,7 +221,6 @@ void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_pr
 			normal_buffer ? Vec3f(normal_buffer[v * 3]) : Vec3f(0.0f),
 			tangent_buffer ? Vec3f(&tangent_buffer[v * 3]).unit() : Vec3f(0.0f),
 			uv_buffer ? Vec2f(&uv_buffer[v * 2]) : Vec2f(0.0f),
-			Vec3f(1.0),
 		};
 
 		vertex_count++;

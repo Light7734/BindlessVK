@@ -20,9 +20,8 @@ public:
 		Vec3f normal;
 		Vec3f tangent;
 		Vec2f uv;
-		Vec3f color;
 
-		auto static get_attributes() -> arr<vk::VertexInputAttributeDescription, 5>;
+		auto static get_attributes() -> arr<vk::VertexInputAttributeDescription, 4>;
 		auto static get_bindings() -> arr<vk::VertexInputBindingDescription, 1>;
 		auto static get_vertex_input_state() -> vk::PipelineVertexInputStateCreateInfo;
 	};
