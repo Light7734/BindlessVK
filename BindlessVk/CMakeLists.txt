@@ -7,6 +7,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/LayoutAllocator.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Gpu.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Instance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Queues.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Surface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Swapchain.cpp

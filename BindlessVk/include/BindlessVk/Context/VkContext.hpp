@@ -4,6 +4,7 @@
 #include "BindlessVk/Allocators/LayoutAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/Gpu.hpp"
+#include "BindlessVk/Context/Instance.hpp"
 #include "BindlessVk/Context/Queues.hpp"
 #include "BindlessVk/Context/Surface.hpp"
 #include "BindlessVk/Context/Swapchain.hpp"
@@ -31,8 +32,7 @@ public:
 	VkContext() = default;
 
 	VkContext(
-	    vec<c_str> layers,
-	    vec<c_str> instance_extensions,
+	    Instance *instance,
 	    vec<c_str> device_extensions,
 	    vk::PhysicalDeviceFeatures physical_device_features,
 
@@ -42,7 +42,6 @@ public:
 
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
 	    vk::DebugUtilsMessageTypeFlagsEXT debug_messenger_types,
-
 	    pair<fn<void(DebugCallbackSource, LogLvl, const str &, std::any)>, std::any>
 	        debug_callback_and_data
 	);
@@ -128,16 +127,6 @@ public:
 		return dynamic_cmd_pools[(thread_index * num_threads) + frame_index];
 	}
 
-	auto get_layers() const
-	{
-		return layers;
-	}
-
-	auto get_instance_extensions() const
-	{
-		return instance_extensions;
-	}
-
 	auto get_device_extensions() const
 	{
 		return device_extensions;
@@ -209,23 +198,13 @@ public:
 		return num_threads;
 	}
 
-	auto get_instance_proc_addr(str_view proc_name) const
-	{
-		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name.data());
-	}
-
 	auto get_device_proc_addr(str_view proc_name) const
 	{
 		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetDeviceProcAddr(device, proc_name.data());
 	}
 
 private:
-	void load_vulkan_instance_functions();
 	void load_vulkan_device_functions();
-
-	void check_layer_support();
-
-	void create_vulkan_instance();
 
 	void create_debug_messenger(
 	    vk::DebugUtilsMessageSeverityFlagsEXT debug_messenger_severities,
@@ -257,10 +236,7 @@ private:
 	    debug_callback_and_data = {};
 
 private:
-	vec<c_str> layers = {};
-
-	vk::Instance instance = {};
-	vec<c_str> instance_extensions = {};
+	Instance *instance = {};
 
 	vk::Device device = {};
 	vec<c_str> device_extensions = {};

@@ -4,8 +4,6 @@
 
 #include "vulkan/vulkan_raii.hpp"
 
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
-
 namespace BINDLESSVK_NAMESPACE {
 
 void static vma_allocate_device_memory_callback(
@@ -96,8 +94,7 @@ auto static vulkan_debug_message_callback(
 }
 
 VkContext::VkContext(
-    vec<c_str> layers,
-    vec<c_str> instance_extensions,
+    Instance *instance,
     vec<c_str> device_extensions,
 
     vk::PhysicalDeviceFeatures physical_device_features,
@@ -112,18 +109,14 @@ VkContext::VkContext(
     pair<fn<void(DebugCallbackSource, LogLvl, const str &, std::any)>, std::any>
         debug_callback_and_data
 )
-    : layers(layers)
-    , instance_extensions(instance_extensions)
+    : instance(instance)
     , device_extensions(device_extensions)
     , get_framebuffer_extent(get_framebuffer_extent_func)
     , debug_callback_and_data(debug_callback_and_data)
 {
-	load_vulkan_instance_functions();
-	check_layer_support();
-
-	create_vulkan_instance();
 	create_debug_messenger(debug_messenger_severities, debug_messenger_types);
-	surface.init_with_instance(instance, create_window_surface_func, get_framebuffer_extent);
+
+	surface.init_with_instance(*instance, create_window_surface_func, get_framebuffer_extent);
 
 	pick_gpu(gpu_picker_func);
 	queues.init_with_gpu(gpu);
@@ -164,57 +157,12 @@ VkContext::~VkContext()
 	device.destroy();
 
 	surface.destroy();
-	instance.destroyDebugUtilsMessengerEXT(debug_util_messenger);
-	instance.destroy();
-}
-
-void VkContext::load_vulkan_instance_functions()
-{
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(
-	    vk::DynamicLoader().getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr")
-	);
+	instance->destroy_debug_messenger(debug_util_messenger);
 }
 
 void VkContext::load_vulkan_device_functions()
 {
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(device);
-}
-
-void VkContext::check_layer_support()
-{
-	for (auto const layer : layers)
-		if (!has_layer(layer))
-			assert_fail("Required layer: {} is not supported", layer);
-}
-
-auto VkContext::has_layer(c_str const layer) const -> bool
-{
-	for (auto const &layer_properties : vk::enumerateInstanceLayerProperties())
-		if (strcmp(layer, layer_properties.layerName))
-			return true;
-
-	return false;
-}
-
-void VkContext::create_vulkan_instance()
-{
-	auto const application_info = vk::ApplicationInfo {
-		"BindlessVK",
-		VK_MAKE_VERSION(1, 0, 0),
-		"BindlessVK", //
-		VK_MAKE_VERSION(1, 0, 0),
-		VK_API_VERSION_1_3,
-	};
-
-	auto const instance_info = vk::InstanceCreateInfo {
-		{},
-		&application_info,
-		layers,
-		instance_extensions,
-	};
-
-	assert_false(vk::createInstance(&instance_info, nullptr, &instance));
-	VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 }
 
 void VkContext::create_debug_messenger(
@@ -230,7 +178,7 @@ void VkContext::create_debug_messenger(
 		&debug_callback_and_data,
 	};
 
-	debug_util_messenger = instance.createDebugUtilsMessengerEXT(debug_messenger_create_info);
+	debug_util_messenger = instance->create_debug_messenger(debug_messenger_create_info);
 }
 
 void VkContext::pick_gpu(fn<Gpu(vec<Gpu>)> const gpu_picker_func)
@@ -261,7 +209,7 @@ void VkContext::pick_gpu(fn<Gpu(vec<Gpu>)> const gpu_picker_func)
 
 void VkContext::fetch_adequate_gpus()
 {
-	for (auto const physical_device : instance.enumeratePhysicalDevices())
+	for (auto const physical_device : instance->enumerate_physical_devices())
 		if (auto const gpu = Gpu(physical_device, surface, device_extensions); gpu.is_adequate())
 			adequate_gpus.push_back(gpu);
 
@@ -336,7 +284,7 @@ void VkContext::create_memory_allocator()
 	    &device_memory_callbacks,
 	    {},
 	    &vulkan_funcs,
-	    instance,
+	    *instance,
 	    {}
 	);
 

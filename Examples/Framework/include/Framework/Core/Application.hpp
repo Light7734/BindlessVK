@@ -32,7 +32,9 @@ public:
 	StagingPool staging_pool = {};
 	CameraController camera_controller = {};
 
+	scope<bvk::Instance> instance = {};
 	ref<bvk::VkContext> vk_context = {};
+
 	scope<bvk::Renderer> renderer = {};
 	scope<bvk::Rendergraph> render_graph = {};
 

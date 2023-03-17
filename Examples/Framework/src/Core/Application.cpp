@@ -58,14 +58,13 @@ void Application::create_window()
 
 void Application::create_vk_context()
 {
-	auto const layers = get_layers();
-	auto const instance_extensions = get_instance_extensions();
 	auto const physical_device_features = get_physical_device_features();
 	auto const device_extensions = get_device_extensions();
 
+	instance = std::make_unique<bvk::Instance>(get_instance_extensions(), get_layers());
+
 	vk_context = std::make_shared<bvk::VkContext>(
-	    layers,
-	    instance_extensions,
+	    instance.get(),
 	    device_extensions,
 	    physical_device_features,
 
@@ -126,8 +125,8 @@ void Application::create_user_interface()
 
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
-	ImGui_ImplVulkan_InitInfo imgui_info {
-		vk_context->get_instance(),
+	auto imgui_info = ImGui_ImplVulkan_InitInfo {
+		*instance.get(),
 		vk_context->get_gpu(),
 		vk_context->get_device(),
 		vk_context->get_queues().get_graphics_index(),
@@ -143,10 +142,10 @@ void Application::create_user_interface()
 	assert_true(
 	    ImGui_ImplVulkan_LoadFunctions(
 	        [](c_str proc_name, void *data) {
-		        auto const vk_context = reinterpret_cast<bvk::VkContext *>(data);
-		        return vk_context->get_instance_proc_addr(proc_name);
+		        auto const instance = reinterpret_cast<bvk::Instance *>(data);
+		        return instance->get_proc_addr(proc_name);
 	        },
-	        (void *)vk_context.get()
+	        (void *)instance.get()
 	    ),
 	    "ImGui failed to load vulkan functions"
 	);
