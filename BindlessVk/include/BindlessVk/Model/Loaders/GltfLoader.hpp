@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BindlessVk/Buffer.hpp"
+#include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Model/Model.hpp"

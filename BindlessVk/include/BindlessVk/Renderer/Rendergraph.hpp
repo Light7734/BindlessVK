@@ -2,7 +2,7 @@
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
-#include "BindlessVk/Buffer.hpp"
+#include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Renderer/RenderResources.hpp"

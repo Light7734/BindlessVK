@@ -1,6 +1,6 @@
 #include "BindlessVk/Model/Model.hpp"
 
-#include "BindlessVk/Buffer.hpp"
+#include "BindlessVk/Buffers/Buffer.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 

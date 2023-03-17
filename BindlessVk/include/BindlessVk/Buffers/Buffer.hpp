@@ -46,7 +46,7 @@ public:
 	void write_data(void const *src_data, usize src_data_size, u32 block_index);
 	void write_buffer(Buffer const &src_buffer, vk::BufferCopy const &copy_info);
 
-	void *map_block(u32 block_index);
+	[[nodiscard]] void *map_block(u32 block_index);
 
 	void unmap();
 

@@ -1,6 +1,6 @@
 #include "BindlessVk/Model/Loaders/GltfLoader.hpp"
 
-#include "BindlessVk/Buffer.hpp"
+#include "BindlessVk/Buffers/Buffer.hpp"
 
 #include <fmt/format.h>
 

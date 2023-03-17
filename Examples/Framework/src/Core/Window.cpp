@@ -85,12 +85,15 @@ void Window::bind_callbacks()
 	    [](GLFWwindow *window, int key, int scanCode, int action, int mods) {
 		    if (key == GLFW_KEY_ESCAPE)
 			    glfwSetWindowShouldClose(window, true);
-		    if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS) {
-			    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
+		    if (key == GLFW_KEY_LEFT_ALT && action == GLFW_PRESS)
+		    {
+			    if (glfwGetInputMode(window, GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
+			    {
 				    int width, height;
 				    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 			    }
-			    else {
+			    else
+			    {
 				    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 			    }
 		    }

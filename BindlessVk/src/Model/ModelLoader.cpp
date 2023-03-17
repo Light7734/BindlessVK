@@ -1,6 +1,6 @@
 #include "BindlessVk/Model/ModelLoader.hpp"
 
-#include "BindlessVk/Buffer.hpp"
+#include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Model/Loaders/GltfLoader.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
