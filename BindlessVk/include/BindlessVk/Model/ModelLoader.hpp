@@ -1,37 +1,33 @@
 #pragma once
 
+#include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Context/DebugUtils.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Model/Model.hpp"
 #include "BindlessVk/Texture/TextureLoader.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
-/**
- * @brief Loads model files like gltf, fbx, etc.
- *
- * @todo feat: support fbx
- * @todo feat: support obj
- *
- * @todo refactor: bindlessvk shouldn't be responsible for STORING textures
- */
+/** Loads model files like gltf, fbx, etc. */
 class ModelLoader
 {
 public:
-	/**
-	 * @brief Main constructor
-	 * @param vk_context the vulkan context
-	 */
-	ModelLoader(ref<VkContext const> vk_context);
-
-	/** @brief Default constructor */
+	/** Default constructor */
 	ModelLoader() = default;
 
-	/** @brief Default destructor */
+	/** Argumented constructor
+	 *
+	 * @param vk_context Pointer to the vk context
+	 * @param memory_allocator Pointer to the memory allocator
+	 */
+	ModelLoader(VkContext const *vk_context, MemoryAllocator const *memory_allocator);
+
+	/** Default destructor */
 	~ModelLoader() = default;
 
-	/**
-	 * @brief Loads a model from a gltf file
+	/** Loads a model from a .gltf file
+	 *
 	 * @param name debug name attached to vulkan objects for debugging tools like renderdoc
 	 * @param file_path path to the gltf model file
 	 */
@@ -53,7 +49,8 @@ public:
 	auto load_from_obj() -> Model = delete;
 
 private:
-	ref<VkContext const> vk_context = {};
+	VkContext const *vk_context = {};
+	MemoryAllocator const *memory_allocator = {};
 	TextureLoader texture_loader = {};
 };
 

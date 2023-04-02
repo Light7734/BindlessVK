@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Context/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -9,7 +10,7 @@ struct DescriptorSetLayoutWithHash
 	vk::DescriptorSetLayout descriptor_set_layout;
 	u64 hash;
 
-	operator vk::DescriptorSetLayout() const
+	auto vk() const
 	{
 		return descriptor_set_layout;
 	}
@@ -24,9 +25,16 @@ struct DescriptorSetLayoutWithHash
 class LayoutAllocator
 {
 public:
-	void init(vk::Device device);
+	LayoutAllocator() = default;
+	LayoutAllocator(VkContext const *vk_context);
 
-	void destroy();
+	LayoutAllocator(LayoutAllocator &&other);
+	LayoutAllocator &operator=(LayoutAllocator &&other);
+
+	LayoutAllocator(LayoutAllocator const &) = delete;
+	LayoutAllocator &operator=(LayoutAllocator const &other) = delete;
+
+	~LayoutAllocator();
 
 	/** @brief get or create descriptor set layout */
 	auto goc_descriptor_set_layout(
@@ -58,7 +66,7 @@ private:
 	) -> u64;
 
 private:
-	vk::Device device = {};
+	Device *device = {};
 
 	hash_map<u64, vk::DescriptorSetLayout> descriptor_set_layouts = {};
 	hash_map<u64, vk::PipelineLayout> pipeline_layouts = {};

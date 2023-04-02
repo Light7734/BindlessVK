@@ -5,9 +5,13 @@ add_library(
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/DescriptorAllocator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/LayoutAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/MemoryAllocator.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/Buffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/VertexBuffer.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/DebugUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Device.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Gpu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Instance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Queues.cpp
@@ -29,6 +33,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/ShaderLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Loaders/SpvLoader.cpp
 
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Image.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/TextureLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/KtxLoader.cpp

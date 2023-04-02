@@ -1,14 +1,11 @@
 #pragma once
 
+#include "BindlessVk/Allocators/DescriptorAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Shader/Shader.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
-/// @todo
-/** @brief Shaders and pipeline layout for creating ShaderPasses
- * usually a pair of vertex and fragment shaders
- */
 
 class Material
 {
@@ -24,24 +21,50 @@ public:
 	};
 
 public:
-	Material(VkContext *vk_context, ShaderPipeline *effect, vk::DescriptorPool descriptor_pool);
+	/** Default constructor */
+	Material() = default;
 
+	/** Argumented constructor
+	 *
+	 * @aaram
+	 */
+	Material(
+	    DescriptorAllocator *descriptor_allocator,
+	    ShaderPipeline *shader_pipeline,
+	    vk::DescriptorPool descriptor_pool
+	);
+
+	/** Move constructor */
+	Material(Material &&other);
+
+	/** Move assignment operator */
+	Material &operator=(Material &&other);
+
+	/** Deleted copy constructor */
+	Material(Material const &) = delete;
+
+	/** Deleted copy assignment operator */
+	Material &operator=(Material const &) = delete;
+
+	/** Destructor */
 	~Material();
 
-	auto *get_effect() const
+	/** Trivial accessor for effect */
+	auto *get_shader_pipeline() const
 	{
-		return effect;
+		return shader_pipeline;
 	}
 
+	/** Trivial accessor for descriptor set */
 	auto get_descriptor_set() const
 	{
 		return descriptor_set;
 	}
 
 private:
-	VkContext *vk_context;
-	ShaderPipeline *effect = {};
-	Parameters parametes = {};
+	DescriptorAllocator *descriptor_allocator;
+	ShaderPipeline *shader_pipeline = {};
+	Parameters parameters = {};
 	AllocatedDescriptorSet descriptor_set = {};
 };
 

@@ -12,14 +12,20 @@ Application::Application()
 {
 	create_window();
 	create_vk_context();
-	create_descriptor_pool();
+	create_allocators();
 
-	renderer = std::make_unique<bvk::Renderer>(vk_context);
+	renderer = bvk::Renderer { &vk_context, &memory_allocator };
+	create_descriptor_pool();
 
 	create_user_interface();
 
-	camera_controller = CameraController(&scene, &window);
-	staging_pool = StagingPool(3, (1024u * 1024u * 256u), vk_context);
+	camera_controller = { &scene, &window };
+	staging_pool = {
+		3,
+		1024u * 1024u * 256u,
+		&vk_context,
+		&memory_allocator,
+	};
 
 	create_loaders();
 	load_default_textures();
@@ -27,29 +33,25 @@ Application::Application()
 
 Application::~Application()
 {
-	auto const device = vk_context->get_device();
-
-	device.waitIdle();
+	device.vk().waitIdle();
 
 	models.clear();
 	textures.clear();
 
 	destroy_user_interface();
 
-	device.destroyDescriptorPool(descriptor_pool);
+	device.vk().destroyDescriptorPool(descriptor_pool);
 }
 
 void Application::create_window()
 {
-	using WindowHints = vec<pair<int, int>>;
-
-	window.init(
-	    WindowSpecs {
+	window = Window(
+	    Window::Specs {
 	        "BindlessVk",
-	        1920u,
-	        1080u,
+	        { 1920, 1080 },
 	    },
-	    WindowHints {
+
+	    Window::Hints {
 	        { GLFW_CLIENT_API, GLFW_NO_API },
 	        { GLFW_FLOATING, GLFW_TRUE },
 	    }
@@ -58,46 +60,93 @@ void Application::create_window()
 
 void Application::create_vk_context()
 {
-	auto const physical_device_features = get_physical_device_features();
-	auto const device_extensions = get_device_extensions();
+	instance = {
+		{
+		    get_instance_extensions(),
+		    get_instance_layers(),
+		},
+	};
 
-	instance = std::make_unique<bvk::Instance>(get_instance_extensions(), get_layers());
+	debug_utils = {
+		&instance,
 
-	vk_context = std::make_shared<bvk::VkContext>(
-	    instance.get(),
-	    device_extensions,
-	    physical_device_features,
+		{
+		    &Logger::bindlessvk_callback,
+		    std::make_any<Logger const *const>(&logger),
+		},
 
-	    [&](vk::Instance instance) { return window.create_surface(instance); },
-	    [&]() { return window.get_framebuffer_size(); },
-	    [](vec<bvk::Gpu> const gpus) {
-		    for (auto const &gpu : gpus)
-			    if (gpu.get_properties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				    return gpu;
+		{
+		    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
 
-		    return gpus[0];
+		    vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
+		        | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+		        | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
+		        | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding,
+		},
+	};
+
+	window_surface = window.create_vulkan_surface(instance);
+
+	gpu = bvk::Gpu::pick_by_score(
+	    &instance,
+	    window_surface.surface,
+
+	    {
+	        get_required_physical_device_features(),
+	        get_required_device_extensions(),
 	    },
 
-	    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-	        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-	        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-	        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+	    [](auto gpu) {
+		    auto const properties = gpu.vk().getProperties();
 
-	    vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
-	        | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-	        | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance
-	        | vk::DebugUtilsMessageTypeFlagBitsEXT::eDeviceAddressBinding,
+		    if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+			    return (u32)100'000 + properties.limits.maxImageDimension2D;
 
-	    pair<fn<void(bvk::DebugCallbackSource, bvk::LogLvl, const str &, std::any)>, std::any> {
-	        &Logger::bindlessvk_callback,
-	        std::make_any<Logger const *const>(&logger),
+		    return properties.limits.maxImageDimension2D;
 	    }
 	);
+
+	surface = {
+		&window_surface,
+		&gpu,
+
+		[this]() { return window.get_framebuffer_size(); },
+
+		[](vk::PresentModeKHR present_mode) {
+		    if (present_mode == vk::PresentModeKHR::eFifo)
+			    return 10'000;
+
+		    return 0;
+		},
+
+		[](vk::SurfaceFormatKHR format) {
+		    if (format.format == vk::Format::eB8G8R8A8Srgb
+		        && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+			    return 10'000;
+
+		    return 0;
+		},
+	};
+
+	device = { &gpu };
+
+	queues = { &device, &gpu };
+
+	vk_context = { &instance, &debug_utils, &surface, &gpu, &queues, &device };
 }
+
+void Application::create_allocators()
+{
+	memory_allocator = { &vk_context };
+	layout_allocator = { &vk_context };
+	descriptor_allocator = { &vk_context };
+}
+
 void Application::create_descriptor_pool()
 {
-	auto const device = vk_context->get_device();
-
 	auto const pool_sizes = vec<vk::DescriptorPoolSize> {
 		{ vk::DescriptorType::eSampler, 8000 },
 		{ vk::DescriptorType::eCombinedImageSampler, 8000 },
@@ -112,7 +161,7 @@ void Application::create_descriptor_pool()
 		{ vk::DescriptorType::eInputAttachment, 8000 },
 	};
 
-	descriptor_pool = device.createDescriptorPool(vk::DescriptorPoolCreateInfo {
+	descriptor_pool = device.vk().createDescriptorPool({
 	    vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
 	    100,
 	    pool_sizes,
@@ -126,17 +175,17 @@ void Application::create_user_interface()
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
 	auto imgui_info = ImGui_ImplVulkan_InitInfo {
-		*instance.get(),
-		vk_context->get_gpu(),
-		vk_context->get_device(),
-		vk_context->get_queues().get_graphics_index(),
-		vk_context->get_queues().get_graphics(),
+		instance,
+		gpu.vk(),
+		device.vk(),
+		queues.get_graphics_index(),
+		queues.get_graphics(),
 		{},
 		descriptor_pool,
-		static_cast<VkFormat>(vk_context->get_surface().get_color_format()),
-		BVK_MAX_FRAMES_IN_FLIGHT,
-		BVK_MAX_FRAMES_IN_FLIGHT,
-		static_cast<VkSampleCountFlagBits>(vk_context->get_gpu().get_max_color_and_depth_samples()),
+		static_cast<VkFormat>(surface.get_color_format()),
+		bvk::max_frames_in_flight,
+		bvk::max_frames_in_flight,
+		static_cast<VkSampleCountFlagBits>(gpu.get_max_color_and_depth_samples()),
 	};
 
 	assert_true(
@@ -145,16 +194,15 @@ void Application::create_user_interface()
 		        auto const instance = reinterpret_cast<bvk::Instance *>(data);
 		        return instance->get_proc_addr(proc_name);
 	        },
-	        (void *)instance.get()
+	        reinterpret_cast<void *>(&instance)
 	    ),
 	    "ImGui failed to load vulkan functions"
 	);
 
 	ImGui_ImplVulkan_Init(&imgui_info);
 
-	vk_context->immediate_submit([](vk::CommandBuffer cmd) {
-		ImGui_ImplVulkan_CreateFontsTexture(cmd);
-	});
+	device.immediate_submit([](vk::CommandBuffer cmd) { ImGui_ImplVulkan_CreateFontsTexture(cmd); }
+	);
 
 	ImGui_ImplVulkan_DestroyFontUploadObjects();
 
@@ -165,9 +213,9 @@ void Application::create_user_interface()
 
 void Application::create_loaders()
 {
-	texture_loader = bvk::TextureLoader(vk_context);
-	model_loader = bvk::ModelLoader(vk_context);
-	shader_loader = bvk::ShaderLoader(vk_context);
+	texture_loader = { &vk_context, &memory_allocator };
+	model_loader = { &vk_context, &memory_allocator };
+	shader_loader = { &vk_context };
 }
 
 void Application::load_default_textures()
@@ -199,9 +247,9 @@ void Application::load_default_textures()
 	);
 }
 
-auto Application::get_layers() const -> vec<c_str>
+auto Application::get_instance_layers() const -> vec<c_str>
 {
-	return vec<c_str> {
+	return {
 		"VK_LAYER_KHRONOS_validation",
 	};
 }
@@ -214,18 +262,19 @@ auto Application::get_instance_extensions() const -> vec<c_str>
 	return instance_extensions;
 }
 
-auto Application::get_device_extensions() const -> vec<c_str>
+auto Application::get_required_device_extensions() const -> vec<c_str>
 {
-	return vec<c_str> {
+	return {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 	};
 }
 
-auto Application::get_physical_device_features() const -> vk::PhysicalDeviceFeatures
+auto Application::get_required_physical_device_features() const -> vk::PhysicalDeviceFeatures
 {
 	auto physical_device_features = vk::PhysicalDeviceFeatures {};
 
+	physical_device_features.geometryShader = true;
 	physical_device_features.samplerAnisotropy = true;
 	physical_device_features.multiDrawIndirect = true;
 	physical_device_features.drawIndirectFirstInstance = true;

@@ -5,24 +5,57 @@ namespace BINDLESSVK_NAMESPACE {
 Gpu::Gpu(
     vk::PhysicalDevice const physical_device,
     vk::SurfaceKHR const surface,
-    vec<c_str> const &required_extensions
+    Requirements const &requirements
 )
     : physical_device(physical_device)
     , surface(surface)
+    , requirements(requirements)
 {
 	calculate_max_sample_counts();
 	calculate_queue_indices();
-	check_adequacy(required_extensions);
+	check_adequacy();
 }
 
-auto Gpu::create_device(vk::DeviceCreateInfo const &info) const -> vk::Device
+/* static */
+auto Gpu::pick_by_score(
+    Instance *instance,
+    vk::SurfaceKHR const surface,
+    Requirements const requirements,
+    fn<u32(Gpu)> const calculate_score
+) -> Gpu
 {
-	return physical_device.createDevice(info);
+	auto adequate_gpus = vec<Gpu> {};
+	auto scores = vec<u32> {};
+
+	auto high_score = u32 { 0 };
+	auto high_score_index = u32 { 0 };
+
+	auto const gpus = instance->vk().enumeratePhysicalDevices();
+	for (u32 i = 0; auto const physical_device : gpus)
+	{
+		auto const gpu = Gpu(physical_device, surface, requirements);
+		if (!gpu.is_adequate())
+			continue;
+
+		adequate_gpus.push_back(gpu);
+		auto const score = calculate_score(gpu);
+		if (score > high_score)
+		{
+			high_score = score;
+			high_score_index = i;
+		}
+
+		++i;
+	}
+
+	assert_false(adequate_gpus.empty(), "No suitable gpu found");
+
+	return adequate_gpus[high_score_index];
 }
 
 void Gpu::calculate_max_sample_counts()
 {
-	auto const limits = get_properties().limits;
+	auto const limits = physical_device.getProperties().limits;
 
 	auto const color_sample_counts = limits.framebufferColorSampleCounts;
 	auto const depth_sample_counts = limits.framebufferDepthSampleCounts;
@@ -65,43 +98,55 @@ void Gpu::calculate_queue_indices()
 	for (auto const &queue_family_property : queue_family_properties)
 	{
 		if (queue_family_property.queueFlags & vk::QueueFlagBits::eGraphics)
-			graphics_index = index;
+			graphics_queue_index = index;
 
 		if (physical_device.getSurfaceSupportKHR(index, surface))
-			present_index = index;
+			present_queue_index = index;
 
-		if (queue_family_property.queueFlags & vk::QueueFlagBits::eCompute)
-			compute_index = index;
+		++index;
 
-		index++;
-
-		if (graphics_index != VK_QUEUE_FAMILY_IGNORED && present_index != VK_QUEUE_FAMILY_IGNORED &&
-		    compute_index != VK_QUEUE_FAMILY_IGNORED)
+		if (graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
+		    present_queue_index != VK_QUEUE_FAMILY_IGNORED)
 			break;
 	}
 }
 
-void Gpu::check_adequacy(vec<c_str> const &required_extensions)
+void Gpu::check_adequacy()
 {
-	adequate = has_required_features() && has_required_queues() &&
-	           has_required_extensions(required_extensions) && can_present_to_surface();
+	adequate = has_required_features() && has_required_queues() && has_required_extensions() &&
+	           can_present_to_surface();
 }
 
 auto Gpu::has_required_features() const -> bool
 {
-	auto const features = get_features();
-	return features.geometryShader && features.samplerAnisotropy;
+	// auto const required_features_arr = vec<vk::Bool32>(
+	//     reinterpret_cast<vk::Bool32 const *>(&requirements.physical_device_features),
+	//     reinterpret_cast<vk::Bool32 const
+	//     *>(requirements.physical_device_features.inheritedQueries)
+	// );
+	//
+	// auto supported_features = physical_device.getFeatures();
+	// auto const supported_features_arr = vec<vk::Bool32>(
+	//     reinterpret_cast<vk::Bool32 const *>(&supported_features),
+	//     reinterpret_cast<vk::Bool32 const *>(&supported_features.inheritedQueries)
+	// );
+	//
+	// for (u32 i = 0; i < required_features_arr.size(); i++)
+	// 	if (required_features_arr[i] && !supported_features_arr[i])
+	// 		return false;
+
+	return true;
 }
 
 auto Gpu::has_required_queues() const -> bool
 {
-	return graphics_index != VK_QUEUE_FAMILY_IGNORED && present_index != VK_QUEUE_FAMILY_IGNORED &&
-	       compute_index != VK_QUEUE_FAMILY_IGNORED;
+	return graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
+	       present_queue_index != VK_QUEUE_FAMILY_IGNORED;
 }
 
-auto Gpu::has_required_extensions(vec<c_str> const &required_extensions) const -> bool
+auto Gpu::has_required_extensions() const -> bool
 {
-	for (auto const &required_extension : required_extensions)
+	for (auto const &required_extension : requirements.logical_device_extensions)
 		if (!has_extension(required_extension))
 			return false;
 

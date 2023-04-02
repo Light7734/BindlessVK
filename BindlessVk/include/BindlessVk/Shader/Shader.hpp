@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Allocators/LayoutAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 
@@ -32,8 +33,13 @@ public:
 	};
 
 public:
+	/** Default constructor */
+	ShaderPipeline() = default;
+
+	/** Argumented constructor */
 	ShaderPipeline(
-	    VkContext *vk_context,
+	    VkContext const *vk_context,
+	    LayoutAllocator *const layout_allocator,
 	    vec<Shader *> const &shaders,
 	    ShaderPipeline::Configuration const &configuration,
 	    DescriptorSetLayoutWithHash graph_set_bindings,
@@ -41,34 +47,51 @@ public:
 	    str_view debug_name = default_debug_name
 	);
 
-	~ShaderPipeline();
+	/** Move constructor */
+	ShaderPipeline(ShaderPipeline &&other);
 
-	ShaderPipeline(ShaderPipeline &&);
-	ShaderPipeline &operator=(ShaderPipeline &&);
+	/** Move assignment operator */
+	ShaderPipeline &operator=(ShaderPipeline &&other);
 
+	/** Deleted copy constructor */
 	ShaderPipeline(const ShaderPipeline &) = delete;
+
+	/** Deleted copy assignment operator */
 	ShaderPipeline &operator=(const ShaderPipeline &) = delete;
 
+	/** Destructor */
+	~ShaderPipeline();
+
+	/** Returns null terminated str view to debug_name */
 	auto get_name() const
 	{
 		return str_view(debug_name);
 	}
 
+	/** Trivial accessor for pipeline */
 	auto get_pipeline() const
 	{
 		return pipeline;
 	}
 
+	/** Trivial accessor for pipeline_layout */
 	auto get_pipeline_layout() const
 	{
 		return pipeline_layout;
 	}
 
+	/** Trivial accessor for descriptor_set_layout
+	 * @warn This will return an invalid descriptor set layout if the pipeline doesn't uses the
+	 * descriptor set slot 2 (per shader descriptor set)
+	 */
 	auto get_descriptor_set_layout() const
 	{
 		return descriptor_set_layout;
 	}
 
+	/** Checks if shader pipeline uses set slot 2 (per shader descriptor set)
+	 * It does so by validating descriptor_set_layout
+	 */
 	auto uses_shader_descriptor_set_slot() const
 	{
 		return !!descriptor_set_layout;
@@ -92,7 +115,10 @@ private:
 
 
 private:
-	VkContext *vk_context = {};
+	Device const *device = {};
+	Surface const *surface = {};
+	DebugUtils const *debug_utils = {};
+	LayoutAllocator *layout_allocator = {};
 
 	vk::Pipeline pipeline = {};
 	vk::PipelineLayout pipeline_layout = {};

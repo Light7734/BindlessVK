@@ -2,20 +2,26 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-RenderResources::RenderResources(ref<VkContext> const vk_context): vk_context(vk_context)
+RenderResources::RenderResources(
+    VkContext const *const vk_context,
+    MemoryAllocator *const memory_allocator,
+    Swapchain const *const swapchain
+)
+    : surface(vk_context->get_surface())
+    , debug_utils(vk_context->get_debug_utils())
+    , device(vk_context->get_device())
+    , memory_allocator(memory_allocator)
 {
-	auto *const swapchain = vk_context->get_swapchain();
-	auto const &surface = vk_context->get_surface();
-	auto const extent = surface.get_framebuffer_extent();
+	auto const extent = surface->get_framebuffer_extent();
 
-	AttachmentContainer container {};
-
-	container.image_format = surface.get_color_format();
-	container.extent = { extent.width, extent.height, 0 };
-	container.size_type = Renderpass::SizeType::eSwapchainRelative;
-	container.size = { 1.0, 1.0 };
-	container.relative_size_name = "";
-	container.type = AttachmentContainer::Type::ePerImage;
+	auto container = AttachmentContainer {
+		AttachmentContainer::Type::ePerImage, //
+		surface->get_color_format(),
+		VkExtent3D { extent.width, extent.height, 0 },
+		pair<f32, f32> { 1.0, 1.0 },
+		Renderpass::SizeType::eSwapchainRelative,
+		"",
+	};
 
 	auto const images = swapchain->get_images();
 	auto const image_views = swapchain->get_image_views();
@@ -25,12 +31,46 @@ RenderResources::RenderResources(ref<VkContext> const vk_context): vk_context(vk
 		    vk::AccessFlagBits::eNone,
 		    vk::ImageLayout::eUndefined,
 		    vk::PipelineStageFlagBits::eTopOfPipe,
-		    AllocatedImage { images[i] },
+		    Image { images[i] },
 		    image_views[i],
 		});
 	}
 
-	containers.push_back(container);
+	containers.push_back(std::move(container));
+}
+
+RenderResources::RenderResources(RenderResources &&other)
+{
+	*this = std::move(other);
+}
+
+RenderResources &RenderResources::operator=(RenderResources &&other)
+{
+	this->device = other.device;
+	this->surface = other.surface;
+	this->debug_utils = other.debug_utils;
+	this->memory_allocator = other.memory_allocator;
+
+	this->containers = std::move(other.containers);
+	this->attachment_indices = std::move(other.attachment_indices);
+	this->transient_attachments = std::move(other.transient_attachments);
+
+	other.device = {};
+
+	return *this;
+}
+
+RenderResources::~RenderResources()
+{
+	if (!device)
+		return;
+
+	for (auto i = 1; i < containers.size(); ++i)
+		for (auto &attachment : containers[i].attachments)
+			device->vk().destroyImageView(attachment.image_view);
+
+	for (auto &attachment : transient_attachments)
+		device->vk().destroyImageView(attachment.image_view);
 }
 
 auto RenderResources::try_get_attachment_index(u64 const key) -> u32
@@ -51,45 +91,46 @@ void RenderResources::create_color_attachment(
     vk::SampleCountFlagBits sample_count
 )
 {
-	auto const device = vk_context->get_device();
-	auto const allocator = vk_context->get_allocator();
-	auto const framebuffer_extent = vk_context->get_surface().get_framebuffer_extent();
+	auto const framebuffer_extent = surface->get_framebuffer_extent();
 
 	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
 	auto attachment = Attachment {};
 
-	auto const image = AllocatedImage {
-		allocator.createImage(
-		    vk::ImageCreateInfo {
-		        {},
-		        vk::ImageType::e2D,
-		        blueprint_attachment.format,
-		        extent,
-		        1u,
-		        1u,
-		        vk::SampleCountFlagBits::e1,
-		        vk::ImageTiling::eOptimal,
-		        vk::ImageUsageFlagBits::eColorAttachment,
-		        vk::SharingMode::eExclusive,
-		        0u,
-		        nullptr,
-		        vk::ImageLayout::eUndefined,
-		    },
-		    vma::AllocationCreateInfo {
-		        {},
-		        vma::MemoryUsage::eGpuOnly,
-		        vk::MemoryPropertyFlagBits::eDeviceLocal,
-		    }
-		),
+	auto image = Image {
+		memory_allocator,
+
+		vk::ImageCreateInfo {
+		    {},
+		    vk::ImageType::e2D,
+		    blueprint_attachment.format,
+		    extent,
+		    1u,
+		    1u,
+		    vk::SampleCountFlagBits::e1,
+		    vk::ImageTiling::eOptimal,
+		    vk::ImageUsageFlagBits::eColorAttachment,
+		    vk::SharingMode::eExclusive,
+		    0u,
+		    nullptr,
+		    vk::ImageLayout::eUndefined,
+		},
+
+		vma::AllocationCreateInfo {
+		    {},
+		    vma::MemoryUsage::eGpuOnly,
+		    vk::MemoryPropertyFlagBits::eDeviceLocal,
+		},
 	};
-	vk_context->set_object_name(
-	    image,
+
+	debug_utils->set_object_name(
+	    device->vk(),
+	    image.vk(),
 	    fmt::format("{}_image (single)", blueprint_attachment.debug_name)
 	);
 
-	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
+	auto const image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
-	    image,
+	    image.vk(),
 	    vk::ImageViewType::e2D,
 	    blueprint_attachment.format,
 	    vk::ComponentMapping {
@@ -98,17 +139,24 @@ void RenderResources::create_color_attachment(
 	        vk::ComponentSwizzle::eIdentity,
 	        vk::ComponentSwizzle::eIdentity,
 	    },
-	    { vk::ImageAspectFlagBits::eColor, 0u, 1u, 0u, 1u },
+	    vk::ImageSubresourceRange {
+	        vk::ImageAspectFlagBits::eColor,
+	        0u,
+	        1u,
+	        0u,
+	        1u,
+	    },
 	});
 
-	vk_context->set_object_name(
+	debug_utils->set_object_name(
+	    device->vk(),
 	    image_view,
 	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name)
 	);
 
 	attachment_indices[blueprint_attachment.hash] = containers.size();
 
-	containers.push_back(AttachmentContainer {
+	containers.emplace_back(AttachmentContainer {
 	    AttachmentContainer::Type::eSingle,
 	    blueprint_attachment.format,
 	    vk::Extent3D {
@@ -116,21 +164,21 @@ void RenderResources::create_color_attachment(
 	        framebuffer_extent.height,
 	        0,
 	    },
-	    pair<u32, u32> {
+	    pair<f32, f32> {
 	        1.0,
 	        1.0,
 	    },
 	    Renderpass::SizeType::eSwapchainRelative,
 	    "",
-	    vec<Attachment> {
-	        Attachment {
-	            {},
-	            vk::ImageLayout::eUndefined,
-	            vk::PipelineStageFlagBits::eTopOfPipe,
-	            image,
-	            image_view,
-	        },
-	    },
+	    {},
+	});
+
+	containers.back().attachments.emplace_back(Attachment {
+	    {},
+	    vk::ImageLayout::eUndefined,
+	    vk::PipelineStageFlagBits::eTopOfPipe,
+	    std::move(image),
+	    image_view,
 	});
 }
 
@@ -139,12 +187,12 @@ void RenderResources::create_depth_attachment(
     vk::SampleCountFlagBits sample_count
 )
 {
-	auto const device = vk_context->get_device();
-	auto const allocator = vk_context->get_allocator();
-	auto const framebuffer_extent = vk_context->get_surface().get_framebuffer_extent();
+	auto const framebuffer_extent = surface->get_framebuffer_extent();
 	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
 
-	auto const image = AllocatedImage { allocator.createImage(
+	auto image = Image {
+		memory_allocator,
+
 		vk::ImageCreateInfo {
 		    {},
 		    vk::ImageType::e2D,
@@ -160,21 +208,23 @@ void RenderResources::create_depth_attachment(
 		    nullptr,
 		    vk::ImageLayout::eUndefined,
 		},
+
 		vma::AllocationCreateInfo {
 		    {},
 		    vma::MemoryUsage::eGpuOnly,
 		    vk::MemoryPropertyFlagBits::eDeviceLocal,
-		}
-	) };
+		},
+	};
 
-	vk_context->set_object_name(
-	    image,
+	debug_utils->set_object_name(
+	    device->vk(),
+	    image.vk(),
 	    fmt::format("{}_depth_image", blueprint_attachment.debug_name)
 	);
 
-	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
+	auto const image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
-	    image,
+	    image.vk(),
 	    vk::ImageViewType::e2D,
 	    blueprint_attachment.format,
 	    vk::ComponentMapping {
@@ -192,7 +242,8 @@ void RenderResources::create_depth_attachment(
 	    },
 	});
 
-	vk_context->set_object_name(
+	debug_utils->set_object_name(
+	    device->vk(),
 	    image_view,
 	    fmt::format("{}_image_view (single)", blueprint_attachment.debug_name)
 	);
@@ -203,21 +254,21 @@ void RenderResources::create_depth_attachment(
 	    AttachmentContainer::Type::eSingle,
 	    blueprint_attachment.format,
 	    vk::Extent3D { framebuffer_extent.width, framebuffer_extent.height, 0 },
-	    pair<u32, u32> {
+	    pair<f32, f32> {
 	        1.0,
 	        1.0,
 	    },
 	    Renderpass::SizeType::eSwapchainRelative,
 	    "",
-	    vec<Attachment> {
-	        Attachment {
-	            {},
-	            vk::ImageLayout::eUndefined,
-	            vk::PipelineStageFlagBits::eTopOfPipe,
-	            image,
-	            image_view,
-	        },
-	    },
+	    vec<Attachment> {},
+	});
+
+	containers.back().attachments.emplace_back(Attachment {
+	    {},
+	    vk::ImageLayout::eUndefined,
+	    vk::PipelineStageFlagBits::eTopOfPipe,
+	    std::move(image),
+	    image_view,
 	});
 }
 
@@ -226,42 +277,42 @@ void RenderResources::create_transient_attachment(
     vk::SampleCountFlagBits sample_count
 )
 {
-	auto const device = vk_context->get_device();
-	auto const allocator = vk_context->get_allocator();
-	auto const framebuffer_extent = vk_context->get_surface().get_framebuffer_extent();
+	auto const framebuffer_extent = surface->get_framebuffer_extent();
 	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
 
-	auto const image = AllocatedImage(allocator.createImage(
-	    vk::ImageCreateInfo {
-	        {},
-	        vk::ImageType::e2D,
-	        blueprint_attachment.format,
-	        extent,
-	        1u,
-	        1u,
-	        sample_count,
-	        vk::ImageTiling::eOptimal,
-	        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
-	        vk::SharingMode::eExclusive,
-	        0u,
-	        nullptr,
-	        vk::ImageLayout::eUndefined,
-	    },
-	    vma::AllocationCreateInfo {
-	        {},
-	        vma::MemoryUsage::eGpuOnly,
-	        vk::MemoryPropertyFlagBits::eDeviceLocal,
-	    }
-	));
+	auto image = Image {
+		memory_allocator,
+		vk::ImageCreateInfo {
+		    {},
+		    vk::ImageType::e2D,
+		    blueprint_attachment.format,
+		    extent,
+		    1u,
+		    1u,
+		    sample_count,
+		    vk::ImageTiling::eOptimal,
+		    vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
+		    vk::SharingMode::eExclusive,
+		    0u,
+		    nullptr,
+		    vk::ImageLayout::eUndefined,
+		},
+		vma::AllocationCreateInfo {
+		    {},
+		    vma::MemoryUsage::eGpuOnly,
+		    vk::MemoryPropertyFlagBits::eDeviceLocal,
+		},
+	};
 
-	vk_context->set_object_name(
-	    image,
+	debug_utils->set_object_name(
+	    device->vk(),
+	    image.vk(),
 	    fmt::format("{}_transient_image", blueprint_attachment.debug_name)
 	);
 
-	auto const image_view = device.createImageView(vk::ImageViewCreateInfo {
+	auto const image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
-	    image,
+	    image.vk(),
 	    vk::ImageViewType::e2D,
 	    blueprint_attachment.format,
 
@@ -281,13 +332,14 @@ void RenderResources::create_transient_attachment(
 	    },
 	});
 
-	vk_context->set_object_name(
+	debug_utils->set_object_name(
+	    device->vk(),
 	    image_view,
 	    fmt::format("{}_transient_image_view", blueprint_attachment.debug_name)
 	);
 
 	transient_attachments.emplace_back(TransientAttachment {
-	    image,
+	    std::move(image),
 	    image_view,
 	    sample_count,
 	    blueprint_attachment.format,

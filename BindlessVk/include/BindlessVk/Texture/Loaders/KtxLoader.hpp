@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
@@ -18,9 +19,11 @@ namespace BINDLESSVK_NAMESPACE {
 class KtxLoader
 {
 public:
-	KtxLoader(VkContext const *vk_context, Buffer *staging_buffer);
-	KtxLoader() = default;
-	~KtxLoader() = default;
+	KtxLoader(
+	    VkContext const *vk_context,
+	    MemoryAllocator const *memory_allocator,
+	    Buffer *staging_buffer
+	);
 
 	Texture load(str_view path, Texture::Type type, vk::ImageLayout final_layout, str_view name);
 
@@ -38,7 +41,9 @@ private:
 	auto create_texture_face_buffer_copies() -> vec<vk::BufferImageCopy>;
 
 private:
-	VkContext const *const vk_context = {};
+	Device const *device {};
+	MemoryAllocator const *memory_allocator {};
+
 	Buffer *const staging_buffer = {};
 
 	Texture texture = {};

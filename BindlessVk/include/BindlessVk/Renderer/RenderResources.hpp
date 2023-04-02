@@ -1,8 +1,11 @@
 #pragma once
 
+#include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Context/Swapchain.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Renderer/Renderpass.hpp"
+#include "BindlessVk/Texture/Image.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,18 +14,17 @@ class RenderResources
 private:
 	struct Attachment
 	{
-		// State carried from last barrier
 		vk::AccessFlags access_mask;
 		vk::ImageLayout image_layout;
 		vk::PipelineStageFlags stage_mask;
 
-		AllocatedImage image;
+		Image image;
 		vk::ImageView image_view;
 	};
 
 	struct TransientAttachment
 	{
-		AllocatedImage image;
+		Image image;
 		vk::ImageView image_view;
 		vk::SampleCountFlagBits sample_count;
 		vk::Format format;
@@ -36,7 +38,9 @@ private:
 			ePerImage,
 			ePerFrame,
 			eSingle,
-		} type;
+		};
+
+		Type type;
 
 		vk::Format image_format;
 
@@ -56,18 +60,59 @@ private:
 	};
 
 public:
-	RenderResources(ref<VkContext> vk_context);
+	/** Default constructor */
+	RenderResources() = default;
 
+	/** Argumented constructor
+	 *
+	 * @param vk_context Pointer to the vk context
+	 * @param memory_allocator Pointer to the memory allocator
+	 * @param swapchain Pointer to the swapchain
+	 * */
+	RenderResources(
+	    VkContext const *vk_context,
+	    MemoryAllocator *memory_allocator,
+	    Swapchain const *swapchain
+	);
+
+	/** Move constructor */
+	RenderResources(RenderResources &&other);
+
+	/** Move assignment operator */
+	RenderResources &operator=(RenderResources &&other);
+
+	/** Deleted copy constructor */
+	RenderResources(RenderResources const &) = delete;
+
+	/** Deleted copy assignment operator */
+	RenderResources &operator=(RenderResources const &) = delete;
+
+	/** Destructor */
+	~RenderResources();
+
+	/** Address accessor for containers[resource_index] */
 	auto get_attachment_container(u32 resource_index)
 	{
 		return &containers[resource_index];
 	}
 
+	/** Returns the backbuffer attachment at @a image_index
+	 *
+	 * @param image_index Index of the swapchain image to retrive
+	 */
 	auto get_backbuffer_attachment(u32 image_index)
 	{
 		return containers[0].get_attachment(image_index, 0);
 	}
 
+	/** Returns the attachment at @a image_index OR frame_index of container at @a resource_index.
+	 * Depending on wether the attachment's type is ePerImage or ePerFrame.
+	 * Returns the first(and only) attachment if attachment's type is eSingle
+	 *
+	 * @param resource_index Attachment container's index
+	 * @param image_index Index of the attachment with type ePerImage
+	 * @param frame_index Index of the attachment with type ePerFrame
+	 */
 	auto get_attachment(u32 resource_index, u32 image_index, u32 frame_index)
 	{
 		return containers[resource_index].get_attachment(image_index, frame_index);
@@ -75,7 +120,7 @@ public:
 
 	auto get_transient_attachment(u32 resource_index) const
 	{
-		return transient_attachments[resource_index];
+		return &transient_attachments[resource_index];
 	}
 
 	auto try_get_suitable_transient_attachment_index(
@@ -91,7 +136,7 @@ public:
 			        calculate_attachment_image_extent(blueprint_attachment))
 				return i;
 
-			i++;
+			++i;
 		}
 
 		return std::numeric_limits<u32>::max();
@@ -122,10 +167,14 @@ private:
 	) const -> vk::Extent3D;
 
 private:
-	ref<VkContext> const vk_context;
-	vec<AttachmentContainer> containers;
-	hash_map<u64, u32> attachment_indices;
-	vec<TransientAttachment> transient_attachments;
+	Device *device = {};
+	Surface *surface = {};
+	DebugUtils *debug_utils = {};
+	MemoryAllocator *memory_allocator = {};
+
+	vec<AttachmentContainer> containers = {};
+	hash_map<u64, u32> attachment_indices = {};
+	vec<TransientAttachment> transient_attachments = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

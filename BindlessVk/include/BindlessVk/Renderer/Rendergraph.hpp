@@ -16,7 +16,14 @@ public:
 	friend class RenderGraphBuilder;
 
 public:
-	Rendergraph(ref<VkContext> vk_context);
+	Rendergraph() = default;
+	Rendergraph(VkContext const *vk_context);
+
+	Rendergraph(Rendergraph &&other);
+	Rendergraph &operator=(Rendergraph &&other);
+
+	Rendergraph(Rendergraph const &) = delete;
+	Rendergraph &operator=(Rendergraph const &) = delete;
 
 	virtual ~Rendergraph();
 
@@ -48,7 +55,7 @@ public:
 	}
 
 protected:
-	ref<VkContext> vk_context;
+	VkContext const *vk_context;
 
 	class RenderResources *resources;
 
@@ -69,10 +76,22 @@ protected:
 class RenderGraphBuilder
 {
 public:
-	RenderGraphBuilder(ref<VkContext> vk_context);
+	/** Argumented constructor
+	 *
+	 * @param vk_context The vulkan context
+	 * @param memory_allocator The memory allocator
+	 * @param descriptor_allocator The descriptor allocator
+	 */
+	RenderGraphBuilder(
+	    VkContext const *vk_context,
+	    MemoryAllocator const *memory_allocator,
+	    DescriptorAllocator *descriptor_allocator
+	);
 
+	/** Build the rendergraph */
 	auto build_graph() -> Rendergraph *;
 
+	/** Sets the rendergraph's derived type */
 	template<typename T>
 	auto set_type() -> RenderGraphBuilder &
 	{
@@ -80,11 +99,12 @@ public:
 		return *this;
 	}
 
+	/** Adds a renderpass to the rendergraph */
 	template<typename T>
 	auto add_pass(RenderpassBlueprint blueprint) -> RenderGraphBuilder &
 	{
 		this->pass_blueprints.push_back(blueprint);
-		this->graph->passes.push_back(new T(vk_context.get()));
+		this->graph->passes.push_back(new T(vk_context));
 		return *this;
 	}
 
@@ -166,7 +186,11 @@ private:
 	);
 
 private:
-	ref<VkContext> const vk_context = {};
+	VkContext const *vk_context = {};
+	Device const *device = {};
+	DebugUtils const *debug_utils = {};
+	MemoryAllocator const *memory_allocator = {};
+	DescriptorAllocator *descriptor_allocator = {};
 
 	Rendergraph *graph = {};
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "BindlessVk/Allocators/DescriptorAllocator.hpp"
+#include "BindlessVk/Allocators/LayoutAllocator.hpp"
+#include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Material/MaterialSystem.hpp"
 #include "BindlessVk/Model/ModelLoader.hpp"
 #include "BindlessVk/Renderer/Renderer.hpp"
@@ -27,15 +30,31 @@ public:
 public:
 	Logger logger = {};
 
+	bvk::Instance instance = {};
+
+	bvk::DebugUtils debug_utils = {};
+
+	bvk::Gpu gpu = {};
+	bvk::Surface::WindowSurface window_surface = {};
+	bvk::Surface surface = {};
+	bvk::Queues queues = {};
+	bvk::Device device = {};
+	bvk::Swapchain swapchain = {};
+
+	bvk::VkContext vk_context = {};
+
+	bvk::MemoryAllocator memory_allocator = {};
+	bvk::LayoutAllocator layout_allocator = {};
+	bvk::DescriptorAllocator descriptor_allocator = {};
+
+
 	Scene scene = {};
 	Window window = {};
-	StagingPool staging_pool = {};
 	CameraController camera_controller = {};
 
-	scope<bvk::Instance> instance = {};
-	ref<bvk::VkContext> vk_context = {};
+	StagingPool staging_pool = {};
 
-	scope<bvk::Renderer> renderer = {};
+	bvk::Renderer renderer = {};
 	scope<bvk::Rendergraph> render_graph = {};
 
 	bvk::TextureLoader texture_loader = {};
@@ -54,6 +73,7 @@ public:
 private:
 	void create_window();
 	void create_vk_context();
+	void create_allocators();
 	void create_descriptor_pool();
 	void create_user_interface();
 	void create_loaders();
@@ -61,10 +81,10 @@ private:
 
 	void load_default_textures();
 
-	auto get_layers() const -> vec<c_str>;
+	auto get_instance_layers() const -> vec<c_str>;
 	auto get_instance_extensions() const -> vec<c_str>;
-	auto get_device_extensions() const -> vec<c_str>;
-	auto get_physical_device_features() const -> vk::PhysicalDeviceFeatures;
+	auto get_required_device_extensions() const -> vec<c_str>;
+	auto get_required_physical_device_features() const -> vk::PhysicalDeviceFeatures;
 
 	void destroy_user_interface();
 };

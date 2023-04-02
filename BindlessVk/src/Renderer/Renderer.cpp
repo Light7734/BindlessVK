@@ -4,15 +4,51 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Renderer::Renderer(ref<VkContext> const vk_context): vk_context(vk_context), resources(vk_context)
+Renderer::Renderer(VkContext const *const vk_context, MemoryAllocator *const memory_allocator)
+    : device(vk_context->get_device())
+    , surface(vk_context->get_surface())
+    , queues(vk_context->get_queues())
+    , debug_utils(vk_context->get_debug_utils())
+    , swapchain(vk_context)
+    , resources(vk_context, memory_allocator, &swapchain)
 {
 	create_sync_objects();
-	allocate_cmd_buffers();
+	create_cmds(vk_context->get_gpu());
+}
+
+Renderer::Renderer(Renderer &&other)
+{
+	*this = std::move(other);
+}
+
+Renderer &Renderer::operator=(Renderer &&other)
+{
+	this->device = other.device;
+	this->surface = other.surface;
+	this->queues = other.queues;
+	this->debug_utils = other.debug_utils;
+	this->swapchain = std::move(other.swapchain);
+	this->used_attachment_indices = std::move(other.used_attachment_indices);
+	this->resources = std::move(other.resources);
+	this->dynamic_pass_info = std::move(other.dynamic_pass_info);
+	this->render_fences = other.render_fences;
+	this->render_semaphores = other.render_semaphores;
+	this->present_semaphores = other.present_semaphores;
+	this->cmd_pools = other.cmd_pools;
+	this->cmd_buffers = other.cmd_buffers;
+	this->frame_index = other.frame_index;
+
+	other.device = {};
+
+	return *this;
 }
 
 Renderer::~Renderer()
 {
-	free_cmd_buffers();
+	if (!device)
+		return;
+
+	destroy_cmds();
 	destroy_sync_objects();
 }
 
@@ -20,14 +56,12 @@ void Renderer::render_graph(Rendergraph *const graph)
 {
 	wait_for_frame_fence();
 
-	auto const device = vk_context->get_device();
 	auto const image_index = aquire_next_image();
 	if (image_index == std::numeric_limits<u32>::max())
 		return;
 
-	device.resetCommandPool(vk_context->get_cmd_pool(frame_index));
+	device->vk().resetCommandPool(cmd_pools[frame_index]);
 	auto const cmd = cmd_buffers[frame_index];
-
 
 	cmd.beginDebugUtilsLabelEXT(graph->get_update_label());
 	graph->on_update(frame_index, image_index);
@@ -55,7 +89,7 @@ void Renderer::render_graph(Rendergraph *const graph)
 
 	reset_used_attachment_states();
 
-	frame_index = (frame_index + 1u) % BVK_MAX_FRAMES_IN_FLIGHT;
+	frame_index = (frame_index + 1u) % max_frames_in_flight;
 }
 
 void Renderer::update_pass(Renderpass *const pass, u32 const image_index)
@@ -65,8 +99,6 @@ void Renderer::update_pass(Renderpass *const pass, u32 const image_index)
 
 void Renderer::apply_pass_barriers(Renderpass *const pass, u32 const image_index)
 {
-	auto const &queues = vk_context->get_queues();
-	auto const &surface = vk_context->get_surface();
 	auto const cmd = cmd_buffers[frame_index];
 
 	cmd.beginDebugUtilsLabelEXT(pass->get_barrier_label());
@@ -100,9 +132,9 @@ void Renderer::apply_pass_barriers(Renderpass *const pass, u32 const image_index
 			        attachment_slot.access_mask,
 			        attachment->image_layout,
 			        attachment_slot.image_layout,
-			        queues.get_graphics_index(),
-			        queues.get_graphics_index(),
-			        attachment->image,
+			        queues->get_graphics_index(),
+			        queues->get_graphics_index(),
+			        attachment->image.vk(),
 			        attachment_slot.subresource_range,
 			    }
 			);
@@ -112,7 +144,6 @@ void Renderer::apply_pass_barriers(Renderpass *const pass, u32 const image_index
 			attachment->image_layout = attachment_slot.image_layout;
 		}
 
-
 		auto rendering_attachment_info = vk::RenderingAttachmentInfo {};
 		if (attachment_slot.is_color_attachment())
 		{
@@ -121,7 +152,7 @@ void Renderer::apply_pass_barriers(Renderpass *const pass, u32 const image_index
 
 			dynamic_pass_info[frame_index].color_attachments.emplace_back(
 			    vk::RenderingAttachmentInfo {
-			        transient_attachment.image_view,
+			        transient_attachment->image_view,
 			        attachment->image_layout,
 			        attachment_slot.transient_resolve_moode,
 			        attachment->image_view,
@@ -179,7 +210,7 @@ void Renderer::apply_pass_barriers(Renderpass *const pass, u32 const image_index
 		{},
 		vk::Rect2D {
 		    { 0, 0 },
-		    surface.get_framebuffer_extent(),
+		    surface->get_framebuffer_extent(),
 		},
 		1,
 		{},
@@ -214,7 +245,7 @@ void Renderer::apply_present_barriers(Rendergraph *const graph, u32 const image_
 	        vk::ImageLayout::ePresentSrcKHR,
 	        {},
 	        {},
-	        backbuffer_attachment->image,
+	        backbuffer_attachment->image.vk(),
 	        vk::ImageSubresourceRange {
 	            vk::ImageAspectFlagBits::eColor,
 	            0,
@@ -263,29 +294,24 @@ void Renderer::render_pass(Rendergraph *const graph, Renderpass *const pass, u32
 
 void Renderer::wait_for_frame_fence()
 {
-	auto const device = vk_context->get_device();
-
-	assert_false(device.waitForFences(render_fences[frame_index], VK_TRUE, UINT64_MAX));
-	device.resetFences(render_fences[frame_index]);
+	assert_false(device->vk().waitForFences(render_fences[frame_index], VK_TRUE, UINT64_MAX));
+	device->vk().resetFences(render_fences[frame_index]);
 }
 
 auto Renderer::aquire_next_image() -> u32
 {
-	auto *const swapchain = vk_context->get_swapchain();
-	auto const device = vk_context->get_device();
-
-	auto const [result, index] = device.acquireNextImageKHR(
-	    *swapchain,
+	auto const [result, index] = device->vk().acquireNextImageKHR(
+	    swapchain.vk(),
 	    std::numeric_limits<u64>::max(),
 	    render_semaphores[frame_index],
 	    VK_NULL_HANDLE
 	);
 
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR ||
-	    swapchain->is_invalid()) [[unlikely]]
+	    swapchain.is_invalid()) [[unlikely]]
 	{
-		device.waitIdle();
-		swapchain->invalidate();
+		device->vk().waitIdle();
+		swapchain.invalidate();
 		return std::numeric_limits<u32>::max();
 	}
 
@@ -300,7 +326,7 @@ auto Renderer::aquire_next_image() -> u32
 
 void Renderer::submit_queue()
 {
-	auto const graphics_queue = vk_context->get_queues().get_graphics();
+	auto const graphics_queue = queues->get_graphics();
 	auto const cmd = cmd_buffers[frame_index];
 	cmd.end();
 
@@ -320,11 +346,8 @@ void Renderer::submit_queue()
 
 void Renderer::present_frame(u32 const image_index)
 {
-	auto const device = vk_context->get_device();
-	auto const present_queue = vk_context->get_queues().get_present();
-	auto *const swapchain = vk_context->get_swapchain();
-	auto const swapchain_array = arr<vk::SwapchainKHR, 1> { *swapchain };
-	;
+	auto const present_queue = queues->get_present();
+	auto const swapchain_array = arr<vk::SwapchainKHR, 1> { swapchain.vk() };
 
 	try
 	{
@@ -334,18 +357,18 @@ void Renderer::present_frame(u32 const image_index)
 		    image_index,
 		});
 
-		if (result == vk::Result::eSuboptimalKHR || swapchain->is_invalid())
+		if (result == vk::Result::eSuboptimalKHR || swapchain.is_invalid())
 		{
-			device.waitIdle();
-			swapchain->invalidate();
+			device->vk().waitIdle();
+			swapchain.invalidate();
 			return;
 		}
 	}
 	// OutOfDateKHR is not considered a success value and throws an error (presentKHR)
 	catch (vk::OutOfDateKHRError err)
 	{
-		device.waitIdle();
-		swapchain->invalidate();
+		device->vk().waitIdle();
+		swapchain.invalidate();
 		return;
 	}
 }
@@ -365,60 +388,74 @@ void Renderer::reset_used_attachment_states()
 
 void Renderer::create_sync_objects()
 {
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; ++i)
+	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
-		render_fences[i] = device.createFence({
+		render_fences[i] = device->vk().createFence({
 		    vk::FenceCreateFlagBits::eSignaled,
 		});
-		vk_context->set_object_name(render_fences[i], fmt::format("render_fence_{}", i));
+		debug_utils->set_object_name(
+		    device->vk(), //
+		    render_fences[i],
+		    fmt::format("render_fence_{}", i)
+		);
 
-		render_semaphores[i] = device.createSemaphore({});
-		vk_context->set_object_name(render_semaphores[i], fmt::format("render_semaphore_{}", i));
+		render_semaphores[i] = device->vk().createSemaphore({});
+		debug_utils->set_object_name(
+		    device->vk(),
+		    render_semaphores[i],
+		    fmt::format("render_semaphore_{}", i)
+		);
 
-		present_semaphores[i] = device.createSemaphore({});
-		vk_context->set_object_name(present_semaphores[i], fmt::format("present_semaphore_{}", i));
+		present_semaphores[i] = device->vk().createSemaphore({});
+		debug_utils->set_object_name(
+		    device->vk(),
+		    present_semaphores[i],
+		    fmt::format("present_semaphore_{}", i)
+		);
 	}
 }
 
 void Renderer::destroy_sync_objects()
 {
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < max_frames_in_flight; i++)
 	{
-		device.destroyFence(render_fences[i]);
-		device.destroySemaphore(render_semaphores[i]);
-		device.destroySemaphore(present_semaphores[i]);
+		device->vk().destroyFence(render_fences[i]);
+		device->vk().destroySemaphore(render_semaphores[i]);
+		device->vk().destroySemaphore(present_semaphores[i]);
 	}
 }
 
-void Renderer::allocate_cmd_buffers()
+void Renderer::create_cmds(Gpu const *const gpu)
 {
-	auto const device = vk_context->get_device();
-
-	for (u32 i = 0; i < BVK_MAX_FRAMES_IN_FLIGHT; i++)
+	for (u32 i = 0; i < max_frames_in_flight; i++)
 	{
-		cmd_buffers.emplace_back(device.allocateCommandBuffers({
-		    vk_context->get_cmd_pool(i),
+		cmd_pools[i] = device->vk().createCommandPool(vk::CommandPoolCreateInfo {
+		    {},
+		    gpu->get_graphics_queue_index(),
+		});
+		debug_utils->set_object_name(
+		    device->vk(), //
+		    cmd_pools[i],
+		    fmt::format("renderer_cmd_pool_{}", i)
+		);
+
+		cmd_buffers[i] = device->vk().allocateCommandBuffers({
+		    cmd_pools[i],
 		    vk::CommandBufferLevel::ePrimary,
 		    1u,
-		})[0]);
-
-		vk_context->set_object_name(cmd_buffers[i], fmt::format("renderer_cmd_buffer_{}", i));
+		})[0];
+		debug_utils->set_object_name(
+		    device->vk(),
+		    cmd_buffers[i],
+		    fmt::format("renderer_cmd_buffer_{}", i)
+		);
 	}
 }
 
-void Renderer::free_cmd_buffers()
+void Renderer::destroy_cmds()
 {
-	auto const device = vk_context->get_device();
-	auto const cmd_pool = vk_context->get_cmd_pool(0, 0);
-
-	for (auto cmd_buffer : cmd_buffers)
-		device.freeCommandBuffers(cmd_pool, cmd_buffer);
-
-	cmd_buffers.clear();
+	for (auto const cmd_pool : cmd_pools)
+		device->vk().destroyCommandPool(cmd_pool);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

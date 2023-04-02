@@ -6,7 +6,7 @@
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
 
-BasicRendergraph::BasicRendergraph(ref<bvk::VkContext> const vk_context)
+BasicRendergraph::BasicRendergraph(bvk::VkContext const *const vk_context)
     : bvk::Rendergraph(vk_context)
 {
 }
@@ -78,7 +78,7 @@ void BasicRendergraph::update_descriptor_sets()
 
 	if (!descriptor_writes.empty())
 	{
-		device.updateDescriptorSets(descriptor_writes, {});
+		device->vk().updateDescriptorSets(descriptor_writes, {});
 		descriptor_writes.clear();
 	}
 }
@@ -181,22 +181,22 @@ void BasicRendergraph::update_for_mesh(
 
 			if (albedo_index != -1)
 			{
-				descriptor_writes.emplace_back(
-				    descriptor_set,
+				descriptor_writes.push_back({
+				    descriptor_set.vk(),
 				    U_Textures::binding,
-				    albedo_index,
+				    static_cast<u32>(albedo_index),
 				    1,
 				    vk::DescriptorType::eCombinedImageSampler,
-				    textures[albedo_index].get_descriptor_info()
-				);
+				    textures[albedo_index].get_descriptor_info(),
+				});
 
 				object.albedo_texture_index = albedo_index;
 			}
 
 			if (metallic_roughness_index != -1)
 			{
-				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				    descriptor_set,
+				descriptor_writes.push_back({
+				    descriptor_set.vk(),
 				    U_Textures::binding,
 				    static_cast<u32>(metallic_roughness_index),
 				    1,
@@ -209,8 +209,8 @@ void BasicRendergraph::update_for_mesh(
 
 			if (normal_index != -1)
 			{
-				descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-				    descriptor_set,
+				descriptor_writes.push_back({
+				    descriptor_set.vk(),
 				    U_Textures::binding,
 				    static_cast<u32>(normal_index),
 				    1,
@@ -229,8 +229,8 @@ void BasicRendergraph::update_for_skybox(SkyboxComponent const &skybox)
 {
 	auto const descriptor_set = descriptor_sets[frame_index];
 
-	descriptor_writes.emplace_back(vk::WriteDescriptorSet {
-	    descriptor_set,
+	descriptor_writes.push_back({
+	    descriptor_set.vk(),
 	    U_TextureCubes::binding,
 	    0,
 	    1,

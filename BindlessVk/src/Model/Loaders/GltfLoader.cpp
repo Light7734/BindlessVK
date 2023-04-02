@@ -8,12 +8,14 @@ namespace BINDLESSVK_NAMESPACE {
 
 GltfLoader::GltfLoader(
     VkContext const *const vk_context,
+    MemoryAllocator const *const memory_allocator,
     TextureLoader const *const texture_loader,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_texture_buffer
 )
     : vk_context(vk_context)
+    , memory_allocator(memory_allocator)
     , texture_loader(texture_loader)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
@@ -39,6 +41,8 @@ auto GltfLoader::load_from_ascii(str_view const file_path, str_view const debug_
 
 void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 {
+	auto *const debug_utils = vk_context->get_debug_utils();
+
 	tinygltf::TinyGLTF gltf_context;
 	str err, warn;
 
@@ -51,7 +55,7 @@ void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 	);
 
 	if (!warn.empty())
-		vk_context->log(LogLvl::eWarn, "gltf warning -> ", warn);
+		debug_utils->log(LogLvl::eWarn, "gltf warning -> ", warn);
 }
 
 void GltfLoader::load_textures()
@@ -139,6 +143,7 @@ void GltfLoader::write_vertex_buffer_to_gpu()
 {
 	model.vertex_buffer = new Buffer(
 	    vk_context,
+	    memory_allocator,
 	    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	    vma::AllocationCreateInfo {
 	        {},
@@ -164,6 +169,7 @@ void GltfLoader::write_index_buffer_to_gpu()
 {
 	model.index_buffer = new Buffer(
 	    vk_context,
+	    memory_allocator,
 	    vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	    vma::AllocationCreateInfo {
 	        {},
@@ -184,7 +190,7 @@ void GltfLoader::write_index_buffer_to_gpu()
 	    }
 	);
 
-	vk_context->get_device().waitIdle();
+	vk_context->get_device()->vk().waitIdle();
 }
 
 void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::Node *node)

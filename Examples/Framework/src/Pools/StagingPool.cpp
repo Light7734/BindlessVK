@@ -1,23 +1,27 @@
 #include "Framework/Pools/StagingPool.hpp"
 
-StagingPool::StagingPool(u32 count, size_t size, ref<bvk::VkContext const> vk_context)
-    : vk_context(vk_context)
+StagingPool::StagingPool(
+    u32 count,
+    size_t size,
+    bvk::VkContext const *const vk_context,
+    bvk::MemoryAllocator const *const memory_allocator
+)
 {
 	staging_buffers.reserve(count);
 
-	for (u32 i = 0; i < count; ++i) {
-		staging_buffers.emplace_back(
-		    vk_context.get(),
+	for (u32 i = 0; i < count; ++i)
+		staging_buffers.push_back({
+		    vk_context,
+		    memory_allocator,
 		    vk::BufferUsageFlagBits::eTransferSrc,
-		    vma::AllocationCreateInfo {
+		    {
 		        vma::AllocationCreateFlagBits::eHostAccessRandom,
 		        vma::MemoryUsage::eAutoPreferHost,
 		    },
 		    size,
 		    1u,
-		    fmt::format("staging_buffer_{}", i)
-		);
-	}
+		    fmt::format("staging_buffer_{}", i),
+		});
 }
 
 StagingPool::StagingPool(StagingPool &&other)
@@ -32,11 +36,6 @@ StagingPool &StagingPool::operator=(StagingPool &&rhs)
 }
 
 StagingPool::~StagingPool()
-{
-	staging_buffers.clear();
-}
-
-void StagingPool::destroy_buffers()
 {
 	staging_buffers.clear();
 }

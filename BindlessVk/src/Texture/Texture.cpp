@@ -2,11 +2,17 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Texture::Texture(Texture &&other) { *this = std::move(other); }
+Texture::Texture(Texture &&other)
+{
+	*this = std::move(other);
+}
 
 Texture &Texture::operator=(Texture &&other)
 {
-	this->vk_context = other.vk_context;
+	this->device = other.device;
+	this->debug_utils = other.debug_utils;
+	this->memory_allocator = other.memory_allocator;
+
 	this->descriptor_info = other.descriptor_info;
 	this->size = other.size;
 	this->format = other.format;
@@ -15,29 +21,24 @@ Texture &Texture::operator=(Texture &&other)
 	this->sampler = other.sampler;
 	this->image_view = other.image_view;
 	this->current_layout = other.current_layout;
-	this->image = other.image;
-	this->debug_name = other.debug_name;
+	this->image = std::move(other.image);
+	this->debug_name = std::move(other.debug_name);
 
-	other.vk_context = {};
+	other.device = {};
 
 	return *this;
 }
 
 Texture::~Texture()
 {
-	if (!vk_context)
+	if (!device)
 		return;
 
-	auto const device = vk_context->get_device();
-	auto const allocator = vk_context->get_allocator();
-
-	device.destroyImageView(image_view);
-	device.destroySampler(sampler);
-	allocator.destroyImage(image, image);
+	device->vk().destroyImageView(image_view);
+	device->vk().destroySampler(sampler);
 }
 
 void Texture::transition_layout(
-    VkContext const *const vk_context,
     vk::CommandBuffer const cmd,
     u32 const base_mip_level,
     u32 const level_count,
@@ -53,7 +54,7 @@ void Texture::transition_layout(
 		new_layout,
 		VK_QUEUE_FAMILY_IGNORED,
 		VK_QUEUE_FAMILY_IGNORED,
-		image,
+		image.vk(),
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eColor,
 		    base_mip_level,
@@ -110,7 +111,7 @@ void Texture::transition_layout(
 
 	else
 	{
-		vk_context->log(
+		debug_utils->log(
 		    LogLvl::eError,
 		    "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
 		    static_cast<i32>(current_layout),
@@ -128,9 +129,9 @@ void Texture::blit(vk::CommandBuffer const cmd, u32 const mip_index, pair<i32, i
 	auto const [mip_width, mip_height] = mip_size;
 
 	cmd.blitImage(
-	    image,
+	    image.vk(),
 	    vk::ImageLayout::eTransferSrcOptimal,
-	    image,
+	    image.vk(),
 	    vk::ImageLayout::eTransferDstOptimal,
 	    vk::ImageBlit {
 	        vk::ImageSubresourceLayers {
@@ -151,9 +152,11 @@ void Texture::blit(vk::CommandBuffer const cmd, u32 const mip_index, pair<i32, i
 	        },
 	        arr<vk::Offset3D, 2> {
 	            vk::Offset3D { 0, 0, 0 },
-	            vk::Offset3D { mip_width > 1 ? mip_width / 2 : 1,
-	                           mip_height > 1 ? mip_height / 2 : 1,
-	                           1 },
+	            vk::Offset3D {
+	                std::max(mip_width / 2, 1),
+	                std::max(mip_height / 2, 1),
+	                1,
+	            },
 	        },
 	    },
 	    vk::Filter::eLinear

@@ -7,9 +7,28 @@ namespace BINDLESSVK_NAMESPACE {
 class Instance
 {
 public:
-	Instance(vec<c_str> const &extensions, vec<c_str> const &layers);
+	struct Requirements
+	{
+		vec<c_str> extensions;
+		vec<c_str> layers;
+	};
+
+public:
+	Instance() = default;
+	Instance(Requirements const &requirements);
+
+	Instance(Instance &&other);
+	Instance &operator=(Instance &&other);
+
+	Instance(Instance const &) = delete;
+	Instance &operator=(Instance const &) = delete;
 
 	~Instance();
+
+	auto vk() const
+	{
+		return instance;
+	}
 
 	auto get_layers()
 	{
@@ -24,21 +43,6 @@ public:
 	auto get_proc_addr(str_view proc_name) const
 	{
 		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name.data());
-	}
-
-	auto enumerate_physical_devices()
-	{
-		return instance.enumeratePhysicalDevices();
-	}
-
-	auto create_debug_messenger(vk::DebugUtilsMessengerCreateInfoEXT create_info) const
-	{
-		return instance.createDebugUtilsMessengerEXT(create_info);
-	}
-
-	void destroy_debug_messenger(vk::DebugUtilsMessengerEXT messenger) const
-	{
-		instance.destroyDebugUtilsMessengerEXT(messenger);
 	}
 
 	operator vk::Instance()

@@ -7,7 +7,7 @@
 class UserInterfacePass: public bvk::Renderpass
 {
 public:
-	UserInterfacePass(bvk::VkContext *vk_context);
+	UserInterfacePass(bvk::VkContext const *vk_context);
 	~UserInterfacePass()
 	{
 	}

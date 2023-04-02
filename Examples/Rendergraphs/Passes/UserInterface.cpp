@@ -6,7 +6,8 @@
 #include <imgui.h>
 
 
-UserInterfacePass::UserInterfacePass(bvk::VkContext *const vk_context): bvk::Renderpass(vk_context)
+UserInterfacePass::UserInterfacePass(bvk::VkContext const *const vk_context)
+    : bvk::Renderpass(vk_context)
 {
 }
 

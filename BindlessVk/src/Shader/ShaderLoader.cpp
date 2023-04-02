@@ -4,13 +4,13 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-ShaderLoader::ShaderLoader(ref<VkContext const> const vk_context): vk_context(vk_context)
+ShaderLoader::ShaderLoader(VkContext const *const vk_context): vk_context(vk_context)
 {
 }
 
 auto ShaderLoader::load_from_spv(str_view const file_path) -> Shader
 {
-	SpvLoader loader(vk_context.get());
+	SpvLoader loader(vk_context);
 	return loader.load(file_path);
 }
 

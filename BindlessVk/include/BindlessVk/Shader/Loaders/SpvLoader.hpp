@@ -35,7 +35,8 @@ private:
 	    -> vk::DescriptorSetLayoutBinding;
 
 private:
-	VkContext const *const vk_context = {};
+	Device const *device = {};
+
 	Shader shader = {};
 	vec<u32> code = {};
 	SpvReflectShaderModule reflection = {};

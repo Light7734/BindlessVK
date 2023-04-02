@@ -4,13 +4,6 @@
 	#define BINDLESSVK_NAMESPACE bvk
 #endif
 
-#ifndef BVK_MAX_FRAMES_IN_FLIGHT
-	#define BVK_MAX_FRAMES_IN_FLIGHT 3
-#endif
-
-#ifndef BVK_DESIRED_SWAPCHAIN_IMAGES
-	#define BVK_DESIRED_SWAPCHAIN_IMAGES 3
-#endif
 
 #include "BindlessVk/Common/Aliases.hpp"
 #include "BindlessVk/Common/Assertions.hpp"
@@ -25,7 +18,14 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+auto constexpr max_frames_in_flight = usize { 3 };
+
 str_view constexpr default_debug_name = "unnamed";
+
+/** Severity of a log message
+ *
+ * @note Values reflect spdlog::lvl
+ */
 
 enum class LogLvl : u8
 {

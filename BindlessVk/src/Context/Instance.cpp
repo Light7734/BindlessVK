@@ -4,18 +4,40 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
 
-Instance::Instance(vec<c_str> const &extensions, vec<c_str> const &layers)
-    : extensions(extensions)
-    , layers(layers)
+Instance::Instance(Requirements const &requirements)
+    : extensions(requirements.extensions)
+    , layers(requirements.layers)
 {
 	load_functions();
+
 	check_layer_support();
 
 	create_instance();
 }
 
+Instance::Instance(Instance &&other)
+{
+	*this = std::move(other);
+}
+
+Instance &Instance::operator=(Instance &&other)
+{
+	this->instance = other.instance;
+	this->extensions = std::move(other.extensions);
+	this->layers = std::move(other.layers);
+
+	other.instance = vk::Instance {};
+	other.extensions = {};
+	other.layers = {};
+
+	return *this;
+}
+
 Instance::~Instance()
 {
+	if (!instance)
+		return;
+
 	instance.destroy();
 }
 

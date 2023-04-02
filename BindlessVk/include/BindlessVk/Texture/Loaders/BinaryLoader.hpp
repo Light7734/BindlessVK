@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
@@ -10,7 +11,11 @@ namespace BINDLESSVK_NAMESPACE {
 class BinaryLoader
 {
 public:
-	BinaryLoader(VkContext const *const vk_context, Buffer *staging_buffer);
+	BinaryLoader(
+	    VkContext const *const vk_context,
+	    MemoryAllocator const *memory_allocator,
+	    Buffer *staging_buffer
+	);
 
 	Texture load(
 	    u8 const *const pixels,
@@ -33,7 +38,8 @@ private:
 	void write_texture_data_to_gpu();
 
 private:
-	VkContext const *const vk_context = {};
+	Device const *device = {};
+	MemoryAllocator const *memory_allocator = {};
 	Buffer *const staging_buffer = {};
 
 	Texture texture = {};

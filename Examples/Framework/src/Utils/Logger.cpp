@@ -11,7 +11,6 @@ Logger::~Logger()
 	spdlog::drop_all();
 }
 
-
 void Logger::bindlessvk_callback(
     bvk::DebugCallbackSource const source,
     bvk::LogLvl const severity,
@@ -19,13 +18,19 @@ void Logger::bindlessvk_callback(
     std::any const user_data
 )
 {
-	auto const *const logger = any_cast<Logger const *const>(user_data);
+	try
+	{
+		auto const *const logger = any_cast<Logger const *const>(user_data);
 
-	auto const source_str = //
-	    source == bvk::DebugCallbackSource::eBindlessVk       ? "BindlessVk" :
-	    source == bvk::DebugCallbackSource::eValidationLayers ? "Validation Layers" :
-	                                                            "Memory Allocator";
+		auto const source_str = //
+		    source == bvk::DebugCallbackSource::eBindlessVk       ? "BindlessVk" :
+		    source == bvk::DebugCallbackSource::eValidationLayers ? "Validation Layers" :
+		                                                            "Memory Allocator";
 
-
-	logger->log((spdlog::level::level_enum)(int)severity, "[{}]: {}", source_str, message);
+		logger->log((spdlog::level::level_enum)(int)severity, "[{}]: {}", source_str, message);
+	}
+	catch (std::bad_any_cast exception)
+	{
+		std::cout << "BAD ANY CAST" << std::endl;
+	}
 }

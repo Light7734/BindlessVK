@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
@@ -10,21 +11,24 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-/**
- * @todo Implement load_from_binary
- * @todo Implement parse_binary_file
- */
 class GltfLoader
 {
 public:
 	GltfLoader(
 	    VkContext const *vk_context,
+	    MemoryAllocator const *memory_allocator,
 	    TextureLoader const *texture_loader,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_texture_buffer
 	);
-	GltfLoader() = default;
+
+	GltfLoader(GltfLoader &&) = delete;
+	GltfLoader &operator=(GltfLoader &&) = delete;
+
+	GltfLoader(GltfLoader const &) = delete;
+	GltfLoader &operator=(GltfLoader const &) = delete;
+
 	~GltfLoader() = default;
 
 	auto load_from_ascii(str_view file_path, str_view debug_name) -> Model;
@@ -64,8 +68,10 @@ private:
 	auto node_has_any_mesh(tinygltf::Node const &gltf_node) -> bool;
 
 private:
-	VkContext const *const vk_context = {};
-	TextureLoader const *const texture_loader = {};
+	VkContext const *vk_context = {};
+
+	MemoryAllocator const *memory_allocator = {};
+	TextureLoader const *texture_loader = {};
 
 	tinygltf::Model gltf_model = {};
 	Model model = {};

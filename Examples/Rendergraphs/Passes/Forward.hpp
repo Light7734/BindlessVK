@@ -6,7 +6,7 @@
 class Forwardpass: public bvk::Renderpass
 {
 public:
-	Forwardpass(bvk::VkContext *vk_context);
+	Forwardpass(bvk::VkContext const *vk_context);
 
 	~Forwardpass() = default;
 

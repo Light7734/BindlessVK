@@ -8,17 +8,20 @@ void build_layout()
 
 namespace BINDLESSVK_NAMESPACE {
 ShaderPipeline::ShaderPipeline(
-    VkContext *const vk_context,
+    VkContext const *const vk_context,
+    LayoutAllocator *const layout_allocator,
     vec<Shader *> const &shaders,
     ShaderPipeline::Configuration const &configuration,
     DescriptorSetLayoutWithHash graph_descriptor_set_layout,
     DescriptorSetLayoutWithHash pass_descriptor_set_layout,
-    str_view const debug_name /* = "" */
+    str_view const debug_name /* = default_debug_name */
 )
-    : vk_context(vk_context)
+    : device(vk_context->get_device())
+    , surface(vk_context->get_surface())
+    , debug_utils(vk_context->get_debug_utils())
+    , layout_allocator(layout_allocator)
     , debug_name(debug_name)
 {
-	vk_context->log(LogLvl::eTrace, "creating pipeline: {}", debug_name);
 	create_descriptor_set_layout(shaders);
 	create_pipeline_layout(graph_descriptor_set_layout, pass_descriptor_set_layout);
 
@@ -30,32 +33,31 @@ ShaderPipeline::ShaderPipeline(ShaderPipeline &&effect)
 	*this = std::move(effect);
 }
 
-ShaderPipeline &ShaderPipeline::operator=(ShaderPipeline &&effect)
+ShaderPipeline &ShaderPipeline::operator=(ShaderPipeline &&other)
 {
-	this->vk_context = effect.vk_context;
-	this->pipeline = effect.pipeline;
-	this->pipeline_layout = effect.pipeline_layout;
-	this->descriptor_set_layout = effect.descriptor_set_layout;
+	this->device = other.device;
+	this->surface = other.surface;
+	this->debug_utils = other.debug_utils;
+	this->layout_allocator = other.layout_allocator;
+	this->pipeline = other.pipeline;
+	this->pipeline_layout = other.pipeline_layout;
+	this->descriptor_set_layout = other.descriptor_set_layout;
 
-	effect.vk_context = {};
+	other.device = {};
 
 	return *this;
 }
 
 ShaderPipeline::~ShaderPipeline()
 {
-	if (!vk_context)
+	if (!device)
 		return;
 
-	auto const device = vk_context->get_device();
-
-	device.destroyPipeline(pipeline);
+	device->vk().destroyPipeline(pipeline);
 }
 
 void ShaderPipeline::create_descriptor_set_layout(vec<Shader *> const &shaders)
 {
-	auto *const layout_allocator = vk_context->get_layout_allocator();
-
 	auto const shader_set_bindings = combine_descriptor_sets_bindings(shaders);
 
 	if (shader_set_bindings.empty())
@@ -69,8 +71,10 @@ void ShaderPipeline::create_descriptor_set_layout(vec<Shader *> const &shaders)
 	        vk::DescriptorBindingFlagBits::ePartiallyBound
 	    )
 	);
-	vk_context->set_object_name(
-	    descriptor_set_layout,
+
+	debug_utils->set_object_name(
+	    device->vk(),
+	    descriptor_set_layout.vk(),
 	    fmt::format("{}_descriptor_set_layout", debug_name)
 	);
 }
@@ -80,7 +84,6 @@ void ShaderPipeline::create_pipeline_layout(
     DescriptorSetLayoutWithHash pass_descriptor_set_layout
 )
 {
-	auto *layout_allocator = vk_context->get_layout_allocator();
 	pipeline_layout = layout_allocator->goc_pipeline_layout(
 	    {},
 	    graph_descriptor_set_layout, // set = 0 -> per graph(frame)
@@ -88,7 +91,11 @@ void ShaderPipeline::create_pipeline_layout(
 	    this->descriptor_set_layout  // set = 2 -> per shader
 	);
 
-	vk_context->set_object_name(pipeline_layout, fmt::format("{}_pipeline_layout", debug_name));
+	debug_utils->set_object_name(
+	    device->vk(),
+	    pipeline_layout,
+	    fmt::format("{}_pipeline_layout", debug_name)
+	);
 }
 
 void ShaderPipeline::create_pipeline(
@@ -96,14 +103,12 @@ void ShaderPipeline::create_pipeline(
     ShaderPipeline::Configuration const configuration
 )
 {
-	auto const device = vk_context->get_device();
-	auto const surface = vk_context->get_surface();
-	auto const surface_color_format = surface.get_color_format();
+	auto const surface_color_format = surface->get_color_format();
 
 	auto const pipeline_rendering_info = vk::PipelineRenderingCreateInfo {
 		{},
 		surface_color_format,
-		vk_context->get_depth_format(),
+		surface->get_depth_format(),
 		{},
 	};
 
@@ -145,12 +150,12 @@ void ShaderPipeline::create_pipeline(
 	};
 
 	auto const [result, graphics_pipeline] =
-	    device.createGraphicsPipeline({}, graphics_pipeline_info);
+	    device->vk().createGraphicsPipeline({}, graphics_pipeline_info);
 
 	assert_false(result);
 	pipeline = graphics_pipeline;
 
-	vk_context->set_object_name(pipeline, fmt::format("{}_pipeline", debug_name));
+	debug_utils->set_object_name(device->vk(), pipeline, fmt::format("{}_pipeline", debug_name));
 }
 
 auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const

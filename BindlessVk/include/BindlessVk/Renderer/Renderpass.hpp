@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Allocators/DescriptorAllocator.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 
@@ -14,7 +15,7 @@ public:
 	friend class RenderpassBlueprint;
 
 public:
-	Renderpass(VkContext *vk_context): vk_context(vk_context)
+	Renderpass(VkContext const *vk_context): vk_context(vk_context)
 	{
 	}
 
@@ -102,32 +103,32 @@ public:
 	}
 
 protected:
-	VkContext *vk_context;
+	VkContext const *vk_context = {};
 
-	str name;
+	str name = {};
 
-	std::any user_data;
+	std::any user_data = {};
 
-	vec<Attachment> attachments;
+	vec<Attachment> attachments = {};
 
-	vec<Buffer> buffer_inputs;
+	vec<Buffer> buffer_inputs = {};
 
-	vec<AllocatedDescriptorSet> descriptor_sets;
-	vk::DescriptorSetLayout descriptor_set_layout;
-	vk::PipelineLayout pipeline_layout;
+	vec<AllocatedDescriptorSet> descriptor_sets = {};
+	vk::DescriptorSetLayout descriptor_set_layout = {};
+	vk::PipelineLayout pipeline_layout = {};
 
-	vec<vk::Format> color_attachment_formats;
-	vk::Format depth_attachment_format;
+	vec<vk::Format> color_attachment_formats = {};
+	vk::Format depth_attachment_format = {};
 
-	vk::SampleCountFlagBits sample_count;
+	vk::SampleCountFlagBits sample_count = {};
 
-	vk::CommandBufferInheritanceRenderingInfo cmd_buffer_inheritance_rendering_info;
-	vk::CommandBufferInheritanceInfo cmd_buffer_inheritance_info;
-	vk::CommandBufferBeginInfo cmd_buffer_begin_info;
+	vk::CommandBufferInheritanceRenderingInfo cmd_buffer_inheritance_rendering_info = {};
+	vk::CommandBufferInheritanceInfo cmd_buffer_inheritance_info = {};
+	vk::CommandBufferBeginInfo cmd_buffer_begin_info = {};
 
-	vk::DebugUtilsLabelEXT update_label;
-	vk::DebugUtilsLabelEXT barrier_label;
-	vk::DebugUtilsLabelEXT render_label;
+	vk::DebugUtilsLabelEXT update_label = {};
+	vk::DebugUtilsLabelEXT barrier_label = {};
+	vk::DebugUtilsLabelEXT render_label = {};
 };
 
 class RenderpassBlueprint
@@ -242,9 +243,9 @@ public:
 	}
 
 private:
-	str name;
+	str name = {};
 
-	std::any user_data;
+	std::any user_data = {};
 
 	vec<Attachment> color_attachments = {};
 	Attachment depth_attachment = {};

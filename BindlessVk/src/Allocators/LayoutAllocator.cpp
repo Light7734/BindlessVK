@@ -2,18 +2,33 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-void LayoutAllocator::init(vk::Device device)
+LayoutAllocator::LayoutAllocator(VkContext const *const context): device(context->get_device())
 {
-	this->device = device;
 }
 
-void LayoutAllocator::destroy()
+LayoutAllocator::LayoutAllocator(LayoutAllocator &&other)
 {
+	*this = std::move(other);
+}
+
+LayoutAllocator &LayoutAllocator::operator=(LayoutAllocator &&other)
+{
+	this->device = other.device;
+	other.device = {};
+
+	return *this;
+}
+
+LayoutAllocator::~LayoutAllocator()
+{
+	if (!device)
+		return;
+
 	for (auto const &[hash, layout] : descriptor_set_layouts)
-		device.destroyDescriptorSetLayout(layout);
+		device->vk().destroyDescriptorSetLayout(layout);
 
 	for (auto const &[hash, layout] : pipeline_layouts)
-		device.destroyPipelineLayout(layout);
+		device->vk().destroyPipelineLayout(layout);
 }
 
 auto LayoutAllocator::goc_descriptor_set_layout(
@@ -30,7 +45,7 @@ auto LayoutAllocator::goc_descriptor_set_layout(
 
 		descriptor_set_layouts.emplace(
 		    hash,
-		    device.createDescriptorSetLayout({
+		    device->vk().createDescriptorSetLayout({
 		        layout_flags,
 		        bindings,
 		        &extended_info,
@@ -61,17 +76,17 @@ auto LayoutAllocator::goc_pipeline_layout(
 		set_layouts.reserve(3);
 
 		if (graph_descriptor_set_layout)
-			set_layouts.push_back(graph_descriptor_set_layout);
+			set_layouts.push_back(graph_descriptor_set_layout.vk());
 
 		if (pass_descriptor_set_layout)
-			set_layouts.push_back(pass_descriptor_set_layout);
+			set_layouts.push_back(pass_descriptor_set_layout.vk());
 
 		if (shader_descriptor_set_layout)
-			set_layouts.push_back(shader_descriptor_set_layout);
+			set_layouts.push_back(shader_descriptor_set_layout.vk());
 
 		pipeline_layouts.emplace(
 		    hash,
-		    device.createPipelineLayout(vk::PipelineLayoutCreateInfo {
+		    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
 		        layout_flags,
 		        set_layouts,
 		    })

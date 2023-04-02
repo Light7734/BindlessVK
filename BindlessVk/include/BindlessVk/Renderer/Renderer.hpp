@@ -1,16 +1,62 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Context/Swapchain.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Renderer/Rendergraph.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** @brief
- *
- */
 class Renderer
 {
+public:
+	/** Default constructor */
+	Renderer() = default;
+
+	/** Argumented constructor
+	 *
+	 * @param vk_context Pointer to the vk context
+	 * @param memory_allocator Pointer to the memory allocator
+	 */
+	Renderer(VkContext const *vk_context, MemoryAllocator *memory_allocator);
+
+	/** Move constructor */
+	Renderer(Renderer &&other);
+
+	/** Move assignment operator */
+	Renderer &operator=(Renderer &&other);
+
+	/** Deleted copy constructor */
+	Renderer(Renderer const &) = delete;
+
+	/** Deleted copy assignment operator  */
+	Renderer &operator=(Renderer const &) = delete;
+
+	/** Destructor */
+	~Renderer();
+
+	/** Renders a graph and presents it
+	 *
+	 * @param render_graph The graph to render
+	 *
+	 * @note also calls on_update for the graph's passes
+	 *
+	 * @warn may block execution to wait for the frame's fence
+	 */
+	void render_graph(Rendergraph *render_graph);
+
+	/** Returns pointer to resources */
+	auto get_resources()
+	{
+		return &resources;
+	}
+
+	/** Checks swapchain validity */
+	bool is_swapchain_invalid() const
+	{
+		return swapchain.is_invalid();
+	}
+
 private:
 	struct DynamicPassInfo
 	{
@@ -23,17 +69,6 @@ private:
 			return rendering_info;
 		}
 	};
-
-public:
-	Renderer(ref<VkContext> vk_context);
-	~Renderer();
-
-	void render_graph(Rendergraph *render_graph);
-
-	auto get_resources()
-	{
-		return &resources;
-	}
 
 private:
 	void wait_for_frame_fence();
@@ -54,21 +89,27 @@ private:
 	void create_sync_objects();
 	void destroy_sync_objects();
 
-	void allocate_cmd_buffers();
-	void free_cmd_buffers();
+	void create_cmds(Gpu const *gpu);
+	void destroy_cmds();
 
 private:
-	ref<VkContext> vk_context = {};
+	Device const *device = {};
+	Surface const *surface = {};
+	Queues const *queues = {};
+	DebugUtils const *debug_utils = {};
+	Swapchain swapchain = {};
+
 	vec<tuple<u32, u32, u32>> used_attachment_indices = {};
 
-	RenderResources resources;
-	arr<DynamicPassInfo, BVK_MAX_FRAMES_IN_FLIGHT> dynamic_pass_info;
+	RenderResources resources = {};
+	arr<DynamicPassInfo, max_frames_in_flight> dynamic_pass_info;
 
-	arr<vk::Fence, BVK_MAX_FRAMES_IN_FLIGHT> render_fences = {};
-	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> render_semaphores = {};
-	arr<vk::Semaphore, BVK_MAX_FRAMES_IN_FLIGHT> present_semaphores = {};
+	arr<vk::Fence, max_frames_in_flight> render_fences = {};
+	arr<vk::Semaphore, max_frames_in_flight> render_semaphores = {};
+	arr<vk::Semaphore, max_frames_in_flight> present_semaphores = {};
 
-	vec<vk::CommandBuffer> cmd_buffers = {};
+	arr<vk::CommandPool, max_frames_in_flight> cmd_pools = {};
+	arr<vk::CommandBuffer, max_frames_in_flight> cmd_buffers = {};
 
 	u32 frame_index = 0;
 };

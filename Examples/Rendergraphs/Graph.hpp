@@ -47,7 +47,7 @@ public:
 	};
 
 public:
-	BasicRendergraph(ref<bvk::VkContext> vk_context);
+	BasicRendergraph(bvk::VkContext const *const vk_context);
 
 	~BasicRendergraph() = default;
 

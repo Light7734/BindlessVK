@@ -26,9 +26,9 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	CVar::draw_imgui_editor();
 
 	camera_controller.update();
-	renderer->render_graph(render_graph.get());
+	renderer.render_graph(render_graph.get());
 
-	if (vk_context->get_swapchain()->is_invalid())
+	if (renderer.is_swapchain_invalid())
 		assert_fail("swapchain-recreation is currently nuked");
 }
 
@@ -52,19 +52,15 @@ void DevelopmentExampleApplication::load_shaders()
 
 void DevelopmentExampleApplication::load_shader_effects()
 {
-	auto const device = vk_context->get_device();
-
-	auto const descriptor_set_bindings = BasicRendergraph::get_descriptor_set_bindings();
-	auto const layout_allocator = vk_context->get_layout_allocator();
-
 	auto const [bindings, flags] = BasicRendergraph::get_descriptor_set_bindings();
-	auto const graph_set_layout = layout_allocator->goc_descriptor_set_layout({}, bindings, flags);
+	auto const graph_set_layout = layout_allocator.goc_descriptor_set_layout({}, bindings, flags);
 
 	shader_pipelines.emplace(
 	    hash_str("opaque_mesh"),
 
-	    bvk::ShaderPipeline(
-	        vk_context.get(),
+	    bvk::ShaderPipeline {
+	        &vk_context,
+	        &layout_allocator,
 	        {
 	            &shaders[hash_str("vertex")],
 	            &shaders[hash_str("pixel")],
@@ -72,15 +68,16 @@ void DevelopmentExampleApplication::load_shader_effects()
 	        shader_effect_configurations[hash_str("opaque_mesh")],
 	        graph_set_layout,
 	        {},
-	        "opaque_mesh"
-	    )
+	        "opaque_mesh",
+	    }
 	);
 
 	shader_pipelines.emplace(
 	    hash_str("skybox"),
 
-	    bvk::ShaderPipeline(
-	        vk_context.get(),
+	    bvk::ShaderPipeline {
+	        &vk_context,
+	        &layout_allocator,
 	        {
 	            &shaders[hash_str("skybox_vertex")],
 	            &shaders[hash_str("skybox_fragment")],
@@ -88,8 +85,8 @@ void DevelopmentExampleApplication::load_shader_effects()
 	        shader_effect_configurations[hash_str("skybox")],
 	        graph_set_layout,
 	        {},
-	        "skybox"
-	    )
+	        "skybox",
+	    }
 	);
 }
 
@@ -125,7 +122,7 @@ void DevelopmentExampleApplication::load_pipeline_configuration()
 		},
 		vk::PipelineMultisampleStateCreateInfo {
 		    {},
-		    vk_context->get_gpu().get_max_color_and_depth_samples(),
+		    gpu.get_max_color_and_depth_samples(),
 		    VK_FALSE,
 		    {},
 		    VK_FALSE,
@@ -193,7 +190,7 @@ void DevelopmentExampleApplication::load_pipeline_configuration()
 		},
 		vk::PipelineMultisampleStateCreateInfo {
 		    {},
-		    vk_context->get_gpu().get_max_color_and_depth_samples(),
+		    gpu.get_max_color_and_depth_samples(),
 		    VK_FALSE,
 		    {},
 		    VK_FALSE,
@@ -236,16 +233,20 @@ void DevelopmentExampleApplication::load_materials()
 {
 	materials.emplace(
 	    hash_str("opaque_mesh"),
-	    bvk::Material(
-	        vk_context.get(),
+	    bvk::Material {
+	        &descriptor_allocator,
 	        &shader_pipelines.at(hash_str("opaque_mesh")),
-	        descriptor_pool
-	    )
+	        descriptor_pool,
+	    }
 	);
 
 	materials.emplace(
 	    hash_str("skybox"),
-	    bvk::Material(vk_context.get(), &shader_pipelines.at(hash_str("skybox")), descriptor_pool)
+	    bvk::Material {
+	        &descriptor_allocator,
+	        &shader_pipelines.at(hash_str("skybox")),
+	        descriptor_pool,
+	    }
 	);
 }
 
@@ -342,11 +343,9 @@ void DevelopmentExampleApplication::load_entities()
 
 auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::RenderpassBlueprint
 {
-	auto const &surface = vk_context->get_surface();
-
 	auto const color_format = surface.get_color_format();
-	auto const depth_format = vk_context->get_depth_format();
-	auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
+	auto const depth_format = surface.get_depth_format();
+	auto const sample_count = gpu.get_max_color_and_depth_samples();
 
 	auto const color_output_hash = hash_str("forward_color_out");
 	auto const depth_attachment_hash = hash_str("forward_depth");
@@ -384,10 +383,8 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 
 auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::RenderpassBlueprint
 {
-	auto const &surface = vk_context->get_surface();
-
 	auto const color_format = surface.get_color_format();
-	auto const sample_count = vk_context->get_gpu().get_max_color_and_depth_samples();
+	auto const sample_count = gpu.get_max_color_and_depth_samples();
 
 	auto const color_output_hash = hash_str("uipass_color_out");
 	auto const color_output_input_hash = hash_str("forward_color_out");
@@ -418,10 +415,14 @@ void DevelopmentExampleApplication::create_render_graph()
 	auto const forwrard_pass_blueprint = create_forward_pass_blueprint();
 	auto const ui_pass_blueprint = create_ui_pass_blueprint();
 
-	auto builder = bvk::RenderGraphBuilder { vk_context };
+	auto builder = bvk::RenderGraphBuilder {
+		&vk_context,
+		&memory_allocator,
+		&descriptor_allocator,
+	};
 
 	builder.set_type<BasicRendergraph>()
-	    .set_resources(renderer->get_resources())
+	    .set_resources(renderer.get_resources())
 	    .set_user_data(&scene)
 	    .set_update_label(BasicRendergraph::get_update_label())
 	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
@@ -451,14 +452,14 @@ void DevelopmentExampleApplication::create_render_graph()
 	    })
 	    .add_texture_input({
 	        "textures",
-	        3,
+	        BasicRendergraph::U_Textures::binding,
 	        10'000,
 	        vk::DescriptorType::eCombinedImageSampler,
 	        vk::ShaderStageFlagBits::eFragment,
 	    })
 	    .add_texture_input({
 	        "texture_cubes",
-	        4,
+	        BasicRendergraph::U_TextureCubes::binding,
 	        1'000,
 	        vk::DescriptorType::eCombinedImageSampler,
 	        vk::ShaderStageFlagBits::eFragment,

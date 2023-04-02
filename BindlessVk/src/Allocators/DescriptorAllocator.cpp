@@ -2,16 +2,37 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-void DescriptorAllocator::init(vk::Device const device)
+DescriptorAllocator::DescriptorAllocator(VkContext const *const vk_context)
+    : device(vk_context->get_device())
 {
-	this->device = device;
 	grab_or_create_new_pool();
 }
 
-void DescriptorAllocator::destroy()
+DescriptorAllocator::DescriptorAllocator(DescriptorAllocator &&other)
 {
+	*this = std::move(other);
+}
+
+DescriptorAllocator &DescriptorAllocator::operator=(DescriptorAllocator &&other)
+{
+	this->device = other.device;
+	this->active_pools = std::move(other.active_pools);
+	this->free_pools = std::move(other.free_pools);
+	this->pool_counter = other.pool_counter;
+	this->current_pool = this->active_pools.end() - 1;
+
+	other.device = {};
+
+	return *this;
+}
+
+DescriptorAllocator::~DescriptorAllocator()
+{
+	if (!device)
+		return;
+
 	for (auto pool : active_pools)
-		device.destroyDescriptorPool(pool);
+		device->vk().destroyDescriptorPool(pool);
 }
 
 AllocatedDescriptorSet DescriptorAllocator::allocate_descriptor_set(
@@ -34,12 +55,12 @@ AllocatedDescriptorSet DescriptorAllocator::allocate_descriptor_set(
 	}
 
 	current_pool->set_count++;
-	return { set, *current_pool };
+	return set;
 }
 
 void DescriptorAllocator::release_descriptor_set(AllocatedDescriptorSet const &set)
 {
-	auto const pool = find_pool(set.descriptor_pool);
+	auto const pool = find_pool(set.get_pool());
 	pool->set_count--;
 
 	if (pool->is_eligable_for_destruction())
@@ -50,7 +71,7 @@ auto DescriptorAllocator::try_allocate_descriptor_set(vk::DescriptorSetAllocateI
 ) -> AllocatedDescriptorSet
 {
 	auto set = vk::DescriptorSet {};
-	auto const result = device.allocateDescriptorSets(&alloc_info, &set);
+	auto const result = device->vk().allocateDescriptorSets(&alloc_info, &set);
 
 	return result == vk::Result::eSuccess ? AllocatedDescriptorSet { set, *current_pool } :
 	                                        AllocatedDescriptorSet {};
@@ -97,14 +118,14 @@ void DescriptorAllocator::create_new_pools()
 
 	auto const flags = vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind;
 
-	free_pools.emplace_back(device.createDescriptorPool({ flags, 100, pool_sizes }));
-	free_pools.emplace_back(device.createDescriptorPool({ flags, 100, pool_sizes }));
-	free_pools.emplace_back(device.createDescriptorPool({ flags, 100, pool_sizes }));
+	free_pools.emplace_back(device->vk().createDescriptorPool({ flags, 100, pool_sizes }));
+	free_pools.emplace_back(device->vk().createDescriptorPool({ flags, 100, pool_sizes }));
+	free_pools.emplace_back(device->vk().createDescriptorPool({ flags, 100, pool_sizes }));
 }
 
 void DescriptorAllocator::destroy_pool(vec_it<Pool> pool)
 {
-	device.destroyDescriptorPool(*pool);
+	device->vk().destroyDescriptorPool(*pool);
 	active_pools.erase(pool);
 	current_pool = active_pools.end() - 1;
 }

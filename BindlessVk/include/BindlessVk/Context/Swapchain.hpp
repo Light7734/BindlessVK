@@ -1,6 +1,7 @@
+#pragma once
+
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Context/Queues.hpp"
-#include "BindlessVk/Context/Surface.hpp"
+#include "BindlessVk/Context/VkContext.hpp"
 
 #ifndef DESIRED_SWAPCHAIN_IMAGES
 	#define DESIRED_SWAPCHAIN_IMAGES 3
@@ -11,37 +12,64 @@ namespace BINDLESSVK_NAMESPACE {
 class Swapchain
 {
 public:
-	void init(vk::Device device, Surface surface, Queues queues);
-	void destroy();
+	/** Default constructor */
+	Swapchain() = default;
 
+	/** Argumented constructor
+	 *
+	 * @param vk_context Pointer to the vk context
+	 */
+	Swapchain(VkContext const *vk_context);
+
+	/** Move constructor */
+	Swapchain(Swapchain &&other);
+
+	/** Move assignment operator */
+	Swapchain &operator=(Swapchain &&other);
+
+	/** Deleted copy constructor */
+	Swapchain(Swapchain const &) = delete;
+
+	/** Deleted copy assingment operator */
+	Swapchain &operator=(Swapchain const &) = delete;
+
+	/** Destructor */
+	~Swapchain();
+
+	/** Trivial setter for invalid (always sets to true) */
 	void invalidate()
 	{
 		invalid = true;
 	}
 
+	/** Trivial accessor for the underyling swapchain */
+	auto vk() const
+	{
+		return swapchain;
+	}
+
+	/** Trivial accessor for images */
 	auto get_images() const
 	{
 		return images;
 	}
 
+	/** Trivial accessor for image_views */
 	auto get_image_views() const
 	{
 		return image_views;
 	}
 
+	/** Returns images.size(), should be the same as get_image_views().size() */
 	auto get_image_count() const
 	{
 		return images.size();
 	}
 
+	/** Trivial accessor for invalid */
 	auto is_invalid() const
 	{
 		return invalid;
-	}
-
-	operator vk::SwapchainKHR() const
-	{
-		return swapchain;
 	}
 
 private:
@@ -55,12 +83,16 @@ private:
 	void destroy_image_views();
 
 private:
-	vk::Device device = {};
+	Device const *device = {};
+	Surface const *surface = {};
+	Queues const *queues = {};
+	DebugUtils const *debug_utils = {};
+
 	vk::SwapchainKHR swapchain = {};
-	Surface surface = {};
-	Queues queues = {};
+
 	vec<vk::Image> images = {};
 	vec<vk::ImageView> image_views = {};
+
 	bool invalid = {};
 };
 

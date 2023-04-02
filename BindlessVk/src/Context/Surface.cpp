@@ -2,29 +2,48 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-void Surface::init_with_instance(
-    vk::Instance const instance,
-    fn<vk::SurfaceKHR(vk::Instance)> const create_window_surface_func,
-    fn<vk::Extent2D()> const fn_get_framebuffer_extent
+Surface::Surface(
+    WindowSurface *const window_surface,
+    Gpu const *const gpu,
+    fn<vk::Extent2D()> get_framebuffer_extent,
+    fn<u32(vk::PresentModeKHR)> calculate_present_mode_score,
+    fn<u32(vk::SurfaceFormatKHR)> calculate_format_score
 )
+    : surface(window_surface->surface)
+    , capabilities(gpu->vk().getSurfaceCapabilitiesKHR(surface))
+    , fn_get_framebuffer_extent(get_framebuffer_extent)
 {
-	this->instance = instance;
-	this->fn_get_framebuffer_extent = fn_get_framebuffer_extent;
-
-	surface = create_window_surface_func(instance);
-}
-
-void Surface::init_with_gpu(Gpu const &gpu)
-{
-	capabilities = gpu.get_surface_capabilities();
-	select_best_surface_format(gpu);
-	select_best_present_mode(gpu);
+	select_best_surface_format(calculate_format_score, gpu);
+	select_best_present_mode(calculate_present_mode_score, gpu);
+	select_best_depth_format(gpu);
 	update_framebuffer_extent();
 }
 
-void Surface::select_best_surface_format(Gpu const &gpu)
+Surface::Surface(Surface &&other)
 {
-	auto const supported_formats = gpu.get_surface_formats();
+	*this = std::move(other);
+}
+
+Surface &Surface::operator=(Surface &&other)
+{
+	this->surface = other.surface;
+	this->capabilities = other.capabilities;
+	this->color_format = other.color_format;
+	this->depth_format = other.depth_format;
+	this->color_space = other.color_space;
+	this->present_mode = other.present_mode;
+	this->framebuffer_extent = other.framebuffer_extent;
+	this->fn_get_framebuffer_extent = other.fn_get_framebuffer_extent;
+
+	return *this;
+}
+
+void Surface::select_best_surface_format(
+    fn<u32(vk::SurfaceFormatKHR)> calculate_format_score,
+    Gpu const *const gpu
+)
+{
+	auto const supported_formats = gpu->vk().getSurfaceFormatsKHR(surface);
 
 	auto selected_surface_format = supported_formats[0]; // default
 	for (auto const &format : supported_formats)
@@ -36,18 +55,42 @@ void Surface::select_best_surface_format(Gpu const &gpu)
 			break;
 		}
 	}
+
 	color_format = selected_surface_format.format;
 	color_space = selected_surface_format.colorSpace;
 }
 
-void Surface::select_best_present_mode(Gpu const &gpu)
+void Surface::select_best_present_mode(
+    fn<u32(vk::PresentModeKHR)> calculate_present_mode,
+    Gpu const *const gpu
+)
 {
-	auto const supported_present_modes = gpu.get_surface_present_modes();
+	auto const supported_present_modes = gpu->vk().getSurfacePresentModesKHR(surface);
 	present_mode = supported_present_modes[0]; // default
 
 	for (auto const &supported_present_mode : supported_present_modes)
 		if (present_mode == vk::PresentModeKHR::eFifo)
 			present_mode = supported_present_mode;
+}
+
+void Surface::select_best_depth_format(Gpu const *const gpu)
+{
+	auto const properties = gpu->vk().getProperties();
+	auto const formats = arr<vk::Format, 3> {
+		vk::Format::eD32Sfloat,
+		vk::Format::eD32SfloatS8Uint,
+		vk::Format::eD24UnormS8Uint,
+	};
+
+	depth_format = formats[0]; // default
+	for (auto const format : formats)
+	{
+		auto const format_properties = gpu->vk().getFormatProperties(format);
+		if ((format_properties.optimalTilingFeatures &
+		     vk::FormatFeatureFlagBits::eDepthStencilAttachment) ==
+		    vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+			depth_format = format;
+	}
 }
 
 void Surface::update_framebuffer_extent()
@@ -57,11 +100,6 @@ void Surface::update_framebuffer_extent()
 	    capabilities.minImageExtent,
 	    capabilities.maxImageExtent
 	);
-}
-
-void Surface::destroy()
-{
-	instance.destroySurfaceKHR(surface);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

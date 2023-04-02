@@ -2,10 +2,18 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-BinaryLoader::BinaryLoader(VkContext const *const vk_context, Buffer *staging_buffer)
-    : vk_context(vk_context)
+BinaryLoader::BinaryLoader(
+    VkContext const *const vk_context,
+    MemoryAllocator const *const memory_allocator,
+    Buffer *const staging_buffer
+)
+    : device(vk_context->get_device())
+    , memory_allocator(memory_allocator)
     , staging_buffer(staging_buffer)
 {
+	texture.device = device;
+	texture.debug_utils = vk_context->get_debug_utils();
+	texture.memory_allocator = memory_allocator;
 }
 
 Texture BinaryLoader::load(
@@ -18,7 +26,6 @@ Texture BinaryLoader::load(
     str_view const debug_name
 )
 {
-	texture.vk_context = vk_context;
 	texture.size = { width, height };
 	texture.format = vk::Format::eR8G8B8A8Srgb;
 	texture.mip_levels = std::floor(std::log2(std::max(width, height))) + 1;
@@ -39,41 +46,43 @@ void BinaryLoader::create_image()
 {
 	auto const [width, height] = texture.size;
 
-	texture.image = vk_context->get_allocator().createImage(
-	    vk::ImageCreateInfo {
-	        {},
-	        vk::ImageType::e2D,
-	        vk::Format::eR8G8B8A8Srgb,
-	        vk::Extent3D {
-	            width,
-	            height,
-	            1u,
-	        },
-	        texture.mip_levels,
-	        1u,
-	        vk::SampleCountFlagBits::e1,
-	        vk::ImageTiling::eOptimal,
-	        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
-	            vk::ImageUsageFlagBits::eSampled,
-	        vk::SharingMode::eExclusive,
-	        0u,
-	        nullptr,
-	        vk::ImageLayout::eUndefined,
-	    },
+	texture.image = Image {
+		memory_allocator,
 
-	    vma::AllocationCreateInfo {
-	        {},
-	        vma::MemoryUsage::eGpuOnly,
-	        vk::MemoryPropertyFlagBits::eDeviceLocal,
-	    }
-	);
+		vk::ImageCreateInfo {
+		    {},
+		    vk::ImageType::e2D,
+		    vk::Format::eR8G8B8A8Srgb,
+		    vk::Extent3D {
+		        width,
+		        height,
+		        1u,
+		    },
+		    texture.mip_levels,
+		    1u,
+		    vk::SampleCountFlagBits::e1,
+		    vk::ImageTiling::eOptimal,
+		    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
+		        vk::ImageUsageFlagBits::eSampled,
+		    vk::SharingMode::eExclusive,
+		    0u,
+		    nullptr,
+		    vk::ImageLayout::eUndefined,
+		},
+
+		vma::AllocationCreateInfo {
+		    {},
+		    vma::MemoryUsage::eGpuOnly,
+		    vk::MemoryPropertyFlagBits::eDeviceLocal,
+		},
+	};
 }
 
 void BinaryLoader::create_image_view()
 {
-	texture.image_view = vk_context->get_device().createImageView(vk::ImageViewCreateInfo {
+	texture.image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
-	    texture.image,
+	    texture.image.vk(),
 	    vk::ImageViewType::e2D,
 	    vk::Format::eR8G8B8A8Srgb,
 	    vk::ComponentMapping {
@@ -96,7 +105,7 @@ void BinaryLoader::create_image_view()
 
 void BinaryLoader::create_sampler()
 {
-	texture.sampler = vk_context->get_device().createSampler(vk::SamplerCreateInfo {
+	texture.sampler = device->vk().createSampler(vk::SamplerCreateInfo {
 	    {},
 	    vk::Filter::eLinear,
 	    vk::Filter::eLinear,
@@ -126,11 +135,10 @@ void BinaryLoader::stage_texture_data(u8 const *const pixels, vk::DeviceSize siz
 
 void BinaryLoader::write_texture_data_to_gpu()
 {
-	vk_context->immediate_submit([&](vk::CommandBuffer cmd) {
+	device->immediate_submit([&](vk::CommandBuffer cmd) {
 		auto const [width, height] = texture.size;
 
 		texture.transition_layout(
-		    vk_context,
 		    cmd,
 		    0u,
 		    texture.mip_levels,
@@ -140,8 +148,8 @@ void BinaryLoader::write_texture_data_to_gpu()
 
 
 		cmd.copyBufferToImage(
-		    *staging_buffer->get_buffer(),
-		    texture.image,
+		    *staging_buffer->vk(),
+		    texture.image.vk(),
 		    vk::ImageLayout::eTransferDstOptimal,
 		    vk::BufferImageCopy {
 		        0u,
@@ -163,7 +171,6 @@ void BinaryLoader::write_texture_data_to_gpu()
 		// @todo hacked
 		texture.current_layout = vk::ImageLayout::eTransferDstOptimal;
 		texture.transition_layout(
-		    vk_context,
 		    cmd,
 		    texture.mip_levels - 1ul,
 		    1u,
@@ -183,28 +190,14 @@ void BinaryLoader::create_mipmaps(vk::CommandBuffer cmd)
 	{
 		// @todo hacked
 		texture.current_layout = vk::ImageLayout::eTransferDstOptimal;
-		texture.transition_layout(
-		    vk_context,
-		    cmd,
-		    i - 1u,
-		    1u,
-		    1u,
-		    vk::ImageLayout::eTransferSrcOptimal
-		);
+		texture.transition_layout(cmd, i - 1u, 1u, 1u, vk::ImageLayout::eTransferSrcOptimal);
 
 		texture.blit(cmd, i, { mip_width, mip_height });
 
 		mip_width = mip_width > 1 ? mip_width / 2.0 : mip_width;
 		mip_height = mip_height > 1 ? mip_height / 2.0 : mip_height;
 
-		texture.transition_layout(
-		    vk_context,
-		    cmd,
-		    i - 1u,
-		    1u,
-		    1u,
-		    vk::ImageLayout::eShaderReadOnlyOptimal
-		);
+		texture.transition_layout(cmd, i - 1u, 1u, 1u, vk::ImageLayout::eShaderReadOnlyOptimal);
 	}
 }
 

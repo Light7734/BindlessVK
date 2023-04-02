@@ -1,35 +1,84 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Context/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
 struct AllocatedDescriptorSet
 {
-	vk::DescriptorSet descriptor_set;
-	vk::DescriptorPool descriptor_pool;
-
-	operator vk::DescriptorSet() const
+	/** Trivial accessor for the underlying descriptor set */
+	auto vk() const
 	{
 		return descriptor_set;
 	}
 
-	operator VkDescriptorSet() const
+	/** Trivial accessor for descriptor pool */
+	auto get_pool() const
 	{
-		return static_cast<VkDescriptorSet>(descriptor_set);
+		return descriptor_pool;
 	}
 
+	/** Validity :Lwqa*/
 	operator bool() const
 	{
 		return descriptor_pool && descriptor_set;
 	}
+
+private:
+	vk::DescriptorSet descriptor_set;
+	vk::DescriptorPool descriptor_pool;
 };
 
-/**
- * @todo Make this more efficient
- */
 class DescriptorAllocator
 {
+private:
+	class Pool;
+
+public:
+	/** Default constructor */
+	DescriptorAllocator() = default;
+
+	/** Argumented constructor
+	 *
+	 * @param vk_context The vulkan context
+	 */
+	DescriptorAllocator(VkContext const *vk_context);
+
+	/** Move constructor */
+	DescriptorAllocator(DescriptorAllocator &&other);
+
+	/** Move assignment operator */
+	DescriptorAllocator &operator=(DescriptorAllocator &&other);
+
+	/** Deleted copy constructor */
+	DescriptorAllocator(DescriptorAllocator const &) = delete;
+
+	/** Deleted copy assignment operator */
+	DescriptorAllocator &operator=(DescriptorAllocator const &other) = delete;
+
+	/** Destructor */
+	~DescriptorAllocator();
+
+	auto allocate_descriptor_set(vk::DescriptorSetLayout layout) -> AllocatedDescriptorSet;
+	void release_descriptor_set(AllocatedDescriptorSet const &set);
+
+private:
+	auto try_allocate_descriptor_set(vk::DescriptorSetAllocateInfo alloc_info)
+	    -> AllocatedDescriptorSet;
+
+	void expire_current_pool();
+
+	void grab_or_create_new_pool();
+	void grab_pool();
+
+	void create_new_pools();
+
+	void destroy_pool(vec<Pool>::iterator pool_it);
+
+	auto find_pool(vk::DescriptorPool pool) -> vec<Pool>::iterator;
+
+
 private:
 	struct Pool
 	{
@@ -62,31 +111,8 @@ private:
 		}
 	};
 
-public:
-	void init(vk::Device device);
-	void destroy();
-
-	auto allocate_descriptor_set(vk::DescriptorSetLayout layout) -> AllocatedDescriptorSet;
-	void release_descriptor_set(AllocatedDescriptorSet const &set);
-
 private:
-	auto try_allocate_descriptor_set(vk::DescriptorSetAllocateInfo alloc_info)
-	    -> AllocatedDescriptorSet;
-
-	void expire_current_pool();
-
-	void grab_or_create_new_pool();
-	void grab_pool();
-
-	void create_new_pools();
-
-	void destroy_pool(vec<Pool>::iterator pool_it);
-
-	auto find_pool(vk::DescriptorPool pool) -> vec<Pool>::iterator;
-
-
-private:
-	vk::Device device = {};
+	Device *device = {};
 
 	vec<Pool> active_pools = {};
 	vec<Pool> free_pools = {};

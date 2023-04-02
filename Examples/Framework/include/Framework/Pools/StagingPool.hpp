@@ -6,7 +6,12 @@
 class StagingPool
 {
 public:
-	StagingPool(u32 count, usize size, ref<bvk::VkContext const> vk_context);
+	StagingPool(
+	    u32 count,
+	    usize size,
+	    bvk::VkContext const *vk_context,
+	    bvk::MemoryAllocator const *memory_allocator
+	);
 
 	StagingPool() = default;
 
@@ -18,8 +23,6 @@ public:
 
 	~StagingPool();
 
-	void destroy_buffers();
-
 	auto get_by_index(u32 index)
 	{
 		assert_true(staging_buffers.size() > index);
@@ -27,6 +30,5 @@ public:
 	}
 
 private:
-	ref<bvk::VkContext const> vk_context = {};
 	vec<bvk::Buffer> staging_buffers = {};
 };

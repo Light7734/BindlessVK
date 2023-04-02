@@ -3,10 +3,18 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-KtxLoader::KtxLoader(VkContext const *const vk_context, Buffer *const staging_buffer)
-    : vk_context(vk_context)
+KtxLoader::KtxLoader(
+    VkContext const *const vk_context,
+    MemoryAllocator const *const memory_allocator,
+    Buffer *const staging_buffer
+)
+    : device(vk_context->get_device())
+    , memory_allocator(memory_allocator)
     , staging_buffer(staging_buffer)
 {
+	texture.device = vk_context->get_device();
+	texture.debug_utils = vk_context->get_debug_utils();
+	texture.memory_allocator = memory_allocator;
 }
 
 Texture KtxLoader::load(
@@ -16,9 +24,7 @@ Texture KtxLoader::load(
     str_view const debug_name
 )
 {
-	texture.vk_context = vk_context;
 	texture.debug_name = debug_name;
-
 	load_ktx_texture(path);
 
 	create_image();
@@ -60,45 +66,44 @@ void KtxLoader::destroy_ktx_texture()
 
 void KtxLoader::create_image()
 {
-	auto const allocator = vk_context->get_allocator();
 	auto const [width, height] = texture.size;
 
-	texture.image = allocator.createImage(
-	    vk::ImageCreateInfo {
-	        vk::ImageCreateFlagBits::eCubeCompatible,
-	        vk::ImageType::e2D,
-	        texture.format,
-	        vk::Extent3D {
-	            width,
-	            height,
-	            1u,
-	        },
-	        texture.mip_levels,
-	        6u,
-	        vk::SampleCountFlagBits::e1,
-	        vk::ImageTiling::eOptimal,
-	        vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
-	        vk::SharingMode::eExclusive,
-	        0u,
-	        nullptr,
-	        vk::ImageLayout::eUndefined,
-	    },
+	texture.image = Image {
+		memory_allocator,
 
-	    vma::AllocationCreateInfo {
-	        {},
-	        vma::MemoryUsage::eGpuOnly,
-	        vk::MemoryPropertyFlagBits::eDeviceLocal,
-	    }
-	);
+		vk::ImageCreateInfo {
+		    vk::ImageCreateFlagBits::eCubeCompatible,
+		    vk::ImageType::e2D,
+		    texture.format,
+		    vk::Extent3D {
+		        width,
+		        height,
+		        1u,
+		    },
+		    texture.mip_levels,
+		    6u,
+		    vk::SampleCountFlagBits::e1,
+		    vk::ImageTiling::eOptimal,
+		    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled,
+		    vk::SharingMode::eExclusive,
+		    0u,
+		    nullptr,
+		    vk::ImageLayout::eUndefined,
+		},
+
+		vma::AllocationCreateInfo {
+		    {},
+		    vma::MemoryUsage::eGpuOnly,
+		    vk::MemoryPropertyFlagBits::eDeviceLocal,
+		},
+	};
 }
 
 void KtxLoader::create_image_view()
 {
-	auto const device = vk_context->get_device();
-
-	texture.image_view = device.createImageView(vk::ImageViewCreateInfo {
+	texture.image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
-	    texture.image,
+	    texture.image.vk(),
 	    vk::ImageViewType::eCube,
 	    texture.format,
 	    vk::ComponentMapping {
@@ -120,9 +125,7 @@ void KtxLoader::create_image_view()
 
 void KtxLoader::create_sampler()
 {
-	auto const device = vk_context->get_device();
-
-	texture.sampler = device.createSampler(vk::SamplerCreateInfo {
+	texture.sampler = device->vk().createSampler(vk::SamplerCreateInfo {
 	    {},
 	    vk::Filter::eLinear,
 	    vk::Filter::eLinear,
@@ -155,9 +158,8 @@ void KtxLoader::write_texture_data_to_gpu(vk::ImageLayout const final_layout)
 {
 	auto const buffer_copies = create_texture_face_buffer_copies();
 
-	vk_context->immediate_submit([&](vk::CommandBuffer &&cmd) {
+	device->immediate_submit([&](vk::CommandBuffer &&cmd) {
 		texture.transition_layout(
-		    vk_context,
 		    cmd,
 		    0u,
 		    texture.mip_levels,
@@ -166,14 +168,14 @@ void KtxLoader::write_texture_data_to_gpu(vk::ImageLayout const final_layout)
 		);
 
 		cmd.copyBufferToImage(
-		    *staging_buffer->get_buffer(),
-		    texture.image,
+		    *staging_buffer->vk(),
+		    texture.image.vk(),
 		    vk::ImageLayout::eTransferDstOptimal,
 		    static_cast<u32>(buffer_copies.size()),
 		    buffer_copies.data()
 		);
 
-		texture.transition_layout(vk_context, cmd, 0u, texture.mip_levels, 6u, final_layout);
+		texture.transition_layout(cmd, 0u, texture.mip_levels, 6u, final_layout);
 	});
 
 	texture.descriptor_info.imageLayout = texture.current_layout;
