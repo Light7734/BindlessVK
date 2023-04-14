@@ -271,9 +271,7 @@ void Renderer::render_pass(Rendergraph *const graph, Renderpass *const pass, u32
 	    vk::PipelineBindPoint::eGraphics,
 	    graph->get_pipeline_layout(),
 	    0,
-	    1,
-	    &graph->get_descriptor_sets()[frame_index].descriptor_set,
-	    0,
+	    graph->get_descriptor_sets()[frame_index].vk(),
 	    {}
 	);
 	auto const &descriptor_sets = pass->get_descriptor_sets();
@@ -282,9 +280,7 @@ void Renderer::render_pass(Rendergraph *const graph, Renderpass *const pass, u32
 		    vk::PipelineBindPoint::eGraphics,
 		    pass->get_pipeline_layout(),
 		    1,
-		    1,
-		    &descriptor_sets[frame_index].descriptor_set,
-		    0,
+		    descriptor_sets[frame_index].vk(),
 		    {}
 		);
 

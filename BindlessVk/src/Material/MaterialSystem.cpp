@@ -15,7 +15,7 @@ Material::Material(
 	if (shader_pipeline->uses_shader_descriptor_set_slot())
 	{
 		auto const descriptor_set_layout = shader_pipeline->get_descriptor_set_layout();
-		descriptor_set = descriptor_allocator->allocate_descriptor_set(descriptor_set_layout.vk());
+		descriptor_set = DescriptorSet(descriptor_allocator, descriptor_set_layout.vk());
 	}
 }
 
@@ -29,7 +29,7 @@ Material &Material::operator=(Material &&other)
 	this->descriptor_allocator = other.descriptor_allocator;
 	this->shader_pipeline = other.shader_pipeline;
 	this->parameters = other.parameters;
-	this->descriptor_set = other.descriptor_set;
+	this->descriptor_set = std::move(other.descriptor_set);
 
 	other.descriptor_allocator = {};
 
@@ -38,8 +38,6 @@ Material &Material::operator=(Material &&other)
 
 Material::~Material()
 {
-	if (descriptor_allocator)
-		descriptor_allocator->release_descriptor_set(descriptor_set);
 }
 
 

@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.14)
 add_library(
     BindlessVk
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/DescriptorAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/Descriptors/DescriptorAllocator.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/Descriptors/DescriptorPool.cpp
+
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/LayoutAllocator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/MemoryAllocator.cpp
 
@@ -30,6 +32,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/RenderResources.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Shader.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/DescriptorSet.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/ShaderLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Shader/Loaders/SpvLoader.cpp
 

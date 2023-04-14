@@ -163,7 +163,7 @@ void BasicRendergraph::update_for_mesh(
 	);
 
 
-	auto const descriptor_set = descriptor_sets[frame_index];
+	auto const &descriptor_set = descriptor_sets[frame_index];
 
 	for (auto const *const node : static_mesh.model->get_nodes())
 		for (auto const &primitive : node->mesh)
@@ -227,7 +227,7 @@ void BasicRendergraph::update_for_mesh(
 
 void BasicRendergraph::update_for_skybox(SkyboxComponent const &skybox)
 {
-	auto const descriptor_set = descriptor_sets[frame_index];
+	auto const &descriptor_set = descriptor_sets[frame_index];
 
 	descriptor_writes.push_back({
 	    descriptor_set.vk(),

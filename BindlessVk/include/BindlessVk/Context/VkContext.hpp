@@ -20,12 +20,12 @@ public:
 
 	/** Argumented constructor
 	 *
-	 * @param instance Pointer an instance
-	 * @param debug_utils Pointer to a debug_utils
-	 * @param surface Pointer to a surface
-	 * @param gpu Pointer to a gpu
-	 * @param queues Pointer to a queues
-	 * @param device Pointer to a device
+	 * @param instance The vulkan instance wrapper
+	 * @param debug_utils The debug utils wrapper
+	 * @param surface The vulkan surface wrapper
+	 * @param gpu The vulkan physical device wrapper
+	 * @param queues The vulkan queues wrapper
+	 * @param device The vulkan device wrapper
 	 */
 	VkContext(
 	    Instance *instance,

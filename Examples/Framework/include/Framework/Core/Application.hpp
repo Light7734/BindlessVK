@@ -1,6 +1,11 @@
 #pragma once
 
-#include "BindlessVk/Allocators/DescriptorAllocator.hpp"
+//
+#include "Framework/Utils/Logger.hpp"
+//
+
+#include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
+#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Allocators/LayoutAllocator.hpp"
 #include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Material/MaterialSystem.hpp"
@@ -14,7 +19,6 @@
 #include "Framework/Pools/StagingPool.hpp"
 #include "Framework/Scene/CameraController.hpp"
 #include "Framework/Scene/Scene.hpp"
-#include "Framework/Utils/Logger.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -46,7 +50,6 @@ public:
 	bvk::MemoryAllocator memory_allocator = {};
 	bvk::LayoutAllocator layout_allocator = {};
 	bvk::DescriptorAllocator descriptor_allocator = {};
-
 
 	Scene scene = {};
 	Window window = {};

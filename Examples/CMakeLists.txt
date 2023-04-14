@@ -34,6 +34,7 @@ target_include_directories(
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/spdlog/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
+    PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/fmt/include/
 )
 
 target_link_libraries(
@@ -43,6 +44,7 @@ target_link_libraries(
     PUBLIC glfw
     PUBLIC spdlog
     PUBLIC imgui
+    PRIVATE fmt
 )
 
 target_precompile_headers(

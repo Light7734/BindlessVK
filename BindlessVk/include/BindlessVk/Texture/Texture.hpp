@@ -69,7 +69,7 @@ public:
 		return str_view(debug_name);
 	}
 
-	/** Address accessor for image */
+	/** Trivial address-accessor for image */
 	auto get_image() const
 	{
 		return &image;

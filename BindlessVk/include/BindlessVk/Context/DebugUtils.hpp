@@ -58,12 +58,6 @@ public:
 	/** Destructor */
 	~DebugUtils();
 
-	/** Address accessor for callback */
-	auto get_callback()
-	{
-		return callback.get();
-	}
-
 	/** Invokes the message callback with log data
 	 *
 	 * @param lvl Severity of the message
@@ -97,6 +91,12 @@ public:
 		    (u64)((typename T::NativeType)(object)),
 		    name.data(),
 		});
+	}
+
+	/** Address accessor for callback */
+	auto get_callback()
+	{
+		return callback.get();
 	}
 
 private:

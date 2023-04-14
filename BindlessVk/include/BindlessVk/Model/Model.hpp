@@ -7,6 +7,10 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Holds 3d mesh data
+ *
+ * The constructor is private, you need to use the friended loader classes to constrruct models
+ * */
 class Model
 {
 public:
@@ -64,39 +68,52 @@ public:
 	};
 
 public:
-	~Model();
-
+	/** Move constructor */
 	Model(Model &&);
+
+	/** Move assignment operator */
 	Model &operator=(Model &&);
 
+	/** Deleted copy constructor */
 	Model(const Model &) = delete;
+
+	/** Deleted copy assignment operator */
 	Model &operator=(const Model &) = delete;
 
+	/** Destructor */
+	~Model();
+
+	/** Returns null-terminated str view to debug_name */
 	auto get_name() const
 	{
 		return str_view(debug_name);
 	}
 
+	/** Trivial const-ref accessor for nodes */
 	auto &get_nodes() const
 	{
 		return nodes;
 	}
 
+	/** Trivial const-ref accessor for textures */
 	auto &get_textures() const
 	{
 		return textures;
 	}
 
+	/** Trivial const-ref accessor for material_parameters */
 	auto &get_material_parameters() const
 	{
 		return material_parameters;
 	}
 
+	/** Trivial address accessor for vertex_buffer */
 	auto get_vertex_buffer() const
 	{
 		return vertex_buffer;
 	}
 
+	/** Trivial address accessor for index_buffer */
 	auto get_index_buffer() const
 	{
 		return index_buffer;

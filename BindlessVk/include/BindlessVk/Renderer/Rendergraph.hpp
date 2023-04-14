@@ -67,7 +67,7 @@ protected:
 
 	vk::PipelineLayout pipeline_layout;
 	vk::DescriptorSetLayout descriptor_set_layout;
-	vec<AllocatedDescriptorSet> descriptor_sets;
+	vec<DescriptorSet> descriptor_sets;
 
 	vk::DebugUtilsLabelEXT update_label;
 	vk::DebugUtilsLabelEXT present_barrier_label;

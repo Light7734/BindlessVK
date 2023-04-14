@@ -1,11 +1,15 @@
 #pragma once
 
+//
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
+//
+
 #include "Framework/Common/Common.hpp"
 
 #include <BindlessVk/Common/Common.hpp>
 #include <BindlessVk/Context/VkContext.hpp>
-#include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
+#include <fmt/format.h>
 
 class Logger
 {

@@ -2,8 +2,6 @@
 
 #include "BindlessVk/Context/VkContext.hpp"
 
-#include "vulkan/vulkan_raii.hpp"
-
 namespace BINDLESSVK_NAMESPACE {
 
 VkContext::VkContext(

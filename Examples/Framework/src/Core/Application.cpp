@@ -88,7 +88,7 @@ void Application::create_vk_context()
 		},
 	};
 
-	window_surface = window.create_vulkan_surface(instance);
+	window_surface = window.create_vulkan_surface(instance.vk());
 
 	gpu = bvk::Gpu::pick_by_score(
 	    &instance,
@@ -175,7 +175,7 @@ void Application::create_user_interface()
 	ImGui_ImplGlfw_InitForVulkan(window.get_glfw_handle(), true);
 
 	auto imgui_info = ImGui_ImplVulkan_InitInfo {
-		instance,
+		instance.vk(),
 		gpu.vk(),
 		device.vk(),
 		queues.get_graphics_index(),

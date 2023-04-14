@@ -25,7 +25,7 @@ Rendergraph &Rendergraph::operator=(Rendergraph &&other)
 	this->buffer_inputs = std::move(other.buffer_inputs);
 	this->pipeline_layout = other.pipeline_layout;
 	this->descriptor_set_layout = other.descriptor_set_layout;
-	this->descriptor_sets = other.descriptor_sets;
+	this->descriptor_sets = std::move(other.descriptor_sets);
 	this->update_label = other.update_label;
 	this->present_barrier_label = other.present_barrier_label;
 
@@ -172,9 +172,7 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 		graph->descriptor_sets.reserve(max_frames_in_flight);
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			graph->descriptor_sets.emplace_back(
-			    descriptor_allocator->allocate_descriptor_set(graph->descriptor_set_layout)
-			);
+			graph->descriptor_sets.emplace_back(descriptor_allocator, graph->descriptor_set_layout);
 
 			debug_utils->set_object_name(
 			    device->vk(),
@@ -453,7 +451,7 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 		for (u32 i = i; i < max_frames_in_flight; ++i)
 		{
 			pass->descriptor_sets.emplace_back(
-			    descriptor_allocator->allocate_descriptor_set(pass->descriptor_set_layout)
+			    descriptor_allocator, pass->descriptor_set_layout
 			);
 
 			debug_utils->set_object_name(

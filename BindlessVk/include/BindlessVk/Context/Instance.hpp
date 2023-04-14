@@ -4,6 +4,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan instance */
 class Instance
 {
 public:
@@ -14,45 +15,49 @@ public:
 	};
 
 public:
+	/** Default constructor */
 	Instance() = default;
+
+	/** Argumented constructor
+	 *
+	 * @param requirements The required layers and extensions
+	 */
 	Instance(Requirements const &requirements);
 
+	/** Move constructor */
 	Instance(Instance &&other);
+
+	/** Move assignment operator */
 	Instance &operator=(Instance &&other);
 
+	/** Deleted copy constructor*/
 	Instance(Instance const &) = delete;
+
+	/** Deleted copy assignment operator */
 	Instance &operator=(Instance const &) = delete;
 
+	/** Destructor */
 	~Instance();
 
+	/** Trivial accessor for the underlying instance */
 	auto vk() const
 	{
 		return instance;
 	}
 
-	auto get_layers()
+	/** Trivial accessor for requirements */
+	auto get_required_layers()
 	{
-		return layers;
+		return requirements;
 	}
 
-	auto get_extensions()
-	{
-		return extensions;
-	}
-
+	/** Returns instance proc address of @a proc_name
+	 *
+	 * @param proc_name A null-terminated str view
+	 */
 	auto get_proc_addr(str_view proc_name) const
 	{
 		return VULKAN_HPP_DEFAULT_DISPATCHER.vkGetInstanceProcAddr(instance, proc_name.data());
-	}
-
-	operator vk::Instance()
-	{
-		return instance;
-	}
-
-	operator VkInstance()
-	{
-		return static_cast<VkInstance>(instance);
 	}
 
 private:
@@ -66,8 +71,7 @@ private:
 
 private:
 	vk::Instance instance = {};
-	vec<c_str> extensions = {};
-	vec<c_str> layers = {};
+	Requirements requirements = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

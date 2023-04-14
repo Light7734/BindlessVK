@@ -5,11 +5,13 @@
 
 int main(int argc, char *argv[])
 {
-	try {
+	try
+	{
 		DevelopmentExampleApplication application = DevelopmentExampleApplication();
 		Timer delta_timer;
 
-		while (!application.window.should_close()) {
+		while (!application.window.should_close())
+		{
 			application.window.poll_events();
 
 			application.on_tick(delta_timer.elapsed_time());
@@ -18,11 +20,13 @@ int main(int argc, char *argv[])
 			// @todo: Handle swapchain invalidation
 		}
 	}
-	catch (bvk::BindlessVkException bvkException) {
+	catch (bvk::BindlessVkException bvkException)
+	{
 		std::cout << "Bvk exception failed: " << bvkException.what() << std::endl;
 		return 1;
 	}
-	catch (std::exception exception) {
+	catch (std::exception exception)
+	{
 		std::cout << "exception failed: " << exception.what() << std::endl;
 		return 2;
 	}

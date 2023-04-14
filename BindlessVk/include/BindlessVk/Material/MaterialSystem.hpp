@@ -1,6 +1,7 @@
 #pragma once
 
-#include "BindlessVk/Allocators/DescriptorAllocator.hpp"
+#include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
+#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Shader/Shader.hpp"
@@ -26,7 +27,7 @@ public:
 
 	/** Argumented constructor
 	 *
-	 * @aaram
+	 * @param
 	 */
 	Material(
 	    DescriptorAllocator *descriptor_allocator,
@@ -55,17 +56,17 @@ public:
 		return shader_pipeline;
 	}
 
-	/** Trivial accessor for descriptor set */
+	/** Accessor for the descriptor set's underlying descriptor set */
 	auto get_descriptor_set() const
 	{
-		return descriptor_set;
+		return descriptor_set.vk();
 	}
 
 private:
 	DescriptorAllocator *descriptor_allocator;
 	ShaderPipeline *shader_pipeline = {};
 	Parameters parameters = {};
-	AllocatedDescriptorSet descriptor_set = {};
+	DescriptorSet descriptor_set = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

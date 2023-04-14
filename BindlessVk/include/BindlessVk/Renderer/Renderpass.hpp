@@ -1,6 +1,7 @@
 #pragma once
 
-#include "BindlessVk/Allocators/DescriptorAllocator.hpp"
+#include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
+#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 
@@ -113,7 +114,7 @@ protected:
 
 	vec<Buffer> buffer_inputs = {};
 
-	vec<AllocatedDescriptorSet> descriptor_sets = {};
+	vec<DescriptorSet> descriptor_sets = {};
 	vk::DescriptorSetLayout descriptor_set_layout = {};
 	vk::PipelineLayout pipeline_layout = {};
 

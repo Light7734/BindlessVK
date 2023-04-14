@@ -42,7 +42,7 @@ public:
 	/** Destructor */
 	~AllocatedBuffer();
 
-	/** Address accessor for the underlying buffer */
+	/** Trivial address-accessor for the underlying buffer */
 	auto vk() const
 	{
 		return &allocated_buffer.first;

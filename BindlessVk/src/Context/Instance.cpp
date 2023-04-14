@@ -4,14 +4,10 @@ VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
 namespace BINDLESSVK_NAMESPACE {
 
-Instance::Instance(Requirements const &requirements)
-    : extensions(requirements.extensions)
-    , layers(requirements.layers)
+Instance::Instance(Requirements const &requirements): requirements(requirements)
 {
 	load_functions();
-
 	check_layer_support();
-
 	create_instance();
 }
 
@@ -23,12 +19,9 @@ Instance::Instance(Instance &&other)
 Instance &Instance::operator=(Instance &&other)
 {
 	this->instance = other.instance;
-	this->extensions = std::move(other.extensions);
-	this->layers = std::move(other.layers);
+	this->requirements = other.requirements;
 
 	other.instance = vk::Instance {};
-	other.extensions = {};
-	other.layers = {};
 
 	return *this;
 }
@@ -50,7 +43,7 @@ void Instance::load_functions()
 
 void Instance::check_layer_support()
 {
-	for (auto const layer : layers)
+	for (auto const layer : requirements.layers)
 		if (!has_layer(layer))
 			assert_fail("Required layer: {} is not supported", layer);
 }
@@ -68,11 +61,15 @@ void Instance::create_instance()
 	auto const instance_info = vk::InstanceCreateInfo {
 		{},
 		&application_info,
-		layers,
-		extensions,
+		requirements.layers,
+		requirements.extensions,
 	};
 
-	assert_false(vk::createInstance(&instance_info, nullptr, &instance));
+	assert_false(
+	    vk::createInstance(&instance_info, nullptr, &instance),
+	    "Failed to create vulkan instance"
+	);
+
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(instance);
 }
 
