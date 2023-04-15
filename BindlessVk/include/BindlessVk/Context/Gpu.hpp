@@ -15,12 +15,33 @@ public:
 	};
 
 public:
+	/** Default constructor */
 	Gpu() = default;
+
+	/** Argumented constructo
+	 *
+	 * @param physiacl_device The vulkan physical device
+	 * @param surface The vulkan window surface
+	 * @param requirements The requirements that the gpu needs to have to be considered adequate
+	 */
 	Gpu(vk::PhysicalDevice physical_device, vk::SurfaceKHR surface, Requirements const &requirements
 	);
 
+	/** Default destructor */
 	~Gpu() = default;
 
+	/** Picks the highest scoring gpu.
+	 * Loops through available gpus and scores them based on @a calculate_score function,
+	 * then returns the highest scoring one.
+	 *
+	 * @param instance The bvk wrapper around vulkan instance
+	 * @param surface The vulkan window surface
+	 * @param requirements The requirements that the gpu needs to be considered adequate
+	 * @param calculate_score function to calculate a gpu's score
+	 *
+	 * @returns Highest scoring gpu based on @a calculate_score function that meets all the @a
+	 * requirements
+	 */
 	static auto pick_by_score(
 	    Instance *instance,
 	    vk::SurfaceKHR surface,
