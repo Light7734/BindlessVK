@@ -34,3 +34,6 @@
 [submodule "Vendor/fmt"]
 	path = Vendor/fmt
 	url = git@github.com:fmtlib/fmt
+[submodule "Vendor/doxygen-awesome-css"]
+	path = Vendor/doxygen-awesome-css
+	url = https://github.com/jothepro/doxygen-awesome-css
