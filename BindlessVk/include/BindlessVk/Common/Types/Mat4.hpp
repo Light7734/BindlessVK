@@ -5,6 +5,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** A 4x4 matrix of 32-bit floats */
 struct Mat4f
 {
 	union {

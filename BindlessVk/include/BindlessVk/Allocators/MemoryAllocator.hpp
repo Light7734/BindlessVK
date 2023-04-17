@@ -4,6 +4,8 @@
 #include "BindlessVk/Context/VkContext.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
+
+/** Wrapper around VMA that manages memory allocations */
 class MemoryAllocator
 {
 public:

@@ -8,6 +8,7 @@ namespace BINDLESSVK_NAMESPACE {
 class Instance
 {
 public:
+	/** Requirements that needs to be met for vulkan instance to be considered usable */
 	struct Requirements
 	{
 		vec<c_str> extensions;

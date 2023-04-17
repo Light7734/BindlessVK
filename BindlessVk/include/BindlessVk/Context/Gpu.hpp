@@ -5,9 +5,11 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan physical device */
 class Gpu
 {
 public:
+	/** Requirements  that needs to be met for Gpu to be considered adaquate */
 	struct Requirements
 	{
 		vk::PhysicalDeviceFeatures physical_device_features;
@@ -18,7 +20,7 @@ public:
 	/** Default constructor */
 	Gpu() = default;
 
-	/** Argumented constructo
+	/** Argumented constructor
 	 *
 	 * @param physiacl_device The vulkan physical device
 	 * @param surface The vulkan window surface

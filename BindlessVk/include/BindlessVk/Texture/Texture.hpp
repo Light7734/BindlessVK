@@ -7,6 +7,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Repersents the textue data needed for texture-shading an object */
 class Texture
 {
 private:

@@ -1,16 +1,18 @@
 #pragma once
 
 #include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
-#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
+#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Shader/Shader.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Represents shading properties of models */
 class Material
 {
 public:
+	/** Parameters that affect the shading of models */
 	struct Parameters
 	{
 		arr<f32, 4> albedo;
@@ -50,7 +52,7 @@ public:
 	/** Destructor */
 	~Material();
 
-	/** Trivial accessor for effect */
+	/** Trivial accessor for shade_pipeline */
 	auto *get_shader_pipeline() const
 	{
 		return shader_pipeline;

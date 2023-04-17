@@ -6,7 +6,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** The bindlessvk exception */
+/** The base exception class */
 struct BindlessVkException: std::exception
 {
 	BindlessVkException(str const &what): msg(what)
@@ -58,7 +58,7 @@ void inline assert_fail(fmt::format_string<Args...> fmt = "", Args &&...args)
 	details::throw_exception(0, fmt::format(fmt, std::forward<Args>(args)...));
 }
 
-/** Throws bindlessvk exception if expression evaluates to false
+/** Throws bindlessvk exception if @a expr evaluates to false
  *
  * @param expr The expression to check against
  * @param fmt Format of the message (fmtlib syntax)
@@ -71,7 +71,7 @@ void inline assert_true(Expr const &expr, fmt::format_string<Args...> fmt = "", 
 		details::throw_exception(expr, fmt::format(fmt, std::forward<Args>(args)...));
 }
 
-/** Throws bindlessvk exception if expression evaluates to true
+/** Throws bindlessvk exception if @a expr evaluates to true
  *
  * @param expr The expression to check against
  * @param fmt Format of the message (fmtlib syntax)

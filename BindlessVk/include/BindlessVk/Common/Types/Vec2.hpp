@@ -4,6 +4,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** A 2 component vector of 32-bit floats */
 struct Vec2f
 {
 	union {

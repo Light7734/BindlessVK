@@ -15,7 +15,6 @@ static_assert(KTX_SUCCESS == false, "KTX_SUCCESS was supposed to be 0 (false), b
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** @warn KtxLoader assumes cubemap type for now...  */
 class KtxLoader
 {
 public:

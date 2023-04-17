@@ -9,6 +9,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+    /** Wrapper aound vulkan swapchain */
 class Swapchain
 {
 public:

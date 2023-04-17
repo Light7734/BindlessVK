@@ -6,6 +6,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan shader module that holds descriptor set slot 2's bindings */
 struct Shader
 {
 	vk::ShaderModule module;
@@ -13,9 +14,11 @@ struct Shader
 	vec<vk::DescriptorSetLayoutBinding> descriptor_set_bindings;
 };
 
+/** Wrapper around vulkan graphics pipeline */
 class ShaderPipeline
 {
 public:
+    /** Pipeline state of the shader */
 	struct Configuration
 	{
 		vk::PipelineVertexInputStateCreateInfo vertex_input_state;

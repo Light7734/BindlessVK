@@ -6,6 +6,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+    /** Loads shader files like .spv */
 class ShaderLoader
 {
 public:

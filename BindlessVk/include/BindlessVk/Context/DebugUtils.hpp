@@ -16,15 +16,18 @@ enum class DebugCallbackSource
 	nCount
 };
 
+/** Debug utilities */
 class DebugUtils
 {
 public:
+	/** Data required for logging */
 	struct Callback
 	{
 		fn<void(DebugCallbackSource, LogLvl, str const &, std::any)> function;
-		std::any data;
+		std::any user_data;
 	};
 
+	/** Severity and type filter to determine the verbosity of debug callback */
 	struct Filter
 	{
 		vk::DebugUtilsMessageSeverityFlagsEXT severity_flags;
@@ -64,7 +67,7 @@ public:
 	 * @param fmt Format string passed to fmt::format
 	 * @param args Variadic arguments forwarded to fmt::format
 	 *
-	 * @warn BindlessVk Internal
+	 * @warn Internal
 	 */
 	template<typename... Args>
 	void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args &&...args) const
@@ -73,7 +76,7 @@ public:
 		    DebugCallbackSource::eBindlessVk,
 		    lvl,
 		    fmt::format(fmt, std::forward<Args>(args)...),
-		    callback->data
+		    callback->user_data
 		);
 	}
 
@@ -81,7 +84,7 @@ public:
 	 *
 	 * @param device The vulkan device
 	 * @param object A vulkan hpp object
-	 * @param name A null terminated str view to name the object
+	 * @param name A null terminated str view to name of the object
 	 */
 	template<typename T>
 	void set_object_name(vk::Device device, T object, str_view name) const
@@ -93,7 +96,7 @@ public:
 		});
 	}
 
-	/** Address accessor for callback */
+	/** Trivial address-accessor for callback */
 	auto get_callback()
 	{
 		return callback.get();

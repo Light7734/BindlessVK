@@ -6,7 +6,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** Responsible for allocating and freeing descriptor sets. */
+/** Manages descriptor set allocations */
 class DescriptorAllocator
 {
 private:

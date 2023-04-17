@@ -8,6 +8,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around a vulkan buffer and it's memory allocation */
 class AllocatedBuffer
 {
 public:
@@ -62,6 +63,7 @@ private:
 };
 
 
+/** Wrapper around AllocatedBuffer that provides utilties to read/write to it */
 class Buffer
 {
 public:

@@ -10,45 +10,65 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Represents the rendering passes and output of a frame */
 class Rendergraph
 {
 public:
 	friend class RenderGraphBuilder;
 
 public:
+	/** Default constructor */
 	Rendergraph() = default;
+
+	/** Argumented constructor
+	 *
+	 * @param vk_context The vulkan context
+	 */
 	Rendergraph(VkContext const *vk_context);
 
+	/** Move constructor */
 	Rendergraph(Rendergraph &&other);
+
+	/** Move assignment operato */
 	Rendergraph &operator=(Rendergraph &&other);
 
+	/** Copy constructor */
 	Rendergraph(Rendergraph const &) = delete;
+
+	/** Deleted copy assignment operato */
 	Rendergraph &operator=(Rendergraph const &) = delete;
 
+	/** Destructor */
 	virtual ~Rendergraph();
 
+	/** Updates the graph (global data like descriptor_set 0) */
 	void virtual on_update(u32 frame_index, u32 image_index) = 0;
 
+	/** Tirvial reference-accessor for passes */
 	auto &get_passes() const
 	{
 		return passes;
 	}
 
+	/** Trivial reference-accessor for pipeline_layout */
 	auto &get_pipeline_layout() const
 	{
 		return pipeline_layout;
 	}
 
+	/** Trivial referrence-accessor for descripto_sets */
 	auto &get_descriptor_sets() const
 	{
 		return descriptor_sets;
 	}
 
+	/** Trivial referrence-accessor for update_label */
 	auto &get_update_label() const
 	{
 		return update_label;
 	}
 
+	/** Trivial referrence-accessor for present_barrier_label */
 	auto &get_present_barrier_label() const
 	{
 		return present_barrier_label;
@@ -73,6 +93,7 @@ protected:
 	vk::DebugUtilsLabelEXT present_barrier_label;
 };
 
+/** A builder class for building render graphs */
 class RenderGraphBuilder
 {
 public:
@@ -108,18 +129,21 @@ public:
 		return *this;
 	}
 
+	/** Sets the pointer to render resources */
 	auto set_resources(RenderResources *resources) -> RenderGraphBuilder &
 	{
 		this->resources = resources;
 		return *this;
 	}
 
+	/** Sets the user-defined data to be accessed in graph's on_update */
 	auto set_user_data(std::any data) -> RenderGraphBuilder &
 	{
 		this->graph->user_data = data;
 		return *this;
 	}
 
+	/** Adds a buffer input to gaph */
 	auto add_buffer_input(RenderpassBlueprint::BufferInput const buffer_input_info)
 	    -> RenderGraphBuilder &
 
@@ -128,18 +152,21 @@ public:
 		return *this;
 	}
 
+	/** Adds a textuer input to graph */
 	auto add_texture_input(RenderpassBlueprint::TextureInput const input) -> RenderGraphBuilder &
 	{
 		this->blueprint_texture_inputs.push_back(input);
 		return *this;
 	}
 
+	/** Sets the update label */
 	auto set_update_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
 	{
 		this->graph->update_label = label;
 		return *this;
 	}
 
+	/** Sets the present barrier label */
 	auto set_present_barrier_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
 	{
 		this->graph->present_barrier_label = label;

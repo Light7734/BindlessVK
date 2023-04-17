@@ -12,6 +12,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Helper class for accessing preliminary vulkan wrapper */
 class VkContext
 {
 public:

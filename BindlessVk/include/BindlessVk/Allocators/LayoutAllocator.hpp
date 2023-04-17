@@ -5,6 +5,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan descriptor set layout providing a hash */
 struct DescriptorSetLayoutWithHash
 {
 	vk::DescriptorSetLayout descriptor_set_layout;
@@ -21,29 +22,44 @@ struct DescriptorSetLayoutWithHash
 	}
 };
 
-/** @warn currently we don't de-allocate any layouts before destruction... */
+/** Manages descriptor set and pipeline layout allocations.
+ * @warning currently we don't de-allocate any layouts before destruction.
+ */
 class LayoutAllocator
 {
 public:
+	/** Default constuctor */
 	LayoutAllocator() = default;
+
+	/** Argumented constructor
+	 *
+	 * @param vk_context The vulkan context
+	 */
 	LayoutAllocator(VkContext const *vk_context);
 
+	/** Move constuctor */
 	LayoutAllocator(LayoutAllocator &&other);
+
+	/** Move assignment opeator */
 	LayoutAllocator &operator=(LayoutAllocator &&other);
 
+	/** Deleted copy constructor */
 	LayoutAllocator(LayoutAllocator const &) = delete;
+
+	/** Deleted copy assignment opeator */
 	LayoutAllocator &operator=(LayoutAllocator const &other) = delete;
 
+	/** Destructor */
 	~LayoutAllocator();
 
-	/** @brief get or create descriptor set layout */
+	/** Get or create descriptor set layout. */
 	auto goc_descriptor_set_layout(
 	    vk::DescriptorSetLayoutCreateFlags layout_flags,
 	    span<vk::DescriptorSetLayoutBinding const> bindings,
 	    span<vk::DescriptorBindingFlags const> binding_flags
 	) -> DescriptorSetLayoutWithHash;
 
-	/** @brief get or create pipeline layout */
+	/** Get or create pipeline layout. */
 	auto goc_pipeline_layout(
 	    vk::PipelineLayoutCreateFlags layout_flags,
 	    DescriptorSetLayoutWithHash graph_descriptor_set_layout,

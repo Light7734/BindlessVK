@@ -6,6 +6,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan queues */
 class Queues
 {
 public:

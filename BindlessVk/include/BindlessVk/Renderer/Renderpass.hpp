@@ -1,14 +1,15 @@
 #pragma once
 
 #include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
-#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
+#include "BindlessVk/Shader/DescriptorSet.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
 class Rendergraph;
 
+/** Describes a single isolated rendering step in the render graph */
 class Renderpass
 {
 public:
@@ -16,12 +17,7 @@ public:
 	friend class RenderpassBlueprint;
 
 public:
-	Renderpass(VkContext const *vk_context): vk_context(vk_context)
-	{
-	}
-
-	virtual ~Renderpass() = default;
-
+	/** Repersents a render color or depth/stencil attachment */
 	struct Attachment
 	{
 		vk::PipelineStageFlags stage_mask;
@@ -39,17 +35,20 @@ public:
 
 		vk::ClearValue clear_value;
 
+		/** Checks wether or not image's aspect mask has color flag */
 		auto is_color_attachment() const
 		{
 			return subresource_range.aspectMask & vk::ImageAspectFlagBits::eColor;
 		}
 
+		/** Checks wether or not image's aspect mask has depth flag */
 		auto is_depth_attachment() const
 		{
 			return subresource_range.aspectMask & vk::ImageAspectFlagBits::eDepth;
 		}
 	};
 
+	/** Determines how the size of the attachments should be interpreted */
 	enum class SizeType : uint8_t
 	{
 		eSwapchainRelative,
@@ -60,44 +59,77 @@ public:
 	};
 
 public:
+	/** Argumented constructo
+	 *
+	 * @param vk_context The vulkan context
+	 */
+	Renderpass(VkContext const *vk_context): vk_context(vk_context)
+	{
+	}
+
+	/** Destuctor */
+	virtual ~Renderpass() = default;
+
+
+public:
+	/** Updates the pass
+	 *
+	 * @param frame_index The index of the current frame
+	 * @param image_index The index of the current image
+	 */
 	void virtual on_update(u32 frame_index, u32 image_index) = 0;
+
+	/** Recordrs rendeing command into @a cmd
+	 *
+	 * @param cmd A vulkan command buffer for rendering commands to be recorded into
+	 * @param frame_index The index of the current fame
+	 * @param image_index The index of the current image
+	 */
 	void virtual on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
 
+	/** Trivial reference-accessor for update_label */
 	auto &get_update_label() const
 	{
 		return update_label;
 	}
 
+	/** Trivial reference-accessor for barrier_label */
 	auto &get_barrier_label() const
 	{
 		return barrier_label;
 	}
 
+	/** Trivial reference-accessor for render_label */
 	auto &get_render_label() const
 	{
 		return render_label;
 	}
 
+	/** Trivial reference-accessor for attachments */
 	auto &get_attachments() const
 	{
 		return attachments;
 	}
 
+	/** Trivial reference-accessor for descriptor_sets */
 	auto &get_descriptor_sets() const
 	{
 		return descriptor_sets;
 	}
 
+	/** Trivial reference-accessor for pipeline_layout */
 	auto &get_pipeline_layout() const
 	{
 		return pipeline_layout;
 	}
 
+	/** Trivial reference-accessor for buffer_inputs */
 	auto &get_buffer_inputs() const
 	{
 		return buffer_inputs;
 	}
 
+	/** Checks if sample_count has more than 1 samples */
 	auto is_multisampled() const
 	{
 		return sample_count != vk::SampleCountFlagBits::e1;
@@ -132,12 +164,14 @@ protected:
 	vk::DebugUtilsLabelEXT render_label = {};
 };
 
+/** Represents build instructions for a Renderpass, to be used by RenderGraphBuilder */
 class RenderpassBlueprint
 {
 private:
 	friend class RenderGraphBuilder;
 
 public:
+	/** Repersents a blueprint render color or depth/stencil attachment */
 	struct Attachment
 	{
 		u64 hash;
@@ -152,13 +186,14 @@ public:
 
 		str debug_name = "";
 
-		// @warn this isn't the best way to check for validity...
+		// @warning this isn't the best way to check for validity...
 		operator bool() const
 		{
 			return !!hash;
 		}
 	};
 
+	/** Repersents a blueprint for a texture input*/
 	struct TextureInput
 	{
 		str name;
@@ -170,6 +205,7 @@ public:
 		class Texture const *default_texture;
 	};
 
+	/** Repersents a blueprint for a buffer input */
 	struct BufferInput
 	{
 		str name;

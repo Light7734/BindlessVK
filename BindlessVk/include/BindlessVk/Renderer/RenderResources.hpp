@@ -9,6 +9,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Manages render garph attachments */
 class RenderResources
 {
 private:

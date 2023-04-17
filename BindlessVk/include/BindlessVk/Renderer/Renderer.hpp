@@ -7,6 +7,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Renders and presents render graphs */
 class Renderer
 {
 public:
@@ -29,7 +30,7 @@ public:
 	/** Deleted copy constructor */
 	Renderer(Renderer const &) = delete;
 
-	/** Deleted copy assignment operator  */
+	/** Deleted copy assignment operator */
 	Renderer &operator=(Renderer const &) = delete;
 
 	/** Destructor */

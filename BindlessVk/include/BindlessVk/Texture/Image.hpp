@@ -5,6 +5,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan image and it's memory alloaction */
 class Image
 {
 public:

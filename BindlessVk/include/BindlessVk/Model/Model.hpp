@@ -18,6 +18,7 @@ public:
 	friend class GltfLoader;
 
 public:
+	/** Holds attibutes of points-in-space to represent a geometric shape in gpu */
 	struct Vertex
 	{
 		Vec3f position;
@@ -30,8 +31,10 @@ public:
 		auto static get_vertex_input_state() -> vk::PipelineVertexInputStateCreateInfo;
 	};
 
+	/** A node that holds child-nodes and/or primitives and their transforrmation matrix */
 	struct Node
 	{
+		/** Renderable primitive composed of a set of vertex indices and a material */
 		struct Primitive
 		{
 			u32 first_index;
@@ -56,6 +59,7 @@ public:
 		Mat4f transform;
 	};
 
+	/** Parameters that affect the shading of models */
 	struct MaterialParameters
 	{
 		Vec3f albedo = Vec3f(1.0f);

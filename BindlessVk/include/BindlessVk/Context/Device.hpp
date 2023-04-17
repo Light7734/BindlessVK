@@ -5,6 +5,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan logical device */
 class Device
 {
 public:

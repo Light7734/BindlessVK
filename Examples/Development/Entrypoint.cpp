@@ -3,6 +3,7 @@
 #include <Framework/Common/Common.hpp>
 #include <iostream>
 
+/** The entry point */
 int main(int argc, char *argv[])
 {
 	try

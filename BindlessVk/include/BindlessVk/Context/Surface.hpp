@@ -5,10 +5,12 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+/** Wrapper around vulkan's surface */
 class Surface
 {
 public:
-	/** We need this so that we can clean up surface in case gpu selection fails */
+	/** Intermediate surface object to be created before picking the desired Gpu.
+	 *  We need this so that we can clean up surface in case gpu selection fails */
 	class WindowSurface
 	{
 	public:
