@@ -430,8 +430,15 @@ build/
 .vimspector.json
 compile_commands.json
 
+# ccls
 .ccls-cache/
 
+# Imgui
 imgui.ini
 
+# Compiled shader files
 *.spv
+
+# Documentations
+docs/html/
+docs/latex/
