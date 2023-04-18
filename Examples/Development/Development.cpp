@@ -253,24 +253,26 @@ void DevelopmentExampleApplication::load_materials()
 void DevelopmentExampleApplication::load_models()
 {
 	models.emplace(
-	    hash_str("flight_helmet"),
-	    model_loader.load_from_gltf_ascii(
-	        "Assets/FlightHelmet/FlightHelmet.gltf",
-	        staging_pool.get_by_index(0u),
-	        staging_pool.get_by_index(1u),
-	        staging_pool.get_by_index(2u),
-	        "flight_helmet"
-	    )
-	);
-
-	models.emplace(
 	    hash_str("skybox"),
 	    model_loader.load_from_gltf_ascii(
 	        "Assets/Cube/Cube.gltf",
+	        &vertex_buffer,
 	        staging_pool.get_by_index(0u),
 	        staging_pool.get_by_index(1u),
 	        staging_pool.get_by_index(2u),
 	        "skybox"
+	    )
+	);
+
+	models.emplace(
+	    hash_str("flight_helmet"),
+	    model_loader.load_from_gltf_ascii(
+	        "Assets/FlightHelmet/FlightHelmet.gltf",
+	        &vertex_buffer,
+	        staging_pool.get_by_index(0u),
+	        staging_pool.get_by_index(1u),
+	        staging_pool.get_by_index(2u),
+	        "flight_helmet"
 	    )
 	);
 }
@@ -421,9 +423,12 @@ void DevelopmentExampleApplication::create_render_graph()
 		&descriptor_allocator,
 	};
 
+	graph_user_data.scene = &scene;
+	graph_user_data.vertex_buffer = &vertex_buffer;
+
 	builder.set_type<BasicRendergraph>()
 	    .set_resources(renderer.get_resources())
-	    .set_user_data(&scene)
+	    .set_user_data(std::make_any<BasicRendergraph::UserData *>(&graph_user_data))
 	    .set_update_label(BasicRendergraph::get_update_label())
 	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
 	    .add_buffer_input({

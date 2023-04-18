@@ -62,15 +62,15 @@ void Renderer::render_graph(Rendergraph *const graph)
 
 	device->vk().resetCommandPool(cmd_pools[frame_index]);
 	auto const cmd = cmd_buffers[frame_index];
+	cmd.begin(vk::CommandBufferBeginInfo {});
 
 	cmd.beginDebugUtilsLabelEXT(graph->get_update_label());
-	graph->on_update(frame_index, image_index);
+	graph->on_update(cmd, frame_index, image_index);
 	cmd.endDebugUtilsLabelEXT();
 
 	for (auto *const pass : graph->get_passes())
 		pass->on_update(frame_index, image_index);
 
-	cmd.begin(vk::CommandBufferBeginInfo {});
 
 	for (u32 i = 0; i < graph->get_passes().size(); ++i)
 	{

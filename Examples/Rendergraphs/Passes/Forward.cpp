@@ -96,10 +96,15 @@ void Forwardpass::draw_model(bvk::Model const *const model, u32 &primitive_index
 {
 	auto const offset = VkDeviceSize { 0 };
 
-	cmd.bindVertexBuffers(0, 1, model->get_vertex_buffer()->vk(), &offset);
 	cmd.bindIndexBuffer(*(model->get_index_buffer()->vk()), 0u, vk::IndexType::eUint32);
 
 	for (auto const *node : model->get_nodes())
 		for (auto const &primitive : node->mesh)
-			cmd.drawIndexed(primitive.index_count, 1, primitive.first_index, 0, primitive_index++);
+			cmd.drawIndexed(
+			    primitive.index_count,
+			    1,
+			    primitive.first_index,
+			    model->get_vertex_offset(),
+			    primitive_index++
+			);
 }

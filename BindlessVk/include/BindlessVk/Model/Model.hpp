@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BindlessVk/Buffers/VertexBuffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Texture/Texture.hpp"
 
@@ -123,6 +124,11 @@ public:
 		return index_buffer;
 	}
 
+	auto get_vertex_offset() const
+	{
+		return vertex_buffer_region.offset / sizeof(Vertex);
+	}
+
 private:
 	Model() = default;
 
@@ -130,6 +136,8 @@ private:
 	vec<Node *> nodes = {};
 	vec<Texture> textures = {};
 	vec<MaterialParameters> material_parameters = {};
+
+	VertexBuffer::Subregion vertex_buffer_region = {};
 
 	class Buffer *vertex_buffer = {};
 	class Buffer *index_buffer = {};

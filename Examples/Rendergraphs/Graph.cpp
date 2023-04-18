@@ -58,18 +58,31 @@ auto BasicRendergraph::get_descriptor_set_bindings()
 	};
 }
 
-void BasicRendergraph::on_update(u32 const frame_index, u32 const image_index)
+void BasicRendergraph::on_update(
+    vk::CommandBuffer const cmd,
+    u32 const frame_index,
+    u32 const image_index
+)
 {
 	this->frame_index = frame_index;
-	scene = any_cast<Scene *>(user_data);
+
+	scene = std::any_cast<UserData *>(user_data)->scene;
+	vertex_buffer = std::any_cast<UserData *>(user_data)->vertex_buffer;
 
 	// These calls can accumulate descriptor_writes
 	update_for_cameras();
 	update_for_lights();
-	update_for_meshes();
 	update_for_skyboxes();
+	update_for_meshes();
 
 	update_descriptor_sets();
+
+	bind_vertex_buffer(cmd);
+}
+
+void BasicRendergraph::bind_vertex_buffer(vk::CommandBuffer const cmd)
+{
+	vertex_buffer->bind(cmd, 0);
 }
 
 void BasicRendergraph::update_descriptor_sets()

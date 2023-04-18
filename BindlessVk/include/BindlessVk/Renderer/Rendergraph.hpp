@@ -42,7 +42,7 @@ public:
 	virtual ~Rendergraph();
 
 	/** Updates the graph (global data like descriptor_set 0) */
-	void virtual on_update(u32 frame_index, u32 image_index) = 0;
+	void virtual on_update(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
 
 	/** Tirvial reference-accessor for passes */
 	auto &get_passes() const

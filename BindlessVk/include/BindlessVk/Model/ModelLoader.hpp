@@ -28,11 +28,16 @@ public:
 
 	/** Loads a model from a .gltf file
 	 *
-	 * @param name debug name attached to vulkan objects for debugging tools like renderdoc
-	 * @param file_path path to the gltf model file
+	 * @param file_path null-terminated str view to path of the gltf model file
+	 * @param vertex_buffer The vertex buffer
+	 * @param staging_vertex_buffer A buffer to be used to stage data for uploading to gpu
+	 * @param staging_index_buffer A buffer to be used to stage data for uploading to gpu
+	 * @param staging_image_buffer A buffer to be used to stage data for uploading to gpu
+	 * @param debug_namedebug name attached to vulkan objects for debugging tools like renderdoc
 	 */
 	auto load_from_gltf_ascii(
 	    str_view file_path,
+	    VertexBuffer *vertex_buffer,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_image_buffer,

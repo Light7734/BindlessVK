@@ -10,6 +10,7 @@ GltfLoader::GltfLoader(
     VkContext const *const vk_context,
     MemoryAllocator const *const memory_allocator,
     TextureLoader const *const texture_loader,
+    VertexBuffer *const vertex_buffer,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_texture_buffer
@@ -17,6 +18,7 @@ GltfLoader::GltfLoader(
     : vk_context(vk_context)
     , memory_allocator(memory_allocator)
     , texture_loader(texture_loader)
+    , vertex_buffer(vertex_buffer)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
     , staging_texture_buffer(staging_texture_buffer)
@@ -141,28 +143,10 @@ Model::Node *GltfLoader::load_node(const tinygltf::Node &gltf_node, Model::Node 
 
 void GltfLoader::write_vertex_buffer_to_gpu()
 {
-	model.vertex_buffer = new Buffer(
-	    vk_context,
-	    memory_allocator,
-	    vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	    vma::AllocationCreateInfo {
-	        {},
-	        vma::MemoryUsage::eAutoPreferDevice,
-	    },
-	    vertex_count * sizeof(Model::Vertex),
-	    1,
-	    fmt::format("{}_model_vb", model.debug_name)
-	);
-
 	staging_vertex_buffer->unmap();
-	model.vertex_buffer->write_buffer(
-	    *staging_vertex_buffer,
-	    {
-	        0u,
-	        0u,
-	        vertex_count * sizeof(Model::Vertex),
-	    }
-	);
+
+	model.vertex_buffer_region = vertex_buffer->grab_region(vertex_count * sizeof(Model::Vertex));
+	vertex_buffer->copy_staging_to_subregion(staging_vertex_buffer, model.vertex_buffer_region);
 }
 
 void GltfLoader::write_index_buffer_to_gpu()

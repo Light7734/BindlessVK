@@ -5,12 +5,12 @@
 //
 
 #include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
-#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Allocators/LayoutAllocator.hpp"
 #include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Material/MaterialSystem.hpp"
 #include "BindlessVk/Model/ModelLoader.hpp"
 #include "BindlessVk/Renderer/Renderer.hpp"
+#include "BindlessVk/Shader/DescriptorSet.hpp"
 #include "BindlessVk/Shader/Shader.hpp"
 #include "BindlessVk/Shader/ShaderLoader.hpp"
 #include "BindlessVk/Texture/Texture.hpp"
@@ -50,6 +50,8 @@ public:
 	bvk::MemoryAllocator memory_allocator = {};
 	bvk::LayoutAllocator layout_allocator = {};
 	bvk::DescriptorAllocator descriptor_allocator = {};
+
+	bvk::VertexBuffer vertex_buffer = {};
 
 	Scene scene = {};
 	Window window = {};

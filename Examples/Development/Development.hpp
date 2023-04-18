@@ -33,6 +33,9 @@ public:
 	}
 
 private:
+	BasicRendergraph::UserData graph_user_data;
+
+private:
 	void load_shaders();
 
 	void load_shader_effects();

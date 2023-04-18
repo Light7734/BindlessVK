@@ -18,6 +18,7 @@ public:
 	    VkContext const *vk_context,
 	    MemoryAllocator const *memory_allocator,
 	    TextureLoader const *texture_loader,
+	    VertexBuffer *vertex_buffer,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_texture_buffer
@@ -72,6 +73,8 @@ private:
 
 	MemoryAllocator const *memory_allocator = {};
 	TextureLoader const *texture_loader = {};
+
+	VertexBuffer *vertex_buffer = {};
 
 	tinygltf::Model gltf_model = {};
 	Model model = {};

@@ -17,6 +17,7 @@ ModelLoader::ModelLoader(
 
 auto ModelLoader::load_from_gltf_ascii(
     str_view const file_path,
+    VertexBuffer *const vertex_buffer,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_image_buffer,
@@ -27,9 +28,11 @@ auto ModelLoader::load_from_gltf_ascii(
 		vk_context,       // curse
 		memory_allocator, // you
 		&texture_loader,  // clang_format!
+		vertex_buffer,    // !!!!!!!!!!!!!
 		staging_vertex_buffer,
 		staging_index_buffer,
 		staging_image_buffer,
+
 	};
 
 	return std::move(loader.load_from_ascii(file_path, debug_name));

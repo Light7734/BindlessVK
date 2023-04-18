@@ -9,6 +9,12 @@
 class BasicRendergraph: public bvk::Rendergraph
 {
 public:
+	struct UserData
+	{
+		Scene *scene;
+		bvk::VertexBuffer *vertex_buffer;
+	};
+
 	struct FrameData
 	{
 		glm::mat4 projection;
@@ -51,8 +57,7 @@ public:
 
 	~BasicRendergraph() = default;
 
-
-	void on_update(u32 frame_index, u32 image_index) final;
+	void on_update(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
 
 	auto static get_descriptor_set_bindings()
 	    -> pair<arr<vk::DescriptorSetLayoutBinding, 5>, arr<vk::DescriptorBindingFlags, 5>>;
@@ -68,6 +73,8 @@ public:
 	}
 
 private:
+	void bind_vertex_buffer(vk::CommandBuffer cmd);
+
 	void update_descriptor_sets();
 
 	void update_for_cameras();
@@ -85,6 +92,8 @@ private:
 	void update_for_skybox(SkyboxComponent const &skybox);
 
 private:
+	bvk::VertexBuffer *vertex_buffer = {};
+
 	u32 frame_index = {};
 	Scene *scene = {};
 	vec<vk::WriteDescriptorSet> descriptor_writes = {};
