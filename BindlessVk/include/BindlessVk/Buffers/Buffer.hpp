@@ -8,62 +8,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** Wrapper around a vulkan buffer and it's memory allocation */
-class AllocatedBuffer
-{
-public:
-	/** Default constructor */
-	AllocatedBuffer() = default;
-
-	/** Argumented constructor
-	 *
-	 * @param vk_context The vulkan context
-	 * @param memory_allocator The memory allocator
-	 * @param create_info Parameters to be used to create the image
-	 * @param allocate_info Parameters to be used to allocate the memory for the image
-	 */
-	AllocatedBuffer(
-	    MemoryAllocator const *memory_allocator,
-	    vk::BufferCreateInfo const &create_info,
-	    vma::AllocationCreateInfo const &allocate_info
-	);
-
-	/** Move constructor */
-	AllocatedBuffer(AllocatedBuffer &&other);
-
-	/** Move assignment operator */
-	AllocatedBuffer &operator=(AllocatedBuffer &&other);
-
-	/** Deleted copy constructor */
-	AllocatedBuffer(AllocatedBuffer const &) = delete;
-
-	/** Deleted copy assignment operator */
-	AllocatedBuffer &operator=(AllocatedBuffer const &) = delete;
-
-	/** Destructor */
-	~AllocatedBuffer();
-
-	/** Trivial address-accessor for the underlying buffer */
-	auto vk() const
-	{
-		return &allocated_buffer.first;
-	}
-
-	/** Trivial accessor for allocation */
-	auto get_allocation() const
-	{
-		return allocated_buffer.second;
-	}
-
-private:
-	Device const *device = {};
-	MemoryAllocator const *memory_allocator = {};
-
-	pair<vk::Buffer, vma::Allocation> allocated_buffer = {};
-};
-
-
-/** Wrapper around AllocatedBuffer that provides utilties to read/write to it */
+/** Wrapper around a vulkan buffer and it's allocation */
 class Buffer
 {
 public:
@@ -145,7 +90,7 @@ public:
 	/** Address accessor for the underlying buffer */
 	auto vk() const
 	{
-		return buffer.vk();
+		return &allocated_buffer.first;
 	}
 
 	/** Trivial accessor for descriptor_info */
@@ -185,7 +130,7 @@ private:
 	Device const *device = {};
 	MemoryAllocator const *memory_allocator = {};
 
-	AllocatedBuffer buffer = {};
+	pair<vk::Buffer, vma::Allocation> allocated_buffer = {};
 
 	vk::DeviceSize whole_size = {};
 	vk::DeviceSize block_size = {};

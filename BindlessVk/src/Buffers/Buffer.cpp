@@ -2,39 +2,6 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-AllocatedBuffer::AllocatedBuffer(
-    MemoryAllocator const *const memory_allocator,
-    vk::BufferCreateInfo const &create_info,
-    vma::AllocationCreateInfo const &allocate_info
-)
-    : memory_allocator(memory_allocator)
-    , allocated_buffer(memory_allocator->vma().createBuffer(create_info, allocate_info))
-{
-}
-
-AllocatedBuffer::AllocatedBuffer(AllocatedBuffer &&other)
-{
-	*this = std::move(other);
-}
-
-AllocatedBuffer &AllocatedBuffer::operator=(AllocatedBuffer &&other)
-{
-	this->memory_allocator = other.memory_allocator;
-	this->allocated_buffer = other.allocated_buffer;
-
-	other.memory_allocator = {};
-
-	return *this;
-}
-
-AllocatedBuffer::~AllocatedBuffer()
-{
-	auto const &[buffer, allocation] = allocated_buffer;
-
-	if (memory_allocator)
-		memory_allocator->vma().destroyBuffer(buffer, allocation);
-}
-
 Buffer::Buffer(
     VkContext const *const vk_context,
     MemoryAllocator const *const memory_allocator,
@@ -52,8 +19,7 @@ Buffer::Buffer(
 {
 	calculate_block_size(vk_context->get_gpu());
 
-	buffer = AllocatedBuffer(
-	    memory_allocator,
+	allocated_buffer = memory_allocator->vma().createBuffer(
 	    vk::BufferCreateInfo {
 	        {},
 	        whole_size,
@@ -63,14 +29,16 @@ Buffer::Buffer(
 	    vma_info
 	);
 
+	auto &[buffer, allocation] = allocated_buffer;
+
 	descriptor_info = vk::DescriptorBufferInfo {
-		*buffer.vk(),
+		buffer,
 		0u,
 		VK_WHOLE_SIZE,
 	};
 
-	memory_allocator->vma().setAllocationName(buffer.get_allocation(), this->debug_name.c_str());
-	vk_context->get_debug_utils()->set_object_name(device->vk(), *buffer.vk(), this->debug_name);
+	memory_allocator->vma().setAllocationName(allocation, this->debug_name.c_str());
+	vk_context->get_debug_utils()->set_object_name(device->vk(), buffer, this->debug_name);
 }
 
 Buffer::Buffer(Buffer &&other) noexcept
@@ -82,12 +50,12 @@ Buffer &Buffer::operator=(Buffer &&other) noexcept
 {
 	this->device = other.device;
 	this->memory_allocator = other.memory_allocator;
-	this->buffer = std::move(other.buffer);
 	this->whole_size = other.whole_size;
 	this->block_size = other.block_size;
 	this->block_count = other.block_count;
 	this->valid_block_size = other.valid_block_size;
 	this->descriptor_info = other.descriptor_info;
+	this->allocated_buffer = other.allocated_buffer;
 
 	other.memory_allocator = {};
 
@@ -96,6 +64,10 @@ Buffer &Buffer::operator=(Buffer &&other) noexcept
 
 Buffer::~Buffer()
 {
+	auto const &[buffer, allocation] = allocated_buffer;
+
+	if (memory_allocator)
+		memory_allocator->vma().destroyBuffer(buffer, allocation);
 }
 
 void Buffer::write_data(
@@ -111,7 +83,9 @@ void Buffer::write_data(
 void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_copy)
 {
 	device->immediate_submit([&](vk::CommandBuffer cmd) {
-		cmd.copyBuffer(*src_buffer.vk(), *buffer.vk(), 1u, &src_copy);
+		auto &[buffer, allocation] = allocated_buffer;
+
+		cmd.copyBuffer(*src_buffer.vk(), buffer, 1u, &src_copy);
 	});
 }
 
@@ -127,13 +101,17 @@ void Buffer::calculate_block_size(Gpu const *const gpu)
 
 void *Buffer::map_block(u32 const block_index)
 {
-	auto const map = (u8 *)memory_allocator->vma().mapMemory(buffer.get_allocation());
+	auto &[buffer, allocation] = allocated_buffer;
+
+	auto const map = (u8 *)memory_allocator->vma().mapMemory(allocation);
 	return map + (block_size * block_index);
 }
 
 void Buffer::unmap() const
 {
-	memory_allocator->vma().unmapMemory(buffer.get_allocation());
+	auto &[buffer, allocation] = allocated_buffer;
+
+	memory_allocator->vma().unmapMemory(allocation);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

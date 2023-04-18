@@ -16,7 +16,7 @@ enum class DebugCallbackSource
 	nCount
 };
 
-/** Debug utilities */
+/** Responsible for logging and handling vulkan debug utils extension */
 class DebugUtils
 {
 public:
