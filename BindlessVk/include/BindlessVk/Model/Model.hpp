@@ -1,6 +1,6 @@
 #pragma once
 
-#include "BindlessVk/Buffers/VertexBuffer.hpp"
+#include "BindlessVk/Buffers/FragmentedBuffer.hpp"
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Texture/Texture.hpp"
 
@@ -112,21 +112,22 @@ public:
 		return material_parameters;
 	}
 
-	/** Trivial address accessor for vertex_buffer */
+	/** Trivial accessor for vertex_buffer */
 	auto get_vertex_buffer() const
 	{
 		return vertex_buffer;
 	}
 
-	/** Trivial address accessor for index_buffer */
+	/** Trivial accessor for index_buffer */
 	auto get_index_buffer() const
 	{
 		return index_buffer;
 	}
 
+	/**  Calcualtes the vertex offset from beginning of vertex buffer to model's first vertex */
 	auto get_vertex_offset() const
 	{
-		return vertex_buffer_region.offset;
+		return vertex_buffer_fragment.offset / sizeof(Model::Vertex);
 	}
 
 private:
@@ -137,7 +138,7 @@ private:
 	vec<Texture> textures = {};
 	vec<MaterialParameters> material_parameters = {};
 
-	VertexBuffer::Subregion vertex_buffer_region = {};
+	FragmentedBuffer::Fragment vertex_buffer_fragment = {};
 
 	class Buffer *vertex_buffer = {};
 	class Buffer *index_buffer = {};

@@ -77,12 +77,12 @@ void BasicRendergraph::on_update(
 
 	update_descriptor_sets();
 
-	bind_vertex_buffer(cmd);
+	bind_buffers(cmd);
 }
 
-void BasicRendergraph::bind_vertex_buffer(vk::CommandBuffer const cmd)
+void BasicRendergraph::bind_buffers(vk::CommandBuffer const cmd)
 {
-	vertex_buffer->bind(cmd, 0);
+	vertex_buffer->bind(cmd);
 }
 
 void BasicRendergraph::update_descriptor_sets()

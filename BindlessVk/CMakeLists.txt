@@ -10,7 +10,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Allocators/MemoryAllocator.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/Buffer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/VertexBuffer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/FragmentedBuffer.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/DebugUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Device.cpp

@@ -51,7 +51,7 @@ public:
 	bvk::LayoutAllocator layout_allocator = {};
 	bvk::DescriptorAllocator descriptor_allocator = {};
 
-	bvk::VertexBuffer vertex_buffer = {};
+	bvk::FragmentedBuffer vertex_buffer = {};
 
 	Scene scene = {};
 	Window window = {};

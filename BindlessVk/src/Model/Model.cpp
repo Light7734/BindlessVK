@@ -15,7 +15,7 @@ Model &Model::operator=(Model &&other)
 	this->textures = std::move(other.textures);
 	this->material_parameters = std::move(other.material_parameters);
 	this->vertex_buffer = other.vertex_buffer;
-	this->vertex_buffer_region = other.vertex_buffer_region;
+	this->vertex_buffer_fragment = other.vertex_buffer_fragment;
 	this->index_buffer = other.index_buffer;
 	this->debug_name = other.debug_name;
 

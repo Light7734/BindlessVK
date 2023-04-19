@@ -37,7 +37,7 @@ public:
 	 */
 	auto load_from_gltf_ascii(
 	    str_view file_path,
-	    VertexBuffer *vertex_buffer,
+	    FragmentedBuffer *vertex_buffer,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_image_buffer,

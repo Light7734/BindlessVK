@@ -30,10 +30,12 @@ Application::Application()
 	create_loaders();
 	load_default_textures();
 
-	vertex_buffer = bvk::VertexBuffer {
+	vertex_buffer = bvk::FragmentedBuffer {
 		&vk_context,
 		&memory_allocator,
-		1024 * 1024 * 8,
+		bvk::FragmentedBuffer::Type::eVertex,
+		1024 * 1024 * 1024,
+
 	};
 }
 

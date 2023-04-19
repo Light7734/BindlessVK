@@ -12,7 +12,7 @@ public:
 	struct UserData
 	{
 		Scene *scene;
-		bvk::VertexBuffer *vertex_buffer;
+		bvk::FragmentedBuffer *vertex_buffer;
 	};
 
 	struct FrameData
@@ -73,7 +73,7 @@ public:
 	}
 
 private:
-	void bind_vertex_buffer(vk::CommandBuffer cmd);
+	void bind_buffers(vk::CommandBuffer cmd);
 
 	void update_descriptor_sets();
 
@@ -92,7 +92,7 @@ private:
 	void update_for_skybox(SkyboxComponent const &skybox);
 
 private:
-	bvk::VertexBuffer *vertex_buffer = {};
+	bvk::FragmentedBuffer *vertex_buffer = {};
 
 	u32 frame_index = {};
 	Scene *scene = {};

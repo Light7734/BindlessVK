@@ -10,7 +10,7 @@ GltfLoader::GltfLoader(
     VkContext const *const vk_context,
     MemoryAllocator const *const memory_allocator,
     TextureLoader const *const texture_loader,
-    VertexBuffer *const vertex_buffer,
+    FragmentedBuffer *const vertex_buffer,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_texture_buffer
@@ -145,8 +145,10 @@ void GltfLoader::write_vertex_buffer_to_gpu()
 {
 	staging_vertex_buffer->unmap();
 
-	model.vertex_buffer_region = vertex_buffer->grab_region(vertex_count);
-	vertex_buffer->copy_staging_to_subregion(staging_vertex_buffer, model.vertex_buffer_region);
+	model.vertex_buffer_fragment =
+	    vertex_buffer->grab_fragment(vertex_count * sizeof(Model::Vertex));
+
+	vertex_buffer->copy_staging_to_subregion(staging_vertex_buffer, model.vertex_buffer_fragment);
 }
 
 void GltfLoader::write_index_buffer_to_gpu()
@@ -165,6 +167,7 @@ void GltfLoader::write_index_buffer_to_gpu()
 	);
 
 	staging_index_buffer->unmap();
+
 	model.index_buffer->write_buffer(
 	    *staging_index_buffer,
 	    {
