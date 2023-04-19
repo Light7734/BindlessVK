@@ -1,11 +1,13 @@
 #include "BindlessVk/Buffers/VertexBuffer.hpp"
 
+#include "BindlessVk/Model/Model.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 VertexBuffer::VertexBuffer(
     VkContext const *vk_context,
     MemoryAllocator const *const memory_allocator,
-    usize size
+    usize vertex_count
 )
     : debug_utils(vk_context->get_debug_utils())
 {
@@ -17,12 +19,18 @@ VertexBuffer::VertexBuffer(
 		    vma::AllocationCreateFlagBits::eHostAccessRandom,
 		    vma::MemoryUsage::eAutoPreferDevice,
 		},
-		size,
+		vertex_count * sizeof(Model::Vertex),
 		1u,
 		fmt::format("vertex_buffer"),
 	};
 
-	regions.push_back(Subregion { 0, size });
+	debug_utils->log(
+	    LogLvl::eTrace,
+	    "Vertex buffer created with size: {} ({} vertices))",
+	    vertex_count * sizeof(Model::Vertex),
+	    vertex_count
+	);
+	regions.push_back(Subregion { 0, vertex_count });
 
 	map = buffer->map_block(0);
 }
@@ -56,8 +64,8 @@ void VertexBuffer::copy_staging_to_subregion(Buffer *staging_buffer, Subregion s
 	    *staging_buffer,
 	    vk::BufferCopy {
 	        0,
-	        subregion.offset,
-	        subregion.length,
+	        subregion.offset * sizeof(Model::Vertex),
+	        subregion.length * sizeof(Model::Vertex),
 	    }
 	);
 }
@@ -68,22 +76,22 @@ void VertexBuffer::bind(vk::CommandBuffer cmd, u32 binding) const
 	cmd.bindVertexBuffers(binding, 1, buffer->vk(), &offset);
 }
 
-[[nodiscard]] auto VertexBuffer::grab_region(u32 size) -> Subregion
+[[nodiscard]] auto VertexBuffer::grab_region(u32 vertex_count) -> Subregion
 {
 	for (auto &region : regions)
-		if (region.length >= size)
+		if (region.length >= vertex_count)
 		{
-			region.offset += size; // OR -> region.length -= size;
 			debug_utils->log(
 			    LogLvl::eTrace,
 			    "Grabbed vertex buffer region: [off: {}, len: {}]",
-			    region.offset - size,
-			    size
+			    region.offset,
+			    vertex_count
 			);
 
+			region.offset += vertex_count; // OR -> region.length -= size;
 			return Subregion {
-				region.offset - size,
-				size,
+				region.offset - vertex_count,
+				vertex_count,
 			};
 		}
 

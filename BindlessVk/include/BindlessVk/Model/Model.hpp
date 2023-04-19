@@ -126,7 +126,7 @@ public:
 
 	auto get_vertex_offset() const
 	{
-		return vertex_buffer_region.offset / sizeof(Vertex);
+		return vertex_buffer_region.offset;
 	}
 
 private:

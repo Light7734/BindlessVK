@@ -56,7 +56,7 @@ public:
 
 private:
 	Device *device = {};
-    DebugUtils* debug_utils = {};
+	DebugUtils *debug_utils = {};
 
 	vec<Subregion> regions = {};
 

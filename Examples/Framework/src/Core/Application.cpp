@@ -33,7 +33,7 @@ Application::Application()
 	vertex_buffer = bvk::VertexBuffer {
 		&vk_context,
 		&memory_allocator,
-		1024 * 1024 * 1024, // 1 GB
+		1024 * 1024 * 8,
 	};
 }
 

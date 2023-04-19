@@ -145,7 +145,7 @@ void GltfLoader::write_vertex_buffer_to_gpu()
 {
 	staging_vertex_buffer->unmap();
 
-	model.vertex_buffer_region = vertex_buffer->grab_region(vertex_count * sizeof(Model::Vertex));
+	model.vertex_buffer_region = vertex_buffer->grab_region(vertex_count);
 	vertex_buffer->copy_staging_to_subregion(staging_vertex_buffer, model.vertex_buffer_region);
 }
 
@@ -213,7 +213,7 @@ void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_pr
 			uv_buffer ? Vec2f(&uv_buffer[v * 2]) : Vec2f(0.0f),
 		};
 
-		vertex_count++;
+		++vertex_count;
 	}
 }
 
@@ -222,14 +222,13 @@ auto GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive &gltf_pri
 	auto const &accessor = gltf_model.accessors[gltf_primitive.indices];
 	auto const &buffer_view = gltf_model.bufferViews[accessor.bufferView];
 	auto const &buffer = gltf_model.buffers[buffer_view.buffer];
+	auto const byte_offset = accessor.byteOffset + buffer_view.byteOffset;
 
 	switch (accessor.componentType)
 	{
 	case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:
 	{
-		const u32 *buf =
-		    reinterpret_cast<const u32 *>(&buffer.data[accessor.byteOffset + buffer_view.byteOffset]
-		    );
+		auto buf = reinterpret_cast<u32 const *>(&buffer.data[byte_offset]);
 		for (size_t index = 0; index < accessor.count; index++)
 		{
 			index_map[index_count] = buf[index] + vertex_count;
@@ -239,9 +238,7 @@ auto GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive &gltf_pri
 	}
 	case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:
 	{
-		const u16 *buf =
-		    reinterpret_cast<const u16 *>(&buffer.data[accessor.byteOffset + buffer_view.byteOffset]
-		    );
+		auto buf = reinterpret_cast<u16 const *>(&buffer.data[byte_offset]);
 		for (usize index = 0; index < accessor.count; index++)
 		{
 			index_map[index_count] = buf[index] + vertex_count;
@@ -251,9 +248,7 @@ auto GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive &gltf_pri
 	}
 	case TINYGLTF_PARAMETER_TYPE_BYTE:
 	{
-		const u8 *buf =
-		    reinterpret_cast<const u8 *>(&buffer.data[accessor.byteOffset + buffer_view.byteOffset]
-		    );
+		auto buf = reinterpret_cast<u8 const *>(&buffer.data[byte_offset]);
 		for (usize index = 0; index < accessor.count; index++)
 		{
 			index_map[index_count] = buf[index] + vertex_count;
