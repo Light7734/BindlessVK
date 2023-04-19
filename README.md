@@ -38,12 +38,10 @@ ln -s ./build/compile_commands.json ./compile_commands.json
 **Commit types:**
 -   **feat:** Changes that add a new feature.
 -   **fix:** Changes that fix a bug.
--   **refactor:** Changes that neither fix a bug nor add a feature.
+-   **refactor:** Changes that improve the code quality (readablity/performance/extensibility/etc)
 -   **style:** Changes to code that won't affect the compiled code.
 -   **docs:** Changes to the documentations.
--   **perf:** Changes that improve the code performance.
 -   **asset:** Changes to the assets.
--   **wip:** Prefix added to aforementioned commit types to split the change in to multiple commits.
 
 **Branches:**
 -   **main:** main development branch.
