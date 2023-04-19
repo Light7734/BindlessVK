@@ -29,14 +29,6 @@ Application::Application()
 
 	create_loaders();
 	load_default_textures();
-
-	vertex_buffer = bvk::FragmentedBuffer {
-		&vk_context,
-		&memory_allocator,
-		bvk::FragmentedBuffer::Type::eVertex,
-		1024 * 1024 * 1024,
-
-	};
 }
 
 Application::~Application()
@@ -224,6 +216,24 @@ void Application::create_loaders()
 	texture_loader = { &vk_context, &memory_allocator };
 	model_loader = { &vk_context, &memory_allocator };
 	shader_loader = { &vk_context };
+}
+
+void Application::create_buffers()
+{
+	vertex_buffer = bvk::FragmentedBuffer {
+		&vk_context,
+		&memory_allocator,
+		bvk::FragmentedBuffer::Type::eVertex,
+		1024 * 1024 * 1024,
+	};
+
+
+	index_buffer = bvk::FragmentedBuffer {
+		&vk_context,
+		&memory_allocator,
+		bvk::FragmentedBuffer::Type::eIndex,
+		(1024 * 1024 * 1024) / 2,
+	};
 }
 
 void Application::load_default_textures()

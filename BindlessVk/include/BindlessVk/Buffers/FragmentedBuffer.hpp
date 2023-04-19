@@ -56,7 +56,7 @@ public:
 	/** Destructor */
 	~FragmentedBuffer();
 
-	void copy_staging_to_subregion(Buffer *staging_buffer, Fragment subregion);
+	void copy_staging_to_fragment(Buffer *staging_buffer, Fragment fragment);
 
 	void bind(vk::CommandBuffer cmd, u32 binding = 0) const;
 
@@ -75,8 +75,8 @@ public:
 	void return_fragment(Fragment returned_fragment);
 
 private:
-	Device *device = {};
 	DebugUtils *debug_utils = {};
+
 	Type type = {};
 
 	vec<Fragment> fragments = {};

@@ -52,6 +52,7 @@ public:
 	bvk::DescriptorAllocator descriptor_allocator = {};
 
 	bvk::FragmentedBuffer vertex_buffer = {};
+	bvk::FragmentedBuffer index_buffer = {};
 
 	Scene scene = {};
 	Window window = {};
@@ -82,7 +83,7 @@ private:
 	void create_descriptor_pool();
 	void create_user_interface();
 	void create_loaders();
-	void create_renderer();
+	void create_buffers();
 
 	void load_default_textures();
 

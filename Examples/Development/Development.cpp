@@ -257,6 +257,7 @@ void DevelopmentExampleApplication::load_models()
 	    model_loader.load_from_gltf_ascii(
 	        "Assets/Cube/Cube.gltf",
 	        &vertex_buffer,
+	        &index_buffer,
 	        staging_pool.get_by_index(0u),
 	        staging_pool.get_by_index(1u),
 	        staging_pool.get_by_index(2u),
@@ -269,6 +270,7 @@ void DevelopmentExampleApplication::load_models()
 	    model_loader.load_from_gltf_ascii(
 	        "Assets/FlightHelmet/FlightHelmet.gltf",
 	        &vertex_buffer,
+	        &index_buffer,
 	        staging_pool.get_by_index(0u),
 	        staging_pool.get_by_index(1u),
 	        staging_pool.get_by_index(2u),
@@ -425,6 +427,7 @@ void DevelopmentExampleApplication::create_render_graph()
 
 	graph_user_data.scene = &scene;
 	graph_user_data.vertex_buffer = &vertex_buffer;
+	graph_user_data.index_buffer = &index_buffer;
 
 	builder.set_type<BasicRendergraph>()
 	    .set_resources(renderer.get_resources())

@@ -68,6 +68,7 @@ void BasicRendergraph::on_update(
 
 	scene = std::any_cast<UserData *>(user_data)->scene;
 	vertex_buffer = std::any_cast<UserData *>(user_data)->vertex_buffer;
+	index_buffer = std::any_cast<UserData *>(user_data)->index_buffer;
 
 	// These calls can accumulate descriptor_writes
 	update_for_cameras();
@@ -83,6 +84,7 @@ void BasicRendergraph::on_update(
 void BasicRendergraph::bind_buffers(vk::CommandBuffer const cmd)
 {
 	vertex_buffer->bind(cmd);
+	index_buffer->bind(cmd);
 }
 
 void BasicRendergraph::update_descriptor_sets()

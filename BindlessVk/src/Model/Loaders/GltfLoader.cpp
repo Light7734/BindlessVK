@@ -11,6 +11,7 @@ GltfLoader::GltfLoader(
     MemoryAllocator const *const memory_allocator,
     TextureLoader const *const texture_loader,
     FragmentedBuffer *const vertex_buffer,
+    FragmentedBuffer *const index_buffer,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_texture_buffer
@@ -19,6 +20,7 @@ GltfLoader::GltfLoader(
     , memory_allocator(memory_allocator)
     , texture_loader(texture_loader)
     , vertex_buffer(vertex_buffer)
+    , index_buffer(index_buffer)
     , staging_vertex_buffer(staging_vertex_buffer)
     , staging_index_buffer(staging_index_buffer)
     , staging_texture_buffer(staging_texture_buffer)
@@ -81,7 +83,6 @@ void GltfLoader::load_textures()
 
 void GltfLoader::load_material_parameters()
 {
-	auto t = gltf_model.materials.begin();
 	for (auto &material : gltf_model.materials)
 	{
 		assert_false(
@@ -148,36 +149,15 @@ void GltfLoader::write_vertex_buffer_to_gpu()
 	model.vertex_buffer_fragment =
 	    vertex_buffer->grab_fragment(vertex_count * sizeof(Model::Vertex));
 
-	vertex_buffer->copy_staging_to_subregion(staging_vertex_buffer, model.vertex_buffer_fragment);
+	vertex_buffer->copy_staging_to_fragment(staging_vertex_buffer, model.vertex_buffer_fragment);
 }
 
 void GltfLoader::write_index_buffer_to_gpu()
 {
-	model.index_buffer = new Buffer(
-	    vk_context,
-	    memory_allocator,
-	    vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	    vma::AllocationCreateInfo {
-	        {},
-	        vma::MemoryUsage::eAutoPreferDevice,
-	    },
-	    index_count * sizeof(u32),
-	    1,
-	    fmt::format("{}_model_ib", model.debug_name)
-	);
-
 	staging_index_buffer->unmap();
 
-	model.index_buffer->write_buffer(
-	    *staging_index_buffer,
-	    {
-	        0u,
-	        0u,
-	        index_count * sizeof(u32),
-	    }
-	);
-
-	vk_context->get_device()->vk().waitIdle();
+	model.index_buffer_fragment = index_buffer->grab_fragment(index_count * sizeof(u32));
+	index_buffer->copy_staging_to_fragment(staging_index_buffer, model.index_buffer_fragment);
 }
 
 void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::Node *node)

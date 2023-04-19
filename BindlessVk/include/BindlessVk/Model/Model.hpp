@@ -112,22 +112,16 @@ public:
 		return material_parameters;
 	}
 
-	/** Trivial accessor for vertex_buffer */
-	auto get_vertex_buffer() const
-	{
-		return vertex_buffer;
-	}
-
-	/** Trivial accessor for index_buffer */
-	auto get_index_buffer() const
-	{
-		return index_buffer;
-	}
-
 	/**  Calcualtes the vertex offset from beginning of vertex buffer to model's first vertex */
 	auto get_vertex_offset() const
 	{
 		return vertex_buffer_fragment.offset / sizeof(Model::Vertex);
+	}
+
+	/**  Calcualtes the index offset from beginning of index buffer to model's first index */
+	auto get_index_offset() const
+	{
+		return index_buffer_fragment.offset / sizeof(u32);
 	}
 
 private:
@@ -139,9 +133,7 @@ private:
 	vec<MaterialParameters> material_parameters = {};
 
 	FragmentedBuffer::Fragment vertex_buffer_fragment = {};
-
-	class Buffer *vertex_buffer = {};
-	class Buffer *index_buffer = {};
+	FragmentedBuffer::Fragment index_buffer_fragment = {};
 
 	str debug_name = {};
 };

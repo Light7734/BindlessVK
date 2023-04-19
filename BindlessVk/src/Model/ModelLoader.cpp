@@ -18,6 +18,7 @@ ModelLoader::ModelLoader(
 auto ModelLoader::load_from_gltf_ascii(
     str_view const file_path,
     FragmentedBuffer *const vertex_buffer,
+    FragmentedBuffer *const index_buffer,
     Buffer *const staging_vertex_buffer,
     Buffer *const staging_index_buffer,
     Buffer *const staging_image_buffer,
@@ -29,6 +30,7 @@ auto ModelLoader::load_from_gltf_ascii(
 		memory_allocator, // you
 		&texture_loader,  // clang_format!
 		vertex_buffer,    // !!!!!!!!!!!!!
+		index_buffer,     // ----_____----
 		staging_vertex_buffer,
 		staging_index_buffer,
 		staging_image_buffer,

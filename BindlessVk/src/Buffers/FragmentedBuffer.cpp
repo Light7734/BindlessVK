@@ -11,6 +11,7 @@ FragmentedBuffer::FragmentedBuffer(
 )
     : debug_utils(vk_context->get_debug_utils())
     , fragments({ { 0, size } })
+    , type(type)
     , buffer(
 
           vk_context,
@@ -30,7 +31,6 @@ FragmentedBuffer::FragmentedBuffer(
           debug_name
       )
     , map(buffer.map_block(0))
-    , type(type)
 {
 }
 
@@ -41,11 +41,11 @@ FragmentedBuffer::FragmentedBuffer(FragmentedBuffer &&other)
 
 FragmentedBuffer &FragmentedBuffer::operator=(FragmentedBuffer &&other)
 {
-	this->device = other.device;
+	this->debug_utils = other.debug_utils;
 	this->fragments = other.fragments;
+	this->type = other.type;
 	this->buffer = std::move(other.buffer);
 	this->map = other.map;
-	this->debug_utils = other.debug_utils;
 
 	other.buffer = {};
 
@@ -56,14 +56,14 @@ FragmentedBuffer::~FragmentedBuffer()
 {
 }
 
-void FragmentedBuffer::copy_staging_to_subregion(Buffer *staging_buffer, Fragment subregion)
+void FragmentedBuffer::copy_staging_to_fragment(Buffer *staging_buffer, Fragment fragment)
 {
 	buffer.write_buffer(
 	    *staging_buffer,
 	    vk::BufferCopy {
 	        0,
-	        subregion.offset,
-	        subregion.length,
+	        fragment.offset,
+	        fragment.length,
 	    }
 	);
 }

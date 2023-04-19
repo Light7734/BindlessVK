@@ -94,17 +94,16 @@ void Forwardpass::switch_pipeline(vk::Pipeline pipeline)
 
 void Forwardpass::draw_model(bvk::Model const *const model, u32 &primitive_index)
 {
-	auto const offset = VkDeviceSize { 0 };
-
-	cmd.bindIndexBuffer(*(model->get_index_buffer()->vk()), 0u, vk::IndexType::eUint32);
+	auto const index_offset = model->get_index_offset();
+	auto const vertex_offset = model->get_vertex_offset();
 
 	for (auto const *node : model->get_nodes())
 		for (auto const &primitive : node->mesh)
 			cmd.drawIndexed(
 			    primitive.index_count,
 			    1,
-			    primitive.first_index,
-			    model->get_vertex_offset(),
+			    primitive.first_index + index_offset,
+			    vertex_offset,
 			    primitive_index++
 			);
 }

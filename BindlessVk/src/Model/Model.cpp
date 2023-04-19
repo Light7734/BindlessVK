@@ -14,9 +14,8 @@ Model &Model::operator=(Model &&other)
 	this->nodes = std::move(other.nodes);
 	this->textures = std::move(other.textures);
 	this->material_parameters = std::move(other.material_parameters);
-	this->vertex_buffer = other.vertex_buffer;
 	this->vertex_buffer_fragment = other.vertex_buffer_fragment;
-	this->index_buffer = other.index_buffer;
+	this->index_buffer_fragment = other.index_buffer_fragment;
 	this->debug_name = other.debug_name;
 
 	return *this;
@@ -29,9 +28,6 @@ Model::~Model()
 
 	for (auto *node : nodes)
 		delete node;
-
-	delete index_buffer;
-	delete vertex_buffer;
 }
 
 auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription, 4>

@@ -20,6 +20,7 @@ public:
 	    MemoryAllocator const *memory_allocator,
 	    TextureLoader const *texture_loader,
 	    FragmentedBuffer *vertex_buffer,
+	    FragmentedBuffer *index_buffer,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_texture_buffer
@@ -76,6 +77,7 @@ private:
 	TextureLoader const *texture_loader = {};
 
 	FragmentedBuffer *vertex_buffer = {};
+	FragmentedBuffer *index_buffer = {};
 
 	tinygltf::Model gltf_model = {};
 	Model model = {};

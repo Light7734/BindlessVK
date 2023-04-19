@@ -13,6 +13,7 @@ public:
 	{
 		Scene *scene;
 		bvk::FragmentedBuffer *vertex_buffer;
+		bvk::FragmentedBuffer *index_buffer;
 	};
 
 	struct FrameData
@@ -93,6 +94,7 @@ private:
 
 private:
 	bvk::FragmentedBuffer *vertex_buffer = {};
+	bvk::FragmentedBuffer *index_buffer = {};
 
 	u32 frame_index = {};
 	Scene *scene = {};

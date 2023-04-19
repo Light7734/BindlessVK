@@ -29,7 +29,8 @@ public:
 	/** Loads a model from a .gltf file
 	 *
 	 * @param file_path null-terminated str view to path of the gltf model file
-	 * @param vertex_buffer The vertex buffer
+	 * @param vertex_buffer A fragmented buffer for vertex data to be written to
+	 * @param index_bufer A fragmented buffer for index data to be written to
 	 * @param staging_vertex_buffer A buffer to be used to stage data for uploading to gpu
 	 * @param staging_index_buffer A buffer to be used to stage data for uploading to gpu
 	 * @param staging_image_buffer A buffer to be used to stage data for uploading to gpu
@@ -38,6 +39,7 @@ public:
 	auto load_from_gltf_ascii(
 	    str_view file_path,
 	    FragmentedBuffer *vertex_buffer,
+	    FragmentedBuffer *index_buffer,
 	    Buffer *staging_vertex_buffer,
 	    Buffer *staging_index_buffer,
 	    Buffer *staging_image_buffer,
