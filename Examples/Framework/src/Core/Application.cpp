@@ -29,6 +29,7 @@ Application::Application()
 
 	create_loaders();
 	load_default_textures();
+    create_buffers();
 }
 
 Application::~Application()
