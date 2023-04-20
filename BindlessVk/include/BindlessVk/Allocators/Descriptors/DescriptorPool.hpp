@@ -51,7 +51,6 @@ public:
 		return descriptor_pool;
 	}
 
-
 private:
 	Device *device = {};
 

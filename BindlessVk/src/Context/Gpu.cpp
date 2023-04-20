@@ -103,7 +103,7 @@ void Gpu::calculate_queue_indices()
 		if (physical_device.getSurfaceSupportKHR(index, surface))
 			present_queue_index = index;
 
-		++index;
+		index++;
 
 		if (graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
 		    present_queue_index != VK_QUEUE_FAMILY_IGNORED)
@@ -119,21 +119,21 @@ void Gpu::check_adequacy()
 
 auto Gpu::has_required_features() const -> bool
 {
-	// auto const required_features_arr = vec<vk::Bool32>(
-	//     reinterpret_cast<vk::Bool32 const *>(&requirements.physical_device_features),
-	//     reinterpret_cast<vk::Bool32 const
-	//     *>(requirements.physical_device_features.inheritedQueries)
-	// );
-	//
-	// auto supported_features = physical_device.getFeatures();
-	// auto const supported_features_arr = vec<vk::Bool32>(
-	//     reinterpret_cast<vk::Bool32 const *>(&supported_features),
-	//     reinterpret_cast<vk::Bool32 const *>(&supported_features.inheritedQueries)
-	// );
-	//
-	// for (u32 i = 0; i < required_features_arr.size(); i++)
-	// 	if (required_features_arr[i] && !supported_features_arr[i])
-	// 		return false;
+	auto const required_features = requirements.physical_device_features;
+	auto const required_features_arr = vec<vk::Bool32>(
+	    reinterpret_cast<vk::Bool32 const *>(&required_features.robustBufferAccess),
+	    reinterpret_cast<vk::Bool32 const *>(&required_features.inheritedQueries)
+	);
+
+	auto supported_features = physical_device.getFeatures();
+	auto const supported_features_arr = vec<vk::Bool32>(
+	    reinterpret_cast<vk::Bool32 const *>(&supported_features.robustBufferAccess),
+	    reinterpret_cast<vk::Bool32 const *>(&supported_features.inheritedQueries)
+	);
+
+	for (u32 i = 0; i < required_features_arr.size(); i++)
+		if (required_features_arr[i] && !supported_features_arr[i])
+			return false;
 
 	return true;
 }
