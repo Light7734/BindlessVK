@@ -35,12 +35,16 @@ public:
 
 	/** Submits the commands recorded to a command buffer by @a func
 	 *
-	 * @param func The function that writes to a command buffer
+	 * @param func A function that writes to a command buffer
+	 * @param queue Which queue to submit the commands to (graphics/compute)
 	 *
 	 * @warn Blocks the execution to wait for the graphics queue to finish executing the
 	 * submitted workload
 	 */
-	void immediate_submit(fn<void(vk::CommandBuffer)> &&func) const;
+	void immediate_submit(
+	    fn<void(vk::CommandBuffer)> &&func,
+	    vk::QueueFlags queue = vk::QueueFlagBits::eGraphics
+	) const;
 
 	/** Trivial accessor for the underyling device */
 	auto vk() const
@@ -54,6 +58,7 @@ private:
 private:
 	vk::Device device = {};
 	vk::Queue graphics_queue = {};
+	vk::Queue compute_queue = {};
 
 	vk::CommandPool immediate_cmd_pool = {};
 	vk::Fence immediate_fence = {};

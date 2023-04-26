@@ -87,6 +87,12 @@ public:
 		return present_queue_index;
 	}
 
+	/** @brief Trivial accessor for compute_queue_index */
+	auto get_compute_queue_index() const
+	{
+		return compute_queue_index;
+	}
+
 	/** @brief Trivial accessor for max_color_samples */
 	auto get_max_color_samples() const
 	{
@@ -123,7 +129,7 @@ private:
 	vk::PhysicalDevice physical_device = {};
 	vk::SurfaceKHR surface = {};
 
-	Requirements requirements;
+	Requirements requirements = {};
 
 	vk::SampleCountFlagBits max_color_samples = {};
 	vk::SampleCountFlagBits max_depth_samples = {};
@@ -131,6 +137,7 @@ private:
 
 	u32 graphics_queue_index = VK_QUEUE_FAMILY_IGNORED;
 	u32 present_queue_index = VK_QUEUE_FAMILY_IGNORED;
+	u32 compute_queue_index = VK_QUEUE_FAMILY_IGNORED;
 
 	bool adequate = {};
 };

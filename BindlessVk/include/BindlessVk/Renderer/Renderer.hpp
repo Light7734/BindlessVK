@@ -65,33 +65,65 @@ private:
 		vk::RenderingAttachmentInfo depth_attachment;
 		vk::RenderingInfo rendering_info;
 
-		operator vk::RenderingInfo() const
+		void reset()
+		{
+			color_attachments.clear();
+			depth_attachment = vk::RenderingAttachmentInfo {};
+		}
+
+		auto vk() const
 		{
 			return rendering_info;
 		}
 	};
 
 private:
-	void wait_for_frame_fence();
+	// 1
+	void create_sync_objects();
+	void create_cmds(Gpu const *gpu);
 
-	auto aquire_next_image() -> u32;
+	void destroy_cmds();
+	void destroy_sync_objects();
 
-	void submit_queue();
+	void prepare_frame(Rendergraph *graph);
+	void compute_frame(Rendergraph *graph);
+	void render_frame(Rendergraph *graph);
+	void present_frame(Rendergraph *graph);
 
-	void present_frame(u32 image_index);
+	void cycle_frame_index();
+	auto acquire_next_image_index() -> u32;
+
+	// 2
+	void create_compute_sync_objects(u32 index);
+	void create_graphics_sync_objects(u32 index);
+	void create_present_sync_objects(u32 index);
+
+	void create_compute_cmds(Gpu const *gpu, u32 index);
+	void create_graphics_cmds(Gpu const *gpu, u32 index);
 
 	void reset_used_attachment_states();
 
-	void update_pass(Renderpass *pass, u32 image_index);
-	void apply_pass_barriers(Renderpass *pass, u32 image_index);
-	void apply_present_barriers(Rendergraph *graph, u32 image_index);
-	void render_pass(Rendergraph *graph, Renderpass *pass, u32 image_index);
+	void wait_for_compute_fence();
+	void wait_for_graphics_fence();
 
-	void create_sync_objects();
-	void destroy_sync_objects();
+	void bind_graph_compute_descriptor(Rendergraph *graph);
+	void bind_graph_graphics_descriptor(Rendergraph *graph);
 
-	void create_cmds(Gpu const *gpu);
-	void destroy_cmds();
+	void apply_graph_barriers(Rendergraph *graph);
+
+	void compute_pass(Rendergraph *graph, Renderpass *pass);
+	void graphics_pass(Rendergraph *graph, Renderpass *pass);
+
+	void submit_compute_queue();
+	void submit_graphics_queue();
+	void submit_present_queue();
+
+	// 3
+
+	void bind_pass_compute_descriptor(Renderpass *pass);
+	void bind_pass_graphics_descriptor(Renderpass *pass);
+
+	void apply_pass_barriers(Renderpass *pass);
 
 private:
 	Device const *device = {};
@@ -105,14 +137,22 @@ private:
 	RenderResources resources = {};
 	arr<DynamicPassInfo, max_frames_in_flight> dynamic_pass_info;
 
-	arr<vk::Fence, max_frames_in_flight> render_fences = {};
-	arr<vk::Semaphore, max_frames_in_flight> render_semaphores = {};
+	arr<vk::Fence, max_frames_in_flight> compute_fences = {};
+	arr<vk::Semaphore, max_frames_in_flight> compute_semaphores = {};
+
+	arr<vk::Fence, max_frames_in_flight> graphics_fences = {};
+	arr<vk::Semaphore, max_frames_in_flight> graphics_semaphores = {};
+
 	arr<vk::Semaphore, max_frames_in_flight> present_semaphores = {};
 
-	arr<vk::CommandPool, max_frames_in_flight> cmd_pools = {};
-	arr<vk::CommandBuffer, max_frames_in_flight> cmd_buffers = {};
+	arr<vk::CommandPool, max_frames_in_flight> compute_cmd_pools = {};
+	arr<vk::CommandPool, max_frames_in_flight> graphics_cmd_pools = {};
+
+	arr<vk::CommandBuffer, max_frames_in_flight> compute_cmds = {};
+	arr<vk::CommandBuffer, max_frames_in_flight> graphics_cmds = {};
 
 	u32 frame_index = 0;
+	u32 image_index = std::numeric_limits<u32>::max();
 };
 
 } // namespace BINDLESSVK_NAMESPACE

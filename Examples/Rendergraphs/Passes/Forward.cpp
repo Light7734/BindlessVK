@@ -4,11 +4,23 @@ Forwardpass::Forwardpass(bvk::VkContext const *const vk_context): bvk::Renderpas
 {
 }
 
-void Forwardpass::on_update(u32 frame_index, u32 image_index)
+void Forwardpass::on_setup()
+{
+	auto const data = any_cast<UserData *>(user_data);
+
+	scene = data->scene;
+	memory_allocator = data->memory_allocator;
+}
+
+void Forwardpass::on_frame_prepare(u32 frame_index, u32 image_index)
 {
 }
 
-void Forwardpass::on_render(
+void Forwardpass::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
+{
+}
+
+void Forwardpass::on_frame_graphics(
     vk::CommandBuffer const cmd,
     u32 const frame_index,
     u32 const image_index
@@ -17,7 +29,6 @@ void Forwardpass::on_render(
 	auto const &surface = vk_context->get_surface();
 
 	this->cmd = cmd;
-	scene = any_cast<Scene *>(user_data);
 	current_pipeline = vk::Pipeline {};
 
 	render_static_meshes();
@@ -28,6 +39,11 @@ void Forwardpass::render_static_meshes()
 {
 	auto i = u32 { 0 };
 	auto const static_meshes = scene->view<StaticMeshRendererComponent const>();
+
+	// auto constexpr size = sizeof(vk::DrawIndexedIndirectCommand);
+
+	// for (u32 i = 0; i < static_meshes.size(); i++)
+	// 	cmd.drawIndexedIndirect(*draw_indirect_buffer.vk(), i * size, 1, size);
 
 	static_meshes.each([this, &i](auto const &static_mesh) { render_static_mesh(static_mesh, i); });
 }
@@ -77,6 +93,7 @@ void Forwardpass::switch_pipeline(vk::Pipeline pipeline)
 	        },
 	    }
 	);
+
 	cmd.setViewport(
 	    0,
 	    {

@@ -64,7 +64,10 @@ Device::~Device()
 	device.destroy();
 }
 
-void Device::immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
+void Device::immediate_submit(
+    fn<void(vk::CommandBuffer)> &&func,
+    vk::QueueFlags const queue /* = vk::QueueFlagBits::eGraphics */
+) const
 {
 	auto const alloc_info = vk::CommandBufferAllocateInfo {
 		immediate_cmd_pool,
@@ -82,7 +85,15 @@ void Device::immediate_submit(fn<void(vk::CommandBuffer)> &&func) const
 	cmd.end();
 
 	auto const submit_info = vk::SubmitInfo { 0u, {}, {}, 1u, &cmd, 0u, {}, {} };
-	graphics_queue.submit(submit_info, immediate_fence);
+
+	if (queue == vk::QueueFlagBits::eGraphics)
+		graphics_queue.submit(submit_info, immediate_fence);
+
+	else if (queue == vk::QueueFlagBits::eCompute)
+		compute_queue.submit(submit_info, immediate_fence);
+
+	else
+		assert_fail("Invalid queue flags for immediate submit");
 
 	assert_false(device.waitForFences(immediate_fence, true, UINT_MAX));
 	device.resetFences(immediate_fence);

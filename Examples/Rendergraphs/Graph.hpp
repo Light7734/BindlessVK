@@ -58,14 +58,32 @@ public:
 
 	~BasicRendergraph() = default;
 
-	void on_update(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
+	void on_setup() final;
+
+	void on_frame_prepare(u32 frame_index, u32 image_index) final;
+
+	void on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final
+	{
+	}
+
+	void on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
 
 	auto static get_descriptor_set_bindings()
 	    -> pair<arr<vk::DescriptorSetLayoutBinding, 5>, arr<vk::DescriptorBindingFlags, 5>>;
 
-	auto static consteval get_update_label()
+	auto static consteval get_prepare_label()
 	{
-		return vk::DebugUtilsLabelEXT { "graph_update", { 1.0, 1.0, 1.0, 1.0 } };
+		return vk::DebugUtilsLabelEXT { "graph_prepare", { 1.0, 1.0, 1.0, 1.0 } };
+	}
+
+	auto static consteval get_compute_label()
+	{
+		return vk::DebugUtilsLabelEXT { "graph_compute", { 1.0, 1.0, 1.0, 1.0 } };
+	}
+
+	auto static consteval get_graphics_label()
+	{
+		return vk::DebugUtilsLabelEXT { "graph_graphics", { 1.0, 1.0, 1.0, 1.0 } };
 	}
 
 	auto static consteval get_barrier_label()
@@ -74,7 +92,7 @@ public:
 	}
 
 private:
-	void bind_buffers(vk::CommandBuffer cmd);
+	void bind_graphic_buffers(vk::CommandBuffer cmd);
 
 	void update_descriptor_sets();
 
@@ -93,6 +111,7 @@ private:
 	void update_for_skybox(SkyboxComponent const &skybox);
 
 private:
+	bvk::Device *device = {};
 	bvk::FragmentedBuffer *vertex_buffer = {};
 	bvk::FragmentedBuffer *index_buffer = {};
 

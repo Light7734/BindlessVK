@@ -29,7 +29,7 @@ Application::Application()
 
 	create_loaders();
 	load_default_textures();
-    create_buffers();
+	create_buffers();
 }
 
 Application::~Application()
@@ -71,12 +71,12 @@ void Application::create_vk_context()
 	debug_utils = {
 		&instance,
 
-		{
+		bvk::DebugUtils::Callback {
 		    &Logger::bindlessvk_callback,
 		    std::make_any<Logger const *const>(&logger),
 		},
 
-		{
+		bvk::DebugUtils::Filter {
 		    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
 		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
 		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
@@ -95,7 +95,7 @@ void Application::create_vk_context()
 	    &instance,
 	    window_surface.surface,
 
-	    {
+	    bvk::Gpu::Requirements {
 	        get_required_physical_device_features(),
 	        get_required_device_extensions(),
 	    },
@@ -134,7 +134,7 @@ void Application::create_vk_context()
 
 	device = { &gpu };
 
-	queues = { &device, &gpu };
+	queues = { &device, &gpu, &debug_utils };
 
 	vk_context = { &instance, &debug_utils, &surface, &gpu, &queues, &device };
 }

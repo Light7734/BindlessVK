@@ -19,10 +19,10 @@ layout(set = 0, binding = 0) uniform Camera {
     vec4 viewPos;
 } u_camera;
 
-layout(set = 0, binding = 1) uniform Lights {
+layout(set = 0, binding = 1) uniform Scene {
     vec4 light_position;
-} u_lights;
-
+    uint model_count;
+} u_scene;
 
 struct ObjectData {
     int albedo_texture_index;

@@ -354,13 +354,20 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	auto const color_output_hash = hash_str("forward_color_out");
 	auto const depth_attachment_hash = hash_str("forward_depth");
 
+	fowardpass_user_data = { &scene, &memory_allocator };
+
 	auto blueprint = bvk::RenderpassBlueprint {};
 	blueprint.set_name("forwardpass")
-	    .set_user_data(&scene)
+	    .set_compute(false)
+	    .set_graphics(true)
+	    .set_user_data(&fowardpass_user_data)
 	    .set_sample_count(sample_count)
-	    .set_update_label(Forwardpass::get_update_label())
-	    .set_render_label(Forwardpass::get_render_label())
+
+	    .set_prepare_label(Forwardpass::get_prepare_label())
+	    .set_compute_label(Forwardpass::get_compute_label())
+	    .set_graphics_label(Forwardpass::get_graphics_label())
 	    .set_barrier_label(Forwardpass::get_barrier_label())
+
 	    .add_color_output({
 	        color_output_hash,
 	        {},
@@ -371,6 +378,7 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	        vk::ClearColorValue { 0.3f, 0.5f, 0.8f, 1.0f },
 	        "forwardpass_depth",
 	    })
+
 	    .set_depth_attachment({
 	        depth_attachment_hash,
 	        {},
@@ -395,10 +403,13 @@ auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::Renderpas
 
 	auto blueprint = bvk::RenderpassBlueprint {};
 	blueprint.set_name("uipass")
+	    .set_compute(false)
+	    .set_graphics(true)
 	    .set_user_data(&scene)
 	    .set_sample_count(sample_count)
-	    .set_update_label(UserInterfacePass::get_update_label())
-	    .set_render_label(UserInterfacePass::get_render_label())
+	    .set_prepare_label(UserInterfacePass::get_prepare_label())
+	    .set_compute_label(UserInterfacePass::get_compute_label())
+	    .set_graphics_label(UserInterfacePass::get_graphics_label())
 	    .set_barrier_label(UserInterfacePass::get_barrier_label())
 	    .add_color_output({
 	        color_output_hash,
@@ -432,8 +443,12 @@ void DevelopmentExampleApplication::create_render_graph()
 	builder.set_type<BasicRendergraph>()
 	    .set_resources(renderer.get_resources())
 	    .set_user_data(std::make_any<BasicRendergraph::UserData *>(&graph_user_data))
-	    .set_update_label(BasicRendergraph::get_update_label())
+
+	    .set_prepare_label(BasicRendergraph::get_prepare_label())
+	    .set_compute_label(BasicRendergraph::get_compute_label())
+	    .set_graphics_label(BasicRendergraph::get_graphics_label())
 	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
+
 	    .add_buffer_input({
 	        "frame_data",
 	        BasicRendergraph::FrameData::binding,
@@ -458,6 +473,7 @@ void DevelopmentExampleApplication::create_render_graph()
 	        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
 	        sizeof(BasicRendergraph::ObjectData) * 1000,
 	    })
+
 	    .add_texture_input({
 	        "textures",
 	        BasicRendergraph::U_Textures::binding,

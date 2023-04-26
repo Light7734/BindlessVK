@@ -41,13 +41,46 @@ public:
 	/** Destructor */
 	virtual ~Rendergraph();
 
-	/** Updates the graph (global data like descriptor_set 0) */
-	void virtual on_update(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+	/**  Sets up the graph, called only once */
+	void virtual on_setup() = 0;
+
+	/** Prepares the graph for rendering, (eg. update global descriptor set)*/
+	void virtual on_frame_prepare(u32 frame_index, u32 image_index) = 0;
+
+	/** Prepares the graph for compute operations */
+	void virtual on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+
+	/** Prepares the graph for compute operations */
+	void virtual on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+
+	/** Tirvial accessor for compute */
+	auto has_compute() const
+	{
+		return compute;
+	}
+
+	/** Tirvial accessor for compute */
+	auto has_graphics() const
+	{
+		return graphics;
+	}
 
 	/** Tirvial reference-accessor for passes */
 	auto &get_passes() const
 	{
 		return passes;
+	}
+
+	/** Trivial reference-accessor for compute_pipeline_layout */
+	auto &get_compute_pipeline_layout() const
+	{
+		return compute_pipeline_layout;
+	}
+
+	/** Trivial reference-accessor for compute_descriptor_sets */
+	auto &get_compute_descriptor_sets() const
+	{
+		return compute_descriptor_sets;
 	}
 
 	/** Trivial reference-accessor for pipeline_layout */
@@ -62,10 +95,21 @@ public:
 		return descriptor_sets;
 	}
 
-	/** Trivial referrence-accessor for update_label */
-	auto &get_update_label() const
+	auto &get_prepare_label() const
 	{
-		return update_label;
+		return prepare_label;
+	}
+
+	/** Trivial referrence-accessor for compute_label */
+	auto &get_compute_label() const
+	{
+		return compute_label;
+	}
+
+	/** Trivial referrence-accessor for update_label */
+	auto &get_graphics_label() const
+	{
+		return prepare_label;
 	}
 
 	/** Trivial referrence-accessor for present_barrier_label */
@@ -75,22 +119,31 @@ public:
 	}
 
 protected:
-	VkContext const *vk_context;
+	VkContext const *vk_context = {};
 
-	class RenderResources *resources;
+	class RenderResources *resources = {};
 
-	std::any user_data;
+	bool compute = {};
+	bool graphics = {};
 
-	vec<Renderpass *> passes;
+	std::any user_data = {};
 
-	vec<Buffer> buffer_inputs;
+	vec<Renderpass *> passes = {};
 
-	vk::PipelineLayout pipeline_layout;
-	vk::DescriptorSetLayout descriptor_set_layout;
-	vec<DescriptorSet> descriptor_sets;
+	vec<Buffer> buffer_inputs = {};
 
-	vk::DebugUtilsLabelEXT update_label;
-	vk::DebugUtilsLabelEXT present_barrier_label;
+	vk::PipelineLayout compute_pipeline_layout = {};
+	vk::DescriptorSetLayout compute_descriptor_set_layout = {};
+	vec<DescriptorSet> compute_descriptor_sets = {};
+
+	vk::PipelineLayout pipeline_layout = {};
+	vk::DescriptorSetLayout descriptor_set_layout = {};
+	vec<DescriptorSet> descriptor_sets = {};
+
+	vk::DebugUtilsLabelEXT prepare_label = {};
+	vk::DebugUtilsLabelEXT compute_label = {};
+	vk::DebugUtilsLabelEXT graphics_label = {};
+	vk::DebugUtilsLabelEXT present_barrier_label = {};
 };
 
 /** A builder class for building render graphs */
@@ -159,10 +212,24 @@ public:
 		return *this;
 	}
 
-	/** Sets the update label */
-	auto set_update_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
+	/** Sets the prepare label */
+	auto set_prepare_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
 	{
-		this->graph->update_label = label;
+		this->graph->prepare_label = label;
+		return *this;
+	}
+
+	/** Sets the compute label */
+	auto set_compute_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
+	{
+		this->graph->compute_label = label;
+		return *this;
+	}
+
+	/** Sets the graphics label */
+	auto set_graphics_label(vk::DebugUtilsLabelEXT label) -> RenderGraphBuilder &
+	{
+		this->graph->graphics_label = label;
 		return *this;
 	}
 

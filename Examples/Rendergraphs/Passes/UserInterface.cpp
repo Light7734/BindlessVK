@@ -11,12 +11,20 @@ UserInterfacePass::UserInterfacePass(bvk::VkContext const *const vk_context)
 {
 }
 
-void UserInterfacePass::on_update(u32 const frame_index, u32 const image_index)
+void UserInterfacePass::on_setup()
+{
+}
+
+void UserInterfacePass::on_frame_prepare(u32 const frame_index, u32 const image_index)
 {
 	ImGui::Render();
 }
 
-void UserInterfacePass::on_render(
+void UserInterfacePass::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
+{
+}
+
+void UserInterfacePass::on_frame_graphics(
     vk::CommandBuffer const cmd,
     u32 const frame_index,
     u32 const image_index

@@ -34,6 +34,7 @@ public:
 
 private:
 	BasicRendergraph::UserData graph_user_data;
+	Forwardpass::UserData fowardpass_user_data;
 
 private:
 	void load_shaders();

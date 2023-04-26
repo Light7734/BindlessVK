@@ -9,7 +9,7 @@ namespace BINDLESSVK_NAMESPACE {
 
 class Rendergraph;
 
-/** Describes a single isolated rendering step in the render graph */
+/** Describes a single compute and/or rendering step in the render graph */
 class Renderpass
 {
 public:
@@ -59,7 +59,7 @@ public:
 	};
 
 public:
-	/** Argumented constructo
+	/** Argumented constructor
 	 *
 	 * @param vk_context The vulkan context
 	 */
@@ -70,39 +70,68 @@ public:
 	/** Destuctor */
 	virtual ~Renderpass() = default;
 
-
 public:
-	/** Updates the pass
+	/** Sets up the pass, called only once */
+	void virtual on_setup() = 0;
+
+	/** Prepares the pass for rendering
 	 *
 	 * @param frame_index The index of the current frame
 	 * @param image_index The index of the current image
 	 */
-	void virtual on_update(u32 frame_index, u32 image_index) = 0;
+	void virtual on_frame_prepare(u32 frame_index, u32 image_index) = 0;
 
-	/** Recordrs rendeing command into @a cmd
+	/** Recordrs compute command into @a cmd
 	 *
-	 * @param cmd A vulkan command buffer for rendering commands to be recorded into
+	 * @param cmd A vk cmd buffer from compute queue family for compute commands to be recorded into
 	 * @param frame_index The index of the current fame
 	 * @param image_index The index of the current image
 	 */
-	void virtual on_render(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+	void virtual on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+
+	/** Recordrs graphics command into @a cmd
+	 *
+	 * @param cmd A vk cmd buffer from graphics queue family for graphics commands to be recorded
+	 * into
+	 * @param frame_index The index of the current fame
+	 * @param image_index The index of the current image
+	 */
+	void virtual on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
+
+	/** Trivial accessor for compute */
+	auto has_compute() const
+	{
+		return compute;
+	}
+
+	/** Trivial accessor for graphics */
+	auto has_graphics() const
+	{
+		return graphics;
+	}
 
 	/** Trivial reference-accessor for update_label */
-	auto &get_update_label() const
+	auto &get_prepare_label() const
 	{
-		return update_label;
+		return prepare_label;
+	}
+
+	/** Trivial reference-accessor for compute_label */
+	auto &get_compute_label() const
+	{
+		return compute_label;
+	}
+
+	/** Trivial reference-accessor for render_label */
+	auto &get_graphics_label() const
+	{
+		return graphics_label;
 	}
 
 	/** Trivial reference-accessor for barrier_label */
 	auto &get_barrier_label() const
 	{
 		return barrier_label;
-	}
-
-	/** Trivial reference-accessor for render_label */
-	auto &get_render_label() const
-	{
-		return render_label;
 	}
 
 	/** Trivial reference-accessor for attachments */
@@ -115,6 +144,24 @@ public:
 	auto &get_descriptor_sets() const
 	{
 		return descriptor_sets;
+	}
+
+	/** Trivial reference-accessor for compute_pipeline_layout */
+	auto &get_compute_pipeline_layout() const
+	{
+		return compute_pipeline_layout;
+	}
+
+	/** Trivial reference-accessor for compute_descriptor_set_layout */
+	auto &get_compute_descriptor_set_layout() const
+	{
+		return compute_descriptor_set_layout;
+	}
+
+	/** Trivial reference-accessor for compute_descriptor_sets */
+	auto &get_compute_descriptor_sets() const
+	{
+		return compute_descriptor_sets;
 	}
 
 	/** Trivial reference-accessor for pipeline_layout */
@@ -140,11 +187,18 @@ protected:
 
 	str name = {};
 
+	bool compute = {};
+	bool graphics = {};
+
 	std::any user_data = {};
 
 	vec<Attachment> attachments = {};
 
 	vec<Buffer> buffer_inputs = {};
+
+	vec<DescriptorSet> compute_descriptor_sets = {};
+	vk::DescriptorSetLayout compute_descriptor_set_layout = {};
+	vk::PipelineLayout compute_pipeline_layout = {};
 
 	vec<DescriptorSet> descriptor_sets = {};
 	vk::DescriptorSetLayout descriptor_set_layout = {};
@@ -159,9 +213,10 @@ protected:
 	vk::CommandBufferInheritanceInfo cmd_buffer_inheritance_info = {};
 	vk::CommandBufferBeginInfo cmd_buffer_begin_info = {};
 
-	vk::DebugUtilsLabelEXT update_label = {};
+	vk::DebugUtilsLabelEXT prepare_label = {};
+	vk::DebugUtilsLabelEXT compute_label = {};
+	vk::DebugUtilsLabelEXT graphics_label = {};
 	vk::DebugUtilsLabelEXT barrier_label = {};
-	vk::DebugUtilsLabelEXT render_label = {};
 };
 
 /** Represents build instructions for a Renderpass, to be used by RenderGraphBuilder */
@@ -225,6 +280,18 @@ public:
 		return *this;
 	}
 
+	auto set_compute(bool const compute) -> RenderpassBlueprint &
+	{
+		this->compute = compute;
+		return *this;
+	}
+
+	auto set_graphics(bool const graphics) -> RenderpassBlueprint &
+	{
+		this->graphics = graphics;
+		return *this;
+	}
+
 	auto add_color_output(Attachment const attachment) -> RenderpassBlueprint &
 	{
 		this->color_attachments.push_back(attachment);
@@ -261,15 +328,21 @@ public:
 		return *this;
 	}
 
-	auto set_update_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
+	auto set_prepare_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
 	{
-		this->update_label = label;
+		this->prepare_label = label;
 		return *this;
 	}
 
-	auto set_render_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
+	auto set_graphics_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
 	{
-		this->render_label = label;
+		this->compute_label = label;
+		return *this;
+	}
+
+	auto set_compute_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
+	{
+		this->graphics_label = label;
 		return *this;
 	}
 
@@ -282,6 +355,9 @@ public:
 private:
 	str name = {};
 
+	bool compute = {};
+	bool graphics = {};
+
 	std::any user_data = {};
 
 	vec<Attachment> color_attachments = {};
@@ -291,8 +367,9 @@ private:
 
 	vk::SampleCountFlagBits sample_count = {};
 
-	vk::DebugUtilsLabelEXT update_label = {};
-	vk::DebugUtilsLabelEXT render_label = {};
+	vk::DebugUtilsLabelEXT prepare_label = {};
+	vk::DebugUtilsLabelEXT compute_label = {};
+	vk::DebugUtilsLabelEXT graphics_label = {};
 	vk::DebugUtilsLabelEXT barrier_label = {};
 };
 

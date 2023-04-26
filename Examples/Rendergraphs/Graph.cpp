@@ -8,6 +8,11 @@
 
 BasicRendergraph::BasicRendergraph(bvk::VkContext const *const vk_context)
     : bvk::Rendergraph(vk_context)
+    , device(vk_context->get_device())
+{
+}
+
+void BasicRendergraph::on_setup()
 {
 }
 
@@ -58,11 +63,7 @@ auto BasicRendergraph::get_descriptor_set_bindings()
 	};
 }
 
-void BasicRendergraph::on_update(
-    vk::CommandBuffer const cmd,
-    u32 const frame_index,
-    u32 const image_index
-)
+void BasicRendergraph::on_frame_prepare(u32 const frame_index, u32 const image_index)
 {
 	this->frame_index = frame_index;
 
@@ -77,11 +78,14 @@ void BasicRendergraph::on_update(
 	update_for_meshes();
 
 	update_descriptor_sets();
-
-	bind_buffers(cmd);
 }
 
-void BasicRendergraph::bind_buffers(vk::CommandBuffer const cmd)
+void BasicRendergraph::on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
+{
+	bind_graphic_buffers(cmd);
+}
+
+void BasicRendergraph::bind_graphic_buffers(vk::CommandBuffer const cmd)
 {
 	vertex_buffer->bind(cmd);
 	index_buffer->bind(cmd);
@@ -89,13 +93,11 @@ void BasicRendergraph::bind_buffers(vk::CommandBuffer const cmd)
 
 void BasicRendergraph::update_descriptor_sets()
 {
-	auto const device = vk_context->get_device();
+	if (descriptor_writes.empty())
+		return;
 
-	if (!descriptor_writes.empty())
-	{
-		device->vk().updateDescriptorSets(descriptor_writes, {});
-		descriptor_writes.clear();
-	}
+	device->vk().updateDescriptorSets(descriptor_writes, {});
+	descriptor_writes.clear();
 }
 
 void BasicRendergraph::update_for_cameras()

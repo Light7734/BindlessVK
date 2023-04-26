@@ -23,10 +23,17 @@ Rendergraph &Rendergraph::operator=(Rendergraph &&other)
 	this->user_data = other.user_data;
 	this->passes = std::move(other.passes);
 	this->buffer_inputs = std::move(other.buffer_inputs);
+
+	this->compute_pipeline_layout = other.compute_pipeline_layout;
+	this->compute_descriptor_sets = std::move(other.compute_descriptor_sets);
+
 	this->pipeline_layout = other.pipeline_layout;
 	this->descriptor_set_layout = other.descriptor_set_layout;
 	this->descriptor_sets = std::move(other.descriptor_sets);
-	this->update_label = other.update_label;
+
+	this->prepare_label = other.prepare_label;
+	this->compute_label = other.prepare_label;
+	this->graphics_label = other.graphics_label;
 	this->present_barrier_label = other.present_barrier_label;
 
 	other.vk_context = {};
@@ -72,11 +79,17 @@ auto RenderGraphBuilder::build_graph() -> Rendergraph *
 		auto &pass = graph->passes[i];
 
 		pass->name = blueprint.name;
+		pass->compute = blueprint.compute;
+		pass->graphics = blueprint.graphics;
 		pass->sample_count = blueprint.sample_count;
-		pass->update_label = blueprint.update_label;
+		pass->prepare_label = blueprint.prepare_label;
+		pass->compute_label = blueprint.compute_label;
+		pass->graphics_label = blueprint.graphics_label;
 		pass->barrier_label = blueprint.barrier_label;
-		pass->render_label = blueprint.render_label;
 		pass->user_data = blueprint.user_data;
+
+		graph->compute |= blueprint.compute;
+		graph->graphics |= blueprint.graphics;
 
 		build_pass_color_attachments(pass, blueprint.color_attachments);
 		build_pass_depth_attachment(pass, blueprint.depth_attachment);
@@ -85,6 +98,12 @@ auto RenderGraphBuilder::build_graph() -> Rendergraph *
 		build_pass_texture_inputs(pass, blueprint.texture_inputs);
 		initialize_pass_input_descriptors(pass, blueprint);
 	}
+
+
+	graph->on_setup();
+
+	for (auto &pass : graph->passes)
+		pass->on_setup();
 
 	return graph;
 }
@@ -158,8 +177,10 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 	);
 
 
-	graph->pipeline_layout =
-	    device->vk().createPipelineLayout({ {}, graph->descriptor_set_layout });
+	graph->pipeline_layout = device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	    {},
+	    graph->descriptor_set_layout,
+	});
 
 	debug_utils->set_object_name(
 	    device->vk(),
@@ -450,9 +471,7 @@ void RenderGraphBuilder::build_pass_input_descriptors(
 		pass->descriptor_sets.reserve(max_frames_in_flight);
 		for (u32 i = i; i < max_frames_in_flight; ++i)
 		{
-			pass->descriptor_sets.emplace_back(
-			    descriptor_allocator, pass->descriptor_set_layout
-			);
+			pass->descriptor_sets.emplace_back(descriptor_allocator, pass->descriptor_set_layout);
 
 			debug_utils->set_object_name(
 			    device->vk(),

@@ -100,13 +100,17 @@ void Gpu::calculate_queue_indices()
 		if (queue_family_property.queueFlags & vk::QueueFlagBits::eGraphics)
 			graphics_queue_index = index;
 
+		if (queue_family_property.queueFlags & vk::QueueFlagBits::eCompute)
+			compute_queue_index = index;
+
 		if (physical_device.getSurfaceSupportKHR(index, surface))
 			present_queue_index = index;
 
-		index++;
+		++index;
 
 		if (graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
-		    present_queue_index != VK_QUEUE_FAMILY_IGNORED)
+		    present_queue_index != VK_QUEUE_FAMILY_IGNORED &&
+		    compute_queue_index != VK_QUEUE_FAMILY_IGNORED)
 			break;
 	}
 }
@@ -141,7 +145,8 @@ auto Gpu::has_required_features() const -> bool
 auto Gpu::has_required_queues() const -> bool
 {
 	return graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
-	       present_queue_index != VK_QUEUE_FAMILY_IGNORED;
+	       present_queue_index != VK_QUEUE_FAMILY_IGNORED &&
+	       compute_queue_index != VK_QUEUE_FAMILY_IGNORED;
 }
 
 auto Gpu::has_required_extensions() const -> bool
