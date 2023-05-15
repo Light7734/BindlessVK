@@ -10,7 +10,7 @@ void MemoryAllocator::allocate_memory_callback(
     void *const VMA_NULLABLE vma_user_data
 )
 {
-	auto const [callback, user_data] = *reinterpret_cast<DebugUtils::Callback *>(vma_user_data);
+	auto const [callback, user_data] = *static_cast<DebugUtils::Callback *>(vma_user_data);
 
 	callback(
 	    DebugCallbackSource::eVma,
@@ -28,7 +28,7 @@ void MemoryAllocator::free_memory_callback(
     void *const VMA_NULLABLE vma_user_data
 )
 {
-	auto const [callback, user_data] = *reinterpret_cast<DebugUtils::Callback *>(vma_user_data);
+	auto const [callback, user_data] = *static_cast<DebugUtils::Callback *>(vma_user_data);
 	callback(DebugCallbackSource::eVma, LogLvl::eTrace, fmt::format("Free: {}", size), user_data);
 }
 

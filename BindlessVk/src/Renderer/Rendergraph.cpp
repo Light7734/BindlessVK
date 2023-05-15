@@ -27,12 +27,16 @@ Rendergraph &Rendergraph::operator=(Rendergraph &&other)
 	this->compute_pipeline_layout = other.compute_pipeline_layout;
 	this->compute_descriptor_sets = std::move(other.compute_descriptor_sets);
 
-	this->pipeline_layout = other.pipeline_layout;
-	this->descriptor_set_layout = other.descriptor_set_layout;
-	this->descriptor_sets = std::move(other.descriptor_sets);
+	this->compute_pipeline_layout = other.compute_pipeline_layout;
+	this->compute_descriptor_set_layout = other.compute_descriptor_set_layout;
+	this->compute_descriptor_sets = std::move(other.compute_descriptor_sets);
+
+	this->graphics_pipeline_layout = other.graphics_pipeline_layout;
+	this->graphics_descriptor_set_layout = other.graphics_descriptor_set_layout;
+	this->graphics_descriptor_sets = std::move(other.graphics_descriptor_sets);
 
 	this->prepare_label = other.prepare_label;
-	this->compute_label = other.prepare_label;
+	this->compute_label = other.compute_label;
 	this->graphics_label = other.graphics_label;
 	this->present_barrier_label = other.present_barrier_label;
 
@@ -99,11 +103,10 @@ auto RenderGraphBuilder::build_graph() -> Rendergraph *
 		initialize_pass_input_descriptors(pass, blueprint);
 	}
 
-
 	graph->on_setup();
 
 	for (auto &pass : graph->passes)
-		pass->on_setup();
+		pass->on_setup(graph);
 
 	return graph;
 }
@@ -111,19 +114,18 @@ auto RenderGraphBuilder::build_graph() -> Rendergraph *
 void RenderGraphBuilder::build_graph_buffer_inputs()
 {
 	graph->buffer_inputs.reserve(blueprint_buffer_inputs.size());
+
 	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
-		graph->buffer_inputs.emplace_back(
+		graph->buffer_inputs[blueprint_buffer_input.key] = Buffer(
 		    vk_context,
 		    memory_allocator,
-		    blueprint_buffer_input.type == vk::DescriptorType::eUniformBuffer ?
-		        vk::BufferUsageFlagBits::eUniformBuffer :
-		        vk::BufferUsageFlagBits::eStorageBuffer,
-		    vma::AllocationCreateInfo {
-		        vma::AllocationCreateFlagBits::eHostAccessRandom,
-		        vma::MemoryUsage::eAutoPreferDevice,
-		    },
+		    blueprint_buffer_input.usage,
+		    blueprint_buffer_input.allocation_info,
 		    blueprint_buffer_input.size,
-		    max_frames_in_flight,
+		    blueprint_buffer_input.update_frequency ==
+		            RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
+		        max_frames_in_flight :
+		        1,
 		    blueprint_buffer_input.name
 		);
 }
@@ -134,71 +136,166 @@ void RenderGraphBuilder::build_graph_texture_inputs()
 
 void RenderGraphBuilder::build_graph_input_descriptors()
 {
-	auto const bindings_count = blueprint_buffer_inputs.size();
+	auto graphics_bindings = vec<vk::DescriptorSetLayoutBinding> {};
+	auto compute_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 
-	auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
-	auto flags = vec<vk::DescriptorBindingFlags> {};
+	extract_graph_buffer_descriptor_bindings(
+	    blueprint_buffer_inputs,
+	    &compute_bindings,
+	    &graphics_bindings
+	);
 
-	bindings.reserve(bindings_count);
-	flags.reserve(bindings_count);
+	extract_graph_texture_descriptor_bindings(
+	    blueprint_texture_inputs,
+	    &compute_bindings,
+	    &graphics_bindings
+	);
 
-	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
-	{
-		bindings.emplace_back(
-		    blueprint_buffer_input.binding,
-		    blueprint_buffer_input.type,
-		    blueprint_buffer_input.count,
-		    blueprint_buffer_input.stage_mask
+	build_graph_graphics_input_descriptors(graphics_bindings);
+	build_graph_compute_input_descriptors(compute_bindings);
+}
+
+void RenderGraphBuilder::extract_graph_buffer_descriptor_bindings(
+    vec<RenderpassBlueprint::BufferInput> const &buffer_inputs,
+    vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
+    vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
+)
+{
+	for (auto const &buffer_input : buffer_inputs)
+		extract_input_descriptor_bindings(
+		    buffer_input.descriptor_infos,
+		    out_compute_bindings,
+		    out_graphics_bindings
 		);
-		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-	}
+}
 
-	for (auto const &blueprint_texture_input : blueprint_texture_inputs)
-	{
-		bindings.emplace_back(
-		    blueprint_texture_input.binding,
-		    blueprint_texture_input.type,
-		    blueprint_texture_input.count,
-		    blueprint_texture_input.stage_mask
+void RenderGraphBuilder::extract_graph_texture_descriptor_bindings(
+    vec<RenderpassBlueprint::TextureInput> const &texture_inputs,
+    vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
+    vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
+)
+{
+	for (auto const &texture_input : texture_inputs)
+		extract_input_descriptor_bindings(
+		    texture_input.descriptor_infos,
+		    out_compute_bindings,
+		    out_graphics_bindings
 		);
-		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-	}
+}
 
+void RenderGraphBuilder::extract_input_descriptor_bindings(
+    vec<RenderpassBlueprint::DescriptorInfo> const &descriptor_infos,
+    vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
+    vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
+)
+{
+	for (auto const &descriptor_info : descriptor_infos)
+		if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eCompute)
+			out_compute_bindings->emplace_back(descriptor_info.layout);
+
+		else if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics)
+			out_graphics_bindings->emplace_back(descriptor_info.layout);
+}
+
+
+void RenderGraphBuilder::build_graph_graphics_input_descriptors(
+    vec<vk::DescriptorSetLayoutBinding> const &bindings
+)
+{
+	auto const flags = vec<vk::DescriptorBindingFlags>(
+	    bindings.size(),
+	    vk::DescriptorBindingFlagBits::ePartiallyBound
+	);
 	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
-	graph->descriptor_set_layout = device->vk().createDescriptorSetLayout({
+
+	graph->graphics_descriptor_set_layout = device->vk().createDescriptorSetLayout({
 	    {},
 	    bindings,
 	    &extended_info,
 	});
 	debug_utils->set_object_name(
 	    device->vk(),
-	    graph->descriptor_set_layout,
-	    fmt::format("graph_descriptor_set_layout")
+	    graph->graphics_descriptor_set_layout,
+	    fmt::format("graph_graphics_descriptor_set_layout")
 	);
 
-
-	graph->pipeline_layout = device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
-	    {},
-	    graph->descriptor_set_layout,
-	});
-
+	graph->graphics_pipeline_layout =
+	    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	        {},
+	        graph->graphics_descriptor_set_layout,
+	    });
 	debug_utils->set_object_name(
 	    device->vk(),
-	    graph->pipeline_layout,
-	    fmt::format("graph_pipeline_layout")
+	    graph->graphics_pipeline_layout,
+	    fmt::format("graph_graphics_pipeline_layout")
 	);
 
 	if (!bindings.empty())
 	{
-		graph->descriptor_sets.reserve(max_frames_in_flight);
+		graph->graphics_descriptor_sets.reserve(max_frames_in_flight);
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			graph->descriptor_sets.emplace_back(descriptor_allocator, graph->descriptor_set_layout);
+			graph->graphics_descriptor_sets.emplace_back(
+			    descriptor_allocator,
+			    graph->graphics_descriptor_set_layout
+			);
 
 			debug_utils->set_object_name(
 			    device->vk(),
-			    graph->descriptor_sets.back().vk(),
-			    fmt::format("graph_descriptor_set_{}", i)
+			    graph->graphics_descriptor_sets.back().vk(),
+			    fmt::format("graph_graphics_descriptor_set_{}", i)
+			);
+		}
+	}
+}
+
+void RenderGraphBuilder::build_graph_compute_input_descriptors(
+    vec<vk::DescriptorSetLayoutBinding> const &bindings
+)
+{
+	auto const flags = vec<vk::DescriptorBindingFlags>(
+	    bindings.size(),
+	    vk::DescriptorBindingFlagBits::ePartiallyBound
+	);
+	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+
+	graph->compute_descriptor_set_layout = device->vk().createDescriptorSetLayout({
+	    {},
+	    bindings,
+	    &extended_info,
+	});
+	debug_utils->set_object_name(
+	    device->vk(),
+	    graph->compute_descriptor_set_layout,
+	    fmt::format("graph_compute_descriptor_set_layout")
+	);
+
+	graph->compute_pipeline_layout =
+	    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	        {},
+	        graph->compute_descriptor_set_layout,
+	    });
+
+	debug_utils->set_object_name(
+	    device->vk(),
+	    graph->compute_pipeline_layout,
+	    fmt::format("graph_compute_pipeline_layout")
+	);
+
+	if (!bindings.empty())
+	{
+		graph->compute_descriptor_sets.reserve(max_frames_in_flight);
+		for (u32 i = 0; i < max_frames_in_flight; ++i)
+		{
+			graph->compute_descriptor_sets.emplace_back(
+			    descriptor_allocator,
+			    graph->compute_descriptor_set_layout
+
+			);
+			debug_utils->set_object_name(
+			    device->vk(),
+			    graph->compute_descriptor_sets.back().vk(),
+			    fmt::format("graph_compute_descriptor_set_{}", i)
 			);
 		}
 	}
@@ -207,32 +304,53 @@ void RenderGraphBuilder::build_graph_input_descriptors()
 void RenderGraphBuilder::initialize_graph_input_descriptors()
 {
 	auto buffer_infos = vec<vk::DescriptorBufferInfo> {};
-	buffer_infos.reserve(blueprint_buffer_inputs.size() * max_frames_in_flight);
+	buffer_infos.reserve(blueprint_buffer_inputs.size() * max_frames_in_flight * 2);
 	auto writes = vec<vk::WriteDescriptorSet> {};
 
-	for (u32 k = 0; auto &buffer_input : graph->buffer_inputs)
+	for (auto const blueprint_buffer : blueprint_buffer_inputs)
 	{
-		auto const &blueprint_buffer = blueprint_buffer_inputs[k++];
+		auto const &buffer_input = graph->buffer_inputs[blueprint_buffer.key];
 
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			buffer_infos.emplace_back(vk::DescriptorBufferInfo {
-			    *buffer_input.vk(),
-			    buffer_input.get_block_size() * i,
-			    buffer_input.get_block_size(),
-			});
-
-			for (u32 j = 0; j < blueprint_buffer.count; ++j)
+			if (blueprint_buffer.update_frequency ==
+			    RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame)
 			{
-				writes.emplace_back(
-				    graph->descriptor_sets[i].vk(),
-				    blueprint_buffer.binding,
-				    j,
-				    1u,
-				    blueprint_buffer.type,
-				    nullptr,
-				    &buffer_infos.back()
-				);
+				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
+				    *buffer_input.vk(),
+				    buffer_input.get_block_size() * i,
+				    buffer_input.get_block_size(),
+				});
+			}
+			else
+			{
+				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
+				    *buffer_input.vk(),
+				    {},
+				    buffer_input.get_block_size(),
+				});
+			}
+
+			for (auto const &descriptor_info : blueprint_buffer.descriptor_infos)
+			{
+				auto &dst_descriptor_set =
+				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
+				        graph->graphics_descriptor_sets[i] :
+				        graph->compute_descriptor_sets[i];
+
+
+				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
+				{
+					writes.emplace_back(
+					    dst_descriptor_set.vk(),
+					    descriptor_info.layout.binding,
+					    j,
+					    1u,
+					    descriptor_info.layout.descriptorType,
+					    nullptr,
+					    &buffer_infos.back()
+					);
+				}
 			}
 		}
 	}
@@ -244,16 +362,24 @@ void RenderGraphBuilder::initialize_graph_input_descriptors()
 
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			for (u32 j = 0; j < texture_input_info.count; ++j)
+			for (auto const &descriptor_info : texture_input_info.descriptor_infos)
 			{
-				writes.emplace_back(
-				    graph->descriptor_sets[i].vk(),
-				    texture_input_info.binding,
-				    j,
-				    1,
-				    texture_input_info.type,
-				    texture_input_info.default_texture->get_descriptor_info()
-				);
+				auto &dst_descriptor_set =
+				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
+				        graph->graphics_descriptor_sets[i] :
+				        graph->compute_descriptor_sets[i];
+
+				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
+				{
+					writes.emplace_back(
+					    dst_descriptor_set.vk(),
+					    descriptor_info.layout.binding,
+					    j,
+					    1,
+					    descriptor_info.layout.descriptorType,
+					    texture_input_info.default_texture->get_descriptor_info()
+					);
+				}
 			}
 		}
 	}
@@ -383,18 +509,13 @@ void RenderGraphBuilder::build_pass_buffer_inputs(
 		pass->buffer_inputs.emplace_back(
 		    vk_context,
 		    memory_allocator,
-
-		    blueprint_buffer_input.type == vk::DescriptorType::eUniformBuffer ?
-		        vk::BufferUsageFlagBits::eUniformBuffer :
-		        vk::BufferUsageFlagBits::eStorageBuffer,
-
-		    vma::AllocationCreateInfo {
-		        vma::AllocationCreateFlagBits::eHostAccessRandom,
-		        vma::MemoryUsage::eAutoPreferDevice,
-		    },
-
+		    blueprint_buffer_input.usage,
+		    blueprint_buffer_input.allocation_info,
 		    blueprint_buffer_input.size,
-		    max_frames_in_flight,
+		    blueprint_buffer_input.update_frequency ==
+		            RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
+		        max_frames_in_flight :
+		        1,
 		    blueprint_buffer_input.name
 		);
 }
@@ -412,72 +533,151 @@ void RenderGraphBuilder::build_pass_input_descriptors(
     vec<RenderpassBlueprint::TextureInput> const &blueprint_texture_inputs
 )
 {
-	auto const bindings_count = blueprint_buffer_inputs.size() + blueprint_texture_inputs.size();
-
-	auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
-	auto flags = vec<vk::DescriptorBindingFlags> {};
-
-	bindings.reserve(bindings_count);
-	flags.reserve(bindings_count);
-
-	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
 	{
-		bindings.emplace_back(
-		    blueprint_buffer_input.binding,
-		    blueprint_buffer_input.type,
-		    blueprint_buffer_input.count,
-		    blueprint_buffer_input.stage_mask
-		);
-		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-	}
+		auto const bindings_count =
+		    blueprint_buffer_inputs.size() + blueprint_texture_inputs.size();
 
-	for (auto const &blueprint_texture_input : blueprint_texture_inputs)
-	{
-		bindings.emplace_back(
-		    blueprint_texture_input.binding,
-		    blueprint_texture_input.type,
-		    blueprint_texture_input.count,
-		    blueprint_texture_input.stage_mask
-		);
-		flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-	}
+		auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
+		auto flags = vec<vk::DescriptorBindingFlags> {};
 
-	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
-	pass->descriptor_set_layout = device->vk().createDescriptorSetLayout({
-	    {},
-	    bindings,
-	    &extended_info,
-	});
-	debug_utils->set_object_name(
-	    device->vk(),
-	    pass->descriptor_set_layout,
-	    fmt::format("{}_descriptor_set_layout", pass->name)
-	);
+		bindings.reserve(bindings_count);
+		flags.reserve(bindings_count);
 
-	auto const layouts = arr<vk::DescriptorSetLayout, 2> {
-		graph->descriptor_set_layout,
-		pass->descriptor_set_layout,
-	};
-
-	pass->pipeline_layout = device->vk().createPipelineLayout({ {}, layouts });
-	debug_utils->set_object_name(
-	    device->vk(),
-	    pass->pipeline_layout,
-	    fmt::format("{}_pipeline_layout", pass->name).c_str()
-	);
-
-	if (!bindings.empty())
-	{
-		pass->descriptor_sets.reserve(max_frames_in_flight);
-		for (u32 i = i; i < max_frames_in_flight; ++i)
+		for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
 		{
-			pass->descriptor_sets.emplace_back(descriptor_allocator, pass->descriptor_set_layout);
+			for (auto const &descriptor_info : blueprint_buffer_input.descriptor_infos)
+			{
+				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics)
+				{
+					bindings.emplace_back(descriptor_info.layout);
+					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+				}
+			}
+		}
 
-			debug_utils->set_object_name(
-			    device->vk(),
-			    pass->descriptor_sets.back().vk(),
-			    fmt::format("{}_descriptor_set_{}", pass->name, i)
-			);
+		for (auto const &blueprint_texture_input : blueprint_texture_inputs)
+		{
+			for (auto const &descriptor_info : blueprint_texture_input.descriptor_infos)
+				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics)
+				{
+					bindings.emplace_back(descriptor_info.layout);
+					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+				}
+		}
+		auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+		pass->graphics_descriptor_set_layout = device->vk().createDescriptorSetLayout({
+		    {},
+		    bindings,
+		    &extended_info,
+		});
+		debug_utils->set_object_name(
+		    device->vk(),
+		    pass->graphics_descriptor_set_layout,
+		    fmt::format("{}_descriptor_set_layout", pass->name)
+		);
+
+		auto const layouts = arr<vk::DescriptorSetLayout, 2> {
+			graph->graphics_descriptor_set_layout,
+			pass->graphics_descriptor_set_layout,
+		};
+
+		pass->graphics_pipeline_layout = device->vk().createPipelineLayout({ {}, layouts });
+		debug_utils->set_object_name(
+		    device->vk(),
+		    pass->graphics_pipeline_layout,
+		    fmt::format("{}_graphics_pipeline_layout", pass->name).c_str()
+		);
+
+		if (!bindings.empty())
+		{
+			pass->graphics_descriptor_sets.reserve(max_frames_in_flight);
+			for (u32 i = i; i < max_frames_in_flight; ++i)
+			{
+				pass->graphics_descriptor_sets.emplace_back(
+				    descriptor_allocator,
+				    pass->graphics_descriptor_set_layout
+				);
+
+				debug_utils->set_object_name(
+				    device->vk(),
+				    pass->graphics_descriptor_sets.back().vk(),
+				    fmt::format("{}_graphics_descriptor_set_{}", pass->name, i)
+				);
+			}
+		}
+	}
+
+	{
+		auto const bindings_count =
+		    blueprint_buffer_inputs.size() + blueprint_texture_inputs.size();
+
+		auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
+		auto flags = vec<vk::DescriptorBindingFlags> {};
+
+		bindings.reserve(bindings_count);
+		flags.reserve(bindings_count);
+
+		for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
+		{
+			for (auto const &descriptor_info : blueprint_buffer_input.descriptor_infos)
+			{
+				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eCompute)
+				{
+					bindings.emplace_back(descriptor_info.layout);
+					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+				}
+			}
+		}
+
+		for (auto const &blueprint_texture_input : blueprint_texture_inputs)
+		{
+			for (auto const &descriptor_info : blueprint_texture_input.descriptor_infos)
+				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eCompute)
+				{
+					bindings.emplace_back(descriptor_info.layout);
+					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
+				}
+		}
+		auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
+		pass->compute_descriptor_set_layout = device->vk().createDescriptorSetLayout({
+		    {},
+		    bindings,
+		    &extended_info,
+		});
+		debug_utils->set_object_name(
+		    device->vk(),
+		    pass->compute_descriptor_set_layout,
+		    fmt::format("{}_descriptor_set_layout", pass->name)
+		);
+
+		auto const layouts = arr<vk::DescriptorSetLayout, 2> {
+			graph->compute_descriptor_set_layout,
+			pass->compute_descriptor_set_layout,
+		};
+
+		pass->compute_pipeline_layout = device->vk().createPipelineLayout({ {}, layouts });
+		debug_utils->set_object_name(
+		    device->vk(),
+		    pass->compute_pipeline_layout,
+		    fmt::format("{}_compute_pipeline_layout", pass->name).c_str()
+		);
+
+		if (!bindings.empty())
+		{
+			pass->compute_descriptor_sets.reserve(max_frames_in_flight);
+			for (u32 i = i; i < max_frames_in_flight; ++i)
+			{
+				pass->compute_descriptor_sets.emplace_back(
+				    descriptor_allocator,
+				    pass->compute_descriptor_set_layout
+				);
+
+				debug_utils->set_object_name(
+				    device->vk(),
+				    pass->compute_descriptor_sets.back().vk(),
+				    fmt::format("{}_compute_descriptor_set_{}", pass->name, i)
+				);
+			}
 		}
 	}
 }
@@ -496,23 +696,49 @@ void RenderGraphBuilder::initialize_pass_input_descriptors(
 
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			buffer_infos.emplace_back(vk::DescriptorBufferInfo {
-			    *buffer.vk(),
-			    buffer.get_block_size() * i,
-			    buffer.get_block_size(),
-			});
-
-			for (u32 j = 0; j < buffer.get_block_count(); ++j)
+			if (blueprint_buffer.update_frequency ==
+			    RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame)
 			{
-				writes.emplace_back(
-				    pass->descriptor_sets[i].vk(),
-				    blueprint_buffer.binding,
-				    j,
-				    1u,
-				    blueprint_buffer.type,
-				    nullptr,
-				    &buffer_infos.back()
-				);
+				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
+				    *buffer.vk(),
+				    buffer.get_block_size() * i,
+				    buffer.get_block_size(),
+				});
+			}
+			else
+			{
+				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
+				    *buffer.vk(),
+				    0,
+				    buffer.get_block_size(),
+				});
+			}
+		}
+	}
+
+	for (u32 i = 0; i < max_frames_in_flight; ++i)
+	{
+		for (auto const &blueprint_buffer : pass_blueprint.buffer_inputs)
+		{
+			for (auto const &descriptor_info : blueprint_buffer.descriptor_infos)
+			{
+				auto &dst_descriptor_set =
+				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
+				        pass->graphics_descriptor_sets[i] :
+				        pass->compute_descriptor_sets[i];
+
+				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
+				{
+					writes.emplace_back(
+					    dst_descriptor_set.vk(),
+					    descriptor_info.layout.binding,
+					    j,
+					    1u,
+					    descriptor_info.layout.descriptorType,
+					    nullptr,
+					    &buffer_infos[blueprint_buffer.key]
+					);
+				}
 			}
 		}
 	}
@@ -521,16 +747,24 @@ void RenderGraphBuilder::initialize_pass_input_descriptors(
 	{
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			for (u32 j = 0; j < texture_input_info.count; ++j)
+			for (auto const &descriptor_info : texture_input_info.descriptor_infos)
 			{
-				writes.emplace_back(
-				    pass->descriptor_sets[i].vk(),
-				    texture_input_info.binding,
-				    j,
-				    1,
-				    texture_input_info.type,
-				    texture_input_info.default_texture->get_descriptor_info()
-				);
+				auto &dst_descriptor_set =
+				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
+				        pass->graphics_descriptor_sets[i] :
+				        pass->compute_descriptor_sets[i];
+
+				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
+				{
+					writes.emplace_back(
+					    dst_descriptor_set.vk(),
+					    descriptor_info.layout.binding,
+					    j,
+					    1,
+					    descriptor_info.layout.descriptorType,
+					    texture_input_info.default_texture->get_descriptor_info()
+					);
+				}
 			}
 		}
 	}

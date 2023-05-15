@@ -1,15 +1,10 @@
 #include "BindlessVk/Shader/Shader.hpp"
 
-template<typename T>
-void build_layout()
-{
-	auto const bindings = T::get_descriptor_set_bindings();
-}
-
 namespace BINDLESSVK_NAMESPACE {
 ShaderPipeline::ShaderPipeline(
     VkContext const *const vk_context,
     LayoutAllocator *const layout_allocator,
+    Type const type,
     vec<Shader *> const &shaders,
     ShaderPipeline::Configuration const &configuration,
     DescriptorSetLayoutWithHash graph_descriptor_set_layout,
@@ -22,10 +17,19 @@ ShaderPipeline::ShaderPipeline(
     , layout_allocator(layout_allocator)
     , debug_name(debug_name)
 {
+	assert_false(shaders.empty(), "No shaders provided to shader pipeline {}", debug_name);
+
 	create_descriptor_set_layout(shaders);
 	create_pipeline_layout(graph_descriptor_set_layout, pass_descriptor_set_layout);
 
-	create_pipeline(shaders, configuration);
+	if (type == Type::eCompute)
+		create_compute_pipeline(shaders);
+
+	else if (type == Type::eGraphics)
+		create_graphics_pipeline(shaders, configuration);
+
+	else
+		assert_fail("Invalid shader pipeline type {}: {}", debug_name, (int)type);
 }
 
 ShaderPipeline::ShaderPipeline(ShaderPipeline &&effect)
@@ -98,7 +102,7 @@ void ShaderPipeline::create_pipeline_layout(
 	);
 }
 
-void ShaderPipeline::create_pipeline(
+void ShaderPipeline::create_graphics_pipeline(
     vec<Shader *> const &shaders,
     ShaderPipeline::Configuration const configuration
 )
@@ -155,7 +159,31 @@ void ShaderPipeline::create_pipeline(
 	assert_false(result);
 	pipeline = graphics_pipeline;
 
-	debug_utils->set_object_name(device->vk(), pipeline, fmt::format("{}_pipeline", debug_name));
+	debug_utils
+	    ->set_object_name(device->vk(), pipeline, fmt::format("{}_graphics_pipeline", debug_name));
+}
+
+void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
+{
+	auto const shader_stage_create_infos = create_shader_stage_create_infos(shaders);
+
+	auto const compute_pipeline_info = vk::ComputePipelineCreateInfo {
+		{}, //
+		shader_stage_create_infos[0],
+		pipeline_layout,
+		{},
+		{},
+		{},
+	};
+
+	auto const [result, compute_pipeline] =
+	    device->vk().createComputePipeline({}, compute_pipeline_info);
+
+	assert_false(result);
+	pipeline = compute_pipeline;
+
+	debug_utils
+	    ->set_object_name(device->vk(), pipeline, fmt::format("{}_compute_pipeline", debug_name));
 }
 
 auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const

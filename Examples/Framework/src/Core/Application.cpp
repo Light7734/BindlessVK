@@ -192,10 +192,10 @@ void Application::create_user_interface()
 	assert_true(
 	    ImGui_ImplVulkan_LoadFunctions(
 	        [](c_str proc_name, void *data) {
-		        auto const instance = reinterpret_cast<bvk::Instance *>(data);
+		        auto const instance = static_cast<bvk::Instance *>(data);
 		        return instance->get_proc_addr(proc_name);
 	        },
-	        reinterpret_cast<void *>(&instance)
+	        static_cast<void *>(&instance)
 	    ),
 	    "ImGui failed to load vulkan functions"
 	);

@@ -83,6 +83,7 @@ void Renderer::render_graph(Rendergraph *const graph)
 	present_frame(graph);
 
 	cycle_frame_index();
+
 	image_index = acquire_next_image_index();
 }
 
@@ -117,9 +118,11 @@ void Renderer::destroy_sync_objects()
 	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
 		device->vk().destroyFence(compute_fences[i]);
-		device->vk().destroyFence(graphics_fences[i]);
 		device->vk().destroySemaphore(compute_semaphores[i]);
+
+		device->vk().destroyFence(graphics_fences[i]);
 		device->vk().destroySemaphore(graphics_semaphores[i]);
+
 		device->vk().destroySemaphore(present_semaphores[i]);
 	}
 }
@@ -152,6 +155,7 @@ void Renderer::compute_frame(Rendergraph *const graph)
 		if (pass->has_compute())
 			compute_pass(graph, pass);
 
+	cmd.endDebugUtilsLabelEXT();
 	cmd.end();
 
 	submit_compute_queue();
@@ -178,6 +182,7 @@ void Renderer::render_frame(Rendergraph *graph)
 
 	apply_graph_barriers(graph);
 
+	cmd.endDebugUtilsLabelEXT();
 	cmd.end();
 
 	submit_graphics_queue();
@@ -218,7 +223,6 @@ auto Renderer::acquire_next_image_index() -> u32
 
 	return index;
 }
-
 
 // 2 //
 void Renderer::create_compute_sync_objects(u32 index)
@@ -438,8 +442,8 @@ void Renderer::compute_pass(Rendergraph *const graph, Renderpass *const pass)
 
 	cmd.beginDebugUtilsLabelEXT(pass->get_compute_label());
 
-	bind_graph_graphics_descriptor(graph);
-	bind_pass_graphics_descriptor(pass);
+	bind_graph_compute_descriptor(graph);
+	bind_pass_compute_descriptor(pass);
 
 	pass->on_frame_compute(compute_cmds[frame_index], frame_index, image_index);
 
@@ -476,8 +480,8 @@ void Renderer::submit_compute_queue()
 
 	compute_queue.submit(
 	    vk::SubmitInfo {
-	        wait_semaphores,
-	        wait_stages,
+	        {},
+	        {},
 	        cmd,
 	        compute_semaphores[frame_index],
 	    },
@@ -491,12 +495,12 @@ void Renderer::submit_graphics_queue()
 	auto const cmd = graphics_cmds[frame_index];
 
 	auto const wait_semaphores = vec<vk::Semaphore> {
+		compute_semaphores[frame_index],
 		present_semaphores[frame_index],
-		// compute_semaphores[frame_index],
 	};
 
 	auto const wait_stages = vec<vk::PipelineStageFlags> {
-		// vk::PipelineStageFlagBits::eDrawIndirect,
+		vk::PipelineStageFlagBits::eDrawIndirect,
 		vk::PipelineStageFlagBits::eColorAttachmentOutput,
 	};
 

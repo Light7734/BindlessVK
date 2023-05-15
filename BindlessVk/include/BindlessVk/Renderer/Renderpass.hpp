@@ -72,7 +72,7 @@ public:
 
 public:
 	/** Sets up the pass, called only once */
-	void virtual on_setup() = 0;
+	void virtual on_setup(Rendergraph *graph) = 0;
 
 	/** Prepares the pass for rendering
 	 *
@@ -143,7 +143,7 @@ public:
 	/** Trivial reference-accessor for descriptor_sets */
 	auto &get_descriptor_sets() const
 	{
-		return descriptor_sets;
+		return graphics_descriptor_sets;
 	}
 
 	/** Trivial reference-accessor for compute_pipeline_layout */
@@ -167,7 +167,7 @@ public:
 	/** Trivial reference-accessor for pipeline_layout */
 	auto &get_pipeline_layout() const
 	{
-		return pipeline_layout;
+		return graphics_pipeline_layout;
 	}
 
 	/** Trivial reference-accessor for buffer_inputs */
@@ -196,13 +196,16 @@ protected:
 
 	vec<Buffer> buffer_inputs = {};
 
-	vec<DescriptorSet> compute_descriptor_sets = {};
+	hash_map<u32, Buffer *> compute_buffers;
+	hash_map<u32, Buffer *> graphics_buffers;
+
 	vk::DescriptorSetLayout compute_descriptor_set_layout = {};
 	vk::PipelineLayout compute_pipeline_layout = {};
+	vec<DescriptorSet> compute_descriptor_sets = {};
 
-	vec<DescriptorSet> descriptor_sets = {};
-	vk::DescriptorSetLayout descriptor_set_layout = {};
-	vk::PipelineLayout pipeline_layout = {};
+	vk::DescriptorSetLayout graphics_descriptor_set_layout = {};
+	vk::PipelineLayout graphics_pipeline_layout = {};
+	vec<DescriptorSet> graphics_descriptor_sets = {};
 
 	vec<vk::Format> color_attachment_formats = {};
 	vk::Format depth_attachment_format = {};
@@ -248,29 +251,36 @@ public:
 		}
 	};
 
+	struct DescriptorInfo
+	{
+		vk::PipelineBindPoint pipeline_bind_point;
+		vk::DescriptorSetLayoutBinding layout;
+	};
+
 	/** Repersents a blueprint for a texture input*/
 	struct TextureInput
 	{
 		str name;
-		u32 binding;
-		u32 count;
-		vk::DescriptorType type;
-		vk::ShaderStageFlagBits stage_mask;
-
-		class Texture const *default_texture;
+		class Texture *default_texture;
+		vec<DescriptorInfo> descriptor_infos;
 	};
 
 	/** Repersents a blueprint for a buffer input */
 	struct BufferInput
 	{
-		str name;
-		u32 binding;
-		u32 count;
-		vk::DescriptorType type;
-		vk::ShaderStageFlags stage_mask;
+		enum class UpdateFrequency
+		{
+			ePerFrame,
+			eSingular,
+		};
 
-		size_t size;
-		void *initial_data;
+		str name;
+		usize key;
+		usize size;
+		vk::BufferUsageFlags usage;
+		UpdateFrequency update_frequency;
+		vma::AllocationCreateInfo allocation_info;
+		vec<DescriptorInfo> descriptor_infos;
 	};
 
 public:
@@ -336,13 +346,13 @@ public:
 
 	auto set_graphics_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
 	{
-		this->compute_label = label;
+		this->graphics_label = label;
 		return *this;
 	}
 
 	auto set_compute_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
 	{
-		this->graphics_label = label;
+		this->compute_label = label;
 		return *this;
 	}
 

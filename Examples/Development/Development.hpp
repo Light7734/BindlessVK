@@ -39,7 +39,8 @@ private:
 private:
 	void load_shaders();
 
-	void load_shader_effects();
+	void load_graphics_pipelines();
+	void load_compute_pipelines();
 
 	void load_pipeline_configuration();
 

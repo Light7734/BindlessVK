@@ -141,3 +141,14 @@ struct LightComponent
 	// components can't have no size
 	uint32_t a;
 };
+
+struct CullViewComponent
+{
+	CullViewComponent(CullViewComponent const &) = default;
+
+	CullViewComponent(bvk::ShaderPipeline *pipeline): pipeline(pipeline)
+	{
+	}
+
+	bvk::ShaderPipeline *pipeline;
+};

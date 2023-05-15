@@ -61,7 +61,11 @@ public:
 	 */
 	void write_data(void const *src_data, usize src_data_size, u32 block_index);
 
-	/** Destructor */
+	/** Copies data over to the buffer
+	 *
+	 * @param src_buffer Source data buffer
+	 * @param copy_info Copy info
+	 */
 	void write_buffer(Buffer const &src_buffer, vk::BufferCopy const &copy_info);
 
 	/** Maps the buffer and returns an offseted pointer to the beginning of a block
@@ -71,6 +75,14 @@ public:
 	 * @warn Don't map twice without unmapping
 	 */
 	[[nodiscard]] void *map_block(u32 block_index);
+
+	/** Maps the buffer and zeroes it, then returns an offseted pointer to the beginning of a block
+	 *
+	 * @param block_index Index of the block to offset the pointer to the beginning of
+	 *
+	 * @warn Don't map twice without unmapping
+	 */
+	[[nodiscard]] void *map_block_zeroed(u32 block_index);
 
 	/** Unmaps a buffer, can be called without prior mapping */
 	void unmap() const;

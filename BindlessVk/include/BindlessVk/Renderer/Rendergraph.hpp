@@ -16,6 +16,7 @@ class Rendergraph
 public:
 	friend class RenderGraphBuilder;
 
+
 public:
 	/** Default constructor */
 	Rendergraph() = default;
@@ -71,6 +72,12 @@ public:
 		return passes;
 	}
 
+	/** Trivial address-accessor for @a buffer_inputs[key] */
+	auto get_buffer(usize key)
+	{
+		return &buffer_inputs.at(key);
+	}
+
 	/** Trivial reference-accessor for compute_pipeline_layout */
 	auto &get_compute_pipeline_layout() const
 	{
@@ -86,13 +93,13 @@ public:
 	/** Trivial reference-accessor for pipeline_layout */
 	auto &get_pipeline_layout() const
 	{
-		return pipeline_layout;
+		return graphics_pipeline_layout;
 	}
 
 	/** Trivial referrence-accessor for descripto_sets */
 	auto &get_descriptor_sets() const
 	{
-		return descriptor_sets;
+		return graphics_descriptor_sets;
 	}
 
 	auto &get_prepare_label() const
@@ -109,7 +116,7 @@ public:
 	/** Trivial referrence-accessor for update_label */
 	auto &get_graphics_label() const
 	{
-		return prepare_label;
+		return graphics_label;
 	}
 
 	/** Trivial referrence-accessor for present_barrier_label */
@@ -130,15 +137,15 @@ protected:
 
 	vec<Renderpass *> passes = {};
 
-	vec<Buffer> buffer_inputs = {};
+	hash_map<usize, Buffer> buffer_inputs = {};
 
 	vk::PipelineLayout compute_pipeline_layout = {};
 	vk::DescriptorSetLayout compute_descriptor_set_layout = {};
 	vec<DescriptorSet> compute_descriptor_sets = {};
 
-	vk::PipelineLayout pipeline_layout = {};
-	vk::DescriptorSetLayout descriptor_set_layout = {};
-	vec<DescriptorSet> descriptor_sets = {};
+	vk::PipelineLayout graphics_pipeline_layout = {};
+	vk::DescriptorSetLayout graphics_descriptor_set_layout = {};
+	vec<DescriptorSet> graphics_descriptor_sets = {};
 
 	vk::DebugUtilsLabelEXT prepare_label = {};
 	vk::DebugUtilsLabelEXT compute_label = {};
@@ -245,6 +252,28 @@ private:
 	void build_graph_texture_inputs();
 	void build_graph_input_descriptors();
 	void initialize_graph_input_descriptors();
+
+	void build_graph_graphics_input_descriptors(vec<vk::DescriptorSetLayoutBinding> const &bindings
+	);
+	void build_graph_compute_input_descriptors(vec<vk::DescriptorSetLayoutBinding> const &bindings);
+
+	void extract_graph_buffer_descriptor_bindings(
+	    vec<RenderpassBlueprint::BufferInput> const &buffer_infos,
+	    vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
+	    vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
+	);
+
+	void extract_graph_texture_descriptor_bindings(
+	    vec<RenderpassBlueprint::TextureInput> const &texture_inputs,
+	    vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
+	    vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
+	);
+
+	void extract_input_descriptor_bindings(
+	    vec<RenderpassBlueprint::DescriptorInfo> const &descriptor_infos,
+	    vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
+	    vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
+	);
 
 	void build_pass_color_attachments(
 	    Renderpass *pass,

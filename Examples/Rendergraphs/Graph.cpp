@@ -14,68 +14,109 @@ BasicRendergraph::BasicRendergraph(bvk::VkContext const *const vk_context)
 
 void BasicRendergraph::on_setup()
 {
+	auto data = std::any_cast<UserData *>(user_data);
+	scene = data->scene;
+	vertex_buffer = data->vertex_buffer;
+	index_buffer = data->index_buffer;
+	debug_util = data->debug_utils;
+
+	staging_buffer = bvk::Buffer {
+		vk_context,
+		data->memory_allocator,
+		vk::BufferUsageFlagBits::eTransferSrc,
+		vma::AllocationCreateInfo {
+		    vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+		    vma::MemoryUsage::eAutoPreferHost,
+		},
+		1024 * 1024 * 1024,
+		1,
+		"graph_staging_buffer",
+	};
+
+	upload_model_data_to_gpu();
+	upload_indirect_data_to_gpu();
 }
 
-auto BasicRendergraph::get_descriptor_set_bindings()
-    -> pair<arr<vk::DescriptorSetLayoutBinding, 5>, arr<vk::DescriptorBindingFlags, 5>>
+void BasicRendergraph::upload_model_data_to_gpu()
 {
-	return pair<arr<vk::DescriptorSetLayoutBinding, 5>, arr<vk::DescriptorBindingFlags, 5>> {
-		arr<vk::DescriptorSetLayoutBinding, 5> {
-		    vk::DescriptorSetLayoutBinding {
-		        FrameData::binding,
-		        vk::DescriptorType::eUniformBuffer,
-		        1,
-		        vk::ShaderStageFlagBits::eVertex,
-		    },
-		    vk::DescriptorSetLayoutBinding {
-		        SceneData::binding,
-		        vk::DescriptorType::eUniformBuffer,
-		        1,
-		        vk::ShaderStageFlagBits::eVertex,
-		    },
-		    vk::DescriptorSetLayoutBinding {
-		        ObjectData::binding,
-		        vk::DescriptorType::eStorageBuffer,
-		        1,
-		        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-		    },
-		    vk::DescriptorSetLayoutBinding {
-		        3,
-		        vk::DescriptorType::eCombinedImageSampler,
-		        10'000,
-		        vk::ShaderStageFlagBits::eFragment,
-		    },
-		    vk::DescriptorSetLayoutBinding {
-		        4,
-		        vk::DescriptorType::eCombinedImageSampler,
-		        1'000,
-		        vk::ShaderStageFlagBits::eFragment,
-		    },
-		},
+	auto &model_buffer = buffer_inputs[U_ModelData::key];
 
-		arr<vk::DescriptorBindingFlags, 5> {
-		    vk::DescriptorBindingFlagBits::ePartiallyBound,
-		    vk::DescriptorBindingFlagBits::ePartiallyBound,
-		    vk::DescriptorBindingFlagBits::ePartiallyBound,
-		    vk::DescriptorBindingFlagBits::ePartiallyBound,
-		    vk::DescriptorBindingFlagBits::ePartiallyBound,
-		}
-	};
+	auto *const map = reinterpret_cast<U_ModelData *>(staging_buffer.map_block_zeroed(0));
+
+	for (auto i = u32 { 0 }; i < bvk::max_frames_in_flight; ++i)
+		stage_model(map, i);
+
+	staging_buffer.unmap();
+
+	debug_util->log(bvk::LogLvl::eInfo, "Primitive count: {}", primitive_count);
+	model_buffer.write_buffer(
+	    staging_buffer,
+	    vk::BufferCopy {
+	        0u,
+	        0,
+	        sizeof(U_ModelData) * primitive_count,
+	    }
+	);
+}
+
+void BasicRendergraph::upload_indirect_data_to_gpu()
+{
+	auto &indirect_buffer = buffer_inputs[U_DrawIndirect::key];
+
+	auto *const map = static_cast<U_DrawIndirect *>(staging_buffer.map_block_zeroed(0));
+
+	stage_indirect(map);
+	staging_buffer.unmap();
+
+	for (u32 i = 0; i < bvk::max_frames_in_flight; ++i)
+	{
+		indirect_buffer.write_buffer(
+		    staging_buffer,
+		    vk::BufferCopy {
+		        0u,
+		        indirect_buffer.get_block_size() * i,
+		        sizeof(U_DrawIndirect) * primitive_count,
+		    }
+		);
+	}
+}
+
+void BasicRendergraph::stage_indirect(U_DrawIndirect *buffer_map)
+{
+	auto i = u32 { 0 };
+	auto const static_meshes = scene->view<
+	    TransformComponent const,
+	    StaticMeshRendererComponent const>();
+
+	static_meshes.each([this, &i, buffer_map](auto const &transform, auto const &static_mesh) {
+		auto const *model = static_mesh.model;
+
+		auto const vertex_offset = model->get_vertex_offset();
+		auto const index_offset = model->get_index_offset();
+
+		for (auto const *node : model->get_nodes())
+			for (auto const &primitive : node->mesh)
+			{
+				buffer_map[i].cmd = vk::DrawIndexedIndirectCommand {
+					primitive.index_count, //
+					1,
+					primitive.first_index + index_offset,
+					vertex_offset,
+					i,
+				};
+				++i;
+			}
+	});
 }
 
 void BasicRendergraph::on_frame_prepare(u32 const frame_index, u32 const image_index)
 {
 	this->frame_index = frame_index;
 
-	scene = std::any_cast<UserData *>(user_data)->scene;
-	vertex_buffer = std::any_cast<UserData *>(user_data)->vertex_buffer;
-	index_buffer = std::any_cast<UserData *>(user_data)->index_buffer;
-
 	// These calls can accumulate descriptor_writes
 	update_for_cameras();
 	update_for_lights();
 	update_for_skyboxes();
-	update_for_meshes();
 
 	update_descriptor_sets();
 }
@@ -116,16 +157,18 @@ void BasicRendergraph::update_for_lights()
 	});
 }
 
-void BasicRendergraph::update_for_meshes()
+void BasicRendergraph::stage_model(U_ModelData *const buffer_map, u32 buffer_index)
 {
 	auto i = u32 { 0 };
 	auto const static_meshes = scene->view<
 	    TransformComponent const,
 	    StaticMeshRendererComponent const>();
 
-	static_meshes.each([this, &i](auto const &transform, auto const &static_mesh) {
-		update_for_mesh(transform, static_mesh, i);
-	});
+	static_meshes.each(
+	    [this, &i, buffer_map, buffer_index](auto const &transform, auto const &static_mesh) {
+		    update_for_model(buffer_map, buffer_index, transform, static_mesh, i);
+	    }
+	);
 }
 
 void BasicRendergraph::update_for_skyboxes()
@@ -139,13 +182,12 @@ void BasicRendergraph::update_for_camera(
     CameraComponent const &camera
 )
 {
-	auto &frame_data_buffer = buffer_inputs[FrameData::binding];
-	auto *const frame_data = reinterpret_cast<FrameData *>(frame_data_buffer.map_block(frame_index)
-	);
+	auto &frame_data_buffer = buffer_inputs[U_FrameData::key];
+	auto *const frame_data = static_cast<U_FrameData *>(frame_data_buffer.map_block(frame_index));
 
-	*frame_data = FrameData {
-		camera.get_projection(),
+	*frame_data = U_FrameData {
 		camera.get_view(transform.translation),
+		camera.get_projection(),
 		glm::vec4(transform.translation, 1.0f),
 	};
 
@@ -157,35 +199,23 @@ void BasicRendergraph::update_for_light(
     LightComponent const &camera
 )
 {
-	auto &scene_data_buffer = buffer_inputs[SceneData::binding];
-	auto *const scene_data = reinterpret_cast<SceneData *>(scene_data_buffer.map_block(frame_index)
-	);
-
-	*scene_data = SceneData {
-		glm::vec4(transform.translation, 1.0f),
-	};
-
-	scene_data_buffer.unmap();
 }
 
-void BasicRendergraph::update_for_mesh(
+void BasicRendergraph::update_for_model(
+    U_ModelData *const buffer_map,
+    u32 buffer_index,
     TransformComponent const &transform,
     StaticMeshRendererComponent const &static_mesh,
     u32 &primitive_index
 )
 {
-	auto &object_data_buffer = buffer_inputs[ObjectData::binding];
-	auto *const object_data = reinterpret_cast<ObjectData *>(
-	    object_data_buffer.map_block(frame_index)
-	);
-
-
-	auto const &descriptor_set = descriptor_sets[frame_index];
+	auto const &descriptor_set = graphics_descriptor_sets[buffer_index];
 
 	for (auto const *const node : static_mesh.model->get_nodes())
 		for (auto const &primitive : node->mesh)
 		{
-			auto &object = object_data[primitive_index++];
+			++primitive_count;
+			auto &object = buffer_map[primitive_index++];
 			object.model = transform.get_transform();
 
 			auto const &model = static_mesh.model;
@@ -195,6 +225,11 @@ void BasicRendergraph::update_for_mesh(
 			auto const albedo_index = material.albedo_texture_index;
 			auto const normal_index = material.normal_texture_index;
 			auto const metallic_roughness_index = material.metallic_roughness_texture_index;
+
+			object.x = transform.translation.x;
+			object.y = transform.translation.y;
+			object.z = transform.translation.z;
+			object.r = std::max(transform.scale.x, std::max(transform.scale.y, transform.scale.z));
 
 			if (albedo_index != -1)
 			{
@@ -238,13 +273,11 @@ void BasicRendergraph::update_for_mesh(
 				object.normal_texture_index = normal_index;
 			}
 		}
-
-	object_data_buffer.unmap();
 }
 
 void BasicRendergraph::update_for_skybox(SkyboxComponent const &skybox)
 {
-	auto const &descriptor_set = descriptor_sets[frame_index];
+	auto const &descriptor_set = graphics_descriptor_sets[frame_index];
 
 	descriptor_writes.push_back({
 	    descriptor_set.vk(),
@@ -254,4 +287,98 @@ void BasicRendergraph::update_for_skybox(SkyboxComponent const &skybox)
 	    vk::DescriptorType::eCombinedImageSampler,
 	    skybox.texture->get_descriptor_info(),
 	});
+}
+
+auto BasicRendergraph::get_graphics_descriptor_set_bindings() -> pair<
+    arr<vk::DescriptorSetLayoutBinding, graphics_descriptor_set_bindings_count>,
+    arr<vk::DescriptorBindingFlags, graphics_descriptor_set_bindings_count>>
+{
+	return {
+		arr<vk::DescriptorSetLayoutBinding, graphics_descriptor_set_bindings_count> {
+		    vk::DescriptorSetLayoutBinding {
+		        U_FrameData::binding,
+		        vk::DescriptorType::eUniformBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eVertex,
+		    },
+		    vk::DescriptorSetLayoutBinding {
+		        U_SceneData::binding,
+		        vk::DescriptorType::eUniformBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eVertex,
+		    },
+
+		    vk::DescriptorSetLayoutBinding {
+		        U_ModelData::binding,
+		        vk::DescriptorType::eStorageBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+		    },
+
+		    vk::DescriptorSetLayoutBinding {
+		        U_Textures::binding,
+		        vk::DescriptorType::eCombinedImageSampler,
+		        10'000,
+		        vk::ShaderStageFlagBits::eFragment,
+		    },
+
+		    vk::DescriptorSetLayoutBinding {
+		        U_TextureCubes::binding,
+		        vk::DescriptorType::eCombinedImageSampler,
+		        1'000,
+		        vk::ShaderStageFlagBits::eFragment,
+		    },
+		},
+
+		arr<vk::DescriptorBindingFlags, graphics_descriptor_set_bindings_count> {
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		},
+	};
+}
+
+auto BasicRendergraph::get_compute_descriptor_set_bindings() -> pair<
+    arr<vk::DescriptorSetLayoutBinding, compute_descriptor_set_bindings_count>,
+    arr<vk::DescriptorBindingFlags, compute_descriptor_set_bindings_count>>
+{
+	return {
+		arr<vk::DescriptorSetLayoutBinding, compute_descriptor_set_bindings_count> {
+		    vk::DescriptorSetLayoutBinding {
+		        U_FrameData::binding,
+		        vk::DescriptorType::eUniformBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eCompute,
+		    },
+		    vk::DescriptorSetLayoutBinding {
+		        U_SceneData::binding,
+		        vk::DescriptorType::eUniformBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eCompute,
+		    },
+
+		    vk::DescriptorSetLayoutBinding {
+		        U_ModelData::binding,
+		        vk::DescriptorType::eStorageBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eCompute,
+		    },
+
+		    vk::DescriptorSetLayoutBinding {
+		        U_DrawIndirect::binding,
+		        vk::DescriptorType::eStorageBuffer,
+		        1,
+		        vk::ShaderStageFlagBits::eCompute,
+		    },
+		},
+
+		arr<vk::DescriptorBindingFlags, compute_descriptor_set_bindings_count> {
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		    vk::DescriptorBindingFlagBits::ePartiallyBound,
+		},
+	};
 }

@@ -84,7 +84,6 @@ void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_co
 {
 	device->immediate_submit([&](vk::CommandBuffer cmd) {
 		auto &[buffer, allocation] = allocated_buffer;
-
 		cmd.copyBuffer(*src_buffer.vk(), buffer, 1u, &src_copy);
 	});
 }
@@ -102,9 +101,15 @@ void Buffer::calculate_block_size(Gpu const *const gpu)
 void *Buffer::map_block(u32 const block_index)
 {
 	auto &[buffer, allocation] = allocated_buffer;
-
 	auto const map = (u8 *)memory_allocator->vma().mapMemory(allocation);
 	return map + (block_size * block_index);
+}
+
+void *Buffer::map_block_zeroed(u32 const block_index)
+{
+	auto map = map_block(block_index);
+	memset(map, {}, get_block_size());
+	return map;
 }
 
 void Buffer::unmap() const

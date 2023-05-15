@@ -3,6 +3,8 @@
 
 #extension GL_EXT_nonuniform_qualifier:enable
 
+#include "scene_descriptors.glsl"
+
 layout(location = 0) in vec3 in_fragment_position;
 layout(location = 1) in vec2 in_uv;
 layout(location = 2) in vec3 in_tangent_light_position;
@@ -10,28 +12,13 @@ layout(location = 3) in vec3 in_tangent_view_position;
 layout(location = 4) in vec3 in_tangent_fragment_position;
 layout(location = 5) in flat int in_instance_index;
 
-
 layout(location = 0) out vec4 out_color;
-
-layout(set = 0, binding = 3) uniform sampler2D u_textures[];
-
-struct ObjectData {
-    int albedo_texture_index;
-    int normal_texture_index;
-    int metallic_roughness_texture_index;
-    int _;
-    mat4 model;
-};
-
-layout(set = 0, binding = 2) readonly buffer Objects{
-    ObjectData data[];
-} ub_objects;
 
 void main()
 {
-    ObjectData object_data = ub_objects.data[in_instance_index];
-    int albedo_index = object_data.albedo_texture_index;
-    int normal_index = object_data.normal_texture_index;
+    ModelData model_data = ub_models.arr[in_instance_index];
+    int albedo_index = model_data.albedo_texture_index;
+    int normal_index = model_data.normal_texture_index;
 
     vec3 normal = texture(u_textures[normal_index], in_uv).rgb;
     normal = normalize(normal * 2.0 - 1.0);

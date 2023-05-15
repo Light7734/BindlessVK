@@ -1,23 +1,85 @@
 #include "Rendergraphs/Passes/Forward.hpp"
 
-Forwardpass::Forwardpass(bvk::VkContext const *const vk_context): bvk::Renderpass(vk_context)
+#include "Rendergraphs/Graph.hpp"
+
+#include <BindlessVk/Renderer/Rendergraph.hpp>
+#include <imgui.h>
+
+Forwardpass::Forwardpass(bvk::VkContext const *const vk_context)
+    : bvk::Renderpass(vk_context)
+    , device(vk_context->get_device())
 {
 }
 
-void Forwardpass::on_setup()
+void Forwardpass::on_setup(bvk::Rendergraph *graph)
 {
 	auto const data = any_cast<UserData *>(user_data);
 
 	scene = data->scene;
 	memory_allocator = data->memory_allocator;
+
+	draw_indirect_buffer = graph->get_buffer(BasicRendergraph::U_DrawIndirect::key);
+
+	cull_pipeline = data->cull_pipeline;
+	model_pipeline = data->model_pipeline;
+	skybox_pipeline = data->skybox_pipeline;
+
+	scene->view<StaticMeshRendererComponent const>().each(
+	    [this](StaticMeshRendererComponent const &mesh) {
+		    auto model = mesh.model;
+
+		    for (auto const *node : model->get_nodes())
+			    primitive_count += node->mesh.size();
+	    }
+	);
+
+	auto scene_buffer = graph->get_buffer(BasicRendergraph::U_SceneData::key);
+
+	{
+		auto *map = (BasicRendergraph::U_SceneData *)scene_buffer->map_block(0);
+		*map = {
+			{},
+			primitive_count,
+		};
+		scene_buffer->unmap();
+	}
+
+	{
+		auto *map = (BasicRendergraph::U_SceneData *)scene_buffer->map_block(1);
+		*map = {
+			{},
+			primitive_count,
+		};
+		scene_buffer->unmap();
+	}
+
+	{
+		auto *map = (BasicRendergraph::U_SceneData *)scene_buffer->map_block(2);
+		*map = {
+			{},
+			primitive_count,
+		};
+		scene_buffer->unmap();
+	}
 }
 
 void Forwardpass::on_frame_prepare(u32 frame_index, u32 image_index)
 {
+	static_mesh_count = scene->view<StaticMeshRendererComponent>().size();
 }
 
 void Forwardpass::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
 {
+	ImGui::Begin("Forwardpass options");
+
+	auto dispatch_x = 1 + (static_mesh_count / 64);
+	cmd.bindPipeline(vk::PipelineBindPoint::eCompute, cull_pipeline->get_pipeline());
+
+	ImGui::Checkbox("freeze cull", &freeze_cull);
+	if (!freeze_cull)
+		cmd.dispatch(1, 1, 1);
+
+	ImGui::End();
 }
 
 void Forwardpass::on_frame_graphics(
@@ -31,48 +93,39 @@ void Forwardpass::on_frame_graphics(
 	this->cmd = cmd;
 	current_pipeline = vk::Pipeline {};
 
-	render_static_meshes();
+	render_static_meshes(frame_index);
 	render_skyboxes();
 }
 
-void Forwardpass::render_static_meshes()
+void Forwardpass::render_static_meshes(u32 frame_index)
 {
-	auto i = u32 { 0 };
-	auto const static_meshes = scene->view<StaticMeshRendererComponent const>();
+	switch_pipeline(model_pipeline->get_pipeline());
 
-	// auto constexpr size = sizeof(vk::DrawIndexedIndirectCommand);
-
-	// for (u32 i = 0; i < static_meshes.size(); i++)
-	// 	cmd.drawIndexedIndirect(*draw_indirect_buffer.vk(), i * size, 1, size);
-
-	static_meshes.each([this, &i](auto const &static_mesh) { render_static_mesh(static_mesh, i); });
+	cmd.drawIndexedIndirect(
+	    *draw_indirect_buffer->vk(),
+	    0,
+	    primitive_count,
+	    sizeof(BasicRendergraph::U_DrawIndirect)
+	);
 }
 
 void Forwardpass::render_skyboxes()
 {
+	switch_pipeline(skybox_pipeline->get_pipeline());
+
 	auto const skyboxes = scene->view<const SkyboxComponent>();
 	skyboxes.each([this](auto const &skybox) { render_skybox(skybox); });
 }
 
 void Forwardpass::render_static_mesh(StaticMeshRendererComponent const &static_mesh, u32 &index)
 {
-	auto const new_pipeline = static_mesh.material->get_shader_pipeline()->get_pipeline();
-
-	if (current_pipeline != new_pipeline)
-		switch_pipeline(new_pipeline);
-
 	draw_model(static_mesh.model, index);
 }
 
 void Forwardpass::render_skybox(SkyboxComponent const &skybox)
 {
-	auto const new_pipeline = skybox.material->get_shader_pipeline()->get_pipeline();
-
-	if (current_pipeline != new_pipeline)
-		switch_pipeline(new_pipeline);
-
-	u32 a = 0;
-	draw_model(skybox.model, a);
+	u32 primitive_index = 0;
+	draw_model(skybox.model, primitive_index);
 }
 
 void Forwardpass::switch_pipeline(vk::Pipeline pipeline)

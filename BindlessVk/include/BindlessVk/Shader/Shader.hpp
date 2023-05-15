@@ -18,7 +18,7 @@ struct Shader
 class ShaderPipeline
 {
 public:
-    /** Pipeline state of the shader */
+	/** Pipeline state of the shader */
 	struct Configuration
 	{
 		vk::PipelineVertexInputStateCreateInfo vertex_input_state;
@@ -35,6 +35,12 @@ public:
 		vec<vk::DynamicState> dynamic_states;
 	};
 
+	enum class Type
+	{
+		eCompute,
+		eGraphics,
+	};
+
 public:
 	/** Default constructor */
 	ShaderPipeline() = default;
@@ -43,6 +49,7 @@ public:
 	ShaderPipeline(
 	    VkContext const *vk_context,
 	    LayoutAllocator *const layout_allocator,
+	    Type type,
 	    vec<Shader *> const &shaders,
 	    ShaderPipeline::Configuration const &configuration,
 	    DescriptorSetLayoutWithHash graph_set_bindings,
@@ -108,7 +115,12 @@ private:
 	    DescriptorSetLayoutWithHash pass_descriptor_set_layout
 	);
 
-	void create_pipeline(vec<Shader *> const &shaders, ShaderPipeline::Configuration configuration);
+	void create_graphics_pipeline(
+	    vec<Shader *> const &shaders,
+	    ShaderPipeline::Configuration configuration
+	);
+
+	void create_compute_pipeline(vec<Shader *> const &shaders);
 
 	auto combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const
 	    -> vec<vk::DescriptorSetLayoutBinding>;

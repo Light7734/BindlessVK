@@ -10,6 +10,10 @@ public:
 	{
 		Scene *scene;
 		bvk::MemoryAllocator *memory_allocator;
+
+		bvk::ShaderPipeline *model_pipeline;
+		bvk::ShaderPipeline *skybox_pipeline;
+		bvk::ShaderPipeline *cull_pipeline;
 	};
 
 	struct ModelInformation
@@ -31,13 +35,12 @@ public:
 		u32 _pad2;
 	};
 
-
 public:
 	Forwardpass(bvk::VkContext const *vk_context);
 
 	~Forwardpass() = default;
 
-	void on_setup() final;
+	void on_setup(bvk::Rendergraph *graph) final;
 
 	void on_frame_prepare(u32 frame_index, u32 image_index) final;
 	void on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
@@ -50,7 +53,7 @@ public:
 
 	auto static consteval get_compute_label()
 	{
-		return vk::DebugUtilsLabelEXT { "forwardpass_(has_no)_compute", { 1.0, 0.5, 0.5, 1.0 } };
+		return vk::DebugUtilsLabelEXT { "forwardpass_compute", { 1.0, 0.5, 0.5, 1.0 } };
 	}
 
 	auto static consteval get_graphics_label()
@@ -64,7 +67,7 @@ public:
 	}
 
 private:
-	void render_static_meshes();
+	void render_static_meshes(u32 frame_index);
 	void render_skyboxes();
 
 	void render_static_mesh(StaticMeshRendererComponent const &static_mesh, u32 &primitive_index);
@@ -76,13 +79,21 @@ private:
 private:
 	bvk::MemoryAllocator *memory_allocator = {};
 	Scene *scene = {};
+	bvk::Device *device = {};
 
-	bvk::Buffer draw_indirect_buffer = {};
-	bvk::Buffer model_information_buffer = {};
+	bvk::Buffer const *draw_indirect_buffer = {};
 
 	vk::Pipeline current_pipeline = {};
-	vk::Pipeline cull_pipeline = {};
-	vk::PipelineLayout cull_pipeline_layout = {};
-	vk::DescriptorSet cull_pipeline_descriptor_set = {};
+
 	vk::CommandBuffer cmd = {};
+
+	usize static_mesh_count = {};
+
+	bvk::ShaderPipeline *cull_pipeline = {};
+	bvk::ShaderPipeline *model_pipeline = {};
+	bvk::ShaderPipeline *skybox_pipeline = {};
+
+	u32 primitive_count = {};
+
+	bool freeze_cull = {};
 };

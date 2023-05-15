@@ -6,7 +6,8 @@ DevelopmentExampleApplication::DevelopmentExampleApplication()
 {
 	load_shaders();
 	load_pipeline_configuration();
-	load_shader_effects();
+	load_graphics_pipelines();
+	load_compute_pipelines();
 	load_materials();
 
 	load_models();
@@ -50,9 +51,9 @@ void DevelopmentExampleApplication::load_shaders()
 	}
 }
 
-void DevelopmentExampleApplication::load_shader_effects()
+void DevelopmentExampleApplication::load_graphics_pipelines()
 {
-	auto const [bindings, flags] = BasicRendergraph::get_descriptor_set_bindings();
+	auto const [bindings, flags] = BasicRendergraph::get_graphics_descriptor_set_bindings();
 	auto const graph_set_layout = layout_allocator.goc_descriptor_set_layout({}, bindings, flags);
 
 	shader_pipelines.emplace(
@@ -61,6 +62,7 @@ void DevelopmentExampleApplication::load_shader_effects()
 	    bvk::ShaderPipeline {
 	        &vk_context,
 	        &layout_allocator,
+	        bvk::ShaderPipeline::Type::eGraphics,
 	        {
 	            &shaders[hash_str("vertex")],
 	            &shaders[hash_str("pixel")],
@@ -78,6 +80,7 @@ void DevelopmentExampleApplication::load_shader_effects()
 	    bvk::ShaderPipeline {
 	        &vk_context,
 	        &layout_allocator,
+	        bvk::ShaderPipeline::Type::eGraphics,
 	        {
 	            &shaders[hash_str("skybox_vertex")],
 	            &shaders[hash_str("skybox_fragment")],
@@ -86,6 +89,29 @@ void DevelopmentExampleApplication::load_shader_effects()
 	        graph_set_layout,
 	        {},
 	        "skybox",
+	    }
+	);
+}
+
+void DevelopmentExampleApplication::load_compute_pipelines()
+{
+	auto const [bindings, flags] = BasicRendergraph::get_compute_descriptor_set_bindings();
+	auto const graph_set_layout = layout_allocator.goc_descriptor_set_layout({}, bindings, flags);
+
+	shader_pipelines.emplace(
+	    hash_str("cull"),
+
+	    bvk::ShaderPipeline {
+	        &vk_context,
+	        &layout_allocator,
+	        bvk::ShaderPipeline::Type::eCompute,
+	        {
+	            &shaders[hash_str("cull")],
+	        },
+	        {},
+	        graph_set_layout,
+	        {},
+	        "cull",
 	    }
 	);
 }
@@ -286,8 +312,8 @@ void DevelopmentExampleApplication::load_entities()
 
 	scene.emplace<TransformComponent>(
 	    test_model_entity,
-	    glm::vec3(0.0f),
-	    glm::vec3(1.0f),
+	    glm::vec3(10.0, 200.0, -5.0),
+	    glm::vec3(30.0),
 	    glm::vec3(0.0f, 0.0, 0.0)
 	);
 
@@ -334,7 +360,7 @@ void DevelopmentExampleApplication::load_entities()
 	    5.0,
 	    1.0,
 	    0.001f,
-	    100.0f,
+	    1000.0f,
 	    225.0,
 	    0.0,
 	    glm::vec3(0.0f, 0.0f, -1.0f),
@@ -354,11 +380,17 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	auto const color_output_hash = hash_str("forward_color_out");
 	auto const depth_attachment_hash = hash_str("forward_depth");
 
-	fowardpass_user_data = { &scene, &memory_allocator };
+	fowardpass_user_data = {
+		&scene,
+		&memory_allocator,
+		&shader_pipelines[hash_str("opaque_mesh")],
+		&shader_pipelines[hash_str("skybox")],
+		&shader_pipelines[hash_str("cull")],
+	};
 
 	auto blueprint = bvk::RenderpassBlueprint {};
 	blueprint.set_name("forwardpass")
-	    .set_compute(false)
+	    .set_compute(true)
 	    .set_graphics(true)
 	    .set_user_data(&fowardpass_user_data)
 	    .set_sample_count(sample_count)
@@ -425,10 +457,14 @@ auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::Renderpas
 	return blueprint;
 }
 
+#include <optional>
+
 void DevelopmentExampleApplication::create_render_graph()
 {
 	auto const forwrard_pass_blueprint = create_forward_pass_blueprint();
 	auto const ui_pass_blueprint = create_ui_pass_blueprint();
+
+	std::optional<vk::DescriptorType> descriptor_type;
 
 	auto builder = bvk::RenderGraphBuilder {
 		&vk_context,
@@ -439,6 +475,8 @@ void DevelopmentExampleApplication::create_render_graph()
 	graph_user_data.scene = &scene;
 	graph_user_data.vertex_buffer = &vertex_buffer;
 	graph_user_data.index_buffer = &index_buffer;
+	graph_user_data.memory_allocator = &memory_allocator;
+	graph_user_data.debug_utils = &debug_utils;
 
 	builder.set_type<BasicRendergraph>()
 	    .set_resources(renderer.get_resources())
@@ -450,44 +488,164 @@ void DevelopmentExampleApplication::create_render_graph()
 	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
 
 	    .add_buffer_input({
-	        "frame_data",
-	        BasicRendergraph::FrameData::binding,
-	        1,
-	        vk::DescriptorType::eUniformBuffer,
-	        vk::ShaderStageFlagBits::eVertex,
-	        sizeof(BasicRendergraph::FrameData),
+	        BasicRendergraph::U_FrameData::name,
+	        BasicRendergraph::U_FrameData::key,
+	        sizeof(BasicRendergraph::U_FrameData),
+	        vk::BufferUsageFlagBits::eUniformBuffer,
+	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame,
+	        vma::AllocationCreateInfo {
+	            vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+	            vma::MemoryUsage::eAutoPreferDevice,
+	        },
+	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	            {
+	                vk::PipelineBindPoint::eCompute,
+	                {
+	                    BasicRendergraph::U_FrameData::binding,
+	                    vk::DescriptorType::eUniformBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eCompute,
+	                },
+	            },
+	            {
+
+	                vk::PipelineBindPoint::eGraphics,
+	                {
+	                    BasicRendergraph::U_FrameData::binding,
+	                    vk::DescriptorType::eUniformBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eVertex,
+	                },
+	            },
+	        },
 	    })
+
 	    .add_buffer_input({
-	        "scene_data",
-	        BasicRendergraph::SceneData::binding,
-	        1,
-	        vk::DescriptorType::eUniformBuffer,
-	        vk::ShaderStageFlagBits::eVertex,
-	        sizeof(BasicRendergraph::SceneData),
+	        BasicRendergraph::U_SceneData::name,
+	        BasicRendergraph::U_SceneData::key,
+	        sizeof(BasicRendergraph::U_SceneData),
+	        vk::BufferUsageFlagBits::eUniformBuffer,
+	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame,
+	        vma::AllocationCreateInfo {
+	            vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
+	            vma::MemoryUsage::eAutoPreferDevice,
+	        },
+	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	            {
+	                vk::PipelineBindPoint::eCompute,
+	                {
+	                    BasicRendergraph::U_SceneData::binding,
+	                    vk::DescriptorType::eUniformBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eCompute,
+	                },
+	            },
+	            {
+	                vk::PipelineBindPoint::eGraphics,
+	                {
+	                    BasicRendergraph::U_SceneData::binding,
+	                    vk::DescriptorType::eUniformBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eVertex,
+	                },
+	            },
+	        },
 	    })
+
 	    .add_buffer_input({
-	        "object_data",
-	        BasicRendergraph::ObjectData::binding,
-	        1,
-	        vk::DescriptorType::eStorageBuffer,
-	        vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-	        sizeof(BasicRendergraph::ObjectData) * 1000,
+	        BasicRendergraph::U_ModelData::name,
+	        BasicRendergraph::U_ModelData::key,
+	        sizeof(BasicRendergraph::U_ModelData) * 1'000,
+	        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::eSingular,
+	        vma::AllocationCreateInfo {
+	            {},
+	            vma::MemoryUsage::eAutoPreferDevice,
+	        },
+	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	            {
+	                vk::PipelineBindPoint::eCompute,
+	                {
+	                    BasicRendergraph::U_ModelData::binding,
+	                    vk::DescriptorType::eStorageBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eCompute,
+	                },
+	            },
+	            {
+	                vk::PipelineBindPoint::eGraphics,
+	                {
+	                    BasicRendergraph::U_ModelData::binding,
+	                    vk::DescriptorType::eStorageBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+	                },
+	            },
+	        },
+	    })
+
+	    .add_buffer_input({
+	        BasicRendergraph::U_DrawIndirect::name,
+	        BasicRendergraph::U_DrawIndirect::key,
+	        sizeof(BasicRendergraph::U_DrawIndirect) * 6 * 3,
+
+	        vk::BufferUsageFlagBits::eTransferDst         //
+	            | vk::BufferUsageFlagBits::eTransferSrc   //
+	            | vk::BufferUsageFlagBits::eStorageBuffer //
+	            | vk::BufferUsageFlagBits::eIndirectBuffer,
+
+	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame,
+
+	        vma::AllocationCreateInfo {
+	            {},
+	            vma::MemoryUsage::eAutoPreferDevice,
+	        },
+
+	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	            {
+	                vk::PipelineBindPoint::eCompute,
+	                vk::DescriptorSetLayoutBinding {
+	                    BasicRendergraph::U_DrawIndirect::binding,
+	                    vk::DescriptorType::eStorageBuffer,
+	                    1,
+	                    vk::ShaderStageFlagBits::eCompute,
+	                },
+	            },
+	        },
 	    })
 
 	    .add_texture_input({
-	        "textures",
-	        BasicRendergraph::U_Textures::binding,
-	        10'000,
-	        vk::DescriptorType::eCombinedImageSampler,
-	        vk::ShaderStageFlagBits::eFragment,
+	        BasicRendergraph::U_Textures::name,
+	        &textures.at(hash_str("default_texture")),
+	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	            {
+	                vk::PipelineBindPoint::eGraphics,
+	                vk::DescriptorSetLayoutBinding {
+	                    BasicRendergraph::U_Textures::binding,
+	                    vk::DescriptorType::eCombinedImageSampler,
+	                    10'000,
+	                    vk::ShaderStageFlagBits::eFragment,
+	                },
+	            },
+	        },
 	    })
+
 	    .add_texture_input({
-	        "texture_cubes",
-	        BasicRendergraph::U_TextureCubes::binding,
-	        1'000,
-	        vk::DescriptorType::eCombinedImageSampler,
-	        vk::ShaderStageFlagBits::eFragment,
+	        BasicRendergraph::U_TextureCubes::name,
+	        &textures.at(hash_str("default_texture_cube")),
+	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	            {
+	                vk::PipelineBindPoint::eGraphics,
+	                vk::DescriptorSetLayoutBinding {
+	                    BasicRendergraph::U_TextureCubes::binding,
+	                    vk::DescriptorType::eCombinedImageSampler,
+	                    1'000,
+	                    vk::ShaderStageFlagBits::eFragment,
+	                },
+	            },
+	        },
 	    })
+
 	    .add_pass<Forwardpass>(forwrard_pass_blueprint)
 	    .add_pass<UserInterfacePass>(ui_pass_blueprint);
 
