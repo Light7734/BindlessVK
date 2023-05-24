@@ -61,7 +61,6 @@ public:
 	StagingPool staging_pool = {};
 
 	bvk::Renderer renderer = {};
-	scope<bvk::Rendergraph> render_graph = {};
 
 	bvk::TextureLoader texture_loader = {};
 	bvk::ModelLoader model_loader = {};

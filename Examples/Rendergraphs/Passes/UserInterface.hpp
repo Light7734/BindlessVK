@@ -1,16 +1,22 @@
 #pragma once
 
-#include "BindlessVk/Renderer/Renderpass.hpp"
+#include "BindlessVk/Renderer/RenderNode.hpp"
 #include "Framework/Scene/Scene.hpp"
 
 
-class UserInterfacePass: public bvk::Renderpass
+class UserInterfacePass: public bvk::RenderNode
 {
 public:
+	UserInterfacePass() = default;
+
 	UserInterfacePass(bvk::VkContext const *vk_context);
+
+	UserInterfacePass(UserInterfacePass &&other);
+	UserInterfacePass &operator=(UserInterfacePass &&other);
+
 	~UserInterfacePass() = default;
 
-	void on_setup(bvk::Rendergraph *graph) final;
+	void on_setup(bvk::RenderNode *parent) final;
 	void on_frame_prepare(u32 frame_index, u32 image_index) final;
 	void on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
 	void on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;

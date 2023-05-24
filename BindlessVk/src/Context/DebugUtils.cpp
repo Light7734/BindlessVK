@@ -84,7 +84,7 @@ auto DebugUtils::parse_message_severity(
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT: return LogLvl::eInfo;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT: return LogLvl::eWarn;
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT: return LogLvl::eError;
-	default: assert_fail("Invalid message severity: {}", message_severity);
+	default: assert_fail("Invalid message severity: {}", static_cast<int>(message_severity));
 	}
 
 	return {};

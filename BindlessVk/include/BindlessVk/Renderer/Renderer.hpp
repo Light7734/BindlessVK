@@ -44,7 +44,7 @@ public:
 	 *
 	 * @warn may block execution to wait for the frame's fence
 	 */
-	void render_graph(Rendergraph *render_graph);
+	void render_graph(RenderNode *root_node);
 
 	/** Returns pointer to resources */
 	auto get_resources()
@@ -59,7 +59,7 @@ public:
 	}
 
 private:
-	struct DynamicPassInfo
+	struct DynamicPassRenderingInfo
 	{
 		vec<vk::RenderingAttachmentInfo> color_attachments;
 		vk::RenderingAttachmentInfo depth_attachment;
@@ -85,10 +85,10 @@ private:
 	void destroy_cmds();
 	void destroy_sync_objects();
 
-	void prepare_frame(Rendergraph *graph);
-	void compute_frame(Rendergraph *graph);
-	void render_frame(Rendergraph *graph);
-	void present_frame(Rendergraph *graph);
+	void prepare_frame(RenderNode *graph);
+	void compute_frame(RenderNode *graph);
+	void graphics_frame(RenderNode *graph);
+	void present_frame();
 
 	void cycle_frame_index();
 	auto acquire_next_image_index() -> u32;
@@ -101,29 +101,29 @@ private:
 	void create_compute_cmds(Gpu const *gpu, u32 index);
 	void create_graphics_cmds(Gpu const *gpu, u32 index);
 
+	void prepare_node(RenderNode *graph);
+	void compute_node(RenderNode *graph, i32 depth);
+	void graphics_node(RenderNode *graph, i32 depth);
+
 	void reset_used_attachment_states();
 
 	void wait_for_compute_fence();
 	void wait_for_graphics_fence();
 
-	void bind_graph_compute_descriptor(Rendergraph *graph);
-	void bind_graph_graphics_descriptor(Rendergraph *graph);
+	void bind_node_compute_descriptors(RenderNode *node, i32 depth);
+	void bind_node_graphics_descriptors(RenderNode *node, i32 depth);
 
-	void apply_graph_barriers(Rendergraph *graph);
-
-	void compute_pass(Rendergraph *graph, Renderpass *pass);
-	void graphics_pass(Rendergraph *graph, Renderpass *pass);
+	void apply_backbuffer_barrier();
+	void apply_node_barriers(RenderNode *node);
 
 	void submit_compute_queue();
 	void submit_graphics_queue();
 	void submit_present_queue();
 
 	// 3
+	auto try_apply_node_barriers(RenderNode *node) -> bool;
 
-	void bind_pass_compute_descriptor(Renderpass *pass);
-	void bind_pass_graphics_descriptor(Renderpass *pass);
-
-	void apply_pass_barriers(Renderpass *pass);
+	void parse_node_rendering_info(RenderNode *node);
 
 private:
 	Device const *device = {};
@@ -135,7 +135,7 @@ private:
 	vec<tuple<u32, u32, u32>> used_attachment_indices = {};
 
 	RenderResources resources = {};
-	arr<DynamicPassInfo, max_frames_in_flight> dynamic_pass_info;
+	DynamicPassRenderingInfo dynamic_pass_rendering_info;
 
 	arr<vk::Fence, max_frames_in_flight> compute_fences = {};
 	arr<vk::Semaphore, max_frames_in_flight> compute_semaphores = {};
@@ -153,6 +153,9 @@ private:
 
 	u32 frame_index = 0;
 	u32 image_index = std::numeric_limits<u32>::max();
+
+	// @wip
+	bool begun_rendering=  false;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

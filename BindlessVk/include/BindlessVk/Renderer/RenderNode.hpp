@@ -7,14 +7,12 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-class Rendergraph;
-
 /** Describes a single compute and/or rendering step in the render graph */
-class Renderpass
+class RenderNode
 {
 public:
 	friend class RenderGraphBuilder;
-	friend class RenderpassBlueprint;
+	friend class RenderNodeBlueprint;
 
 public:
 	/** Repersents a render color or depth/stencil attachment */
@@ -25,15 +23,32 @@ public:
 		vk::ImageLayout image_layout;
 		vk::ImageSubresourceRange subresource_range;
 
+		vk::ClearValue clear_value;
 		vk::AttachmentLoadOp load_op;
 		vk::AttachmentStoreOp store_op;
-
-		vk::ResolveModeFlagBits transient_resolve_moode;
 
 		u32 resource_index;
 		u32 transient_resource_index;
 
-		vk::ClearValue clear_value;
+		vk::ResolveModeFlagBits transient_resolve_mode;
+
+		auto has_resource() const
+		{
+			return resource_index != std::numeric_limits<u32>::max();
+		}
+
+		auto has_transient_resource() const
+		{
+			return transient_resource_index != std::numeric_limits<u32>::max();
+		}
+
+		auto is_compatible_with(void *attachment) const
+		{
+			return false;
+			// return access_mask == attachment->access_mask && //
+			//        stage_mask == attachment->stage_mask &&   //
+			//        image_layout == attachment->image_layout;
+		}
 
 		/** Checks wether or not image's aspect mask has color flag */
 		auto is_color_attachment() const
@@ -59,20 +74,32 @@ public:
 	};
 
 public:
+	/** Default constructor */
+	RenderNode() = default;
+
 	/** Argumented constructor
 	 *
 	 * @param vk_context The vulkan context
 	 */
-	Renderpass(VkContext const *vk_context): vk_context(vk_context)
-	{
-	}
+	RenderNode(VkContext const *vk_context);
 
-	/** Destuctor */
-	virtual ~Renderpass() = default;
+	/** Default move constructor */
+	RenderNode(RenderNode &&other) = default;
 
-public:
+	/** Default move assignment operator */
+	RenderNode &operator=(RenderNode &&other) = default;
+
+	/** Deleted copy constructor */
+	RenderNode(RenderNode const &) = delete;
+
+	/** Deleted copy assignment operator */
+	RenderNode &operator=(RenderNode const &) = delete;
+
+	/** Default virtual destuctor */
+	virtual ~RenderNode() = default;
+
 	/** Sets up the pass, called only once */
-	void virtual on_setup(Rendergraph *graph) = 0;
+	void virtual on_setup(RenderNode *parent) = 0;
 
 	/** Prepares the pass for rendering
 	 *
@@ -98,6 +125,38 @@ public:
 	 */
 	void virtual on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) = 0;
 
+	/** Returns null-terminated str view to name */
+	auto get_name() const
+	{
+		return str_view { name };
+	}
+
+	auto &get_descriptor_set(vk::PipelineBindPoint bind_point, u32 frame_index) const
+	{
+		switch (bind_point)
+		{
+		case vk::PipelineBindPoint::eCompute: return compute_descriptor_sets[frame_index];
+		case vk::PipelineBindPoint::eGraphics: return graphics_descriptor_sets[frame_index];
+		default:
+			assert_fail(
+			    "Invalid bind point for RenderNode::get_descriptor_set: {}",
+			    vk::to_string(bind_point)
+			);
+		}
+	}
+
+	/** Trivial reference-accessor for buffer_inputs */
+	auto &get_buffer_inputs()
+	{
+		return buffer_inputs;
+	}
+
+	/** Checks if sample_count has more than 1 samples */
+	auto is_multisampled() const
+	{
+		return sample_count != vk::SampleCountFlagBits::e1;
+	}
+
 	/** Trivial accessor for compute */
 	auto has_compute() const
 	{
@@ -110,16 +169,22 @@ public:
 		return graphics;
 	}
 
-	/** Trivial reference-accessor for update_label */
-	auto &get_prepare_label() const
+	/** Trivial reference-accessor for attachments */
+	auto &get_attachments() const
 	{
-		return prepare_label;
+		return attachments;
 	}
 
 	/** Trivial reference-accessor for compute_label */
 	auto &get_compute_label() const
 	{
 		return compute_label;
+	}
+
+	/** Trivial reference-accessor for descriptor_sets */
+	auto &get_descriptor_sets() const
+	{
+		return graphics_descriptor_sets;
 	}
 
 	/** Trivial reference-accessor for render_label */
@@ -134,16 +199,10 @@ public:
 		return barrier_label;
 	}
 
-	/** Trivial reference-accessor for attachments */
-	auto &get_attachments() const
+	/** Trivial reference-accessor for barrier_label */
+	auto &get_children() const
 	{
-		return attachments;
-	}
-
-	/** Trivial reference-accessor for descriptor_sets */
-	auto &get_descriptor_sets() const
-	{
-		return graphics_descriptor_sets;
+		return children;
 	}
 
 	/** Trivial reference-accessor for compute_pipeline_layout */
@@ -164,22 +223,22 @@ public:
 		return compute_descriptor_sets;
 	}
 
-	/** Trivial reference-accessor for pipeline_layout */
-	auto &get_pipeline_layout() const
+	/** Trivial reference-accessor for graphics_pipeline_layout */
+	auto &get_graphics_pipeline_layout() const
 	{
 		return graphics_pipeline_layout;
 	}
 
-	/** Trivial reference-accessor for buffer_inputs */
-	auto &get_buffer_inputs() const
+	/** Trivial reference-accessor for graphics_descriptor_set_layout */
+	auto &get_graphics_descriptor_set_layout() const
 	{
-		return buffer_inputs;
+		return graphics_descriptor_set_layout;
 	}
 
-	/** Checks if sample_count has more than 1 samples */
-	auto is_multisampled() const
+	/** Trivial referrence-accessor for graphics_descripto_sets */
+	auto &get_graphics_descriptor_sets() const
 	{
-		return sample_count != vk::SampleCountFlagBits::e1;
+		return graphics_descriptor_sets;
 	}
 
 protected:
@@ -187,43 +246,39 @@ protected:
 
 	str name = {};
 
+	class RenderResources *resources = {};
+
+	vec<Attachment> attachments = {};
+
 	bool compute = {};
 	bool graphics = {};
 
 	std::any user_data = {};
 
-	vec<Attachment> attachments = {};
+	vec<RenderNode *> children = {};
 
-	vec<Buffer> buffer_inputs = {};
+	hash_map<usize, Buffer> buffer_inputs = {};
 
-	hash_map<u32, Buffer *> compute_buffers;
-	hash_map<u32, Buffer *> graphics_buffers;
-
-	vk::DescriptorSetLayout compute_descriptor_set_layout = {};
 	vk::PipelineLayout compute_pipeline_layout = {};
+	vk::DescriptorSetLayout compute_descriptor_set_layout = {};
 	vec<DescriptorSet> compute_descriptor_sets = {};
 
-	vk::DescriptorSetLayout graphics_descriptor_set_layout = {};
 	vk::PipelineLayout graphics_pipeline_layout = {};
+	vk::DescriptorSetLayout graphics_descriptor_set_layout = {};
 	vec<DescriptorSet> graphics_descriptor_sets = {};
-
-	vec<vk::Format> color_attachment_formats = {};
-	vk::Format depth_attachment_format = {};
-
-	vk::SampleCountFlagBits sample_count = {};
-
-	vk::CommandBufferInheritanceRenderingInfo cmd_buffer_inheritance_rendering_info = {};
-	vk::CommandBufferInheritanceInfo cmd_buffer_inheritance_info = {};
-	vk::CommandBufferBeginInfo cmd_buffer_begin_info = {};
 
 	vk::DebugUtilsLabelEXT prepare_label = {};
 	vk::DebugUtilsLabelEXT compute_label = {};
 	vk::DebugUtilsLabelEXT graphics_label = {};
 	vk::DebugUtilsLabelEXT barrier_label = {};
+
+	vec<vk::Format> color_attachment_formats = {};
+	vk::Format depth_attachment_format = {};
+	vk::SampleCountFlagBits sample_count = {};
 };
 
 /** Represents build instructions for a Renderpass, to be used by RenderGraphBuilder */
-class RenderpassBlueprint
+class RenderNodeBlueprint
 {
 private:
 	friend class RenderGraphBuilder;
@@ -237,7 +292,7 @@ public:
 		u64 size_relative_hash;
 
 		pair<f32, f32> size;
-		Renderpass::SizeType size_type;
+		RenderNode::SizeType size_type;
 		vk::Format format;
 
 		vk::ClearValue clear_value;
@@ -284,103 +339,121 @@ public:
 	};
 
 public:
-	auto set_name(str const name) -> RenderpassBlueprint &
+	auto set_derived_object(RenderNode *const derived_object) -> RenderNodeBlueprint &
 	{
-		this->name = name;
+		this->derived_object = derived_object;
 		return *this;
 	}
 
-	auto set_compute(bool const compute) -> RenderpassBlueprint &
+	auto set_name(str const name) -> RenderNodeBlueprint &
 	{
-		this->compute = compute;
+		this->derived_object->name = name;
 		return *this;
 	}
 
-	auto set_graphics(bool const graphics) -> RenderpassBlueprint &
+	auto set_compute(bool const compute) -> RenderNodeBlueprint &
 	{
-		this->graphics = graphics;
+		this->derived_object->compute = compute;
 		return *this;
 	}
 
-	auto add_color_output(Attachment const attachment) -> RenderpassBlueprint &
+	auto set_graphics(bool const graphics) -> RenderNodeBlueprint &
 	{
+		this->derived_object->graphics = graphics;
+		return *this;
+	}
+
+	auto set_user_data(std::any data) -> RenderNodeBlueprint &
+	{
+		this->derived_object->user_data = data;
+		return *this;
+	}
+
+	auto set_sample_count(vk::SampleCountFlagBits sample_count) -> RenderNodeBlueprint &
+	{
+		this->derived_object->sample_count = sample_count;
+		return *this;
+	}
+
+	auto set_prepare_label(vk::DebugUtilsLabelEXT const label) -> RenderNodeBlueprint &
+	{
+		this->derived_object->prepare_label = label;
+		return *this;
+	}
+
+	auto set_graphics_label(vk::DebugUtilsLabelEXT const label) -> RenderNodeBlueprint &
+	{
+		this->derived_object->graphics_label = label;
+		return *this;
+	}
+
+	auto set_compute_label(vk::DebugUtilsLabelEXT const label) -> RenderNodeBlueprint &
+	{
+		this->derived_object->compute_label = label;
+		return *this;
+	}
+
+	auto set_barrier_label(vk::DebugUtilsLabelEXT const label) -> RenderNodeBlueprint &
+	{
+		this->derived_object->barrier_label = label;
+		return *this;
+	}
+
+	auto push_node(RenderNodeBlueprint blueprint) -> RenderNodeBlueprint &
+	{
+		this->children.push_back(blueprint);
+		this->derived_object->children.push_back(blueprint.derived_object);
+
+		return *this;
+	}
+
+	auto add_color_output(Attachment const attachment) -> RenderNodeBlueprint &
+	{
+		this->derived_object->color_attachment_formats.push_back(attachment.format);
 		this->color_attachments.push_back(attachment);
 		return *this;
 	}
 
-	auto set_depth_attachment(Attachment const attachment) -> RenderpassBlueprint &
+	auto set_depth_attachment(Attachment const attachment) -> RenderNodeBlueprint &
 	{
+		this->derived_object->depth_attachment_format = attachment.format;
 		this->depth_attachment = attachment;
 		return *this;
 	}
 
-	auto add_texture_input(TextureInput const input) -> RenderpassBlueprint &
+	auto add_texture_input(TextureInput const input) -> RenderNodeBlueprint &
 	{
 		this->texture_inputs.push_back(input);
 		return *this;
 	}
 
-	auto add_buffer_input(BufferInput const input) -> RenderpassBlueprint &
+	auto add_buffer_input(BufferInput const input) -> RenderNodeBlueprint &
 	{
 		this->buffer_inputs.push_back(input);
 		return *this;
 	}
 
-	auto set_user_data(std::any data) -> RenderpassBlueprint &
+private:
+	auto has_color_attachment() const
 	{
-		this->user_data = data;
-		return *this;
+		return !color_attachments.empty();
 	}
 
-	auto set_sample_count(vk::SampleCountFlagBits sample_count) -> RenderpassBlueprint &
+	auto has_depth_attachment() const
 	{
-		this->sample_count = sample_count;
-		return *this;
-	}
-
-	auto set_prepare_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
-	{
-		this->prepare_label = label;
-		return *this;
-	}
-
-	auto set_graphics_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
-	{
-		this->graphics_label = label;
-		return *this;
-	}
-
-	auto set_compute_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
-	{
-		this->compute_label = label;
-		return *this;
-	}
-
-	auto set_barrier_label(vk::DebugUtilsLabelEXT const label) -> RenderpassBlueprint &
-	{
-		this->barrier_label = label;
-		return *this;
+		return !!depth_attachment;
 	}
 
 private:
-	str name = {};
+	RenderNode *derived_object = {};
 
-	bool compute = {};
-	bool graphics = {};
-
-	std::any user_data = {};
+	vec<RenderNodeBlueprint> children {};
 
 	vec<Attachment> color_attachments = {};
 	Attachment depth_attachment = {};
+
 	vec<TextureInput> texture_inputs = {};
 	vec<BufferInput> buffer_inputs = {};
-
-	vk::SampleCountFlagBits sample_count = {};
-
-	vk::DebugUtilsLabelEXT prepare_label = {};
-	vk::DebugUtilsLabelEXT compute_label = {};
-	vk::DebugUtilsLabelEXT graphics_label = {};
-	vk::DebugUtilsLabelEXT barrier_label = {};
 };
 
 

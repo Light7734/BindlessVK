@@ -5,13 +5,23 @@
 
 #include <imgui.h>
 
-
 UserInterfacePass::UserInterfacePass(bvk::VkContext const *const vk_context)
-    : bvk::Renderpass(vk_context)
+    : bvk::RenderNode(vk_context)
 {
 }
 
-void UserInterfacePass::on_setup(bvk::Rendergraph *graph)
+UserInterfacePass::UserInterfacePass(UserInterfacePass &&other)
+{
+	*this = std::move(other);
+}
+
+UserInterfacePass &UserInterfacePass::operator=(UserInterfacePass &&other)
+{
+	bvk::RenderNode::operator=(std::move(other));
+	return *this;
+}
+
+void UserInterfacePass::on_setup(bvk::RenderNode *const parent)
 {
 }
 
@@ -19,7 +29,11 @@ void UserInterfacePass::on_frame_prepare(u32 const frame_index, u32 const image_
 {
 }
 
-void UserInterfacePass::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
+void UserInterfacePass::on_frame_compute(
+    vk::CommandBuffer const cmd,
+    u32 frame_index,
+    u32 const image_index
+)
 {
 }
 

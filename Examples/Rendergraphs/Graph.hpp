@@ -1,7 +1,7 @@
 #pragma once
 
+#include "BindlessVk/Renderer/RenderNode.hpp"
 #include "BindlessVk/Renderer/Rendergraph.hpp"
-#include "BindlessVk/Renderer/Renderpass.hpp"
 #include "Framework/Common/Common.hpp"
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
@@ -31,7 +31,7 @@ private:
 	str debug_name;
 };
 
-class BasicRendergraph: public bvk::Rendergraph
+class BasicRendergraph: public bvk::RenderNode
 {
 public:
 	struct UserData
@@ -112,11 +112,16 @@ public:
 	auto static constexpr compute_descriptor_set_bindings_count = usize { 4 };
 
 public:
+	BasicRendergraph() = default;
+
 	BasicRendergraph(bvk::VkContext const *const vk_context);
+
+	BasicRendergraph(BasicRendergraph &&other) = default;
+	BasicRendergraph &operator=(BasicRendergraph &&other) = default;
 
 	~BasicRendergraph() = default;
 
-	void on_setup() final;
+	void on_setup(RenderNode *parent) final;
 
 	void on_frame_prepare(u32 frame_index, u32 image_index) final;
 
@@ -184,7 +189,7 @@ private:
 	bvk::Device *device = {};
 	bvk::FragmentedBuffer *vertex_buffer = {};
 	bvk::FragmentedBuffer *index_buffer = {};
-	bvk::DebugUtils *debug_util;
+	bvk::DebugUtils *debug_util = {};
 
 	bvk::Buffer staging_buffer = {};
 

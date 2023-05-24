@@ -1,5 +1,6 @@
 #include "Development/Development.hpp"
 
+#include <optional>
 #include <span>
 
 DevelopmentExampleApplication::DevelopmentExampleApplication()
@@ -14,6 +15,7 @@ DevelopmentExampleApplication::DevelopmentExampleApplication()
 
 	load_entities();
 
+	initialize_render_nodes();
 	create_render_graph();
 }
 
@@ -27,7 +29,7 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	CVar::draw_imgui_editor();
 
 	camera_controller.update();
-	renderer.render_graph(render_graph.get());
+	renderer.render_graph(&render_graph);
 
 	if (renderer.is_swapchain_invalid())
 		assert_fail("swapchain-recreation is currently nuked");
@@ -371,7 +373,7 @@ void DevelopmentExampleApplication::load_entities()
 	scene.emplace<LightComponent>(light_entity, 12);
 }
 
-auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::RenderpassBlueprint
+auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::RenderNodeBlueprint
 {
 	auto const color_format = surface.get_color_format();
 	auto const depth_format = surface.get_depth_format();
@@ -388,24 +390,27 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 		&shader_pipelines[hash_str("cull")],
 	};
 
-	auto blueprint = bvk::RenderpassBlueprint {};
-	blueprint.set_name("forwardpass")
-	    .set_compute(true)
-	    .set_graphics(true)
+	auto blueprint = bvk::RenderNodeBlueprint {};
+	blueprint.set_derived_object(&forward_pass)
 	    .set_user_data(&fowardpass_user_data)
-	    .set_sample_count(sample_count)
 
+	    .set_name("forwardpass")
 	    .set_prepare_label(Forwardpass::get_prepare_label())
 	    .set_compute_label(Forwardpass::get_compute_label())
 	    .set_graphics_label(Forwardpass::get_graphics_label())
 	    .set_barrier_label(Forwardpass::get_barrier_label())
+
+	    .set_compute(true)
+	    .set_graphics(true)
+
+	    .set_sample_count(sample_count)
 
 	    .add_color_output({
 	        color_output_hash,
 	        {},
 	        {},
 	        { 1.0, 1.0 },
-	        bvk::Renderpass::SizeType::eSwapchainRelative,
+	        bvk::RenderNode::SizeType::eSwapchainRelative,
 	        color_format,
 	        vk::ClearColorValue { 0.3f, 0.5f, 0.8f, 1.0f },
 	        "forwardpass_depth",
@@ -416,7 +421,7 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	        {},
 	        {},
 	        { 1.0, 1.0 },
-	        bvk::Renderpass::SizeType::eSwapchainRelative,
+	        bvk::RenderNode::SizeType::eSwapchainRelative,
 	        depth_format,
 	        vk::ClearDepthStencilValue { 1.0, 0 },
 	        "forwardpass_depth",
@@ -425,7 +430,7 @@ auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::Rend
 	return blueprint;
 }
 
-auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::RenderpassBlueprint
+auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::RenderNodeBlueprint
 {
 	auto const color_format = surface.get_color_format();
 	auto const sample_count = gpu.get_max_color_and_depth_samples();
@@ -433,22 +438,28 @@ auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::Renderpas
 	auto const color_output_hash = hash_str("uipass_color_out");
 	auto const color_output_input_hash = hash_str("forward_color_out");
 
-	auto blueprint = bvk::RenderpassBlueprint {};
-	blueprint.set_name("uipass")
-	    .set_compute(false)
-	    .set_graphics(true)
+	auto blueprint = bvk::RenderNodeBlueprint {};
+
+	blueprint.set_derived_object(&user_interface_pass)
 	    .set_user_data(&scene)
-	    .set_sample_count(sample_count)
+
+	    .set_name("uipass")
 	    .set_prepare_label(UserInterfacePass::get_prepare_label())
 	    .set_compute_label(UserInterfacePass::get_compute_label())
 	    .set_graphics_label(UserInterfacePass::get_graphics_label())
 	    .set_barrier_label(UserInterfacePass::get_barrier_label())
+
+	    .set_compute(false)
+	    .set_graphics(true)
+
+	    .set_sample_count(sample_count)
+
 	    .add_color_output({
 	        color_output_hash,
 	        color_output_input_hash,
 	        {},
 	        { 1.0, 1.0 },
-	        bvk::Renderpass::SizeType::eSwapchainRelative,
+	        bvk::RenderNode::SizeType::eSwapchainRelative,
 	        color_format,
 	        {},
 	        "uipass_color",
@@ -457,20 +468,15 @@ auto DevelopmentExampleApplication::create_ui_pass_blueprint() -> bvk::Renderpas
 	return blueprint;
 }
 
-#include <optional>
-
-void DevelopmentExampleApplication::create_render_graph()
+auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::RenderNodeBlueprint
 {
-	auto const forwrard_pass_blueprint = create_forward_pass_blueprint();
-	auto const ui_pass_blueprint = create_ui_pass_blueprint();
+	auto blueprint = bvk::RenderNodeBlueprint {};
 
-	std::optional<vk::DescriptorType> descriptor_type;
+	auto const color_format = surface.get_color_format();
+	auto const sample_count = gpu.get_max_color_and_depth_samples();
 
-	auto builder = bvk::RenderGraphBuilder {
-		&vk_context,
-		&memory_allocator,
-		&descriptor_allocator,
-	};
+	auto const color_output_hash = hash_str("graph_color_out");
+	auto const color_output_input_hash = hash_str("uipass_color_out");
 
 	graph_user_data.scene = &scene;
 	graph_user_data.vertex_buffer = &vertex_buffer;
@@ -478,26 +484,41 @@ void DevelopmentExampleApplication::create_render_graph()
 	graph_user_data.memory_allocator = &memory_allocator;
 	graph_user_data.debug_utils = &debug_utils;
 
-	builder.set_type<BasicRendergraph>()
-	    .set_resources(renderer.get_resources())
+	blueprint.set_derived_object(&render_graph)
 	    .set_user_data(std::make_any<BasicRendergraph::UserData *>(&graph_user_data))
 
-	    .set_prepare_label(BasicRendergraph::get_prepare_label())
+	    .set_compute(false)
+	    .set_graphics(false)
+
+	    .set_name("render_graph")
 	    .set_compute_label(BasicRendergraph::get_compute_label())
+	    .set_barrier_label(BasicRendergraph::get_barrier_label())
 	    .set_graphics_label(BasicRendergraph::get_graphics_label())
-	    .set_present_barrier_label(BasicRendergraph::get_barrier_label())
+
+	    .add_color_output({
+	        color_output_hash,
+	        color_output_input_hash,
+	        {},
+	        { 1.0, 1.0 },
+	        bvk::RenderNode::SizeType::eSwapchainRelative,
+	        color_format,
+	        {},
+	        "graph_color",
+	    })
+
+	    .set_sample_count(sample_count)
 
 	    .add_buffer_input({
 	        BasicRendergraph::U_FrameData::name,
 	        BasicRendergraph::U_FrameData::key,
 	        sizeof(BasicRendergraph::U_FrameData),
 	        vk::BufferUsageFlagBits::eUniformBuffer,
-	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame,
+	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame,
 	        vma::AllocationCreateInfo {
 	            vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
 	            vma::MemoryUsage::eAutoPreferDevice,
 	        },
-	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                {
@@ -525,12 +546,12 @@ void DevelopmentExampleApplication::create_render_graph()
 	        BasicRendergraph::U_SceneData::key,
 	        sizeof(BasicRendergraph::U_SceneData),
 	        vk::BufferUsageFlagBits::eUniformBuffer,
-	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame,
+	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame,
 	        vma::AllocationCreateInfo {
 	            vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
 	            vma::MemoryUsage::eAutoPreferDevice,
 	        },
-	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                {
@@ -557,12 +578,12 @@ void DevelopmentExampleApplication::create_render_graph()
 	        BasicRendergraph::U_ModelData::key,
 	        sizeof(BasicRendergraph::U_ModelData) * 1'000,
 	        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::eSingular,
+	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::eSingular,
 	        vma::AllocationCreateInfo {
 	            {},
 	            vma::MemoryUsage::eAutoPreferDevice,
 	        },
-	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                {
@@ -594,14 +615,14 @@ void DevelopmentExampleApplication::create_render_graph()
 	            | vk::BufferUsageFlagBits::eStorageBuffer //
 	            | vk::BufferUsageFlagBits::eIndirectBuffer,
 
-	        bvk::RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame,
+	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame,
 
 	        vma::AllocationCreateInfo {
 	            {},
 	            vma::MemoryUsage::eAutoPreferDevice,
 	        },
 
-	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                vk::DescriptorSetLayoutBinding {
@@ -617,7 +638,7 @@ void DevelopmentExampleApplication::create_render_graph()
 	    .add_texture_input({
 	        BasicRendergraph::U_Textures::name,
 	        &textures.at(hash_str("default_texture")),
-	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eGraphics,
 	                vk::DescriptorSetLayoutBinding {
@@ -633,7 +654,7 @@ void DevelopmentExampleApplication::create_render_graph()
 	    .add_texture_input({
 	        BasicRendergraph::U_TextureCubes::name,
 	        &textures.at(hash_str("default_texture_cube")),
-	        vec<bvk::RenderpassBlueprint::DescriptorInfo> {
+	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eGraphics,
 	                vk::DescriptorSetLayoutBinding {
@@ -645,9 +666,30 @@ void DevelopmentExampleApplication::create_render_graph()
 	            },
 	        },
 	    })
+	    .push_node(create_forward_pass_blueprint())
+	    .push_node(create_ui_pass_blueprint());
 
-	    .add_pass<Forwardpass>(forwrard_pass_blueprint)
-	    .add_pass<UserInterfacePass>(ui_pass_blueprint);
+	return blueprint;
+}
 
-	render_graph = scope<bvk::Rendergraph>(builder.build_graph());
+void DevelopmentExampleApplication::initialize_render_nodes()
+{
+	render_graph = BasicRendergraph { &vk_context };
+	forward_pass = Forwardpass { &vk_context };
+	user_interface_pass = UserInterfacePass { &vk_context };
+}
+
+void DevelopmentExampleApplication::create_render_graph()
+{
+	auto builder = bvk::RenderGraphBuilder {
+		&vk_context,
+		&memory_allocator,
+		&descriptor_allocator,
+	};
+
+	builder //
+	    .set_resources(renderer.get_resources())
+	    .push_node(create_render_graph_blueprint());
+
+	builder.build_graph();
 }

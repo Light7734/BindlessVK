@@ -4,9 +4,9 @@
 //
 //
 #include "BindlessVk/Context/VkContext.hpp"
+#include "BindlessVk/Renderer/RenderNode.hpp"
 #include "BindlessVk/Renderer/Renderer.hpp"
 #include "BindlessVk/Renderer/Rendergraph.hpp"
-#include "BindlessVk/Renderer/Renderpass.hpp"
 #include "Framework/Common/Common.hpp"
 #include "Framework/Core/Window.hpp"
 #include "Framework/Scene/CameraController.hpp"
@@ -33,8 +33,12 @@ public:
 	}
 
 private:
-	BasicRendergraph::UserData graph_user_data;
-	Forwardpass::UserData fowardpass_user_data;
+	BasicRendergraph::UserData graph_user_data {};
+	Forwardpass::UserData fowardpass_user_data = {};
+
+	BasicRendergraph render_graph = {};
+	Forwardpass forward_pass = {};
+	UserInterfacePass user_interface_pass = {};
 
 private:
 	void load_shaders();
@@ -50,9 +54,13 @@ private:
 
 	void load_entities();
 
-	auto create_forward_pass_blueprint() -> bvk::RenderpassBlueprint;
+	auto create_render_graph_blueprint() -> bvk::RenderNodeBlueprint;
 
-	auto create_ui_pass_blueprint() -> bvk::RenderpassBlueprint;
+	auto create_forward_pass_blueprint() -> bvk::RenderNodeBlueprint;
+
+	auto create_ui_pass_blueprint() -> bvk::RenderNodeBlueprint;
+
+	void initialize_render_nodes();
 
 	void create_render_graph();
 };

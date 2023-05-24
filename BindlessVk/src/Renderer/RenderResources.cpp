@@ -19,7 +19,7 @@ RenderResources::RenderResources(
 		surface->get_color_format(),
 		VkExtent3D { extent.width, extent.height, 0 },
 		pair<f32, f32> { 1.0, 1.0 },
-		Renderpass::SizeType::eSwapchainRelative,
+		RenderNode::SizeType::eSwapchainRelative,
 		"",
 	};
 
@@ -87,7 +87,7 @@ void RenderResources::add_key_to_attachment_index(u64 const key, u32 const attac
 }
 
 void RenderResources::create_color_attachment(
-    RenderpassBlueprint::Attachment const &blueprint_attachment,
+    RenderNodeBlueprint::Attachment const &blueprint_attachment,
     vk::SampleCountFlagBits sample_count
 )
 {
@@ -168,7 +168,7 @@ void RenderResources::create_color_attachment(
 	        1.0,
 	        1.0,
 	    },
-	    Renderpass::SizeType::eSwapchainRelative,
+	    RenderNode::SizeType::eSwapchainRelative,
 	    "",
 	    {},
 	});
@@ -183,7 +183,7 @@ void RenderResources::create_color_attachment(
 }
 
 void RenderResources::create_depth_attachment(
-    RenderpassBlueprint::Attachment const &blueprint_attachment,
+    RenderNodeBlueprint::Attachment const &blueprint_attachment,
     vk::SampleCountFlagBits sample_count
 )
 {
@@ -258,7 +258,7 @@ void RenderResources::create_depth_attachment(
 	        1.0,
 	        1.0,
 	    },
-	    Renderpass::SizeType::eSwapchainRelative,
+	    RenderNode::SizeType::eSwapchainRelative,
 	    "",
 	    vec<Attachment> {},
 	});
@@ -273,7 +273,7 @@ void RenderResources::create_depth_attachment(
 }
 
 void RenderResources::create_transient_attachment(
-    RenderpassBlueprint::Attachment const &blueprint_attachment,
+    RenderNodeBlueprint::Attachment const &blueprint_attachment,
     vk::SampleCountFlagBits sample_count
 )
 {
@@ -345,6 +345,37 @@ void RenderResources::create_transient_attachment(
 	    blueprint_attachment.format,
 	    extent,
 	});
+}
+
+auto RenderResources::calculate_attachment_image_extent(
+    RenderNodeBlueprint::Attachment const &blueprint_attachment
+) const -> vk::Extent3D
+{
+	switch (blueprint_attachment.size_type)
+	{
+	case RenderNode::SizeType::eSwapchainRelative:
+	{
+		auto const [width, height] = blueprint_attachment.size;
+		return {
+			static_cast<u32>(surface->get_framebuffer_extent().width * width),
+			static_cast<u32>(surface->get_framebuffer_extent().height * height),
+			1,
+		};
+	}
+
+	case RenderNode::SizeType::eAbsolute:
+	{
+		auto const [width, height] = blueprint_attachment.size;
+		return {
+			static_cast<u32>(width),
+			static_cast<u32>(height),
+			1,
+		};
+	}
+
+	case  RenderNode::SizeType::eRelative:
+	default: assert_fail("Invalid attachment size type"); return {};
+	};
 }
 
 } // namespace BINDLESSVK_NAMESPACE

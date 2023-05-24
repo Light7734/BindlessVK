@@ -4,7 +4,8 @@
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 
-Window::Window(Specs const &specs, vec<pair<i32, i32>> const &hints): specs(specs)
+Window::Window(Specs const &specs, vec<pair<i32, i32>> const &hints)
+    : specs(std::make_unique<Specs>(specs))
 {
 	glfwSetErrorCallback([](int code, char const *str) {
 		fmt::print(stdout, "Glfw error ({}): {}\n", code, str);
@@ -16,11 +17,11 @@ Window::Window(Specs const &specs, vec<pair<i32, i32>> const &hints): specs(spec
 	for (auto [hint, value] : hints)
 		glfwWindowHint(hint, value);
 
-	auto const [width, height] = specs.size;
-	glfw_window_handle = glfwCreateWindow(width, height, specs.title.c_str(), {}, {});
+	auto const [width, height] = this->specs->size;
+	glfw_window_handle = glfwCreateWindow(width, height, this->specs->title.c_str(), {}, {});
 	assert_true(glfw_window_handle, "Failed to create glfw window");
 
-	glfwSetWindowUserPointer(glfw_window_handle, &this->specs);
+	glfwSetWindowUserPointer(glfw_window_handle, this->specs.get());
 	bind_callbacks();
 }
 
@@ -32,7 +33,7 @@ Window::Window(Window &&other)
 Window &Window::operator=(Window &&other)
 {
 	this->glfw_window_handle = other.glfw_window_handle;
-	this->specs = other.specs;
+	this->specs = std::move(other.specs);
 	this->glfw_initialized = other.glfw_initialized;
 
 	other.glfw_window_handle = {};

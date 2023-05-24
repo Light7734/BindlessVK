@@ -28,6 +28,7 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Model/Loaders/GltfLoader.cpp
 
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/Renderer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/RenderNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/Rendergraph.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Renderer/RenderResources.cpp
 

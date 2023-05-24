@@ -3,56 +3,8 @@
 #include "BindlessVk/Texture/Texture.hpp"
 
 #include <fmt/format.h>
-#include <ranges>
 
 namespace BINDLESSVK_NAMESPACE {
-
-Rendergraph::Rendergraph(VkContext const *const vk_context): vk_context(vk_context)
-{
-}
-
-Rendergraph::Rendergraph(Rendergraph &&other)
-{
-	*this = std::move(other);
-}
-
-Rendergraph &Rendergraph::operator=(Rendergraph &&other)
-{
-	this->vk_context = other.vk_context;
-	this->resources = other.resources;
-	this->user_data = other.user_data;
-	this->passes = std::move(other.passes);
-	this->buffer_inputs = std::move(other.buffer_inputs);
-
-	this->compute_pipeline_layout = other.compute_pipeline_layout;
-	this->compute_descriptor_sets = std::move(other.compute_descriptor_sets);
-
-	this->compute_pipeline_layout = other.compute_pipeline_layout;
-	this->compute_descriptor_set_layout = other.compute_descriptor_set_layout;
-	this->compute_descriptor_sets = std::move(other.compute_descriptor_sets);
-
-	this->graphics_pipeline_layout = other.graphics_pipeline_layout;
-	this->graphics_descriptor_set_layout = other.graphics_descriptor_set_layout;
-	this->graphics_descriptor_sets = std::move(other.graphics_descriptor_sets);
-
-	this->prepare_label = other.prepare_label;
-	this->compute_label = other.compute_label;
-	this->graphics_label = other.graphics_label;
-	this->present_barrier_label = other.present_barrier_label;
-
-	other.vk_context = {};
-
-	return *this;
-}
-
-Rendergraph::~Rendergraph()
-{
-	if (!vk_context)
-		return;
-
-	for (auto *pass : passes)
-		delete pass;
-}
 
 RenderGraphBuilder::RenderGraphBuilder(
     VkContext const *const vk_context,
@@ -67,96 +19,258 @@ RenderGraphBuilder::RenderGraphBuilder(
 {
 }
 
-auto RenderGraphBuilder::build_graph() -> Rendergraph *
+void RenderGraphBuilder::build_graph()
 {
-	backbuffer_attachment_key = pass_blueprints.back().color_attachments.back().hash;
+	auto const backbuffer_attachment_key = node_blueprints.back().color_attachments.back().hash;
 	resources->add_key_to_attachment_index(backbuffer_attachment_key, 0);
 
-	build_graph_buffer_inputs();
-	build_graph_texture_inputs();
-	build_graph_input_descriptors();
-	initialize_graph_input_descriptors();
+	for (auto const &blueprint : node_blueprints)
+		build_node(blueprint);
 
-	for (u32 i = pass_blueprints.size(); i-- > 0;)
-	{
-		auto const &blueprint = pass_blueprints[i];
-		auto &pass = graph->passes[i];
-
-		pass->name = blueprint.name;
-		pass->compute = blueprint.compute;
-		pass->graphics = blueprint.graphics;
-		pass->sample_count = blueprint.sample_count;
-		pass->prepare_label = blueprint.prepare_label;
-		pass->compute_label = blueprint.compute_label;
-		pass->graphics_label = blueprint.graphics_label;
-		pass->barrier_label = blueprint.barrier_label;
-		pass->user_data = blueprint.user_data;
-
-		graph->compute |= blueprint.compute;
-		graph->graphics |= blueprint.graphics;
-
-		build_pass_color_attachments(pass, blueprint.color_attachments);
-		build_pass_depth_attachment(pass, blueprint.depth_attachment);
-		build_pass_buffer_inputs(pass, blueprint.buffer_inputs);
-		build_pass_input_descriptors(pass, blueprint.buffer_inputs, blueprint.texture_inputs);
-		build_pass_texture_inputs(pass, blueprint.texture_inputs);
-		initialize_pass_input_descriptors(pass, blueprint);
-	}
-
-	graph->on_setup();
-
-	for (auto &pass : graph->passes)
-		pass->on_setup(graph);
-
-	return graph;
+	for (auto const &blueprint : node_blueprints)
+		setup_node(blueprint, {});
 }
 
-void RenderGraphBuilder::build_graph_buffer_inputs()
+void RenderGraphBuilder::build_node(RenderNodeBlueprint const &node_blueprint)
 {
-	graph->buffer_inputs.reserve(blueprint_buffer_inputs.size());
+	build_node_color_attachments(node_blueprint);
+	build_node_depth_attachment(node_blueprint);
+	build_node_buffer_inputs(node_blueprint);
+	build_node_texture_inputs(node_blueprint);
+	build_node_descriptors(node_blueprint);
+	initialize_node_descriptors(node_blueprint);
 
-	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
-		graph->buffer_inputs[blueprint_buffer_input.key] = Buffer(
+	for (auto const &child_node_blueprint : node_blueprint.children)
+		build_node(child_node_blueprint);
+}
+
+void RenderGraphBuilder::setup_node(RenderNodeBlueprint const &node_blueprint, RenderNode *parent)
+{
+	node_blueprint.derived_object->on_setup(parent);
+
+	for (auto const &child_node_blueprint : node_blueprint.children)
+		setup_node(child_node_blueprint, node_blueprint.derived_object);
+}
+
+void RenderGraphBuilder::build_node_color_attachments(RenderNodeBlueprint const &node_blueprint)
+{
+	if (!node_blueprint.has_color_attachment())
+		return;
+
+	auto *const node = node_blueprint.derived_object;
+	node->attachments.resize(node_blueprint.color_attachments.size());
+
+	for (u32 i = 0; i < node->attachments.size(); ++i)
+	{
+		auto &attachment = node->attachments[i];
+		auto const &attachment_blueprint = node_blueprint.color_attachments[i];
+
+		attachment = create_color_attachment(attachment_blueprint, node->sample_count);
+	}
+}
+
+void RenderGraphBuilder::build_node_depth_attachment(RenderNodeBlueprint const &node_blueprint)
+{
+	if (!node_blueprint.has_depth_attachment())
+		return;
+
+	auto *const node = node_blueprint.derived_object;
+	auto &attachment = node->attachments.emplace_back();
+
+	attachment = create_depth_attachment(node_blueprint.depth_attachment, node->sample_count);
+}
+
+void RenderGraphBuilder::build_node_buffer_inputs(RenderNodeBlueprint const &node_blueprint)
+{
+	auto *node = node_blueprint.derived_object;
+	node->buffer_inputs.reserve(node_blueprint.buffer_inputs.size());
+
+	for (auto const &buffer_blueprint : node_blueprint.buffer_inputs)
+		node->buffer_inputs[buffer_blueprint.key] = Buffer(
 		    vk_context,
 		    memory_allocator,
-		    blueprint_buffer_input.usage,
-		    blueprint_buffer_input.allocation_info,
-		    blueprint_buffer_input.size,
-		    blueprint_buffer_input.update_frequency ==
-		            RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
+		    buffer_blueprint.usage,
+		    buffer_blueprint.allocation_info,
+		    buffer_blueprint.size,
+		    buffer_blueprint.update_frequency ==
+		            RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
 		        max_frames_in_flight :
 		        1,
-		    blueprint_buffer_input.name
+		    buffer_blueprint.name
 		);
 }
 
-void RenderGraphBuilder::build_graph_texture_inputs()
+void RenderGraphBuilder::build_node_texture_inputs(RenderNodeBlueprint const &node_blueprint)
 {
+	debug_utils->log(LogLvl::eWarn, "Texture inputs are not supported (yet)");
 }
 
-void RenderGraphBuilder::build_graph_input_descriptors()
+void RenderGraphBuilder::build_node_descriptors(RenderNodeBlueprint const &node_blueprint)
 {
+	auto *const node = node_blueprint.derived_object;
 	auto graphics_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 	auto compute_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 
-	extract_graph_buffer_descriptor_bindings(
-	    blueprint_buffer_inputs,
+	extract_node_buffer_descriptor_bindings(
+	    node_blueprint.buffer_inputs,
 	    &compute_bindings,
 	    &graphics_bindings
 	);
 
-	extract_graph_texture_descriptor_bindings(
-	    blueprint_texture_inputs,
+	extract_node_texture_descriptor_bindings(
+	    node_blueprint.texture_inputs,
 	    &compute_bindings,
 	    &graphics_bindings
 	);
 
-	build_graph_graphics_input_descriptors(graphics_bindings);
-	build_graph_compute_input_descriptors(compute_bindings);
+	build_node_graphics_descriptors(node, graphics_bindings);
+	build_node_compute_descriptors(node, compute_bindings);
 }
 
-void RenderGraphBuilder::extract_graph_buffer_descriptor_bindings(
-    vec<RenderpassBlueprint::BufferInput> const &buffer_inputs,
+void RenderGraphBuilder::initialize_node_descriptors(RenderNodeBlueprint const &node_blueprint)
+{
+	auto *node = node_blueprint.derived_object;
+
+	auto buffer_infos = vec<vk::DescriptorBufferInfo> {};
+	auto writes = vec<vk::WriteDescriptorSet> {};
+
+	buffer_infos.reserve(node_blueprint.buffer_inputs.size() * max_frames_in_flight * 2);
+
+	extract_node_buffer_descriptor_writes(node_blueprint, &buffer_infos, &writes);
+	extract_node_texture_descriptor_writes(node_blueprint, &writes);
+
+	device->vk().updateDescriptorSets(writes, {});
+	device->vk().waitIdle();
+}
+
+auto RenderGraphBuilder::create_color_attachment(
+    RenderNodeBlueprint::Attachment const &attachment_blueprint,
+    vk::SampleCountFlagBits sample_count
+) -> RenderNode::Attachment
+{
+	auto const has_input = !!attachment_blueprint.input_hash;
+	auto const is_multisampled = sample_count != vk::SampleCountFlagBits::e1;
+
+	auto attachment = RenderNode::Attachment {
+		vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		vk::AccessFlagBits::eColorAttachmentWrite,
+		vk::ImageLayout::eColorAttachmentOptimal,
+		vk::ImageSubresourceRange { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 },
+		attachment_blueprint.clear_value,
+		has_input ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear,
+		vk::AttachmentStoreOp::eStore,
+		std::numeric_limits<u32>::max(),
+		std::numeric_limits<u32>::max(),
+		is_multisampled ? vk::ResolveModeFlagBits::eAverage : vk::ResolveModeFlagBits::eNone
+	};
+
+	attachment.resource_index = get_or_create_color_resource(attachment_blueprint, sample_count);
+
+	if (is_multisampled)
+		attachment.transient_resource_index =
+		    get_or_create_transient_color_resource(attachment_blueprint, sample_count);
+
+	assert_true(attachment.has_resource());
+	assert_true(is_multisampled == attachment.has_transient_resource());
+
+	return attachment;
+}
+
+auto RenderGraphBuilder::create_depth_attachment(
+    RenderNodeBlueprint::Attachment const &attachment_blueprint,
+    vk::SampleCountFlagBits sample_count
+) -> RenderNode::Attachment
+{
+	auto const has_input = !!attachment_blueprint.input_hash;
+
+	auto attachment = RenderNode::Attachment {
+		vk::PipelineStageFlagBits::eEarlyFragmentTests,
+		vk::AccessFlagBits::eDepthStencilAttachmentRead |
+		    vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+		vk::ImageLayout::eDepthAttachmentOptimal,
+		vk::ImageSubresourceRange {
+		    vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
+		    0,
+		    1,
+		    0,
+		    1,
+		},
+		attachment_blueprint.clear_value,
+		has_input ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear,
+		vk::AttachmentStoreOp::eStore,
+		std::numeric_limits<u32>::max(),
+		std::numeric_limits<u32>::max(),
+		vk::ResolveModeFlagBits::eNone
+	};
+
+	attachment.resource_index = get_or_create_depth_resource(attachment_blueprint, sample_count);
+
+	assert_true(attachment.has_resource());
+	assert_false(attachment.has_transient_resource());
+
+	return attachment;
+}
+
+auto RenderGraphBuilder::get_or_create_color_resource(
+    RenderNodeBlueprint::Attachment const &attachment_blueprint,
+    vk::SampleCountFlagBits sample_count
+) -> u32
+{
+	auto index = resources->try_get_attachment_index(attachment_blueprint.hash);
+
+	if (index != std::numeric_limits<u32>::max())
+		resources->add_key_to_attachment_index(attachment_blueprint.input_hash, index);
+	else
+	{
+		resources->create_color_attachment(attachment_blueprint, sample_count);
+		index = resources->try_get_attachment_index(attachment_blueprint.hash);
+	}
+
+	return index;
+}
+
+auto RenderGraphBuilder::get_or_create_transient_color_resource(
+    RenderNodeBlueprint::Attachment const &attachment_blueprint,
+    vk::SampleCountFlagBits const sample_count
+) -> u32
+{
+	auto index =
+	    resources->try_get_suitable_transient_attachment_index(attachment_blueprint, sample_count);
+
+	if (index == std::numeric_limits<u32>::max())
+	{
+		resources->create_transient_attachment(attachment_blueprint, sample_count);
+
+		index = resources->try_get_suitable_transient_attachment_index(
+		    attachment_blueprint,
+		    sample_count
+		);
+	}
+
+	return index;
+}
+
+auto RenderGraphBuilder::get_or_create_depth_resource(
+    RenderNodeBlueprint::Attachment const &attachment_blueprint,
+    vk::SampleCountFlagBits sample_count
+) -> u32
+{
+	auto index = resources->try_get_attachment_index(attachment_blueprint.hash);
+
+	if (index != std::numeric_limits<u32>::max())
+		resources->add_key_to_attachment_index(attachment_blueprint.input_hash, index);
+	else
+	{
+		resources->create_depth_attachment(attachment_blueprint, sample_count);
+		index = resources->try_get_attachment_index(attachment_blueprint.hash);
+	}
+
+	return index;
+}
+
+
+void RenderGraphBuilder::extract_node_buffer_descriptor_bindings(
+    vec<RenderNodeBlueprint::BufferInput> const &buffer_inputs,
     vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
     vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
 )
@@ -169,8 +283,8 @@ void RenderGraphBuilder::extract_graph_buffer_descriptor_bindings(
 		);
 }
 
-void RenderGraphBuilder::extract_graph_texture_descriptor_bindings(
-    vec<RenderpassBlueprint::TextureInput> const &texture_inputs,
+void RenderGraphBuilder::extract_node_texture_descriptor_bindings(
+    vec<RenderNodeBlueprint::TextureInput> const &texture_inputs,
     vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
     vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
 )
@@ -184,7 +298,7 @@ void RenderGraphBuilder::extract_graph_texture_descriptor_bindings(
 }
 
 void RenderGraphBuilder::extract_input_descriptor_bindings(
-    vec<RenderpassBlueprint::DescriptorInfo> const &descriptor_infos,
+    vec<RenderNodeBlueprint::DescriptorInfo> const &descriptor_infos,
     vec<vk::DescriptorSetLayoutBinding> *out_compute_bindings,
     vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
 )
@@ -197,8 +311,8 @@ void RenderGraphBuilder::extract_input_descriptor_bindings(
 			out_graphics_bindings->emplace_back(descriptor_info.layout);
 }
 
-
-void RenderGraphBuilder::build_graph_graphics_input_descriptors(
+void RenderGraphBuilder::build_node_compute_descriptors(
+    RenderNode *const node,
     vec<vk::DescriptorSetLayoutBinding> const &bindings
 )
 {
@@ -208,628 +322,209 @@ void RenderGraphBuilder::build_graph_graphics_input_descriptors(
 	);
 	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
 
-	graph->graphics_descriptor_set_layout = device->vk().createDescriptorSetLayout({
+	// descriptor set layout
+	node->compute_descriptor_set_layout = device->vk().createDescriptorSetLayout({
 	    {},
 	    bindings,
 	    &extended_info,
 	});
 	debug_utils->set_object_name(
 	    device->vk(),
-	    graph->graphics_descriptor_set_layout,
-	    fmt::format("graph_graphics_descriptor_set_layout")
-	);
-
-	graph->graphics_pipeline_layout =
-	    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
-	        {},
-	        graph->graphics_descriptor_set_layout,
-	    });
-	debug_utils->set_object_name(
-	    device->vk(),
-	    graph->graphics_pipeline_layout,
-	    fmt::format("graph_graphics_pipeline_layout")
-	);
-
-	if (!bindings.empty())
-	{
-		graph->graphics_descriptor_sets.reserve(max_frames_in_flight);
-		for (u32 i = 0; i < max_frames_in_flight; ++i)
-		{
-			graph->graphics_descriptor_sets.emplace_back(
-			    descriptor_allocator,
-			    graph->graphics_descriptor_set_layout
-			);
-
-			debug_utils->set_object_name(
-			    device->vk(),
-			    graph->graphics_descriptor_sets.back().vk(),
-			    fmt::format("graph_graphics_descriptor_set_{}", i)
-			);
-		}
-	}
-}
-
-void RenderGraphBuilder::build_graph_compute_input_descriptors(
-    vec<vk::DescriptorSetLayoutBinding> const &bindings
-)
-{
-	auto const flags = vec<vk::DescriptorBindingFlags>(
-	    bindings.size(),
-	    vk::DescriptorBindingFlagBits::ePartiallyBound
-	);
-	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
-
-	graph->compute_descriptor_set_layout = device->vk().createDescriptorSetLayout({
-	    {},
-	    bindings,
-	    &extended_info,
-	});
-	debug_utils->set_object_name(
-	    device->vk(),
-	    graph->compute_descriptor_set_layout,
+	    node->compute_descriptor_set_layout,
 	    fmt::format("graph_compute_descriptor_set_layout")
 	);
 
-	graph->compute_pipeline_layout =
-	    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
-	        {},
-	        graph->compute_descriptor_set_layout,
-	    });
+	// pipeline layout
+	node->compute_pipeline_layout = device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	    {},
+	    node->compute_descriptor_set_layout,
+	});
 
 	debug_utils->set_object_name(
 	    device->vk(),
-	    graph->compute_pipeline_layout,
+	    node->compute_pipeline_layout,
 	    fmt::format("graph_compute_pipeline_layout")
 	);
 
+	// descriptor sets
 	if (!bindings.empty())
 	{
-		graph->compute_descriptor_sets.reserve(max_frames_in_flight);
+		node->compute_descriptor_sets.reserve(max_frames_in_flight);
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			graph->compute_descriptor_sets.emplace_back(
+			node->compute_descriptor_sets.emplace_back(
 			    descriptor_allocator,
-			    graph->compute_descriptor_set_layout
+			    node->compute_descriptor_set_layout
 
 			);
 			debug_utils->set_object_name(
 			    device->vk(),
-			    graph->compute_descriptor_sets.back().vk(),
+			    node->compute_descriptor_sets.back().vk(),
 			    fmt::format("graph_compute_descriptor_set_{}", i)
 			);
 		}
 	}
 }
 
-void RenderGraphBuilder::initialize_graph_input_descriptors()
+void RenderGraphBuilder::build_node_graphics_descriptors(
+    RenderNode *const node,
+    vec<vk::DescriptorSetLayoutBinding> const &bindings
+)
 {
-	auto buffer_infos = vec<vk::DescriptorBufferInfo> {};
-	buffer_infos.reserve(blueprint_buffer_inputs.size() * max_frames_in_flight * 2);
-	auto writes = vec<vk::WriteDescriptorSet> {};
+	auto const flags = vec<vk::DescriptorBindingFlags>(
+	    bindings.size(),
+	    vk::DescriptorBindingFlagBits::ePartiallyBound
+	);
+	auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
 
-	for (auto const blueprint_buffer : blueprint_buffer_inputs)
+	// descriptor set layout
+	node->graphics_descriptor_set_layout = device->vk().createDescriptorSetLayout({
+	    {},
+	    bindings,
+	    &extended_info,
+	});
+	debug_utils->set_object_name(
+	    device->vk(),
+	    node->graphics_descriptor_set_layout,
+	    fmt::format("graph_graphics_descriptor_set_layout")
+	);
+
+	// pipeline layout
+	node->graphics_pipeline_layout =
+	    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	        {},
+	        node->graphics_descriptor_set_layout,
+	    });
+	debug_utils->set_object_name(
+	    device->vk(),
+	    node->graphics_pipeline_layout,
+	    fmt::format("graph_graphics_pipeline_layout")
+	);
+
+	// descriptor sets
+	if (!bindings.empty())
 	{
-		auto const &buffer_input = graph->buffer_inputs[blueprint_buffer.key];
-
+		node->graphics_descriptor_sets.reserve(max_frames_in_flight);
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 		{
-			if (blueprint_buffer.update_frequency ==
-			    RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame)
-			{
-				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
-				    *buffer_input.vk(),
-				    buffer_input.get_block_size() * i,
-				    buffer_input.get_block_size(),
-				});
-			}
-			else
-			{
-				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
-				    *buffer_input.vk(),
-				    {},
-				    buffer_input.get_block_size(),
-				});
-			}
+			node->graphics_descriptor_sets.emplace_back(
+			    descriptor_allocator,
+			    node->graphics_descriptor_set_layout
+			);
 
-			for (auto const &descriptor_info : blueprint_buffer.descriptor_infos)
-			{
-				auto &dst_descriptor_set =
-				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
-				        graph->graphics_descriptor_sets[i] :
-				        graph->compute_descriptor_sets[i];
-
-
-				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
-				{
-					writes.emplace_back(
-					    dst_descriptor_set.vk(),
-					    descriptor_info.layout.binding,
-					    j,
-					    1u,
-					    descriptor_info.layout.descriptorType,
-					    nullptr,
-					    &buffer_infos.back()
-					);
-				}
-			}
+			debug_utils->set_object_name(
+			    device->vk(),
+			    node->graphics_descriptor_sets.back().vk(),
+			    fmt::format("graph_graphics_descriptor_set_{}", i)
+			);
 		}
 	}
+}
 
-	for (auto const &texture_input_info : blueprint_texture_inputs)
+void RenderGraphBuilder::extract_node_buffer_descriptor_writes(
+    RenderNodeBlueprint const &node_blueprint,
+    vec<vk::DescriptorBufferInfo> *const out_buffer_infos,
+    vec<vk::WriteDescriptorSet> *out_writes
+)
+{
+	for (auto const buffer_blueprint : node_blueprint.buffer_inputs)
+		for (u32 i = 0; i < max_frames_in_flight; ++i)
+			extract_frame_buffer_descriptor_writes(
+			    node_blueprint.derived_object,
+			    buffer_blueprint,
+			    i,
+			    out_buffer_infos,
+			    out_writes
+			);
+}
+
+void RenderGraphBuilder::extract_node_texture_descriptor_writes(
+    RenderNodeBlueprint const &node_blueprint,
+    vec<vk::WriteDescriptorSet> *const out_writes
+)
+{
+	auto *const node = node_blueprint.derived_object;
+
+	for (auto const &texture_blueprint : node_blueprint.texture_inputs)
 	{
-		if (!texture_input_info.default_texture)
+		if (!texture_blueprint.default_texture)
 			continue;
 
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
-		{
-			for (auto const &descriptor_info : texture_input_info.descriptor_infos)
-			{
-				auto &dst_descriptor_set =
-				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
-				        graph->graphics_descriptor_sets[i] :
-				        graph->compute_descriptor_sets[i];
-
-				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
-				{
-					writes.emplace_back(
-					    dst_descriptor_set.vk(),
-					    descriptor_info.layout.binding,
-					    j,
-					    1,
-					    descriptor_info.layout.descriptorType,
-					    texture_input_info.default_texture->get_descriptor_info()
-					);
-				}
-			}
-		}
-	}
-
-	device->vk().updateDescriptorSets(writes, {});
-	device->vk().waitIdle();
-}
-
-void RenderGraphBuilder::build_pass_color_attachments(
-    Renderpass *const pass,
-    vec<RenderpassBlueprint::Attachment> const &blueprint_attachments
-)
-{
-	pass->attachments.resize(blueprint_attachments.size());
-	u32 i = 0;
-	for (auto const &blueprint_attachment : blueprint_attachments)
-	{
-		auto &attachment = pass->attachments[i++];
-		pass->color_attachment_formats.emplace_back(blueprint_attachment.format);
-
-		attachment.stage_mask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-		attachment.access_mask = vk::AccessFlagBits::eColorAttachmentWrite;
-		attachment.image_layout = vk::ImageLayout::eColorAttachmentOptimal;
-		attachment.subresource_range = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
-		attachment.store_op = vk::AttachmentStoreOp::eStore;
-		attachment.clear_value = blueprint_attachment.clear_value;
-
-		auto const has_input = !!blueprint_attachment.input_hash;
-		attachment.load_op = has_input ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear;
-
-		attachment.resource_index = resources->try_get_attachment_index(blueprint_attachment.hash);
-
-		if (attachment.resource_index == std::numeric_limits<u32>::max())
-		{
-			resources->create_color_attachment(blueprint_attachment, pass->sample_count);
-
-			attachment.resource_index =
-			    resources->try_get_attachment_index(blueprint_attachment.hash);
-
-			assert_false(attachment.resource_index == std::numeric_limits<u32>::max());
-		}
-		else
-			resources->add_key_to_attachment_index(
-			    blueprint_attachment.input_hash,
-			    attachment.resource_index
+			extract_frame_texture_descriptor_writes(
+			    node_blueprint.derived_object,
+			    texture_blueprint,
+			    i,
+			    out_writes
 			);
-
-		if (pass->is_multisampled())
-		{
-			attachment.transient_resolve_moode = vk::ResolveModeFlagBits::eAverage;
-
-			attachment.transient_resource_index =
-			    resources->try_get_suitable_transient_attachment_index(
-			        blueprint_attachment,
-			        pass->sample_count
-			    );
-
-			if (attachment.transient_resource_index == std::numeric_limits<u32>::max())
-			{
-				resources->create_transient_attachment(blueprint_attachment, pass->sample_count);
-
-				attachment.transient_resource_index =
-				    resources->try_get_suitable_transient_attachment_index(
-				        blueprint_attachment,
-				        pass->sample_count
-				    );
-
-				assert_false(
-				    attachment.transient_resource_index == std::numeric_limits<u32>::max()
-				);
-			}
-		}
 	}
 }
 
-void RenderGraphBuilder::build_pass_depth_attachment(
-    Renderpass *pass,
-    RenderpassBlueprint::Attachment const &blueprint_attachment
+void RenderGraphBuilder::extract_frame_buffer_descriptor_writes(
+    RenderNode *const node,
+    RenderNodeBlueprint::BufferInput const &buffer_blueprint,
+    u32 frame_index,
+    vec<vk::DescriptorBufferInfo> *out_buffer_infos,
+    vec<vk::WriteDescriptorSet> *out_writes
 )
 {
-	if (!blueprint_attachment)
-		return;
+	auto const per_frame = buffer_blueprint.update_frequency ==
+	                       RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame;
 
-	pass->depth_attachment_format = blueprint_attachment.format;
+	auto const &buffer_input = node->buffer_inputs[buffer_blueprint.key];
 
-	auto &attachment = pass->attachments.emplace_back();
+	out_buffer_infos->emplace_back(vk::DescriptorBufferInfo {
+	    *buffer_input.vk(),
+	    per_frame ? buffer_input.get_block_size() * frame_index : 0,
+	    buffer_input.get_block_size(),
+	});
 
-	attachment.stage_mask = vk::PipelineStageFlagBits::eEarlyFragmentTests;
-	attachment.access_mask = vk::AccessFlagBits::eDepthStencilAttachmentRead |
-	                         vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-	attachment.image_layout = vk::ImageLayout::eDepthAttachmentOptimal;
-	attachment.subresource_range = {
-		vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil, 0, 1, 0, 1,
-	};
-
-	auto const has_input = !!blueprint_attachment.input_hash;
-	attachment.load_op = has_input ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear;
-	attachment.store_op = vk::AttachmentStoreOp::eStore;
-	attachment.clear_value = blueprint_attachment.clear_value;
-
-	attachment.resource_index = resources->try_get_attachment_index(blueprint_attachment.hash);
-
-	if (attachment.resource_index == std::numeric_limits<u32>::max())
-	{
-		resources->create_depth_attachment(blueprint_attachment, pass->sample_count);
-
-		attachment.resource_index = resources->try_get_attachment_index(blueprint_attachment.hash);
-
-		assert_false(attachment.resource_index == std::numeric_limits<u32>::max());
-	}
-
-	else
-		resources->add_key_to_attachment_index(
-		    attachment.resource_index,
-		    blueprint_attachment.input_hash
-		);
-}
-
-void RenderGraphBuilder::build_pass_buffer_inputs(
-    Renderpass *pass,
-    vec<RenderpassBlueprint::BufferInput> const &blueprint_buffer_inputs
-)
-{
-	pass->buffer_inputs.reserve(blueprint_buffer_inputs.size());
-
-	for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
-		pass->buffer_inputs.emplace_back(
-		    vk_context,
-		    memory_allocator,
-		    blueprint_buffer_input.usage,
-		    blueprint_buffer_input.allocation_info,
-		    blueprint_buffer_input.size,
-		    blueprint_buffer_input.update_frequency ==
-		            RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
-		        max_frames_in_flight :
-		        1,
-		    blueprint_buffer_input.name
-		);
-}
-
-void RenderGraphBuilder::build_pass_texture_inputs(
-    Renderpass *pass,
-    vec<RenderpassBlueprint::TextureInput> const &blueprint_texture_inputs
-)
-{
-}
-
-void RenderGraphBuilder::build_pass_input_descriptors(
-    Renderpass *pass,
-    vec<RenderpassBlueprint::BufferInput> const &blueprint_buffer_inputs,
-    vec<RenderpassBlueprint::TextureInput> const &blueprint_texture_inputs
-)
-{
-	{
-		auto const bindings_count =
-		    blueprint_buffer_inputs.size() + blueprint_texture_inputs.size();
-
-		auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
-		auto flags = vec<vk::DescriptorBindingFlags> {};
-
-		bindings.reserve(bindings_count);
-		flags.reserve(bindings_count);
-
-		for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
-		{
-			for (auto const &descriptor_info : blueprint_buffer_input.descriptor_infos)
-			{
-				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics)
-				{
-					bindings.emplace_back(descriptor_info.layout);
-					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-				}
-			}
-		}
-
-		for (auto const &blueprint_texture_input : blueprint_texture_inputs)
-		{
-			for (auto const &descriptor_info : blueprint_texture_input.descriptor_infos)
-				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics)
-				{
-					bindings.emplace_back(descriptor_info.layout);
-					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-				}
-		}
-		auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
-		pass->graphics_descriptor_set_layout = device->vk().createDescriptorSetLayout({
+	for (auto const &descriptor_info : buffer_blueprint.descriptor_infos)
+		extract_descriptor_writes(
+		    descriptor_info,
+		    node->get_descriptor_set(descriptor_info.pipeline_bind_point, frame_index).vk(),
 		    {},
-		    bindings,
-		    &extended_info,
-		});
-		debug_utils->set_object_name(
-		    device->vk(),
-		    pass->graphics_descriptor_set_layout,
-		    fmt::format("{}_descriptor_set_layout", pass->name)
+		    &out_buffer_infos->back(),
+		    out_writes
 		);
-
-		auto const layouts = arr<vk::DescriptorSetLayout, 2> {
-			graph->graphics_descriptor_set_layout,
-			pass->graphics_descriptor_set_layout,
-		};
-
-		pass->graphics_pipeline_layout = device->vk().createPipelineLayout({ {}, layouts });
-		debug_utils->set_object_name(
-		    device->vk(),
-		    pass->graphics_pipeline_layout,
-		    fmt::format("{}_graphics_pipeline_layout", pass->name).c_str()
-		);
-
-		if (!bindings.empty())
-		{
-			pass->graphics_descriptor_sets.reserve(max_frames_in_flight);
-			for (u32 i = i; i < max_frames_in_flight; ++i)
-			{
-				pass->graphics_descriptor_sets.emplace_back(
-				    descriptor_allocator,
-				    pass->graphics_descriptor_set_layout
-				);
-
-				debug_utils->set_object_name(
-				    device->vk(),
-				    pass->graphics_descriptor_sets.back().vk(),
-				    fmt::format("{}_graphics_descriptor_set_{}", pass->name, i)
-				);
-			}
-		}
-	}
-
-	{
-		auto const bindings_count =
-		    blueprint_buffer_inputs.size() + blueprint_texture_inputs.size();
-
-		auto bindings = vec<vk::DescriptorSetLayoutBinding> {};
-		auto flags = vec<vk::DescriptorBindingFlags> {};
-
-		bindings.reserve(bindings_count);
-		flags.reserve(bindings_count);
-
-		for (auto const &blueprint_buffer_input : blueprint_buffer_inputs)
-		{
-			for (auto const &descriptor_info : blueprint_buffer_input.descriptor_infos)
-			{
-				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eCompute)
-				{
-					bindings.emplace_back(descriptor_info.layout);
-					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-				}
-			}
-		}
-
-		for (auto const &blueprint_texture_input : blueprint_texture_inputs)
-		{
-			for (auto const &descriptor_info : blueprint_texture_input.descriptor_infos)
-				if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eCompute)
-				{
-					bindings.emplace_back(descriptor_info.layout);
-					flags.emplace_back(vk::DescriptorBindingFlagBits::ePartiallyBound);
-				}
-		}
-		auto const extended_info = vk::DescriptorSetLayoutBindingFlagsCreateInfo { flags };
-		pass->compute_descriptor_set_layout = device->vk().createDescriptorSetLayout({
-		    {},
-		    bindings,
-		    &extended_info,
-		});
-		debug_utils->set_object_name(
-		    device->vk(),
-		    pass->compute_descriptor_set_layout,
-		    fmt::format("{}_descriptor_set_layout", pass->name)
-		);
-
-		auto const layouts = arr<vk::DescriptorSetLayout, 2> {
-			graph->compute_descriptor_set_layout,
-			pass->compute_descriptor_set_layout,
-		};
-
-		pass->compute_pipeline_layout = device->vk().createPipelineLayout({ {}, layouts });
-		debug_utils->set_object_name(
-		    device->vk(),
-		    pass->compute_pipeline_layout,
-		    fmt::format("{}_compute_pipeline_layout", pass->name).c_str()
-		);
-
-		if (!bindings.empty())
-		{
-			pass->compute_descriptor_sets.reserve(max_frames_in_flight);
-			for (u32 i = i; i < max_frames_in_flight; ++i)
-			{
-				pass->compute_descriptor_sets.emplace_back(
-				    descriptor_allocator,
-				    pass->compute_descriptor_set_layout
-				);
-
-				debug_utils->set_object_name(
-				    device->vk(),
-				    pass->compute_descriptor_sets.back().vk(),
-				    fmt::format("{}_compute_descriptor_set_{}", pass->name, i)
-				);
-			}
-		}
-	}
 }
 
-void RenderGraphBuilder::initialize_pass_input_descriptors(
-    Renderpass *pass,
-    RenderpassBlueprint const &pass_blueprint
+void RenderGraphBuilder::extract_frame_texture_descriptor_writes(
+    RenderNode *node,
+    RenderNodeBlueprint::TextureInput const &texture_blueprint,
+    u32 frame_index,
+    vec<vk::WriteDescriptorSet> *out_writes
 )
 {
-	auto writes = vec<vk::WriteDescriptorSet> {};
-	auto buffer_infos = vec<vk::DescriptorBufferInfo> {};
-
-	for (u32 k = 0; auto &buffer : pass->buffer_inputs)
-	{
-		auto const &blueprint_buffer = pass_blueprint.buffer_inputs[k++];
-
-		for (u32 i = 0; i < max_frames_in_flight; ++i)
-		{
-			if (blueprint_buffer.update_frequency ==
-			    RenderpassBlueprint::BufferInput::UpdateFrequency::ePerFrame)
-			{
-				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
-				    *buffer.vk(),
-				    buffer.get_block_size() * i,
-				    buffer.get_block_size(),
-				});
-			}
-			else
-			{
-				buffer_infos.emplace_back(vk::DescriptorBufferInfo {
-				    *buffer.vk(),
-				    0,
-				    buffer.get_block_size(),
-				});
-			}
-		}
-	}
-
-	for (u32 i = 0; i < max_frames_in_flight; ++i)
-	{
-		for (auto const &blueprint_buffer : pass_blueprint.buffer_inputs)
-		{
-			for (auto const &descriptor_info : blueprint_buffer.descriptor_infos)
-			{
-				auto &dst_descriptor_set =
-				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
-				        pass->graphics_descriptor_sets[i] :
-				        pass->compute_descriptor_sets[i];
-
-				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
-				{
-					writes.emplace_back(
-					    dst_descriptor_set.vk(),
-					    descriptor_info.layout.binding,
-					    j,
-					    1u,
-					    descriptor_info.layout.descriptorType,
-					    nullptr,
-					    &buffer_infos[blueprint_buffer.key]
-					);
-				}
-			}
-		}
-	}
-
-	for (auto const &texture_input_info : pass_blueprint.texture_inputs)
-	{
-		for (u32 i = 0; i < max_frames_in_flight; ++i)
-		{
-			for (auto const &descriptor_info : texture_input_info.descriptor_infos)
-			{
-				auto &dst_descriptor_set =
-				    descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eGraphics ?
-				        pass->graphics_descriptor_sets[i] :
-				        pass->compute_descriptor_sets[i];
-
-				for (u32 j = 0; j < descriptor_info.layout.descriptorCount; ++j)
-				{
-					writes.emplace_back(
-					    dst_descriptor_set.vk(),
-					    descriptor_info.layout.binding,
-					    j,
-					    1,
-					    descriptor_info.layout.descriptorType,
-					    texture_input_info.default_texture->get_descriptor_info()
-					);
-				}
-			}
-		}
-	}
-
-	device->vk().updateDescriptorSets(writes, {});
-	device->vk().waitIdle();
-}
-void RenderGraphBuilder::build_pass_cmd_buffer_begin_infos(Renderpass *pass)
-{
-	pass->cmd_buffer_inheritance_rendering_info = {
-		{},
-		{},
-		static_cast<u32>(pass->color_attachment_formats.size()),
-		pass->color_attachment_formats.data(),
-		pass->depth_attachment_format,
-		{},
-		pass->sample_count,
-		{},
-	};
-
-	pass->cmd_buffer_inheritance_info = {
-		{},
-		{},
-		{},
-		{},
-		{},
-		{}, // _
-		&pass->cmd_buffer_inheritance_rendering_info,
-	};
-
-	pass->cmd_buffer_begin_info = {
-		vk::CommandBufferUsageFlagBits::eRenderPassContinue,
-		&pass->cmd_buffer_inheritance_info,
-	};
+	for (auto const &descriptor_info : texture_blueprint.descriptor_infos)
+		extract_descriptor_writes(
+		    descriptor_info,
+		    node->get_descriptor_set(descriptor_info.pipeline_bind_point, frame_index).vk(),
+		    texture_blueprint.default_texture->get_descriptor_info(),
+		    {},
+		    out_writes
+		);
 }
 
-auto RenderResources::calculate_attachment_image_extent(
-    RenderpassBlueprint::Attachment const &blueprint_attachment
-) const -> vk::Extent3D
+
+void RenderGraphBuilder::extract_descriptor_writes(
+    RenderNodeBlueprint::DescriptorInfo const &descriptor_info,
+    vk::DescriptorSet const descriptor_set,
+    vk::DescriptorImageInfo const *const image_info,
+    vk::DescriptorBufferInfo const *const buffer_info,
+    vec<vk::WriteDescriptorSet> *const out_writes
+)
 {
-	switch (blueprint_attachment.size_type)
-	{
-	case Renderpass::SizeType::eSwapchainRelative:
-	{
-		auto const [width, height] = blueprint_attachment.size;
-		return {
-			static_cast<u32>(surface->get_framebuffer_extent().width * width),
-			static_cast<u32>(surface->get_framebuffer_extent().height * height),
-			1,
-		};
-	}
-
-	case Renderpass::SizeType::eAbsolute:
-	{
-		auto const [width, height] = blueprint_attachment.size;
-		return {
-			static_cast<u32>(width),
-			static_cast<u32>(height),
-			1,
-		};
-	}
-
-	case Renderpass::SizeType::eRelative:
-	default: assert_fail("Invalid attachment size type"); return {};
-	};
+	for (u32 i = 0; i < descriptor_info.layout.descriptorCount; ++i)
+		out_writes->emplace_back(
+		    descriptor_set,
+		    descriptor_info.layout.binding,
+		    i,
+		    1u,
+		    descriptor_info.layout.descriptorType,
+		    image_info,
+		    buffer_info
+		);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

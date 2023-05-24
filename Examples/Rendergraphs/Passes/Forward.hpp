@@ -1,9 +1,9 @@
 #pragma once
 
-#include "BindlessVk/Renderer/Renderpass.hpp"
+#include "BindlessVk/Renderer/RenderNode.hpp"
 #include "Framework/Scene/Scene.hpp"
 
-class Forwardpass: public bvk::Renderpass
+class Forwardpass: public bvk::RenderNode
 {
 public:
 	struct UserData
@@ -36,11 +36,16 @@ public:
 	};
 
 public:
+	Forwardpass() = default;
+
 	Forwardpass(bvk::VkContext const *vk_context);
+
+	Forwardpass(Forwardpass &&other);
+	Forwardpass &operator=(Forwardpass &&other);
 
 	~Forwardpass() = default;
 
-	void on_setup(bvk::Rendergraph *graph) final;
+	void on_setup(bvk::RenderNode *parent) final;
 
 	void on_frame_prepare(u32 frame_index, u32 image_index) final;
 	void on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;

@@ -84,7 +84,7 @@ void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 		cmd.bindIndexBuffer(*buffer.vk(), 0u, vk::IndexType::eUint32);
 		break;
 	}
-	default: assert_fail("Invalid fragmented buffer ({}) type: {} ", buffer.get_name(), type);
+	default: assert_fail("Invalid fragmented buffer ({}) type: {} ", buffer.get_name(), static_cast<int>(type));
 	}
 }
 

@@ -47,7 +47,7 @@ private:
 private:
 	struct GLFWwindow *glfw_window_handle = {};
 
-	Specs specs = {};
+	scope<Specs> specs = {};
 
 	bool glfw_initialized = {};
 };

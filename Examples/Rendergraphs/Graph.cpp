@@ -1,18 +1,18 @@
 #include "Rendergraphs/Graph.hpp"
 
+#include "BindlessVk/Renderer/RenderNode.hpp"
 #include "BindlessVk/Renderer/Rendergraph.hpp"
-#include "BindlessVk/Renderer/Renderpass.hpp"
 #include "Framework/Common/Common.hpp"
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
 
 BasicRendergraph::BasicRendergraph(bvk::VkContext const *const vk_context)
-    : bvk::Rendergraph(vk_context)
+    : bvk::RenderNode(vk_context)
     , device(vk_context->get_device())
 {
 }
 
-void BasicRendergraph::on_setup()
+void BasicRendergraph::on_setup(RenderNode *const parent)
 {
 	auto data = std::any_cast<UserData *>(user_data);
 	scene = data->scene;

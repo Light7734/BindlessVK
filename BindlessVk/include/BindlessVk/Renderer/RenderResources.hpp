@@ -4,7 +4,7 @@
 #include "BindlessVk/Common/Common.hpp"
 #include "BindlessVk/Context/Swapchain.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
-#include "BindlessVk/Renderer/Renderpass.hpp"
+#include "BindlessVk/Renderer/RenderNode.hpp"
 #include "BindlessVk/Texture/Image.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
@@ -12,7 +12,7 @@ namespace BINDLESSVK_NAMESPACE {
 /** Manages render garph attachments */
 class RenderResources
 {
-private:
+public:
 	struct Attachment
 	{
 		vk::AccessFlags access_mask;
@@ -47,7 +47,7 @@ private:
 
 		VkExtent3D extent;
 		pair<f32, f32> size;
-		Renderpass::SizeType size_type;
+		RenderNode::SizeType size_type;
 		str relative_size_name;
 
 		vec<Attachment> attachments;
@@ -125,7 +125,7 @@ public:
 	}
 
 	auto try_get_suitable_transient_attachment_index(
-	    RenderpassBlueprint::Attachment const &blueprint_attachment,
+	    RenderNodeBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	) const
 	{
@@ -148,23 +148,23 @@ public:
 	void add_key_to_attachment_index(u64 const key, u32 const attachment_index);
 
 	void create_color_attachment(
-	    RenderpassBlueprint::Attachment const &blueprint_attachment,
+	    RenderNodeBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	);
 
 	void create_depth_attachment(
-	    RenderpassBlueprint::Attachment const &blueprint_attachment,
+	    RenderNodeBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	);
 
 	void create_transient_attachment(
-	    RenderpassBlueprint::Attachment const &blueprint_attachment,
+	    RenderNodeBlueprint::Attachment const &blueprint_attachment,
 	    vk::SampleCountFlagBits sample_count
 	);
 
 private:
 	auto calculate_attachment_image_extent(
-	    RenderpassBlueprint::Attachment const &blueprint_attachment
+	    RenderNodeBlueprint::Attachment const &blueprint_attachment
 	) const -> vk::Extent3D;
 
 private:
