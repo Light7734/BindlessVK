@@ -4,23 +4,6 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Model::Model(Model &&other)
-{
-	*this = std::move(other);
-}
-
-Model &Model::operator=(Model &&other)
-{
-	this->nodes = std::move(other.nodes);
-	this->textures = std::move(other.textures);
-	this->material_parameters = std::move(other.material_parameters);
-	this->vertex_buffer_fragment = other.vertex_buffer_fragment;
-	this->index_buffer_fragment = other.index_buffer_fragment;
-	this->debug_name = other.debug_name;
-
-	return *this;
-}
-
 Model::~Model()
 {
 	if (nodes.empty())

@@ -46,11 +46,11 @@ public:
 	 */
 	DebugUtils(Instance *instance, Callback const &callback, Filter const &filter);
 
-	/** Move constructor */
-	DebugUtils(DebugUtils &&other);
+	/** Default move constructor */
+	DebugUtils(DebugUtils &&other) = default;
 
-	/** Move assignment operator */
-	DebugUtils &operator=(DebugUtils &&other);
+	/** Default move assignment operator */
+	DebugUtils &operator=(DebugUtils &&other) = default;
 
 	/** Deleted copy constructor */
 	DebugUtils(DebugUtils const &) = delete;
@@ -116,7 +116,7 @@ private:
 	    -> LogLvl;
 
 private:
-	Instance *instance = {};
+	tidy_ptr<Instance> instance = {};
 	vk::DebugUtilsMessengerEXT messenger = {};
 
 	// Needs to live on the heap to preserve address after move

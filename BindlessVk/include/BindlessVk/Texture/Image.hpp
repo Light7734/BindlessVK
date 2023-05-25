@@ -32,11 +32,11 @@ public:
 	    vma::AllocationCreateInfo const &allocate_info
 	);
 
-	/** Move constructor */
-	Image(Image &&other);
+	/** Default move constructor */
+	Image(Image &&other) = default;
 
-	/** Move assignment operator */
-	Image &operator=(Image &&other);
+	/** Default move assignment operator */
+	Image &operator=(Image &&other) = default;
 
 	/** Deleted copy constructor */
 	Image(Image const &) = delete;
@@ -69,7 +69,7 @@ public:
 	}
 
 private:
-	MemoryAllocator const *memory_allocator = {};
+	tidy_ptr<MemoryAllocator const> memory_allocator = {};
 
 	pair<vk::Image, vma::Allocation> allocated_image = {};
 };

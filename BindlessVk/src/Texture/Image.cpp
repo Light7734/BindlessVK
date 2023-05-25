@@ -16,21 +16,6 @@ Image::Image(
 {
 }
 
-Image::Image(Image &&other)
-{
-	*this = std::move(other);
-}
-
-Image &Image::operator=(Image &&other)
-{
-	this->memory_allocator = other.memory_allocator;
-	this->allocated_image = other.allocated_image;
-
-	other.memory_allocator = {};
-
-	return *this;
-}
-
 Image::~Image()
 {
 	auto const &[image, allocation] = allocated_image;

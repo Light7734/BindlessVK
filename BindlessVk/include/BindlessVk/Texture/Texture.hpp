@@ -24,11 +24,11 @@ public:
 	};
 
 public:
-	/** Move constructor */
-	Texture(Texture &&);
+	/** Default move constructor */
+	Texture(Texture &&) = default;
 
-	/** Move assignment operator */
-	Texture &operator=(Texture &&);
+	/** Default move assignment operator */
+	Texture &operator=(Texture &&) = default;
 
 	/** Deleted copy constructor */
 	Texture(Texture const &) = delete;
@@ -121,7 +121,8 @@ public:
 private:
 	Texture() = default;
 
-	Device const *device = {};
+	tidy_ptr<Device const> device = {};
+
 	DebugUtils const *debug_utils = {};
 	MemoryAllocator const *memory_allocator = {};
 

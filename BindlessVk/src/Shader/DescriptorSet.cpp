@@ -11,21 +11,6 @@ DescriptorSet::DescriptorSet(
 {
 }
 
-DescriptorSet::DescriptorSet(DescriptorSet &&other)
-{
-	*this = std::move(other);
-}
-
-DescriptorSet &DescriptorSet::operator=(DescriptorSet &&other)
-{
-	this->descriptor_allocator = other.descriptor_allocator;
-	this->allocated_descriptor_set = other.allocated_descriptor_set;
-
-	other.descriptor_allocator = {};
-
-	return *this;
-}
-
 DescriptorSet::~DescriptorSet()
 {
 	if (!descriptor_allocator)

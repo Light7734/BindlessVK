@@ -9,7 +9,7 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-    /** Wrapper aound vulkan swapchain */
+/** Wrapper aound vulkan swapchain */
 class Swapchain
 {
 public:
@@ -22,11 +22,11 @@ public:
 	 */
 	Swapchain(VkContext const *vk_context);
 
-	/** Move constructor */
-	Swapchain(Swapchain &&other);
+	/** Default move constructor */
+	Swapchain(Swapchain &&other) = default;
 
-	/** Move assignment operator */
-	Swapchain &operator=(Swapchain &&other);
+	/** Default move assignment operator */
+	Swapchain &operator=(Swapchain &&other) = default;
 
 	/** Deleted copy constructor */
 	Swapchain(Swapchain const &) = delete;
@@ -84,7 +84,8 @@ private:
 	void destroy_image_views();
 
 private:
-	Device const *device = {};
+	tidy_ptr<Device const> device = {};
+
 	Surface const *surface = {};
 	Queues const *queues = {};
 	DebugUtils const *debug_utils = {};

@@ -57,6 +57,7 @@ private:
 
 private:
 	vk::Device device = {};
+
 	vk::Queue graphics_queue = {};
 	vk::Queue compute_queue = {};
 

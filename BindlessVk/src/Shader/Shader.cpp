@@ -32,26 +32,6 @@ ShaderPipeline::ShaderPipeline(
 		assert_fail("Invalid shader pipeline type {}: {}", debug_name, (int)type);
 }
 
-ShaderPipeline::ShaderPipeline(ShaderPipeline &&effect)
-{
-	*this = std::move(effect);
-}
-
-ShaderPipeline &ShaderPipeline::operator=(ShaderPipeline &&other)
-{
-	this->device = other.device;
-	this->surface = other.surface;
-	this->debug_utils = other.debug_utils;
-	this->layout_allocator = other.layout_allocator;
-	this->pipeline = other.pipeline;
-	this->pipeline_layout = other.pipeline_layout;
-	this->descriptor_set_layout = other.descriptor_set_layout;
-
-	other.device = {};
-
-	return *this;
-}
-
 ShaderPipeline::~ShaderPipeline()
 {
 	if (!device)

@@ -10,13 +10,13 @@ class DescriptorPool
 {
 public:
 	/** Argumented constructor */
-	DescriptorPool(Device *device, vk::DescriptorPoolCreateInfo info);
+	DescriptorPool(Device const *device, vk::DescriptorPoolCreateInfo info);
 
-	/** Move constructor */
-	DescriptorPool(DescriptorPool &&other);
+	/** Default move constructor */
+	DescriptorPool(DescriptorPool &&other) = default;
 
-	/** Move assignment operator */
-	DescriptorPool &operator=(DescriptorPool &&other);
+	/** Default move assignment operator */
+	DescriptorPool &operator=(DescriptorPool &&other) = default;
 
 	/** Deleted copy constructor */
 	DescriptorPool(DescriptorPool const &) = delete;
@@ -52,7 +52,7 @@ public:
 	}
 
 private:
-	Device *device = {};
+	tidy_ptr<Device const> device = {};
 
 	vk::DescriptorPool descriptor_pool = {};
 

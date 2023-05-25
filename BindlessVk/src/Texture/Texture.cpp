@@ -2,33 +2,6 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-Texture::Texture(Texture &&other)
-{
-	*this = std::move(other);
-}
-
-Texture &Texture::operator=(Texture &&other)
-{
-	this->device = other.device;
-	this->debug_utils = other.debug_utils;
-	this->memory_allocator = other.memory_allocator;
-
-	this->descriptor_info = other.descriptor_info;
-	this->size = other.size;
-	this->format = other.format;
-	this->mip_levels = other.mip_levels;
-	this->device_size = other.device_size;
-	this->sampler = other.sampler;
-	this->image_view = other.image_view;
-	this->current_layout = other.current_layout;
-	this->image = std::move(other.image);
-	this->debug_name = std::move(other.debug_name);
-
-	other.device = {};
-
-	return *this;
-}
-
 Texture::~Texture()
 {
 	if (!device)

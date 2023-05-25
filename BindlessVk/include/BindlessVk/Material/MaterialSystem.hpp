@@ -37,11 +37,11 @@ public:
 	    vk::DescriptorPool descriptor_pool
 	);
 
-	/** Move constructor */
-	Material(Material &&other);
+	/** Default move constructor */
+	Material(Material &&other) = default;
 
-	/** Move assignment operator */
-	Material &operator=(Material &&other);
+	/** Default move assignment operator */
+	Material &operator=(Material &&other) = default;
 
 	/** Deleted copy constructor */
 	Material(Material const &) = delete;
@@ -49,8 +49,8 @@ public:
 	/** Deleted copy assignment operator */
 	Material &operator=(Material const &) = delete;
 
-	/** Destructor */
-	~Material();
+	/** Default destructor */
+	~Material() = default;
 
 	/** Trivial accessor for shade_pipeline */
 	auto *get_shader_pipeline() const
@@ -65,7 +65,6 @@ public:
 	}
 
 private:
-	DescriptorAllocator *descriptor_allocator;
 	ShaderPipeline *shader_pipeline = {};
 	Parameters parameters = {};
 	DescriptorSet descriptor_set = {};

@@ -76,11 +76,11 @@ public:
 	    Swapchain const *swapchain
 	);
 
-	/** Move constructor */
-	RenderResources(RenderResources &&other);
+	/** Default move constructor */
+	RenderResources(RenderResources &&other) = default;
 
-	/** Move assignment operator */
-	RenderResources &operator=(RenderResources &&other);
+	/** Default move assignment operator */
+	RenderResources &operator=(RenderResources &&other) = default;
 
 	/** Deleted copy constructor */
 	RenderResources(RenderResources const &) = delete;
@@ -168,7 +168,7 @@ private:
 	) const -> vk::Extent3D;
 
 private:
-	Device *device = {};
+	tidy_ptr<Device> device = {};
 	Surface *surface = {};
 	DebugUtils *debug_utils = {};
 	MemoryAllocator *memory_allocator = {};

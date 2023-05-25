@@ -18,25 +18,6 @@ Swapchain::Swapchain(VkContext const *const vk_context)
 	set_object_names();
 }
 
-Swapchain::Swapchain(Swapchain &&other)
-{
-	*this = std::move(other);
-}
-
-Swapchain &Swapchain::operator=(Swapchain &&other)
-{
-	this->device = other.device;
-	this->surface = other.surface;
-	this->queues = other.queues;
-	this->debug_utils = other.debug_utils;
-	this->swapchain = other.swapchain;
-	this->images = std::move(other.images);
-	this->image_views = std::move(other.image_views);
-	this->invalid = other.invalid;
-
-	return *this;
-}
-
 Swapchain::~Swapchain()
 {
 	if (!device)
