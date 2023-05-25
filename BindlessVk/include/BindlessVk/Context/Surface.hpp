@@ -72,11 +72,11 @@ public:
 	    fn<u32(vk::SurfaceFormatKHR)> calculate_format_score
 	);
 
-	/** Move constructor */
-	Surface(Surface &&other);
+	/** Default move constructor */
+	Surface(Surface &&other) = default;
 
-	/** Move assignment operator */
-	Surface &operator=(Surface &&other);
+	/** Default move assignment operator */
+	Surface &operator=(Surface &&other) = default;
 
 	/** Deleted copy constructor */
 	Surface(Surface const &) = delete;

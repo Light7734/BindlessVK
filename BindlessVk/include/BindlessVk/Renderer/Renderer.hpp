@@ -21,11 +21,11 @@ public:
 	 */
 	Renderer(VkContext const *vk_context, MemoryAllocator *memory_allocator);
 
-	/** Move constructor */
+	/** Default move constructor */
 	Renderer(Renderer &&other);
 
-	/** Move assignment operator */
-	Renderer &operator=(Renderer &&other);
+	/** Default move assignment operator */
+	Renderer &operator=(Renderer &&other) = default;
 
 	/** Deleted copy constructor */
 	Renderer(Renderer const &) = delete;
@@ -78,7 +78,6 @@ private:
 	};
 
 private:
-	// 1
 	void create_sync_objects();
 	void create_cmds(Gpu const *gpu);
 
@@ -93,7 +92,6 @@ private:
 	void cycle_frame_index();
 	auto acquire_next_image_index() -> u32;
 
-	// 2
 	void create_compute_sync_objects(u32 index);
 	void create_graphics_sync_objects(u32 index);
 	void create_present_sync_objects(u32 index);
@@ -120,16 +118,17 @@ private:
 	void submit_graphics_queue();
 	void submit_present_queue();
 
-	// 3
 	auto try_apply_node_barriers(RenderNode *node) -> bool;
 
 	void parse_node_rendering_info(RenderNode *node);
 
 private:
-	Device const *device = {};
+	tidy_ptr<Device const> device = {};
+
 	Surface const *surface = {};
 	Queues const *queues = {};
 	DebugUtils const *debug_utils = {};
+
 	Swapchain swapchain = {};
 
 	vec<tuple<u32, u32, u32>> used_attachment_indices = {};
@@ -155,7 +154,7 @@ private:
 	u32 image_index = std::numeric_limits<u32>::max();
 
 	// @wip
-	bool begun_rendering=  false;
+	bool dynamic_render_pass_active = false;
 };
 
 } // namespace BINDLESSVK_NAMESPACE

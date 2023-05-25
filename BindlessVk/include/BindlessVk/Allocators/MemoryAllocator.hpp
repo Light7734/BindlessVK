@@ -5,8 +5,8 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-/** Wrapper around VMA that manages memory allocations */
 class MemoryAllocator
+/** Wrapper around VMA that manages memory allocations */
 {
 public:
 	/** Default constructor */

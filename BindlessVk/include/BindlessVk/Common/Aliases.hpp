@@ -68,11 +68,4 @@ using pair = std::pair<T1, T2>;
 template<typename... Ts>
 using tuple = std::tuple<Ts...>;
 
-template<typename T>
-using ref = std::shared_ptr<T>;
-
-template<typename T>
-using scope = std::unique_ptr<T>;
-
-
 } // namespace BINDLESSVK_NAMESPACE

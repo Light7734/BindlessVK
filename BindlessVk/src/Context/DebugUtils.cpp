@@ -18,22 +18,6 @@ DebugUtils::DebugUtils(Instance *const instance, Callback const &callback, Filte
 	messenger = instance->vk().createDebugUtilsMessengerEXT(messenger_info);
 }
 
-DebugUtils::DebugUtils(DebugUtils &&other)
-{
-	*this = std::move(other);
-}
-
-DebugUtils &DebugUtils::operator=(DebugUtils &&other)
-{
-	this->instance = other.instance;
-	this->messenger = other.messenger;
-	this->callback = std::move(other.callback);
-
-	other.instance = {};
-
-	return *this;
-}
-
 DebugUtils::~DebugUtils()
 {
 	if (!instance)

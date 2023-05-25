@@ -57,11 +57,11 @@ public:
 	    str_view debug_name = default_debug_name
 	);
 
-	/** Move constructor */
-	ShaderPipeline(ShaderPipeline &&other);
+	/** Default move constructor */
+	ShaderPipeline(ShaderPipeline &&other) = default;
 
-	/** Move assignment operator */
-	ShaderPipeline &operator=(ShaderPipeline &&other);
+	/** Default move assignment operator */
+	ShaderPipeline &operator=(ShaderPipeline &&other) = default;
 
 	/** Deleted copy constructor */
 	ShaderPipeline(const ShaderPipeline &) = delete;
@@ -130,7 +130,8 @@ private:
 
 
 private:
-	Device const *device = {};
+	tidy_ptr<Device const> device = {};
+
 	Surface const *surface = {};
 	DebugUtils const *debug_utils = {};
 	LayoutAllocator *layout_allocator = {};

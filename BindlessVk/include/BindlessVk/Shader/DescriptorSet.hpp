@@ -23,11 +23,11 @@ public:
 	    vk::DescriptorSetLayout descriptor_set_layout
 	);
 
-	/** Move constructor */
-	DescriptorSet(DescriptorSet &&other);
+	/** Default move constructor */
+	DescriptorSet(DescriptorSet &&other) = default;
 
-	/** Move assignment operator */
-	DescriptorSet &operator=(DescriptorSet &&);
+	/** Default move assignment operator */
+	DescriptorSet &operator=(DescriptorSet &&) = default;
 
 	/** Deleted copy constructor  */
 	DescriptorSet(DescriptorSet const &) = delete;
@@ -57,7 +57,7 @@ public:
 	}
 
 private:
-	DescriptorAllocator *descriptor_allocator = {};
+	tidy_ptr<DescriptorAllocator> descriptor_allocator = {};
 
 	pair<vk::DescriptorSet, vk::DescriptorPool> allocated_descriptor_set;
 };

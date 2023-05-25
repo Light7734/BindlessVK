@@ -19,25 +19,6 @@ Surface::Surface(
 	update_framebuffer_extent();
 }
 
-Surface::Surface(Surface &&other)
-{
-	*this = std::move(other);
-}
-
-Surface &Surface::operator=(Surface &&other)
-{
-	this->surface = other.surface;
-	this->capabilities = other.capabilities;
-	this->color_format = other.color_format;
-	this->depth_format = other.depth_format;
-	this->color_space = other.color_space;
-	this->present_mode = other.present_mode;
-	this->framebuffer_extent = other.framebuffer_extent;
-	this->fn_get_framebuffer_extent = other.fn_get_framebuffer_extent;
-
-	return *this;
-}
-
 void Surface::select_best_surface_format(
     fn<u32(vk::SurfaceFormatKHR)> calculate_format_score,
     Gpu const *const gpu

@@ -41,33 +41,14 @@ Buffer::Buffer(
 	vk_context->get_debug_utils()->set_object_name(device->vk(), buffer, this->debug_name);
 }
 
-Buffer::Buffer(Buffer &&other) noexcept
-{
-	*this = std::move(other);
-}
-
-Buffer &Buffer::operator=(Buffer &&other) noexcept
-{
-	this->device = other.device;
-	this->memory_allocator = other.memory_allocator;
-	this->whole_size = other.whole_size;
-	this->block_size = other.block_size;
-	this->block_count = other.block_count;
-	this->valid_block_size = other.valid_block_size;
-	this->descriptor_info = other.descriptor_info;
-	this->allocated_buffer = other.allocated_buffer;
-
-	other.memory_allocator = {};
-
-	return *this;
-}
-
 Buffer::~Buffer()
 {
+	if (!device)
+		return;
+
 	auto const &[buffer, allocation] = allocated_buffer;
 
-	if (memory_allocator)
-		memory_allocator->vma().destroyBuffer(buffer, allocation);
+	memory_allocator->vma().destroyBuffer(buffer, allocation);
 }
 
 void Buffer::write_data(
@@ -97,8 +78,8 @@ void Buffer::calculate_block_size(Gpu const *const gpu)
 	block_size = (valid_block_size + min_alignment - 1) & -min_alignment;
 	whole_size = block_size * block_count;
 }
-
 void *Buffer::map_block(u32 const block_index)
+
 {
 	auto &[buffer, allocation] = allocated_buffer;
 	auto const map = (u8 *)memory_allocator->vma().mapMemory(allocation);

@@ -34,28 +34,6 @@ FragmentedBuffer::FragmentedBuffer(
 {
 }
 
-FragmentedBuffer::FragmentedBuffer(FragmentedBuffer &&other)
-{
-	*this = std::move(other);
-}
-
-FragmentedBuffer &FragmentedBuffer::operator=(FragmentedBuffer &&other)
-{
-	this->debug_utils = other.debug_utils;
-	this->fragments = other.fragments;
-	this->type = other.type;
-	this->buffer = std::move(other.buffer);
-	this->map = other.map;
-
-	other.buffer = {};
-
-	return *this;
-}
-
-FragmentedBuffer::~FragmentedBuffer()
-{
-}
-
 void FragmentedBuffer::copy_staging_to_fragment(Buffer *staging_buffer, Fragment fragment)
 {
 	buffer.write_buffer(
@@ -84,7 +62,12 @@ void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 		cmd.bindIndexBuffer(*buffer.vk(), 0u, vk::IndexType::eUint32);
 		break;
 	}
-	default: assert_fail("Invalid fragmented buffer ({}) type: {} ", buffer.get_name(), static_cast<int>(type));
+	default:
+		assert_fail(
+		    "Invalid fragmented buffer ({}) type: {} ",
+		    buffer.get_name(),
+		    static_cast<int>(type)
+		);
 	}
 }
 

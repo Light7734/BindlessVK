@@ -73,11 +73,11 @@ public:
 	};
 
 public:
-	/** Move constructor */
-	Model(Model &&);
+	/** Default move constructor */
+	Model(Model &&) = default;
 
-	/** Move assignment operator */
-	Model &operator=(Model &&);
+	/** Default move assignment operator */
+	Model &operator=(Model &&) = default;
 
 	/** Deleted copy constructor */
 	Model(const Model &) = delete;

@@ -39,27 +39,6 @@ RenderResources::RenderResources(
 	containers.push_back(std::move(container));
 }
 
-RenderResources::RenderResources(RenderResources &&other)
-{
-	*this = std::move(other);
-}
-
-RenderResources &RenderResources::operator=(RenderResources &&other)
-{
-	this->device = other.device;
-	this->surface = other.surface;
-	this->debug_utils = other.debug_utils;
-	this->memory_allocator = other.memory_allocator;
-
-	this->containers = std::move(other.containers);
-	this->attachment_indices = std::move(other.attachment_indices);
-	this->transient_attachments = std::move(other.transient_attachments);
-
-	other.device = {};
-
-	return *this;
-}
-
 RenderResources::~RenderResources()
 {
 	if (!device)
@@ -373,7 +352,7 @@ auto RenderResources::calculate_attachment_image_extent(
 		};
 	}
 
-	case  RenderNode::SizeType::eRelative:
+	case RenderNode::SizeType::eRelative:
 	default: assert_fail("Invalid attachment size type"); return {};
 	};
 }

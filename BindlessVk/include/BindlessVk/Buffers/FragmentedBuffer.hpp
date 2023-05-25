@@ -41,11 +41,11 @@ public:
 	    str_view debug_name = default_debug_name
 	);
 
-	/** Move constructor */
-	FragmentedBuffer(FragmentedBuffer &&other);
+	/** Default move constructor */
+	FragmentedBuffer(FragmentedBuffer &&other) = default;
 
-	/** Move assignment operator */
-	FragmentedBuffer &operator=(FragmentedBuffer &&other);
+	/** Default move assignment operator */
+	FragmentedBuffer &operator=(FragmentedBuffer &&other) = default;
 
 	/** Deleted copy constructor */
 	FragmentedBuffer(const FragmentedBuffer &) = delete;
@@ -53,8 +53,8 @@ public:
 	/** Deleted copy assignment operator */
 	FragmentedBuffer &operator=(const FragmentedBuffer &) = delete;
 
-	/** Destructor */
-	~FragmentedBuffer();
+	/** Default destructor */
+	~FragmentedBuffer() = default;
 
 	void copy_staging_to_fragment(Buffer *staging_buffer, Fragment fragment);
 

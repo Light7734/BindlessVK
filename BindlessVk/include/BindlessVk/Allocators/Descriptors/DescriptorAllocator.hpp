@@ -22,11 +22,11 @@ public:
 	 */
 	DescriptorAllocator(VkContext const *vk_context);
 
-	/** Move constructor */
-	DescriptorAllocator(DescriptorAllocator &&other);
+	/** Default move constructor */
+	DescriptorAllocator(DescriptorAllocator &&other) = default;
 
-	/** Move assignment operator */
-	DescriptorAllocator &operator=(DescriptorAllocator &&other);
+	/** Default move assignment operator */
+	DescriptorAllocator &operator=(DescriptorAllocator &&other) = default;
 
 	/** Deleted copy constructor */
 	DescriptorAllocator(DescriptorAllocator const &) = delete;
@@ -68,7 +68,7 @@ private:
 	auto find_pool(vk::DescriptorPool pool) -> vec<DescriptorPool>::iterator;
 
 private:
-	Device *device = {};
+	tidy_ptr<Device const> device = {};
 
 	vec<DescriptorPool> active_pools = {};
 	vec<DescriptorPool> free_pools = {};

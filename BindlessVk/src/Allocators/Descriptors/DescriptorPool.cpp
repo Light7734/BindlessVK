@@ -2,26 +2,10 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-DescriptorPool::DescriptorPool(Device *device, vk::DescriptorPoolCreateInfo info): device(device)
+DescriptorPool::DescriptorPool(Device const *device, vk::DescriptorPoolCreateInfo info)
+    : device(device)
 {
 	descriptor_pool = device->vk().createDescriptorPool(info);
-}
-
-DescriptorPool::DescriptorPool(DescriptorPool &&other)
-{
-	*this = std::move(other);
-}
-
-DescriptorPool &DescriptorPool::operator=(DescriptorPool &&other)
-{
-	this->device = other.device;
-	this->descriptor_pool = other.descriptor_pool;
-	this->descriptor_set_count = other.descriptor_set_count;
-	this->out_of_memory = other.out_of_memory;
-
-	other.device = {};
-
-	return *this;
 }
 
 DescriptorPool::~DescriptorPool()

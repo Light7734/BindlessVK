@@ -8,24 +8,6 @@ DescriptorAllocator::DescriptorAllocator(VkContext const *vk_context)
 	grab_or_create_new_pool();
 }
 
-DescriptorAllocator::DescriptorAllocator(DescriptorAllocator &&other)
-{
-	*this = std::move(other);
-}
-
-DescriptorAllocator &DescriptorAllocator::operator=(DescriptorAllocator &&other)
-{
-	this->device = other.device;
-	this->active_pools = std::move(other.active_pools);
-	this->free_pools = std::move(other.free_pools);
-	this->pool_counter = other.pool_counter;
-	this->current_pool = this->active_pools.end() - 1;
-
-	other.device = {};
-
-	return *this;
-}
-
 DescriptorAllocator::~DescriptorAllocator()
 {
 	if (!device)

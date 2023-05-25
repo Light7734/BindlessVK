@@ -38,11 +38,11 @@ public:
 	    str_view debug_name = default_debug_name
 	);
 
-	/** Move constructor */
-	Buffer(Buffer &&other) noexcept;
+	/** Default move constructor */
+	Buffer(Buffer &&other) = default;
 
-	/** Move assignment operator */
-	Buffer &operator=(Buffer &&other) noexcept;
+	/** Default move assignment operator */
+	Buffer &operator=(Buffer &&other) = default;
 
 	/** Deleted copy constructor */
 	Buffer(Buffer const &other) = delete;
@@ -139,7 +139,7 @@ private:
 	void calculate_block_size(Gpu const *gpu);
 
 private:
-	Device const *device = {};
+	tidy_ptr<Device const> device = {};
 	MemoryAllocator const *memory_allocator = {};
 
 	pair<vk::Buffer, vma::Allocation> allocated_buffer = {};

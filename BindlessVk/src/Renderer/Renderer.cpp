@@ -18,46 +18,6 @@ Renderer::Renderer(VkContext const *const vk_context, MemoryAllocator *const mem
 	image_index = acquire_next_image_index();
 }
 
-Renderer::Renderer(Renderer &&other)
-{
-	*this = std::move(other);
-}
-
-Renderer &Renderer::operator=(Renderer &&other)
-{
-	this->device = other.device;
-	this->surface = other.surface;
-	this->queues = other.queues;
-	this->debug_utils = other.debug_utils;
-	this->swapchain = std::move(other.swapchain);
-
-	this->used_attachment_indices = std::move(other.used_attachment_indices);
-
-	this->resources = std::move(other.resources);
-	this->dynamic_pass_rendering_info = std::move(other.dynamic_pass_rendering_info);
-
-	this->compute_fences = other.compute_fences;
-	this->compute_semaphores = other.compute_semaphores;
-
-	this->graphics_fences = other.graphics_fences;
-	this->graphics_semaphores = other.graphics_semaphores;
-
-	this->present_semaphores = other.present_semaphores;
-
-	this->compute_cmd_pools = other.compute_cmd_pools;
-	this->graphics_cmd_pools = other.graphics_cmd_pools;
-
-	this->compute_cmds = other.compute_cmds;
-	this->graphics_cmds = other.graphics_cmds;
-
-	this->frame_index = other.frame_index;
-	this->image_index = other.image_index;
-
-	other.device = {};
-
-	return *this;
-}
-
 Renderer::~Renderer()
 {
 	if (!device)
@@ -335,7 +295,7 @@ void Renderer::graphics_node(RenderNode *const node, i32 depth)
 	{
 		parse_node_rendering_info(node);
 		cmd.beginRendering(dynamic_pass_rendering_info.vk());
-		begun_rendering = true;
+		dynamic_render_pass_active = true;
 	}
 
 	bind_node_graphics_descriptors(node, depth);
@@ -375,10 +335,10 @@ auto Renderer::try_apply_node_barriers(RenderNode *node) -> bool
 			{
 				applied_any_barriers = true;
 
-				if (begun_rendering)
+				if (dynamic_render_pass_active)
 				{
 					cmd.endRendering();
-					begun_rendering = false;
+					dynamic_render_pass_active = false;
 				}
 			}
 
@@ -545,7 +505,7 @@ void Renderer::apply_backbuffer_barrier()
 	auto *const backbuffer_attachment = backbuffer_container->get_attachment(image_index, 0);
 
 	cmd.endRendering();
-	begun_rendering = false;
+	dynamic_render_pass_active = false;
 
 	cmd.pipelineBarrier(
 	    backbuffer_attachment->stage_mask,
