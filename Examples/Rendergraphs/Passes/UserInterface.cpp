@@ -10,17 +10,6 @@ UserInterfacePass::UserInterfacePass(bvk::VkContext const *const vk_context)
 {
 }
 
-UserInterfacePass::UserInterfacePass(UserInterfacePass &&other)
-{
-	*this = std::move(other);
-}
-
-UserInterfacePass &UserInterfacePass::operator=(UserInterfacePass &&other)
-{
-	bvk::RenderNode::operator=(std::move(other));
-	return *this;
-}
-
 void UserInterfacePass::on_setup(bvk::RenderNode *const parent)
 {
 }

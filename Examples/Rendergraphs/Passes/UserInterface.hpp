@@ -11,8 +11,9 @@ public:
 
 	UserInterfacePass(bvk::VkContext const *vk_context);
 
-	UserInterfacePass(UserInterfacePass &&other);
-	UserInterfacePass &operator=(UserInterfacePass &&other);
+	UserInterfacePass(UserInterfacePass &&other) = default;
+
+	UserInterfacePass &operator=(UserInterfacePass &&other) = default;
 
 	~UserInterfacePass() = default;
 

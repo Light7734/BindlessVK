@@ -11,31 +11,6 @@ Forwardpass::Forwardpass(bvk::VkContext const *const vk_context)
 {
 }
 
-Forwardpass ::Forwardpass(Forwardpass &&other)
-{
-	*this = std::move(other);
-}
-
-Forwardpass &Forwardpass ::operator=(Forwardpass &&other)
-{
-	bvk::RenderNode::operator=(std::move(other));
-
-	this->memory_allocator = other.memory_allocator;
-	this->scene = other.scene;
-	this->device = other.device;
-	this->draw_indirect_buffer = other.draw_indirect_buffer;
-	this->current_pipeline = other.current_pipeline;
-	this->cmd = other.cmd;
-	this->static_mesh_count = other.static_mesh_count;
-	this->cull_pipeline = other.cull_pipeline;
-	this->model_pipeline = other.model_pipeline;
-	this->skybox_pipeline = other.skybox_pipeline;
-	this->primitive_count = other.primitive_count;
-	this->freeze_cull = other.freeze_cull;
-
-	return *this;
-}
-
 void Forwardpass::on_setup(bvk::RenderNode *parent)
 {
 	auto const data = any_cast<UserData *>(user_data);

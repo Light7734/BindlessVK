@@ -121,6 +121,10 @@ void BasicRendergraph::on_frame_prepare(u32 const frame_index, u32 const image_i
 	update_descriptor_sets();
 }
 
+void BasicRendergraph::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
+{
+}
+
 void BasicRendergraph::on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
 {
 	bind_graphic_buffers(cmd);
@@ -203,7 +207,7 @@ void BasicRendergraph::update_for_light(
 
 void BasicRendergraph::update_for_model(
     U_ModelData *const buffer_map,
-    u32 buffer_index,
+    u32 const buffer_index,
     TransformComponent const &transform,
     StaticMeshRendererComponent const &static_mesh,
     u32 &primitive_index

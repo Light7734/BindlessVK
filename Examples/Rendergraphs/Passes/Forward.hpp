@@ -40,8 +40,9 @@ public:
 
 	Forwardpass(bvk::VkContext const *vk_context);
 
-	Forwardpass(Forwardpass &&other);
-	Forwardpass &operator=(Forwardpass &&other);
+	Forwardpass(Forwardpass &&other) = default;
+
+	Forwardpass &operator=(Forwardpass &&other) = default;
 
 	~Forwardpass() = default;
 

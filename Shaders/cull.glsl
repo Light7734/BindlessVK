@@ -40,8 +40,8 @@ void main()
         return;
 
     const ModelData model = ub_models.arr[id];
+    const vec3 model_center = vec3(model.x, model.y, model.z);
 
-    ub_commands.arr[id].instance_count = is_visible(u_camera.proj * u_camera.view,
-                                                    vec3(model.x, model.y, model.z),
-                                                    model.radius) ? 1 : 0;
+    ub_commands.arr[id].instance_count =
+        is_visible(u_camera.proj * u_camera.view, model_center, model.radius) ? 1 : 0;
 }

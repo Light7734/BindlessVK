@@ -117,6 +117,7 @@ public:
 	BasicRendergraph(bvk::VkContext const *const vk_context);
 
 	BasicRendergraph(BasicRendergraph &&other) = default;
+
 	BasicRendergraph &operator=(BasicRendergraph &&other) = default;
 
 	~BasicRendergraph() = default;
@@ -125,9 +126,7 @@ public:
 
 	void on_frame_prepare(u32 frame_index, u32 image_index) final;
 
-	void on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final
-	{
-	}
+	void on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
 
 	void on_frame_graphics(vk::CommandBuffer cmd, u32 frame_index, u32 image_index) final;
 
