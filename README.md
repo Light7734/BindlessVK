@@ -36,10 +36,10 @@ ln -s ./build/compile_commands.json ./compile_commands.json
 ```
 
 **Commit types:**
--   **feat:** Changes that add a new feature.
--   **fix:** Changes that fix a bug.
--   **refactor:** Changes that improve the code quality (readablity/performance/extensibility/etc)
--   **style:** Changes to code that won't affect the compiled code.
+-   **feat:** Changes that add behavior.
+-   **fix:** Changes that fix a malfunction in behavior.
+-   **refactor:** Changes that improve the internal structure of the code without altering its external behavior.
+-   **style:** Aesthetic changes to won't affect the structure or the behavior of the code.
 -   **docs:** Changes to the documentations.
 -   **asset:** Changes to the assets.
 
