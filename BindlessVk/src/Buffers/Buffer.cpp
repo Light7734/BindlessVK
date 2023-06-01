@@ -78,12 +78,40 @@ void Buffer::calculate_block_size(Gpu const *const gpu)
 	block_size = (valid_block_size + min_alignment - 1) & -min_alignment;
 	whole_size = block_size * block_count;
 }
-void *Buffer::map_block(u32 const block_index)
 
+void *Buffer::map_block(u32 const block_index)
 {
 	auto &[buffer, allocation] = allocated_buffer;
 	auto const map = (u8 *)memory_allocator->vma().mapMemory(allocation);
 	return map + (block_size * block_index);
+}
+
+auto Buffer::map_all() -> vec<void *>
+{
+	auto maps = vec<void *>(block_count);
+
+	auto &[buffer, allocation] = allocated_buffer;
+	auto const vk_map = (u8 *)memory_allocator->vma().mapMemory(allocation);
+
+	for (u32 i = 0; i < block_count; ++i)
+		maps[i] = vk_map + (block_size * i);
+
+	return maps;
+}
+
+auto Buffer::map_all_zeroed() -> vec<void *>
+{
+	auto maps = vec<void *>(block_count);
+
+	auto &[buffer, allocation] = allocated_buffer;
+	auto const vk_map = (u8 *)memory_allocator->vma().mapMemory(allocation);
+
+	memset(vk_map, {}, block_size * block_count);
+
+	for (u32 i = 0; i < block_count; ++i)
+		maps[i] = vk_map + (block_size * i);
+
+	return maps;
 }
 
 void *Buffer::map_block_zeroed(u32 const block_index)

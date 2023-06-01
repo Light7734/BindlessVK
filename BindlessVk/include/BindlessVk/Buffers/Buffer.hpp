@@ -84,6 +84,19 @@ public:
 	 */
 	[[nodiscard]] void *map_block_zeroed(u32 block_index);
 
+	/** Maps the buffer and returns offseted pointers to the beginning of the blocks
+	 *
+	 * @warn Don't map twice without unmapping
+	 */
+	[[nodiscard]] auto map_all() -> vec<void *>;
+
+	/** Maps the buffer and zeroes it, then returns offseted pointers to the beginning of the blocks
+	 *
+	 * @warn Don't map twice without unmapping
+	 */
+	[[nodiscard]] auto map_all_zeroed() -> vec<void *>;
+
+
 	/** Unmaps a buffer, can be called without prior mapping */
 	void unmap() const;
 
