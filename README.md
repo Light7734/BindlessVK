@@ -26,7 +26,7 @@ cd ..
 ln -s ./build/compile_commands.json ./compile_commands.json
 ```
 
-**Commit syntax follows the** [**_conventional commits specification_**](https://www.conventionalcommits.org/en/v1.0.0/):
+**Commit syntax (almost) follows the** [**_conventional commits specification_**](https://www.conventionalcommits.org/en/v1.0.0/):
 ```
 <type>[optional scope]: <description>
 
@@ -36,15 +36,43 @@ ln -s ./build/compile_commands.json ./compile_commands.json
 ```
 
 **Commit types:**
--   **feat:** Changes that add behavior.
+-   **beh:** Changes to the behavior.
+    - beh(bvk): add multi sample anti-aliasing
+    - beh(demo): randomize objects' transformation
+    - beh(asset-loader): add progress logging
+    - beh(profiler): output will be prettified
+
 -   **fix:** Changes that fix a malfunction in behavior.
--   **refactor:** Changes that improve the internal structure of the code without altering its external behavior.
--   **style:** Aesthetic changes to won't affect the structure or the behavior of the code.
--   **docs:** Changes to the documentations.
--   **asset:** Changes to the assets.
+    - fix(asset-loader): file handle left open
+    - fix(demo): incorrect lights' parameters
+    - fix(profiler): missing closing brackets
+
+-   **ref:** Changes that improve the internal structure of the code without altering its external behavior.
+    - ref(bvk): optimize render loop
+    - ref(bvk): rename methods & variables
+    - ref(profiler): remove unused variables
+    - ref(asset-loader): split large class 'a' into 'a', 'b' & 'c'
+
+-   **sty:** Aesthetic changes that won't affect the structure or the behavior of the code.
+    - sty: update .clang-format
+    - sty: tidy up CMakeLists
+    - sty: change naming convention for 'some type'
+    - sty(bvk): remove extra whitespaces
+    - sty(profiler): re-order methods
+
+-   **doc:** Changes to the documentations.
+    - doc: update repository readme
+    - doc(bvk): fix spelling errors
+    - doc(profiler): add docs for class 'a'
+    - doc(asset-loader): remove comments
+
+-   **ass:** Changes to the assets.
+    - ass(branding): add bindlessvk logo
+    - ass(demo): fix player weight paintings
+    - ass(demo): remove unused files 
 
 **Branches:**
--   **main:** main development branch.
+-   **main:** the main development branch.
 
 ## Contact
 Feel free to HMU anytime on matrix @light7734:matrix.org to chat about programming or whatever. ♥️
