@@ -1,7 +1,7 @@
 #version 450 core
 #pragma shader_stage(vertex)
 
-#include "scene_descriptors.glsl"
+#include "global_descriptors.glsl"
 
 layout(location = 0) in vec3 in_position;
 layout(location = 1) in vec3 in_normal;
@@ -17,10 +17,12 @@ layout(location = 5) out flat int out_instance_index;
 
 void main() 
 {
+    const Camera camera = u_frame.camera;
+
     vec3 light_position = vec3(40.0, 40.0, 2.0);
 
-    ModelData model_data = ub_models.arr[gl_InstanceIndex];
-    mat4 model = model_data.model;
+    Primitive primitive = ssbo_primitives.arr[gl_InstanceIndex];
+    mat4 model = primitive.model;
 
     out_fragment_position = vec3(model * vec4(in_position, 1.0));
     out_uv = in_uv;
@@ -33,12 +35,13 @@ void main()
     mat3 TBN = transpose(mat3(T, B, N));    
 
     out_tangent_light_position = TBN * light_position;
-    out_tangent_view_position = TBN * vec3(u_camera.view_position);
+    out_tangent_view_position = TBN * vec3(camera.view_position);
     out_tangent_fragment_position = TBN * out_fragment_position;
 
     out_instance_index = gl_InstanceIndex;
 
-    gl_Position =  u_camera.proj * u_camera.view * model * vec4(in_position, 1.0);
+    gl_Position = camera.proj * camera.view * model * vec4(in_position, 1.0);
 }
+
 
 

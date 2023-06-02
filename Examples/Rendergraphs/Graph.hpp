@@ -5,31 +5,7 @@
 #include "Framework/Common/Common.hpp"
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
-
-class InputBuffer
-{
-public:
-	InputBuffer() {};
-
-	virtual u32 get_compute_binding()
-	{
-		return std::numeric_limits<u32>::max();
-	}
-
-	virtual u32 get_graphics_binding()
-	{
-		return std::numeric_limits<u32>::max();
-	}
-
-	/** Returns null-terminated str view to debug_name */
-	str_view get_name()
-	{
-		return str_view(debug_name);
-	}
-
-private:
-	str debug_name;
-};
+#include "Framework/Utils/Timer.hpp"
 
 class BasicRendergraph: public bvk::RenderNode
 {
@@ -43,11 +19,57 @@ public:
 		bvk::DebugUtils *debug_utils;
 	};
 
-	struct U_FrameData
+	struct DirectionalLight
+	{
+		glm::vec4 direction;
+
+		glm::vec4 ambient;
+		glm::vec4 diffuse;
+		glm::vec4 specular;
+	};
+
+	struct PointLight
+	{
+		glm::vec4 position;
+
+		f32 constant;
+		f32 linear;
+		f32 quadratic;
+		f32 _0;
+
+		glm::vec4 ambient;
+		glm::vec4 diffuse;
+		glm::vec4 specular;
+
+		auto static constexpr max_count = 32;
+	};
+
+	struct RenderScene
+	{
+		DirectionalLight directional_light;
+
+		arr<PointLight, PointLight::max_count> point_lights;
+		u32 point_light_count;
+
+		u32 primitive_count;
+	};
+
+	struct Camera
 	{
 		glm::mat4 view;
 		glm::mat4 projection;
+		glm::mat4 view_projection;
 		glm::vec4 view_position;
+	};
+
+	// Descriptors
+
+	struct FrameDescriptor
+	{
+		Camera camera;
+		RenderScene render_scene;
+
+		f32 delta_time;
 
 		auto static constexpr name = str { "frame_data" };
 		auto static constexpr key = hash_str("frame_data");
@@ -55,61 +77,53 @@ public:
 		auto static constexpr binding = usize { 0 };
 	};
 
-	struct U_SceneData
-	{
-		glm::vec4 light_position;
-		u32 primitive_count;
-
-		auto static constexpr name = str { "scene_data" };
-		auto static constexpr key = hash_str("scene_data");
-
-		auto static constexpr binding = usize { 1 };
-	};
-
-	struct U_ModelData
+	struct PrimitivesDescriptor
 	{
 		f32 x;
 		f32 y;
 		f32 z;
 		f32 r;
 
-		i32 albedo_texture_index;
-		i32 normal_texture_index;
-		i32 metallic_roughness_texture_index;
+		i32 albedo_index;
+		i32 normal_index;
+		i32 mr_index;
 		i32 _0;
 
-		glm::mat4 model;
+		glm::mat4 transform;
 
 		auto static constexpr name = str { "model_data" };
-		auto static constexpr key = hash_str("model_data");
+		auto static constexpr key = hash_str(name);
+
+		auto static constexpr binding = usize { 1 };
+	};
+
+	struct DrawIndirectDescriptor
+	{
+		vk::DrawIndexedIndirectCommand cmd;
+		u32 _0;
+		u32 _1;
+		u32 _2;
+
+		auto static constexpr name = str { "draw_indirect" };
+		auto static constexpr key = hash_str(name);
 
 		auto static constexpr binding = usize { 2 };
 	};
 
-	struct U_DrawIndirect
+	struct TexturesDescriptor
 	{
-		vk::DrawIndexedIndirectCommand cmd;
-
-		auto static constexpr name = str { "draw_indirect" };
-		auto static constexpr key = hash_str("draw_indirect");
-
+		auto static constexpr name = str { "textures" };
 		auto static constexpr binding = usize { 3 };
 	};
 
-	struct U_Textures
+	struct TextureCubesDescriptor
 	{
-		auto static constexpr name = str { "textures" };
+		auto static constexpr name = str { "texture_cubes" };
 		auto static constexpr binding = usize { 4 };
 	};
 
-	struct U_TextureCubes
-	{
-		auto static constexpr name = str { "texture_cubes" };
-		auto static constexpr binding = usize { 5 };
-	};
-
-	auto static constexpr graphics_descriptor_set_bindings_count = usize { 5 };
-	auto static constexpr compute_descriptor_set_bindings_count = usize { 4 };
+	auto static constexpr graphics_descriptor_set_bindings_count = usize { 4 };
+	auto static constexpr compute_descriptor_set_bindings_count = usize { 3 };
 
 public:
 	BasicRendergraph() = default;
@@ -159,30 +173,62 @@ public:
 	}
 
 private:
-	void upload_model_data_to_gpu();
-	void upload_indirect_data_to_gpu();
+	void setup_descriptors();
 
-	void bind_graphic_buffers(vk::CommandBuffer cmd);
+	void setup_descriptor_maps();
 
-	void stage_indirect(U_DrawIndirect *buffer_map);
+	void setup_primitives_descriptor();
+	void setup_draw_indirects_descriptor();
 
-	void update_descriptor_sets();
+	void setup_frame_descriptor_maps();
 
-	void update_for_cameras();
-	void update_for_lights();
-	void stage_model(U_ModelData *buffer_map, u32 buffer_index);
-	void update_for_skyboxes();
+	void update_frame();
 
-	void update_for_camera(TransformComponent const &transform, CameraComponent const &camera);
-	void update_for_light(TransformComponent const &transform, LightComponent const &camera);
-	void update_for_model(
-	    U_ModelData *buffer_map,
+	void update_delta_time();
+
+	void bind_graphics_buffers(vk::CommandBuffer cmd);
+
+	void stage_indirect();
+
+	void update_descriptors();
+
+	void update_cameras();
+	void update_skyboxes();
+	void update_directional_lights();
+	void update_point_lights();
+
+	void stage_static_meshes(u32 buffer_index);
+
+	void update_camera(TransformComponent const &transform, CameraComponent const &camera);
+
+	void update_directional_light(DirectionalLightComponent const &directional_light);
+
+	void update_point_light(
+	    TransformComponent const &transform,
+	    PointLightComponent const &point_light,
+	    u32 index
+	);
+
+	void stage_static_mesh(
 	    u32 buffer_index,
 	    TransformComponent const &transform,
-	    StaticMeshRendererComponent const &static_mesh,
+	    StaticMeshComponent const &static_mesh,
 	    u32 &primitive_index
 	);
-	void update_for_skybox(SkyboxComponent const &skybox);
+	void update_skybox(SkyboxComponent const &skybox);
+
+	void update_primitive_buffer(
+	    PrimitivesDescriptor &primitive,
+
+	    TransformComponent const &transform,
+	    bvk::Model::MaterialParameters const &material
+	);
+
+	void update_primitive_textures(
+	    bvk::DescriptorSet const &descriptor_set,
+	    vec<bvk::Texture> const &textures,
+	    bvk::Model::MaterialParameters material
+	);
 
 private:
 	bvk::Device *device = {};
@@ -192,9 +238,19 @@ private:
 
 	bvk::Buffer staging_buffer = {};
 
+	f32 linear = 0.09f;
+	f32 quadratic = 0.032f;
+
+	arr<FrameDescriptor *, bvk::max_frames_in_flight> frame_descriptor_maps;
+	arr<DrawIndirectDescriptor *, bvk::max_frames_in_flight> draw_indirect_descriptor_maps;
+	PrimitivesDescriptor *primitive_descriptor_map;
+	void *staging_buffer_map;
+
 	usize primitive_count = {};
 
 	u32 frame_index = {};
 	Scene *scene = {};
 	vec<vk::WriteDescriptorSet> descriptor_writes = {};
+
+	Timer timer = {};
 };

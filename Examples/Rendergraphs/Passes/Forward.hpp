@@ -76,7 +76,7 @@ private:
 	void render_static_meshes(u32 frame_index);
 	void render_skyboxes();
 
-	void render_static_mesh(StaticMeshRendererComponent const &static_mesh, u32 &primitive_index);
+	void render_static_mesh(StaticMeshComponent const &static_mesh, u32 &primitive_index);
 	void render_skybox(SkyboxComponent const &skybox);
 
 	void draw_model(bvk::Model const *model, u32 &primitive_index);

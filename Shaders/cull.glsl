@@ -1,7 +1,7 @@
 #version 460
 #pragma shader_stage(compute)
 
-#include "scene_descriptors.glsl"
+#include "global_descriptors.glsl"
 
 layout(local_size_x = 64) in;
 
@@ -36,12 +36,14 @@ void main()
 {
     const uint id = gl_GlobalInvocationID.x;
 
-    if (id > u_scene.model_count) 
+    if (id > u_frame.scene.primitive_count) 
         return;
 
-    const ModelData model = ub_models.arr[id];
-    const vec3 model_center = vec3(model.x, model.y, model.z);
+    const mat4 view_proj = u_frame.camera.view_proj;
 
-    ub_commands.arr[id].instance_count =
-        is_visible(u_camera.proj * u_camera.view, model_center, model.radius) ? 1 : 0;
+    const Primitive primitive =  ssbo_primitives.arr[id];
+    const vec3 center = vec3(primitive .x, primitive .y, primitive .z);
+
+    ssbo_indirect_commands.arr[id].instance_count = 
+        is_visible(view_proj, center, primitive.radius) ? 1 : 0;
 }

@@ -67,7 +67,7 @@ public:
 	 * @param fmt Format string passed to fmt::format
 	 * @param args Variadic arguments forwarded to fmt::format
 	 *
-	 * @warn Internal
+	 * @warning Internal
 	 */
 	template<typename... Args>
 	void log(LogLvl lvl, fmt::format_string<Args...> fmt, Args &&...args) const

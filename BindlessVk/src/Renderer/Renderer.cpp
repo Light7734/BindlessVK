@@ -14,8 +14,6 @@ Renderer::Renderer(VkContext const *const vk_context, MemoryAllocator *const mem
 {
 	create_sync_objects();
 	create_cmds(vk_context->get_gpu());
-
-	image_index = acquire_next_image_index();
 }
 
 Renderer::~Renderer()
@@ -29,16 +27,17 @@ Renderer::~Renderer()
 
 void Renderer::render_graph(RenderNode *const root_node)
 {
-	if (image_index == std::numeric_limits<u32>::max())
-		return;
+	wait_for_frame_fence();
+
+	image_index = acquire_next_image_index();
 
 	prepare_frame(root_node);
+
 	compute_frame(root_node);
 	graphics_frame(root_node);
 	present_frame();
 
 	cycle_frame_index();
-	image_index = acquire_next_image_index();
 }
 
 // 1 //
@@ -46,6 +45,7 @@ void Renderer::create_sync_objects()
 {
 	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
+		create_frame_sync_objects(i);
 		create_compute_sync_objects(i);
 		create_graphics_sync_objects(i);
 		create_present_sync_objects(i);
@@ -71,14 +71,22 @@ void Renderer::destroy_sync_objects()
 {
 	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
-		device->vk().destroyFence(compute_fences[i]);
 		device->vk().destroySemaphore(compute_semaphores[i]);
 
-		device->vk().destroyFence(graphics_fences[i]);
+		device->vk().destroyFence(frame_fences[i]);
 		device->vk().destroySemaphore(graphics_semaphores[i]);
 
 		device->vk().destroySemaphore(present_semaphores[i]);
 	}
+}
+
+void Renderer::wait_for_frame_fence()
+{
+	assert_false(
+	    device->vk().waitForFences(frame_fences[frame_index], true, std::numeric_limits<u32>::max())
+	);
+
+	device->vk().resetFences(frame_fences[frame_index]);
 }
 
 void Renderer::prepare_frame(RenderNode *const node)
@@ -89,8 +97,6 @@ void Renderer::prepare_frame(RenderNode *const node)
 
 void Renderer::compute_frame(RenderNode *const node)
 {
-	wait_for_compute_fence();
-
 	auto const cmd = compute_cmds[frame_index];
 	device->vk().resetCommandPool(compute_cmd_pools[frame_index]);
 
@@ -103,8 +109,6 @@ void Renderer::compute_frame(RenderNode *const node)
 
 void Renderer::graphics_frame(RenderNode *node)
 {
-	wait_for_graphics_fence();
-
 	auto const cmd = graphics_cmds[frame_index];
 	device->vk().resetCommandPool(graphics_cmd_pools[frame_index]);
 
@@ -152,20 +156,22 @@ auto Renderer::acquire_next_image_index() -> u32
 	return index;
 }
 
-// 2 //
-void Renderer::create_compute_sync_objects(u32 index)
+void Renderer::create_frame_sync_objects(u32 const index)
 {
-	compute_fences[index] = device->vk().createFence(vk::FenceCreateInfo {
+	frame_fences[index] = device->vk().createFence(vk::FenceCreateInfo {
+
 	    vk::FenceCreateFlagBits::eSignaled,
 	});
-	compute_semaphores[index] = device->vk().createSemaphore({});
-
 	debug_utils->set_object_name(
 	    device->vk(), //
-	    compute_fences[index],
-	    fmt::format("compute_fence_{}", index)
+	    frame_fences[index],
+	    fmt::format("graphics_fence_{}", index)
 	);
+}
 
+void Renderer::create_compute_sync_objects(u32 const index)
+{
+	compute_semaphores[index] = device->vk().createSemaphore({});
 	debug_utils->set_object_name(
 	    device->vk(),
 	    compute_semaphores[index],
@@ -173,19 +179,9 @@ void Renderer::create_compute_sync_objects(u32 index)
 	);
 }
 
-void Renderer::create_graphics_sync_objects(u32 index)
+void Renderer::create_graphics_sync_objects(u32 const index)
 {
-	graphics_fences[index] = device->vk().createFence(vk::FenceCreateInfo {
-	    vk::FenceCreateFlagBits::eSignaled,
-	});
 	graphics_semaphores[index] = device->vk().createSemaphore({});
-
-	debug_utils->set_object_name(
-	    device->vk(), //
-	    graphics_fences[index],
-	    fmt::format("graphics_fence_{}", index)
-	);
-
 	debug_utils->set_object_name(
 	    device->vk(),
 	    graphics_semaphores[index],
@@ -196,7 +192,6 @@ void Renderer::create_graphics_sync_objects(u32 index)
 void Renderer::create_present_sync_objects(u32 index)
 {
 	present_semaphores[index] = device->vk().createSemaphore({});
-
 	debug_utils->set_object_name(
 	    device->vk(),
 	    present_semaphores[index],
@@ -204,7 +199,7 @@ void Renderer::create_present_sync_objects(u32 index)
 	);
 }
 
-void Renderer::create_compute_cmds(Gpu const *const gpu, u32 index)
+void Renderer::create_compute_cmds(Gpu const *const gpu, u32 const index)
 {
 	compute_cmd_pools[index] = device->vk().createCommandPool(vk::CommandPoolCreateInfo {
 	    {},
@@ -230,7 +225,7 @@ void Renderer::create_compute_cmds(Gpu const *const gpu, u32 index)
 	);
 }
 
-void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 index)
+void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 const index)
 {
 	graphics_cmd_pools[index] = device->vk().createCommandPool(vk::CommandPoolCreateInfo {
 	    {},
@@ -308,7 +303,7 @@ void Renderer::graphics_node(RenderNode *const node, i32 depth)
 	cmd.endDebugUtilsLabelEXT();
 }
 
-auto Renderer::try_apply_node_barriers(RenderNode *node) -> bool
+auto Renderer::try_apply_node_barriers(RenderNode *const node) -> bool
 {
 	auto const cmd = graphics_cmds[frame_index];
 	auto applied_any_barriers = false;
@@ -369,7 +364,7 @@ auto Renderer::try_apply_node_barriers(RenderNode *node) -> bool
 	return applied_any_barriers;
 }
 
-void Renderer::parse_node_rendering_info(RenderNode *node)
+void Renderer::parse_node_rendering_info(RenderNode *const node)
 {
 	// alias
 	auto &info = dynamic_pass_rendering_info;
@@ -439,28 +434,6 @@ void Renderer::reset_used_attachment_states()
 		attachment->image_layout = vk::ImageLayout::eUndefined;
 		attachment->stage_mask = vk::PipelineStageFlagBits::eTopOfPipe;
 	}
-}
-
-void Renderer::wait_for_compute_fence()
-{
-	assert_false(device->vk().waitForFences(
-	    compute_fences[frame_index],
-	    true,
-	    std::numeric_limits<u32>::max()
-	));
-
-	device->vk().resetFences(compute_fences[frame_index]);
-}
-
-void Renderer::wait_for_graphics_fence()
-{
-	assert_false(device->vk().waitForFences(
-	    graphics_fences[frame_index],
-	    true,
-	    std::numeric_limits<u32>::max()
-	));
-
-	device->vk().resetFences(graphics_fences[frame_index]);
 }
 
 void Renderer::bind_node_compute_descriptors(RenderNode *const node, i32 depth)
@@ -552,7 +525,7 @@ void Renderer::submit_compute_queue()
 	        cmd,
 	        compute_semaphores[frame_index],
 	    },
-	    compute_fences[frame_index]
+	    {}
 	);
 }
 
@@ -567,7 +540,7 @@ void Renderer::submit_graphics_queue()
 	};
 
 	auto const wait_stages = vec<vk::PipelineStageFlags> {
-		vk::PipelineStageFlagBits::eDrawIndirect,
+		vk::PipelineStageFlagBits::eVertexInput,
 		vk::PipelineStageFlagBits::eColorAttachmentOutput,
 	};
 
@@ -578,7 +551,7 @@ void Renderer::submit_graphics_queue()
 	        cmd,
 	        graphics_semaphores[frame_index],
 	    },
-	    graphics_fences[frame_index]
+	    frame_fences[frame_index]
 	);
 }
 

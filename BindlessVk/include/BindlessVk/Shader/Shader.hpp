@@ -91,7 +91,7 @@ public:
 	}
 
 	/** Trivial accessor for descriptor_set_layout
-	 * @warn This will return an invalid descriptor set layout if the pipeline doesn't uses the
+	 * @warning This will return an invalid descriptor set layout if the pipeline doesn't uses the
 	 * descriptor set slot 2 (per shader descriptor set)
 	 */
 	auto get_descriptor_set_layout() const

@@ -18,66 +18,41 @@ void Forwardpass::on_setup(bvk::RenderNode *parent)
 	scene = data->scene;
 	memory_allocator = data->memory_allocator;
 
-	draw_indirect_buffer = &parent->get_buffer_inputs().at(BasicRendergraph::U_DrawIndirect::key);
+	draw_indirect_buffer = &parent->get_buffer_inputs().at(
+	    BasicRendergraph::DrawIndirectDescriptor::key
+	);
 
 	cull_pipeline = data->cull_pipeline;
 	model_pipeline = data->model_pipeline;
 	skybox_pipeline = data->skybox_pipeline;
 
-	scene->view<StaticMeshRendererComponent const>().each(
-	    [this](StaticMeshRendererComponent const &mesh) {
-		    auto model = mesh.model;
+	scene->view<StaticMeshComponent const>().each([this](StaticMeshComponent const &mesh) {
+		auto model = mesh.model;
 
-		    for (auto const *node : model->get_nodes())
-			    primitive_count += node->mesh.size();
-	    }
-	);
-
-	auto *scene_buffer = &parent->get_buffer_inputs().at(BasicRendergraph::U_SceneData::key);
-
-	{
-		auto *map = (BasicRendergraph::U_SceneData *)scene_buffer->map_block(0);
-		*map = {
-			{},
-			primitive_count,
-		};
-		scene_buffer->unmap();
-	}
-
-	{
-		auto *map = (BasicRendergraph::U_SceneData *)scene_buffer->map_block(1);
-		*map = {
-			{},
-			primitive_count,
-		};
-		scene_buffer->unmap();
-	}
-
-	{
-		auto *map = (BasicRendergraph::U_SceneData *)scene_buffer->map_block(2);
-		*map = {
-			{},
-			primitive_count,
-		};
-		scene_buffer->unmap();
-	}
+		for (auto const *node : model->get_nodes())
+			primitive_count += node->mesh.size();
+	});
 }
 
 void Forwardpass::on_frame_prepare(u32 frame_index, u32 image_index)
 {
-	static_mesh_count = scene->view<StaticMeshRendererComponent>().size();
+	static_mesh_count = scene->view<StaticMeshComponent>().size();
 }
 
 void Forwardpass::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
 {
 	ImGui::Begin("Forwardpass options");
 
-	auto dispatch_x = 1 + (static_mesh_count / 64);
-	cmd.bindPipeline(vk::PipelineBindPoint::eCompute, cull_pipeline->get_pipeline());
-
 	ImGui::Checkbox("freeze cull", &freeze_cull);
+
 	if (!freeze_cull)
-		cmd.dispatch(1, 1, 1);
+	{
+		u32 dispatch_x = 1 + (primitive_count / 64);
+		ImGui::Text("dispatches: %u", dispatch_x);
+
+		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, cull_pipeline->get_pipeline());
+		cmd.dispatch(dispatch_x, 1, 1);
+	}
 
 	ImGui::End();
 }
@@ -101,11 +76,12 @@ void Forwardpass::render_static_meshes(u32 frame_index)
 {
 	switch_pipeline(model_pipeline->get_pipeline());
 
+	ImGui::Text("primitives: %u", primitive_count);
 	cmd.drawIndexedIndirect(
 	    *draw_indirect_buffer->vk(),
 	    0,
 	    primitive_count,
-	    sizeof(BasicRendergraph::U_DrawIndirect)
+	    sizeof(BasicRendergraph::DrawIndirectDescriptor)
 	);
 }
 
@@ -117,7 +93,7 @@ void Forwardpass::render_skyboxes()
 	skyboxes.each([this](auto const &skybox) { render_skybox(skybox); });
 }
 
-void Forwardpass::render_static_mesh(StaticMeshRendererComponent const &static_mesh, u32 &index)
+void Forwardpass::render_static_mesh(StaticMeshComponent const &static_mesh, u32 &index)
 {
 	draw_model(static_mesh.model, index);
 }

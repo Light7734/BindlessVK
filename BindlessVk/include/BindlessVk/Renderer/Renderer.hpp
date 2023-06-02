@@ -42,7 +42,7 @@ public:
 	 *
 	 * @note also calls on_update for the graph's passes
 	 *
-	 * @warn may block execution to wait for the frame's fence
+	 * @warning may block execution to wait for the frame's fence
 	 */
 	void render_graph(RenderNode *root_node);
 
@@ -84,6 +84,7 @@ private:
 	void destroy_cmds();
 	void destroy_sync_objects();
 
+	void wait_for_frame_fence();
 	void prepare_frame(RenderNode *graph);
 	void compute_frame(RenderNode *graph);
 	void graphics_frame(RenderNode *graph);
@@ -92,6 +93,7 @@ private:
 	void cycle_frame_index();
 	auto acquire_next_image_index() -> u32;
 
+	void create_frame_sync_objects(u32 index);
 	void create_compute_sync_objects(u32 index);
 	void create_graphics_sync_objects(u32 index);
 	void create_present_sync_objects(u32 index);
@@ -104,9 +106,6 @@ private:
 	void graphics_node(RenderNode *graph, i32 depth);
 
 	void reset_used_attachment_states();
-
-	void wait_for_compute_fence();
-	void wait_for_graphics_fence();
 
 	void bind_node_compute_descriptors(RenderNode *node, i32 depth);
 	void bind_node_graphics_descriptors(RenderNode *node, i32 depth);
@@ -136,10 +135,10 @@ private:
 	RenderResources resources = {};
 	DynamicPassRenderingInfo dynamic_pass_rendering_info;
 
-	arr<vk::Fence, max_frames_in_flight> compute_fences = {};
+	arr<vk::Fence, max_frames_in_flight> frame_fences = {};
+
 	arr<vk::Semaphore, max_frames_in_flight> compute_semaphores = {};
 
-	arr<vk::Fence, max_frames_in_flight> graphics_fences = {};
 	arr<vk::Semaphore, max_frames_in_flight> graphics_semaphores = {};
 
 	arr<vk::Semaphore, max_frames_in_flight> present_semaphores = {};
@@ -153,7 +152,6 @@ private:
 	u32 frame_index = 0;
 	u32 image_index = std::numeric_limits<u32>::max();
 
-	// @wip
 	bool dynamic_render_pass_active = false;
 };
 

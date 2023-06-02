@@ -67,9 +67,9 @@ public:
 		Vec3f diffuse = Vec3f(1.0f);
 		Vec3f specular = Vec3f(1.0f);
 
-		i32 albedo_texture_index;
-		i32 normal_texture_index;
-		i32 metallic_roughness_texture_index;
+		i32 albedo_index;
+		i32 normal_index;
+		i32 mr_index;
 	};
 
 public:

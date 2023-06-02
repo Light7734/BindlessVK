@@ -14,12 +14,12 @@ struct TransformComponent
 	glm::vec3 scale;
 	glm::vec3 rotation;
 
-	TransformComponent(const TransformComponent &) = default;
+	TransformComponent(TransformComponent const &) = default;
 
 	TransformComponent(
-	    const glm::vec3 &translation,
-	    const glm::vec3 &scale = glm::vec3(1.0),
-	    const glm::vec3 &rotation = glm::vec3(0.0f)
+	    glm::vec3 const &translation,
+	    glm::vec3 const &scale = glm::vec3(1.0),
+	    glm::vec3 const &rotation = glm::vec3(0.0f)
 	)
 	    : translation(translation)
 	    , scale(scale)
@@ -29,9 +29,7 @@ struct TransformComponent
 
 	auto get_transform() const
 	{
-		return glm::translate(translation) * glm::rotate(rotation.x, glm::vec3(1.0f, 0.0f, 0.0f))
-		       * glm::rotate(rotation.y, glm::vec3(0.0f, 1.0f, 0.0f))
-		       * glm::rotate(rotation.z, glm::vec3(0.0f, 0.0f, 1.0f)) * glm::scale(scale);
+		return glm::translate(translation) * glm::scale(scale);
 	}
 
 	operator glm::mat4() const
@@ -40,11 +38,11 @@ struct TransformComponent
 	}
 };
 
-struct StaticMeshRendererComponent
+struct StaticMeshComponent
 {
-	StaticMeshRendererComponent(const StaticMeshRendererComponent &) = default;
+	StaticMeshComponent(StaticMeshComponent const &) = default;
 
-	StaticMeshRendererComponent(bvk::Material *material, bvk::Model *model)
+	StaticMeshComponent(bvk::Material *material, bvk::Model *model)
 	    : material(material)
 	    , model(model)
 	{
@@ -57,7 +55,7 @@ struct StaticMeshRendererComponent
 
 struct SkyboxComponent
 {
-	SkyboxComponent(const SkyboxComponent &) = default;
+	SkyboxComponent(SkyboxComponent const &) = default;
 
 	SkyboxComponent(bvk::Material *material, bvk::Texture *texture, bvk::Model *model)
 	    : material(material)
@@ -74,7 +72,7 @@ struct SkyboxComponent
 
 struct CameraComponent
 {
-	CameraComponent(const CameraComponent &) = default;
+	CameraComponent(CameraComponent const &) = default;
 
 	CameraComponent(
 	    float fov,
@@ -108,38 +106,86 @@ struct CameraComponent
 		return glm::perspective(fov, aspect_ratio, near_plane, far_plane);
 	}
 
-	auto get_view(const glm::vec3 &position) const
+	auto get_view(glm::vec3 const &translation) const
 	{
-		return glm::lookAt(position, position + front, up);
+		return glm::lookAt(translation, translation + front, up);
 	}
 
-	float fov;
+	auto get_view_projection(glm::vec3 const &translation) const
+	{
+		return get_projection() * get_view(translation);
+	}
 
-	float width;
-	float aspect_ratio;
+	f32 fov;
 
-	float near_plane;
-	float far_plane;
+	f32 width;
+	f32 aspect_ratio;
 
-	double yaw;
-	double pitch;
+	f32 near_plane;
+	f32 far_plane;
+
+	f64 yaw;
+	f64 pitch;
 
 	glm::vec3 front;
 	glm::vec3 up;
 
-	float speed;
+	f32 speed;
 };
 
-struct LightComponent
+struct DirectionalLightComponent
 {
-	LightComponent(const LightComponent &) = default;
+	DirectionalLightComponent(DirectionalLightComponent const &) = default;
 
-	LightComponent(uint32_t b): a(b)
+	DirectionalLightComponent(
+	    glm::vec4 const &direction,
+	    glm::vec4 const &ambient,
+	    glm::vec4 const &diffuse,
+	    glm::vec4 const &specular
+	)
+	    : direction(direction)
+	    , ambient(ambient)
+	    , diffuse(diffuse)
+	    , specular(specular)
 	{
 	}
 
-	// components can't have no size
-	uint32_t a;
+	glm::vec4 direction;
+
+	glm::vec4 ambient;
+	glm::vec4 diffuse;
+	glm::vec4 specular;
+};
+
+struct PointLightComponent
+{
+	PointLightComponent(PointLightComponent const &) = default;
+
+	PointLightComponent(
+	    f32 constant,
+	    f32 linear,
+	    f32 quadratic,
+	    glm::vec4 const &ambient,
+	    glm::vec4 const &diffuse,
+	    glm::vec4 const &specular
+	)
+	    : constant(constant)
+	    , linear(linear)
+	    , quadratic(quadratic)
+	    , ambient(ambient)
+	    , diffuse(diffuse)
+	    , specular(specular)
+	{
+	}
+
+	f32 constant;
+	f32 linear;
+	f32 quadratic;
+	f32 _0;
+
+	glm::vec4 ambient;
+	glm::vec4 diffuse;
+	glm::vec4 specular;
 };
 
 struct CullViewComponent

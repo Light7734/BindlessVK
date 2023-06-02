@@ -72,27 +72,28 @@ public:
 	 *
 	 * @param block_index Index of the block to offset the pointer to the beginning of
 	 *
-	 * @warn Don't map twice without unmapping
+	 * @warning Don't map twice without unmapping
 	 */
 	[[nodiscard]] void *map_block(u32 block_index);
 
-	/** Maps the buffer and zeroes it, then returns an offseted pointer to the beginning of a block
+	/** Maps the buffer and zeroes a block of it, then returns a pointer to the beginning of the
+	 * block
 	 *
 	 * @param block_index Index of the block to offset the pointer to the beginning of
 	 *
-	 * @warn Don't map twice without unmapping
+	 * @warning Don't map twice without unmapping
 	 */
 	[[nodiscard]] void *map_block_zeroed(u32 block_index);
 
-	/** Maps the buffer and returns offseted pointers to the beginning of the blocks
+	/** Maps the buffer and returns offseted pointers to the beginning of its blocks
 	 *
-	 * @warn Don't map twice without unmapping
+	 * @warning Don't map twice without unmapping
 	 */
 	[[nodiscard]] auto map_all() -> vec<void *>;
 
-	/** Maps the buffer and zeroes it, then returns offseted pointers to the beginning of the blocks
+	/** Maps the buffer and zeroes it, then returns pointers to the beginning of its blocks
 	 *
-	 * @warn Don't map twice without unmapping
+	 * @warning Don't map twice without unmapping
 	 */
 	[[nodiscard]] auto map_all_zeroed() -> vec<void *>;
 

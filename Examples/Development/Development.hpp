@@ -17,6 +17,7 @@
 #include "Rendergraphs/Passes/UserInterface.hpp"
 
 #include <imgui.h>
+#include <random>
 
 // @todo: load stuff from files
 class DevelopmentExampleApplication: public Application
@@ -40,7 +41,13 @@ private:
 	Forwardpass forward_pass = {};
 	UserInterfacePass user_interface_pass = {};
 
+	std::uniform_int_distribution<u32> dst_0_100;
+	std::uniform_int_distribution<u32> dst_0_max;
+
+	std::mt19937 rng;
+
 private:
+	void setup_rng();
 	void load_shaders();
 
 	void load_graphics_pipelines();
@@ -53,6 +60,14 @@ private:
 	void load_models();
 
 	void load_entities();
+
+	void load_cameras();
+	void load_skyboxes();
+
+	void load_directional_lights();
+	void load_point_lights();
+
+	void load_static_meshes();
 
 	auto create_render_graph_blueprint() -> bvk::RenderNodeBlueprint;
 

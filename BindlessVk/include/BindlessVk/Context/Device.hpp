@@ -38,7 +38,7 @@ public:
 	 * @param func A function that writes to a command buffer
 	 * @param queue Which queue to submit the commands to (graphics/compute)
 	 *
-	 * @warn Blocks the execution to wait for the graphics queue to finish executing the
+	 * @warning Blocks the execution to wait for the graphics queue to finish executing the
 	 * submitted workload
 	 */
 	void immediate_submit(

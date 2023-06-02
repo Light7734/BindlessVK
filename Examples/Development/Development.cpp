@@ -5,6 +5,8 @@
 
 DevelopmentExampleApplication::DevelopmentExampleApplication()
 {
+	setup_rng();
+
 	load_shaders();
 	load_pipeline_configuration();
 	load_graphics_pipelines();
@@ -31,8 +33,15 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	camera_controller.update();
 	renderer.render_graph(&render_graph);
 
+
 	if (renderer.is_swapchain_invalid())
 		assert_fail("swapchain-recreation is currently nuked");
+}
+void DevelopmentExampleApplication ::setup_rng()
+{
+	rng.seed(std::random_device()());
+	dst_0_100 = std::uniform_int_distribution<u32>(0, 100);
+	dst_0_max = std::uniform_int_distribution<u32>();
 }
 
 void DevelopmentExampleApplication::load_shaders()
@@ -307,57 +316,30 @@ void DevelopmentExampleApplication::load_models()
 	);
 }
 
-// @todo: Load from files instead of hard-coding
 void DevelopmentExampleApplication::load_entities()
 {
-	auto const test_model_entity = scene.create();
+	scene.reserve(64'000);
+
+	load_cameras();
+	load_skyboxes();
+	load_directional_lights();
+	load_point_lights();
+	load_static_meshes();
+}
+
+void DevelopmentExampleApplication::load_cameras()
+{
+	auto const entity = scene.create();
 
 	scene.emplace<TransformComponent>(
-	    test_model_entity,
-	    glm::vec3(10.0, 200.0, -5.0),
-	    glm::vec3(30.0),
-	    glm::vec3(0.0f, 0.0, 0.0)
-	);
-
-	scene.emplace<StaticMeshRendererComponent>(
-	    test_model_entity,
-	    &materials.at(hash_str("opaque_mesh")),
-	    &models.at(hash_str("flight_helmet"))
-	);
-
-	auto const skybox_entity = scene.create();
-	scene.emplace<TransformComponent>(
-	    skybox_entity,
-	    glm::vec3(0.0f),
-	    glm::vec3(1.0f),
-	    glm::vec3(0.0f, 0.0, 0.0)
-	);
-
-	scene.emplace<SkyboxComponent>(
-	    skybox_entity,
-	    &materials.at(hash_str("skybox")),
-	    &textures.at(hash_str("default_texture_cube")),
-	    &models.at(hash_str("skybox"))
-	);
-
-	auto const light_entity = scene.create();
-	scene.emplace<TransformComponent>(
-	    light_entity,
-	    glm::vec3(50.0f, 50.0f, 1.0f),
-	    glm::vec3(1.0f),
-	    glm::vec3(0.0f, 0.0, 0.0)
-	);
-
-	auto const camera_entity = scene.create();
-	scene.emplace<TransformComponent>(
-	    camera_entity,
-	    glm::vec3(6.0, 7.0, 2.5),
+	    entity,
+	    glm::vec3(50.0, 50.0, 50.0),
 	    glm::vec3(1.0),
 	    glm::vec3(0.0f, 0.0, 0.0)
 	);
 
 	scene.emplace<CameraComponent>(
-	    camera_entity,
+	    entity,
 	    45.0f,
 	    5.0,
 	    1.0,
@@ -367,10 +349,121 @@ void DevelopmentExampleApplication::load_entities()
 	    0.0,
 	    glm::vec3(0.0f, 0.0f, -1.0f),
 	    glm::vec3(0.0f, -1.0f, 0.0f),
-	    10.0f
+	    100.0f
 	);
+}
 
-	scene.emplace<LightComponent>(light_entity, 12);
+void DevelopmentExampleApplication::load_skyboxes()
+{
+	auto const entity = scene.create();
+
+	scene.emplace<SkyboxComponent>(
+	    entity,
+	    &materials.at(hash_str("skybox")),
+	    &textures.at(hash_str("default_texture_cube")),
+	    &models.at(hash_str("skybox"))
+	);
+}
+
+
+void DevelopmentExampleApplication::load_directional_lights()
+{
+	auto const entity = scene.create();
+
+	scene.emplace<DirectionalLightComponent>(
+	    entity,
+	    glm::vec4(-0.2, -1.0, -3.0, 0.0),
+	    glm::vec4(0.05, 0.05, 0.05, 0.0),
+	    glm::vec4(0.4, 0.4, 0.4, 0.0),
+	    glm::vec4(0.5, 0.5, 0.5, 0.0)
+	);
+}
+
+void DevelopmentExampleApplication::load_point_lights()
+{
+	for (u32 i = 0; i < BasicRendergraph::PointLight::max_count; ++i)
+	{
+		auto const entity = scene.create();
+
+		auto const x = dst_0_100(rng);
+		auto const y = dst_0_100(rng);
+		auto const z = dst_0_100(rng);
+
+		scene.emplace<TransformComponent>(
+		    entity,
+		    glm::vec3(x, y, z),
+		    glm::vec3(1.0f),
+		    glm::vec3(0.0f, 0.0, 0.0)
+		);
+
+		scene.emplace<PointLightComponent>(
+		    entity,
+		    1.0f,
+		    0.09f,
+		    0.032f,
+		    glm::vec4(0.05),
+		    glm::vec4(0.8),
+		    glm::vec4(1.0)
+		);
+
+		scene.emplace<StaticMeshComponent>(
+		    entity,
+		    &materials.at(hash_str("opaque_mesh")),
+		    &models.at(hash_str("skybox"))
+		);
+	}
+}
+
+void DevelopmentExampleApplication::load_static_meshes()
+{
+	auto const floor_tile_size = 5;
+	for (u32 x = 0; x < 50; ++x)
+	{
+		for (u32 y = 0; y < 50; ++y)
+		{
+			auto const entity = scene.create();
+
+			scene.emplace<TransformComponent>(
+			    entity,
+			    glm::vec3(x * 11, -100.0, y * 11),
+			    glm::vec3(floor_tile_size),
+			    glm::vec3(0.0f, 0.0, 0.0)
+			);
+
+			scene.emplace<StaticMeshComponent>(
+			    entity,
+			    &materials.at(hash_str("opaque_mesh")),
+			    &models.at(hash_str("skybox"))
+			);
+		}
+	}
+
+
+	for (u32 a = 0; a < 15; ++a)
+	{
+		for (u32 b = 0; b < 15; ++b)
+		{
+			auto const entity = scene.create();
+
+			auto const x = dst_0_100(rng);
+			auto const y = dst_0_100(rng);
+			auto const z = dst_0_100(rng);
+
+
+			scene.emplace<TransformComponent>(
+			    entity,
+			    glm::vec3(x, y, z),
+			    glm::vec3(10.0),
+			    glm::vec3(0.0f, 0.0, 0.0)
+			);
+
+			scene.emplace<StaticMeshComponent>(
+			    entity,
+			    &materials.at(hash_str("opaque_mesh")),
+			    &models.at(hash_str("flight_helmet"))
+			);
+		}
+	}
 }
 
 auto DevelopmentExampleApplication::create_forward_pass_blueprint() -> bvk::RenderNodeBlueprint
@@ -509,9 +602,9 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	    .set_sample_count(sample_count)
 
 	    .add_buffer_input({
-	        BasicRendergraph::U_FrameData::name,
-	        BasicRendergraph::U_FrameData::key,
-	        sizeof(BasicRendergraph::U_FrameData),
+	        BasicRendergraph::FrameDescriptor::name,
+	        BasicRendergraph::FrameDescriptor::key,
+	        sizeof(BasicRendergraph::FrameDescriptor),
 	        vk::BufferUsageFlagBits::eUniformBuffer,
 	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame,
 	        vma::AllocationCreateInfo {
@@ -522,7 +615,7 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                {
-	                    BasicRendergraph::U_FrameData::binding,
+	                    BasicRendergraph::FrameDescriptor::binding,
 	                    vk::DescriptorType::eUniformBuffer,
 	                    1,
 	                    vk::ShaderStageFlagBits::eCompute,
@@ -532,51 +625,19 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 
 	                vk::PipelineBindPoint::eGraphics,
 	                {
-	                    BasicRendergraph::U_FrameData::binding,
+	                    BasicRendergraph::FrameDescriptor::binding,
 	                    vk::DescriptorType::eUniformBuffer,
 	                    1,
-	                    vk::ShaderStageFlagBits::eVertex,
+	                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
 	                },
 	            },
 	        },
 	    })
 
 	    .add_buffer_input({
-	        BasicRendergraph::U_SceneData::name,
-	        BasicRendergraph::U_SceneData::key,
-	        sizeof(BasicRendergraph::U_SceneData),
-	        vk::BufferUsageFlagBits::eUniformBuffer,
-	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame,
-	        vma::AllocationCreateInfo {
-	            vma::AllocationCreateFlagBits::eHostAccessSequentialWrite,
-	            vma::MemoryUsage::eAutoPreferDevice,
-	        },
-	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
-	            {
-	                vk::PipelineBindPoint::eCompute,
-	                {
-	                    BasicRendergraph::U_SceneData::binding,
-	                    vk::DescriptorType::eUniformBuffer,
-	                    1,
-	                    vk::ShaderStageFlagBits::eCompute,
-	                },
-	            },
-	            {
-	                vk::PipelineBindPoint::eGraphics,
-	                {
-	                    BasicRendergraph::U_SceneData::binding,
-	                    vk::DescriptorType::eUniformBuffer,
-	                    1,
-	                    vk::ShaderStageFlagBits::eVertex,
-	                },
-	            },
-	        },
-	    })
-
-	    .add_buffer_input({
-	        BasicRendergraph::U_ModelData::name,
-	        BasicRendergraph::U_ModelData::key,
-	        sizeof(BasicRendergraph::U_ModelData) * 1'000,
+	        BasicRendergraph::PrimitivesDescriptor::name,
+	        BasicRendergraph::PrimitivesDescriptor::key,
+	        sizeof(BasicRendergraph::PrimitivesDescriptor) * 64'000 * 3,
 	        vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	        bvk::RenderNodeBlueprint::BufferInput::UpdateFrequency::eSingular,
 	        vma::AllocationCreateInfo {
@@ -587,7 +648,7 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                {
-	                    BasicRendergraph::U_ModelData::binding,
+	                    BasicRendergraph::PrimitivesDescriptor::binding,
 	                    vk::DescriptorType::eStorageBuffer,
 	                    1,
 	                    vk::ShaderStageFlagBits::eCompute,
@@ -596,7 +657,7 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	            {
 	                vk::PipelineBindPoint::eGraphics,
 	                {
-	                    BasicRendergraph::U_ModelData::binding,
+	                    BasicRendergraph::PrimitivesDescriptor::binding,
 	                    vk::DescriptorType::eStorageBuffer,
 	                    1,
 	                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
@@ -606,9 +667,9 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	    })
 
 	    .add_buffer_input({
-	        BasicRendergraph::U_DrawIndirect::name,
-	        BasicRendergraph::U_DrawIndirect::key,
-	        sizeof(BasicRendergraph::U_DrawIndirect) * 6 * 3,
+	        BasicRendergraph::DrawIndirectDescriptor::name,
+	        BasicRendergraph::DrawIndirectDescriptor::key,
+	        sizeof(BasicRendergraph::DrawIndirectDescriptor) * 64'000 * 3,
 
 	        vk::BufferUsageFlagBits::eTransferDst         //
 	            | vk::BufferUsageFlagBits::eTransferSrc   //
@@ -626,7 +687,7 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	            {
 	                vk::PipelineBindPoint::eCompute,
 	                vk::DescriptorSetLayoutBinding {
-	                    BasicRendergraph::U_DrawIndirect::binding,
+	                    BasicRendergraph::DrawIndirectDescriptor::binding,
 	                    vk::DescriptorType::eStorageBuffer,
 	                    1,
 	                    vk::ShaderStageFlagBits::eCompute,
@@ -636,13 +697,13 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	    })
 
 	    .add_texture_input({
-	        BasicRendergraph::U_Textures::name,
+	        BasicRendergraph::TexturesDescriptor::name,
 	        &textures.at(hash_str("default_texture")),
 	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eGraphics,
 	                vk::DescriptorSetLayoutBinding {
-	                    BasicRendergraph::U_Textures::binding,
+	                    BasicRendergraph::TexturesDescriptor::binding,
 	                    vk::DescriptorType::eCombinedImageSampler,
 	                    10'000,
 	                    vk::ShaderStageFlagBits::eFragment,
@@ -652,13 +713,13 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	    })
 
 	    .add_texture_input({
-	        BasicRendergraph::U_TextureCubes::name,
+	        BasicRendergraph::TextureCubesDescriptor::name,
 	        &textures.at(hash_str("default_texture_cube")),
 	        vec<bvk::RenderNodeBlueprint::DescriptorInfo> {
 	            {
 	                vk::PipelineBindPoint::eGraphics,
 	                vk::DescriptorSetLayoutBinding {
-	                    BasicRendergraph::U_TextureCubes::binding,
+	                    BasicRendergraph::TextureCubesDescriptor::binding,
 	                    vk::DescriptorType::eCombinedImageSampler,
 	                    1'000,
 	                    vk::ShaderStageFlagBits::eFragment,
