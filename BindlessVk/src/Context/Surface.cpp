@@ -26,19 +26,19 @@ void Surface::select_best_surface_format(
 {
 	auto const supported_formats = gpu->vk().getSurfaceFormatsKHR(surface);
 
-	auto selected_surface_format = supported_formats[0]; // default
+	u32 high_score = 0;
+	color_format = supported_formats[0].format;
+	color_space = supported_formats[0].colorSpace;
+
 	for (auto const &format : supported_formats)
 	{
-		if (format.format == vk::Format::eB8G8R8A8Srgb &&
-		    format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear)
+		if (u32 new_score = calculate_format_score(format); new_score > high_score)
 		{
-			selected_surface_format = format;
-			break;
+			high_score = new_score;
+			color_format = format.format;
+			color_space = format.colorSpace;
 		}
 	}
-
-	color_format = selected_surface_format.format;
-	color_space = selected_surface_format.colorSpace;
 }
 
 void Surface::select_best_present_mode(
@@ -47,11 +47,18 @@ void Surface::select_best_present_mode(
 )
 {
 	auto const supported_present_modes = gpu->vk().getSurfacePresentModesKHR(surface);
-	present_mode = supported_present_modes[0]; // default
 
-	for (auto const &supported_present_mode : supported_present_modes)
-		if (present_mode == vk::PresentModeKHR::eFifo)
-			present_mode = supported_present_mode;
+	u32 high_score = 0;
+	present_mode = supported_present_modes[0];
+
+	for (auto const &mode : supported_present_modes)
+	{
+		if (u32 new_score = calculate_present_mode(mode); new_score > high_score)
+		{
+			high_score = new_score;
+			present_mode = mode;
+		}
+	}
 }
 
 void Surface::select_best_depth_format(Gpu const *const gpu)

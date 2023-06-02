@@ -117,7 +117,7 @@ void Application::create_vk_context()
 		[this]() { return window.get_framebuffer_size(); },
 
 		[](vk::PresentModeKHR present_mode) {
-		    if (present_mode == vk::PresentModeKHR::eFifo)
+		    if (present_mode == vk::PresentModeKHR::eMailbox)
 			    return 10'000;
 
 		    return 0;
