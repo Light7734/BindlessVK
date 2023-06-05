@@ -6,19 +6,6 @@ LayoutAllocator::LayoutAllocator(VkContext const *const context): device(context
 {
 }
 
-LayoutAllocator::LayoutAllocator(LayoutAllocator &&other)
-{
-	*this = std::move(other);
-}
-
-LayoutAllocator &LayoutAllocator::operator=(LayoutAllocator &&other)
-{
-	this->device = other.device;
-	other.device = {};
-
-	return *this;
-}
-
 LayoutAllocator::~LayoutAllocator()
 {
 	if (!device)

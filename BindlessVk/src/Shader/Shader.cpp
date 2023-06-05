@@ -13,7 +13,6 @@ ShaderPipeline::ShaderPipeline(
 )
     : device(vk_context->get_device())
     , surface(vk_context->get_surface())
-    , debug_utils(vk_context->get_debug_utils())
     , layout_allocator(layout_allocator)
     , debug_name(debug_name)
 {
@@ -55,12 +54,7 @@ void ShaderPipeline::create_descriptor_set_layout(vec<Shader *> const &shaders)
 	        vk::DescriptorBindingFlagBits::ePartiallyBound
 	    )
 	);
-
-	debug_utils->set_object_name(
-	    device->vk(),
-	    descriptor_set_layout.vk(),
-	    fmt::format("{}_descriptor_set_layout", debug_name)
-	);
+	device->set_object_name(descriptor_set_layout.vk(), "{}_descriptor_set_layout", debug_name);
 }
 
 void ShaderPipeline::create_pipeline_layout(
@@ -74,12 +68,7 @@ void ShaderPipeline::create_pipeline_layout(
 	    pass_descriptor_set_layout,  // set = 1 -> per pass
 	    this->descriptor_set_layout  // set = 2 -> per shader
 	);
-
-	debug_utils->set_object_name(
-	    device->vk(),
-	    pipeline_layout,
-	    fmt::format("{}_pipeline_layout", debug_name)
-	);
+	device->set_object_name(pipeline_layout, "{}_pipeline_layout", debug_name);
 }
 
 void ShaderPipeline::create_graphics_pipeline(
@@ -139,8 +128,7 @@ void ShaderPipeline::create_graphics_pipeline(
 	assert_false(result);
 	pipeline = graphics_pipeline;
 
-	debug_utils
-	    ->set_object_name(device->vk(), pipeline, fmt::format("{}_graphics_pipeline", debug_name));
+	device->set_object_name(pipeline, "{}_graphics_pipeline", debug_name);
 }
 
 void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
@@ -162,8 +150,7 @@ void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
 	assert_false(result);
 	pipeline = compute_pipeline;
 
-	debug_utils
-	    ->set_object_name(device->vk(), pipeline, fmt::format("{}_compute_pipeline", debug_name));
+	device->set_object_name(pipeline, "{}_compute_pipeline", debug_name);
 }
 
 auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const

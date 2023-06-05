@@ -16,7 +16,6 @@ public:
 		bvk::FragmentedBuffer *vertex_buffer;
 		bvk::FragmentedBuffer *index_buffer;
 		bvk::MemoryAllocator const *memory_allocator;
-		bvk::DebugUtils *debug_utils;
 	};
 
 	struct DirectionalLight
@@ -234,7 +233,6 @@ private:
 	bvk::Device *device = {};
 	bvk::FragmentedBuffer *vertex_buffer = {};
 	bvk::FragmentedBuffer *index_buffer = {};
-	bvk::DebugUtils *debug_util = {};
 
 	bvk::Buffer staging_buffer = {};
 

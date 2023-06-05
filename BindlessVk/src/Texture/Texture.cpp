@@ -1,5 +1,7 @@
 #include "BindlessVk/Texture/Texture.hpp"
 
+#include "Amender/Logger.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 Texture::~Texture()
@@ -84,8 +86,7 @@ void Texture::transition_layout(
 
 	else
 	{
-		debug_utils->log(
-		    LogLvl::eError,
+		log_err(
 		    "Texture transition layout to/from unexpected layout(s) \n {} -> {}",
 		    static_cast<i32>(current_layout),
 		    static_cast<i32>(new_layout)

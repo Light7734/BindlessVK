@@ -1,5 +1,6 @@
 #include "Development/Development.hpp"
 
+#include <Amender/Logger.hpp>
 #include <optional>
 #include <span>
 
@@ -30,6 +31,8 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	ImGui::ShowDemoWindow();
 	CVar::draw_imgui_editor();
 
+	Logger::show_imgui_window();
+
 	camera_controller.update();
 	renderer.render_graph(&render_graph);
 
@@ -58,7 +61,7 @@ void DevelopmentExampleApplication::load_shaders()
 			continue;
 
 		shaders[hash_str(name)] = shader_loader.load_from_spv(path);
-		logger.log(spdlog::level::trace, "Loaded shader {}", name);
+		log_trc("Loaded shader {}", name);
 	}
 }
 
@@ -381,7 +384,7 @@ void DevelopmentExampleApplication::load_directional_lights()
 
 void DevelopmentExampleApplication::load_point_lights()
 {
-	for (u32 i = 0; i < BasicRendergraph::PointLight::max_count; ++i)
+	for (u32 i = 0; i < 6; ++i)
 	{
 		auto const entity = scene.create();
 
@@ -575,7 +578,6 @@ auto DevelopmentExampleApplication::create_render_graph_blueprint() -> bvk::Rend
 	graph_user_data.vertex_buffer = &vertex_buffer;
 	graph_user_data.index_buffer = &index_buffer;
 	graph_user_data.memory_allocator = &memory_allocator;
-	graph_user_data.debug_utils = &debug_utils;
 
 	blueprint.set_derived_object(&render_graph)
 	    .set_user_data(std::make_any<BasicRendergraph::UserData *>(&graph_user_data))

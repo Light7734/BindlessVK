@@ -1,10 +1,52 @@
 #include "BindlessVk/Model/Loaders/GltfLoader.hpp"
 
+#include "Amender/Logger.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 
-#include <fmt/format.h>
-
 namespace BINDLESSVK_NAMESPACE {
+
+auto static mat4_from_f64ptr(f64 const *const ptr) -> mat4
+{
+	auto mat = mat4 {};
+	for (usize i = 0; i < 4 * 4; ++i)
+		mat[i] = ptr[i];
+
+	return mat;
+}
+
+auto static vec3_from_f64ptr(f64 const *const ptr) -> vec3
+{
+	auto vec = vec3 {};
+	for (usize i = 0; i < 3; ++i)
+		vec[i] = ptr[i];
+
+	return vec;
+}
+
+void static translate(mat4 &mat, vec3 v)
+{
+	mat[3 * 4 + 0] += v[0];
+	mat[3 * 4 + 1] += v[1];
+	mat[3 * 4 + 2] += v[2];
+}
+
+void static scale(mat4 &mat, vec3 v)
+{
+	mat[0 * 4 + 0] *= v[0];
+	mat[0 * 4 + 1] *= v[0];
+	mat[0 * 4 + 2] *= v[0];
+	mat[0 * 4 + 3] *= v[0];
+
+	mat[1 * 4 + 0] *= v[1];
+	mat[1 * 4 + 1] *= v[1];
+	mat[1 * 4 + 2] *= v[1];
+	mat[1 * 4 + 3] *= v[1];
+
+	mat[2 * 4 + 0] *= v[2];
+	mat[2 * 4 + 1] *= v[2];
+	mat[2 * 4 + 2] *= v[2];
+	mat[2 * 4 + 3] *= v[2];
+}
 
 GltfLoader::GltfLoader(
     VkContext const *const vk_context,
@@ -45,8 +87,6 @@ auto GltfLoader::load_from_ascii(str_view const file_path, str_view const debug_
 
 void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 {
-	auto *const debug_utils = vk_context->get_debug_utils();
-
 	tinygltf::TinyGLTF gltf_context;
 	str err, warn;
 
@@ -59,7 +99,7 @@ void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 	);
 
 	if (!warn.empty())
-		debug_utils->log(LogLvl::eWarn, "gltf warning -> ", warn);
+		log_wrn("gltf warning -> ", warn);
 }
 
 void GltfLoader::load_textures()
@@ -91,9 +131,9 @@ void GltfLoader::load_material_parameters()
 		);
 
 		model.material_parameters.push_back({
-		    Vec3f(1.0),
-		    Vec3f(1.0),
-		    Vec3f(1.0),
+		    vec3 { 1.0f },
+		    vec3 { 1.0f },
+		    vec3 { 1.0f },
 		    material.values["baseColorTexture"].TextureIndex(),
 		    material.normalTexture.index,
 		    material.values["metallicRoughnessTexture"].TextureIndex(),
@@ -180,20 +220,30 @@ void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::No
 
 void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_primitive)
 {
-	auto const *position_buffer = get_primitive_attribute_buffer(gltf_primitive, "POSITION");
-	auto const *normal_buffer = get_primitive_attribute_buffer(gltf_primitive, "NORMAL");
-	auto const *tangent_buffer = get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
-	auto const *uv_buffer = get_primitive_attribute_buffer(gltf_primitive, "TEXCOORD_0");
+	auto const *position_buffer =
+	    (vec3 const *)get_primitive_attribute_buffer(gltf_primitive, "POSITION");
+
+	auto const *normal_buffer =
+	    (vec3 const *)get_primitive_attribute_buffer(gltf_primitive, "NORMAL");
+
+	auto const *tangent_buffer =
+	    (vec3 const *)get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
+
+	auto const *uv_buffer =
+	    (vec2 const *)(get_primitive_attribute_buffer(gltf_primitive, "TEXCOORD_0"));
 
 	auto primitive_vertex_count = get_primitive_vertex_count(gltf_primitive);
 
 	for (auto v = 0; v < primitive_vertex_count; ++v)
 	{
+		auto const [x, y, z] = tangent_buffer ? tangent_buffer[v] : vec3 { 0.0f };
+		auto const mag = sqrt(x * x + y * y + z * z);
+
 		vertex_map[vertex_count] = {
-			Vec3f(&position_buffer[v * 3]),
-			normal_buffer ? Vec3f(normal_buffer[v * 3]) : Vec3f(0.0f),
-			tangent_buffer ? Vec3f(&tangent_buffer[v * 3]).unit() : Vec3f(0.0f),
-			uv_buffer ? Vec2f(&uv_buffer[v * 2]) : Vec2f(0.0f),
+			position_buffer[v],
+			normal_buffer ? normal_buffer[v] : vec3 { 0.0f },
+			tangent_buffer ? vec3 { x / mag, y / mag, z / mag } : vec3 { 0.0f },
+			uv_buffer ? uv_buffer[v] : vec2 { 0.0f },
 		};
 
 		++vertex_count;
@@ -245,9 +295,9 @@ auto GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive &gltf_pri
 }
 
 auto GltfLoader::get_primitive_attribute_buffer(
-    const tinygltf::Primitive &gltf_primitive,
+    tinygltf::Primitive const &gltf_primitive,
     str_view const attribute_name
-) -> const f32 *
+) -> f32 const *
 {
 	auto const &it = gltf_primitive.attributes.find(attribute_name.data());
 	if (it == gltf_primitive.attributes.end())
@@ -275,35 +325,35 @@ auto GltfLoader::get_primitive_vertex_count(const tinygltf::Primitive &gltf_prim
 	return gltf_model.accessors[it->second].count;
 }
 
-auto GltfLoader::get_primitive_index_count(const tinygltf::Primitive &gltf_primitive) -> usize
+auto GltfLoader::get_primitive_index_count(tinygltf::Primitive const &gltf_primitive) -> usize
 {
 	return gltf_model.accessors[gltf_primitive.indices].count;
 }
 
-void GltfLoader::set_initial_node_transform(const tinygltf::Node &gltf_node, Model::Node *node)
+void GltfLoader::set_initial_node_transform(tinygltf::Node const &gltf_node, Model::Node *node)
 {
 	if (!gltf_node.matrix.empty())
-		node->transform = Mat4f(gltf_node.matrix.data());
+		node->transform = mat4_from_f64ptr(gltf_node.matrix.data());
 
 	else
 	{
 		if (!gltf_node.translation.empty())
-			node->transform.translate(Vec3f(gltf_node.translation.data()));
+			translate(node->transform, vec3_from_f64ptr(gltf_node.translation.data()));
 
-		if (!gltf_node.rotation.empty())
-			node->transform *= Mat4f(Vec4f(gltf_node.rotation.data()));
+		// We don't support rotation yet
+		// if (!gltf_node.rotation.empty())
 
 		if (!gltf_node.scale.empty())
-			node->transform.scale(Vec3f(gltf_node.scale.data()));
+			scale(node->transform, vec3_from_f64ptr(gltf_node.scale.data()));
 	}
 }
 
-auto GltfLoader::node_has_any_children(const tinygltf::Node &gltf_node) -> bool
+auto GltfLoader::node_has_any_children(tinygltf::Node const &gltf_node) -> bool
 {
 	return gltf_node.children.size() > 1;
 }
 
-auto GltfLoader::node_has_any_mesh(const tinygltf::Node &gltf_node) -> bool
+auto GltfLoader::node_has_any_mesh(tinygltf::Node const &gltf_node) -> bool
 {
 	return gltf_node.mesh > -1;
 }

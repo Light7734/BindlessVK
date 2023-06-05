@@ -1,7 +1,6 @@
 #include "Development.hpp"
 
-#include <Framework/Common/Common.hpp>
-#include <iostream>
+#include <Amender/Logger.hpp>
 
 /** The entry point */
 int main(int argc, char *argv[])
@@ -17,18 +16,16 @@ int main(int argc, char *argv[])
 
 			application.on_tick(delta_timer.elapsed_time());
 			delta_timer.reset();
-
-			// @todo: Handle swapchain invalidation
 		}
 	}
-	catch (bvk::BindlessVkException bvkException)
+	catch (bvk::BindlessVkException exception)
 	{
-		std::cout << "Bvk exception failed: " << bvkException.what() << std::endl;
+		log_crt("Uncaught BindlessVkException: {}", exception.what());
 		return 1;
 	}
 	catch (std::exception exception)
 	{
-		std::cout << "exception failed: " << exception.what() << std::endl;
+		log_crt("Uncaught exception: {}", exception.what());
 		return 2;
 	}
 

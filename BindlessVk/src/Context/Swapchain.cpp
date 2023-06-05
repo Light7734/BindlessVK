@@ -5,7 +5,6 @@ namespace BINDLESSVK_NAMESPACE {
 Swapchain::Swapchain(VkContext const *const vk_context)
     : device(vk_context->get_device())
     , surface(vk_context->get_surface())
-    , debug_utils(vk_context->get_debug_utils())
     , queues(vk_context->get_queues())
     , invalid(false)
 {
@@ -85,17 +84,8 @@ void Swapchain::set_object_names()
 {
 	for (u32 i = 0; i < get_image_count(); ++i)
 	{
-		debug_utils->set_object_name(
-		    device->vk(), // You're doing great <3
-		    images[i],
-		    fmt::format("swap_chain_image_{}", i)
-		);
-
-		debug_utils->set_object_name(
-		    device->vk(),
-		    image_views[i],
-		    fmt::format("swapchain_image_view_{}", i)
-		);
+		device->set_object_name(images[i], "swap_chain_image_{}", i);
+		device->set_object_name(image_views[i], "swapchain_image_view_{}", i);
 	}
 }
 

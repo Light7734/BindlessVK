@@ -1,8 +1,10 @@
 #include "BindlessVk/Context/Queues.hpp"
 
+#include "Amender/Logger.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
-Queues::Queues(Device *device, Gpu *gpu, DebugUtils *debug_utils)
+Queues::Queues(Device *device, Gpu *gpu)
     : compute_index(gpu->get_compute_queue_index())
     , graphics_index(gpu->get_graphics_queue_index())
     , present_index(gpu->get_present_queue_index())
@@ -11,9 +13,9 @@ Queues::Queues(Device *device, Gpu *gpu, DebugUtils *debug_utils)
     , graphics(device->vk().getQueue(graphics_index, 0))
     , present(device->vk().getQueue(present_index, 0))
 {
-	debug_utils->log(LogLvl::eInfo, "compute queue index: {}", compute_index);
-	debug_utils->log(LogLvl::eInfo, "graphics queue index: {}", graphics_index);
-	debug_utils->log(LogLvl::eInfo, "present queue index: {}", present_index);
+	log_inf("compute queue index: {}", compute_index);
+	log_inf("graphics queue index: {}", graphics_index);
+	log_inf("present queue index: {}", present_index);
 }
 
 } // namespace BINDLESSVK_NAMESPACE

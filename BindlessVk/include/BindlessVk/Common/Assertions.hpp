@@ -1,7 +1,6 @@
 #include "BindlessVk/Common/Aliases.hpp"
 
 #include <exception>
-#include <fmt/format.h>
 #include <type_traits>
 
 namespace BINDLESSVK_NAMESPACE {
@@ -40,7 +39,7 @@ void inline throw_exception(Expr const &expr, str_view msg)
 	auto what = str { msg };
 
 	if constexpr (is_static_castable<Expr, int>())
-		what = fmt::format("{} - expr({})", msg, int(expr));
+		what = std::format("{} - expr({})", msg, int(expr));
 
 	throw BindlessVkException(what);
 }
@@ -53,9 +52,9 @@ void inline throw_exception(Expr const &expr, str_view msg)
  * @param args Arguments of the message
  */
 template<typename... Args>
-void inline assert_fail(fmt::format_string<Args...> fmt = "", Args &&...args)
+void inline assert_fail(std::format_string<Args...> fmt = "", Args &&...args)
 {
-	details::throw_exception(0, fmt::format(fmt, std::forward<Args>(args)...));
+	details::throw_exception(0, std::format(fmt, std::forward<Args>(args)...));
 }
 
 /** Throws bindlessvk exception if @a expr evaluates to false
@@ -65,10 +64,10 @@ void inline assert_fail(fmt::format_string<Args...> fmt = "", Args &&...args)
  * @param args Arguments of the message
  */
 template<typename Expr, typename... Args>
-void inline assert_true(Expr const &expr, fmt::format_string<Args...> fmt = "", Args &&...args)
+void inline assert_true(Expr const &expr, std::format_string<Args...> fmt = "", Args &&...args)
 {
 	if (!static_cast<bool>(expr))
-		details::throw_exception(expr, fmt::format(fmt, std::forward<Args>(args)...));
+		details::throw_exception(expr, std::format(fmt, std::forward<Args>(args)...));
 }
 
 /** Throws bindlessvk exception if @a expr evaluates to true
@@ -78,10 +77,10 @@ void inline assert_true(Expr const &expr, fmt::format_string<Args...> fmt = "", 
  * @param args Arguments of the message
  */
 template<typename Expr, typename... Args>
-void inline assert_false(Expr const &expr, fmt::format_string<Args...> fmt = "", Args &&...args)
+void inline assert_false(Expr const &expr, std::format_string<Args...> fmt = "", Args &&...args)
 {
 	if (static_cast<bool>(expr))
-		details::throw_exception(expr, fmt::format(fmt, std::forward<Args>(args)...));
+		details::throw_exception(expr, std::format(fmt, std::forward<Args>(args)...));
 }
 
 } // namespace BINDLESSVK_NAMESPACE

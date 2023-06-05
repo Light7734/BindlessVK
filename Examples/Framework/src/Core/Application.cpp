@@ -20,12 +20,7 @@ Application::Application()
 	create_user_interface();
 
 	camera_controller = { &scene, &window };
-	staging_pool = {
-		3,
-		1024u * 1024u * 256u,
-		&vk_context,
-		&memory_allocator,
-	};
+	staging_pool = { 3, 1024u * 1024u * 256u, &vk_context, &memory_allocator };
 
 	create_loaders();
 	load_default_textures();
@@ -62,21 +57,11 @@ void Application::create_window()
 void Application::create_vk_context()
 {
 	instance = {
-		{
+		bvk::Instance::Requirements {
 		    get_instance_extensions(),
 		    get_instance_layers(),
 		},
-	};
-
-	debug_utils = {
-		&instance,
-
-		bvk::DebugUtils::Callback {
-		    &Logger::bindlessvk_callback,
-		    std::make_any<Logger const *const>(&logger),
-		},
-
-		bvk::DebugUtils::Filter {
+		bvk::Instance::Filter {
 		    vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
 		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
 		        | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
@@ -134,9 +119,9 @@ void Application::create_vk_context()
 
 	device = { &gpu };
 
-	queues = { &device, &gpu, &debug_utils };
+	queues = { &device, &gpu };
 
-	vk_context = { &instance, &debug_utils, &surface, &gpu, &queues, &device };
+	vk_context = { &instance, &surface, &gpu, &queues, &device };
 }
 
 void Application::create_allocators()

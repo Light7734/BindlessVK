@@ -1,9 +1,5 @@
 #pragma once
 
-//
-#include "Framework/Utils/Logger.hpp"
-//
-
 #include "BindlessVk/Allocators/Descriptors/DescriptorAllocator.hpp"
 #include "BindlessVk/Allocators/LayoutAllocator.hpp"
 #include "BindlessVk/Allocators/MemoryAllocator.hpp"
@@ -32,11 +28,7 @@ public:
 	virtual void on_swapchain_recreate() = 0;
 
 public:
-	Logger logger = {};
-
 	bvk::Instance instance = {};
-
-	bvk::DebugUtils debug_utils = {};
 
 	bvk::Gpu gpu = {};
 	bvk::Surface::WindowSurface window_surface = {};

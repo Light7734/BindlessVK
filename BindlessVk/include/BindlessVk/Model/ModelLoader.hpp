@@ -2,7 +2,6 @@
 
 #include "BindlessVk/Allocators/MemoryAllocator.hpp"
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Context/DebugUtils.hpp"
 #include "BindlessVk/Context/VkContext.hpp"
 #include "BindlessVk/Model/Model.hpp"
 #include "BindlessVk/Texture/TextureLoader.hpp"

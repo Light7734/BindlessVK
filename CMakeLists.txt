@@ -15,6 +15,7 @@ OPTION(SPIRV_REFLECT_EXAMPLES OFF)
 
 add_subdirectory(Vendor/)
 
+add_subdirectory(Amender/)
 add_subdirectory(AssetBaker/)
 add_subdirectory(AssetParser/)
 add_subdirectory(BindlessVk/)

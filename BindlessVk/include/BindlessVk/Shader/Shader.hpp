@@ -133,7 +133,6 @@ private:
 	tidy_ptr<Device const> device = {};
 
 	Surface const *surface = {};
-	DebugUtils const *debug_utils = {};
 	LayoutAllocator *layout_allocator = {};
 
 	vk::Pipeline pipeline = {};

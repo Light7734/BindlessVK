@@ -1,5 +1,7 @@
 #include "BindlessVk/Buffers/Buffer.hpp"
 
+#include "Amender/Logger.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 Buffer::Buffer(
@@ -38,7 +40,7 @@ Buffer::Buffer(
 	};
 
 	memory_allocator->vma().setAllocationName(allocation, this->debug_name.c_str());
-	vk_context->get_debug_utils()->set_object_name(device->vk(), buffer, this->debug_name);
+	device->set_object_name(buffer, "{}", this->debug_name);
 }
 
 Buffer::~Buffer()
@@ -46,8 +48,11 @@ Buffer::~Buffer()
 	if (!device)
 		return;
 
+	device->vk().waitIdle();
+
 	auto const &[buffer, allocation] = allocated_buffer;
 
+	unmap();
 	memory_allocator->vma().destroyBuffer(buffer, allocation);
 }
 
@@ -57,8 +62,11 @@ void Buffer::write_data(
     u32 const block_index
 )
 {
-	memcpy(map_block(block_index), src_data, src_data_size);
-	unmap();
+	if (auto *map = map_block(block_index))
+	{
+		memcpy(map, src_data, src_data_size);
+		unmap();
+	}
 }
 
 void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_copy)
@@ -67,6 +75,20 @@ void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_co
 		auto &[buffer, allocation] = allocated_buffer;
 		cmd.copyBuffer(*src_buffer.vk(), buffer, 1u, &src_copy);
 	});
+}
+
+auto Buffer::map_memory() -> u8 *
+{
+	if (mapped)
+	{
+		log_err("Failed to map a previously mapped buffer: {}", debug_name);
+		return {};
+	}
+
+	mapped = true;
+
+	auto &[buffer, allocation] = allocated_buffer;
+	return (u8 *)memory_allocator->vma().mapMemory(allocation);
 }
 
 void Buffer::calculate_block_size(Gpu const *const gpu)
@@ -81,49 +103,58 @@ void Buffer::calculate_block_size(Gpu const *const gpu)
 
 void *Buffer::map_block(u32 const block_index)
 {
-	auto &[buffer, allocation] = allocated_buffer;
-	auto const map = (u8 *)memory_allocator->vma().mapMemory(allocation);
-	return map + (block_size * block_index);
+	if (auto *map = map_memory())
+		return map + (block_size * block_index);
+
+	return {};
 }
 
 auto Buffer::map_all() -> vec<void *>
 {
-	auto maps = vec<void *>(block_count);
+	if (auto const map = map_memory())
+		return blockify_all_map(map);
 
-	auto &[buffer, allocation] = allocated_buffer;
-	auto const vk_map = (u8 *)memory_allocator->vma().mapMemory(allocation);
-
-	for (u32 i = 0; i < block_count; ++i)
-		maps[i] = vk_map + (block_size * i);
-
-	return maps;
+	return {};
 }
 
 auto Buffer::map_all_zeroed() -> vec<void *>
 {
+	if (auto const map = map_memory())
+	{
+		memset(map, {}, block_size * block_count);
+		return blockify_all_map(map);
+	}
+
+	return {};
+}
+
+auto Buffer::blockify_all_map(u8 *map) -> vec<void *>
+{
 	auto maps = vec<void *>(block_count);
-
-	auto &[buffer, allocation] = allocated_buffer;
-	auto const vk_map = (u8 *)memory_allocator->vma().mapMemory(allocation);
-
-	memset(vk_map, {}, block_size * block_count);
-
 	for (u32 i = 0; i < block_count; ++i)
-		maps[i] = vk_map + (block_size * i);
+		maps[i] = map + (block_size * i);
 
 	return maps;
 }
 
 void *Buffer::map_block_zeroed(u32 const block_index)
 {
-	auto map = map_block(block_index);
-	memset(map, {}, get_block_size());
-	return map;
+	if (auto map = map_block(block_index))
+	{
+		memset(map, {}, get_block_size());
+		return map;
+	}
+
+	return {};
 }
 
-void Buffer::unmap() const
+void Buffer::unmap()
 {
+	if (!mapped)
+		return;
+
 	auto &[buffer, allocation] = allocated_buffer;
+	mapped = false;
 
 	memory_allocator->vma().unmapMemory(allocation);
 }

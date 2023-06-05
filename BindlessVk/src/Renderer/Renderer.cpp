@@ -1,6 +1,6 @@
 #include "BindlessVk/Renderer/Renderer.hpp"
 
-#include <fmt/format.h>
+#include <csignal>
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -8,7 +8,6 @@ Renderer::Renderer(VkContext const *const vk_context, MemoryAllocator *const mem
     : device(vk_context->get_device())
     , surface(vk_context->get_surface())
     , queues(vk_context->get_queues())
-    , debug_utils(vk_context->get_debug_utils())
     , swapchain(vk_context)
     , resources(vk_context, memory_allocator, &swapchain)
 {
@@ -162,41 +161,25 @@ void Renderer::create_frame_sync_objects(u32 const index)
 
 	    vk::FenceCreateFlagBits::eSignaled,
 	});
-	debug_utils->set_object_name(
-	    device->vk(), //
-	    frame_fences[index],
-	    fmt::format("graphics_fence_{}", index)
-	);
+	device->set_object_name(frame_fences[index], "graphics_fence_{}", index);
 }
 
 void Renderer::create_compute_sync_objects(u32 const index)
 {
 	compute_semaphores[index] = device->vk().createSemaphore({});
-	debug_utils->set_object_name(
-	    device->vk(),
-	    compute_semaphores[index],
-	    fmt::format("compute_semaphores_{}", index)
-	);
+	device->set_object_name(compute_semaphores[index], "compute_semaphores_{}", index);
 }
 
 void Renderer::create_graphics_sync_objects(u32 const index)
 {
 	graphics_semaphores[index] = device->vk().createSemaphore({});
-	debug_utils->set_object_name(
-	    device->vk(),
-	    graphics_semaphores[index],
-	    fmt::format("graphics_semaphore{}", index)
-	);
+	device->set_object_name(graphics_semaphores[index], "graphics_semaphore{}", index);
 }
 
 void Renderer::create_present_sync_objects(u32 index)
 {
 	present_semaphores[index] = device->vk().createSemaphore({});
-	debug_utils->set_object_name(
-	    device->vk(),
-	    present_semaphores[index],
-	    fmt::format("present_semaphore_{}", index)
-	);
+	device->set_object_name(present_semaphores[index], "present_semaphore_{}", index);
 }
 
 void Renderer::create_compute_cmds(Gpu const *const gpu, u32 const index)
@@ -205,24 +188,14 @@ void Renderer::create_compute_cmds(Gpu const *const gpu, u32 const index)
 	    {},
 	    gpu->get_compute_queue_index(),
 	});
-
-	debug_utils->set_object_name(
-	    device->vk(), // :D
-	    compute_cmd_pools[index],
-	    fmt::format("compute_cmd_pool_{}", index)
-	);
+	device->set_object_name(compute_cmd_pools[index], "compute_cmd_pool_{}", index);
 
 	compute_cmds[index] = device->vk().allocateCommandBuffers({
 	    compute_cmd_pools[index],
 	    vk::CommandBufferLevel::ePrimary,
 	    1u,
 	})[0];
-
-	debug_utils->set_object_name(
-	    device->vk(),
-	    compute_cmds[index],
-	    fmt::format("compute_cmd_buffer_{}", index)
-	);
+	device->set_object_name(compute_cmds[index], "compute_cmd_buffer_{}", index);
 }
 
 void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 const index)
@@ -232,11 +205,7 @@ void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 const index)
 	    gpu->get_graphics_queue_index(),
 	});
 
-	debug_utils->set_object_name(
-	    device->vk(), // :D
-	    graphics_cmd_pools[index],
-	    fmt::format("graphics_cmd_pool_{}", index)
-	);
+	device->set_object_name(graphics_cmd_pools[index], "graphics_cmd_pool_{}", index);
 
 	graphics_cmds[index] = device->vk().allocateCommandBuffers({
 	    graphics_cmd_pools[index],
@@ -244,11 +213,7 @@ void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 const index)
 	    1u,
 	})[0];
 
-	debug_utils->set_object_name(
-	    device->vk(),
-	    graphics_cmds[index],
-	    fmt::format("graphics_cmd_buffer_{}", index)
-	);
+	device->set_object_name(graphics_cmds[index], "graphics_cmd_buffer_{}", index);
 }
 
 void Renderer::prepare_node(RenderNode *const node)
@@ -511,8 +476,12 @@ void Renderer::apply_backbuffer_barrier()
 	cmd.endDebugUtilsLabelEXT();
 }
 
+#define PROFILE_SCOPE()
+
 void Renderer::submit_compute_queue()
 {
+	PROFILE_SCOPE();
+
 	auto const compute_queue = queues->get_compute();
 	auto const cmd = compute_cmds[frame_index];
 	auto const wait_semaphores = vec<vk::Semaphore> {};
@@ -531,6 +500,8 @@ void Renderer::submit_compute_queue()
 
 void Renderer::submit_graphics_queue()
 {
+	PROFILE_SCOPE();
+
 	auto const graphics_queue = queues->get_graphics();
 	auto const cmd = graphics_cmds[frame_index];
 

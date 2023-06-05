@@ -55,6 +55,8 @@ public:
 
 	/** Copies data over to the buffer
 	 *
+	 * @warning Fails if the buffer has an active map
+	 *
 	 * @param src_data Source data
 	 * @param src_data_size Size of the source data in bytes
 	 * @param block_index Index of buffer's block to copy the data to
@@ -74,7 +76,7 @@ public:
 	 *
 	 * @warning Don't map twice without unmapping
 	 */
-	[[nodiscard]] void *map_block(u32 block_index);
+	auto map_block(u32 block_index) -> void *;
 
 	/** Maps the buffer and zeroes a block of it, then returns a pointer to the beginning of the
 	 * block
@@ -83,23 +85,23 @@ public:
 	 *
 	 * @warning Don't map twice without unmapping
 	 */
-	[[nodiscard]] void *map_block_zeroed(u32 block_index);
+	auto map_block_zeroed(u32 block_index) -> void *;
 
 	/** Maps the buffer and returns offseted pointers to the beginning of its blocks
 	 *
 	 * @warning Don't map twice without unmapping
 	 */
-	[[nodiscard]] auto map_all() -> vec<void *>;
+	auto map_all() -> vec<void *>;
 
 	/** Maps the buffer and zeroes it, then returns pointers to the beginning of its blocks
 	 *
 	 * @warning Don't map twice without unmapping
 	 */
-	[[nodiscard]] auto map_all_zeroed() -> vec<void *>;
+	auto map_all_zeroed() -> vec<void *>;
 
 
 	/** Unmaps a buffer, can be called without prior mapping */
-	void unmap() const;
+	void unmap();
 
 	/** Returns null terminated str view to debug_name */
 	auto get_name() const
@@ -150,6 +152,10 @@ public:
 	}
 
 private:
+	auto map_memory() -> u8 *;
+
+	auto blockify_all_map(u8 *map) -> vec<void *>;
+
 	void calculate_block_size(Gpu const *gpu);
 
 private:
@@ -165,6 +171,8 @@ private:
 	u32 block_count = {};
 
 	vk::DescriptorBufferInfo descriptor_info = {};
+
+	bool mapped = {};
 
 	str debug_name = {};
 };

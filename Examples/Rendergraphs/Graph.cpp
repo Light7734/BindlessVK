@@ -6,6 +6,7 @@
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
 
+#include <Amender/Logger.hpp>
 #include <imgui.h>
 
 BasicRendergraph::BasicRendergraph(bvk::VkContext const *const vk_context)
@@ -20,7 +21,6 @@ void BasicRendergraph::on_setup(RenderNode *const parent)
 	scene = data->scene;
 	vertex_buffer = data->vertex_buffer;
 	index_buffer = data->index_buffer;
-	debug_util = data->debug_utils;
 
 	staging_buffer = bvk::Buffer {
 		vk_context,
@@ -67,7 +67,7 @@ void BasicRendergraph::setup_primitives_descriptor()
 	for (auto i = u32 { 0 }; i < bvk::max_frames_in_flight; ++i)
 		stage_static_meshes(i);
 
-	debug_util->log(bvk::LogLvl::eInfo, "Primitive count: {}", primitive_count);
+	log_inf("Primitive count: {}", primitive_count);
 	model_buffer.write_buffer(
 	    staging_buffer,
 	    vk::BufferCopy {
@@ -222,7 +222,7 @@ void BasicRendergraph::update_point_lights()
 		update_point_light(transform, light, index++);
 	});
 
-	frame_descriptor_maps[frame_index]->render_scene.point_light_count = 16;
+	frame_descriptor_maps[frame_index]->render_scene.point_light_count = 6;
 }
 
 void BasicRendergraph::update_camera(
@@ -271,12 +271,7 @@ void BasicRendergraph::update_point_light(
 {
 	if (index > PointLight::max_count)
 	{
-		debug_util->log(
-		    bvk::LogLvl::eWarn,
-		    "Point lights exceed max count: index({})> max({})",
-		    index,
-		    PointLight::max_count
-		);
+		log_wrn("Point lights exceed max count: index({})> max({})", index, PointLight::max_count);
 
 		return;
 	}

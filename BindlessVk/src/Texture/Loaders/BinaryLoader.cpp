@@ -12,7 +12,6 @@ BinaryLoader::BinaryLoader(
     , staging_buffer(staging_buffer)
 {
 	texture.device = device;
-	texture.debug_utils = vk_context->get_debug_utils();
 	texture.memory_allocator = memory_allocator;
 }
 

@@ -1,6 +1,7 @@
 #include "Framework/Core/Window.hpp"
 
 #define GLFW_INCLUDE_VULKAN
+#include <Amender/Logger.hpp>
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.hpp>
 
@@ -8,7 +9,7 @@ Window::Window(Specs const &specs, vec<pair<i32, i32>> const &hints)
     : specs(std::make_unique<Specs>(specs))
 {
 	glfwSetErrorCallback([](int code, char const *str) {
-		fmt::print(stdout, "Glfw error ({}): {}\n", code, str);
+		log_err("Glfw error ({}): {}\n", code, str);
 	});
 
 	assert_true(glfwInit(), "Failed to initalize glfw");

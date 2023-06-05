@@ -2,7 +2,6 @@
 
 #include "Framework/Common/Aliases.hpp"
 
-#include <fmt/format.h>
 #include <source_location>
 
 // same as BindlessVK, w/out being inside a namespace
@@ -21,14 +20,14 @@ struct FrameworkException: std::exception
 };
 
 template<typename Expr, typename... Args>
-void inline assert_true(const Expr &expr, fmt::format_string<Args...> fmt = "", Args &&...args)
+void inline assert_true(const Expr &expr, std::format_string<Args...> fmt = "", Args &&...args)
 {
 	if (!static_cast<bool>(expr)) [[unlikely]]
-		throw FrameworkException(fmt::format(fmt, std::forward<Args>(args)...));
+		throw FrameworkException(std::format(fmt, std::forward<Args>(args)...));
 }
 
 template<typename T, typename... Args>
-void inline assert_false(const T &expr, fmt::format_string<Args...> fmt = "", Args &&...args)
+void inline assert_false(const T &expr, std::format_string<Args...> fmt = "", Args &&...args)
 {
 	assert_true(!static_cast<bool>(expr), fmt, std::forward<Args>(args)...);
 }
@@ -46,7 +45,7 @@ void inline assert_nq(const Expr1 &expr1, const Expr2 &expr2, Args &&...args)
 }
 
 template<typename... Args>
-void inline assert_fail(fmt::format_string<Args...> fmt, Args &&...args)
+void inline assert_fail(std::format_string<Args...> fmt, Args &&...args)
 {
-	throw FrameworkException(fmt::format(fmt, std::forward<Args>(args)...));
+	throw FrameworkException(std::format(fmt, std::forward<Args>(args)...));
 }

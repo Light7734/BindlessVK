@@ -170,7 +170,6 @@ private:
 private:
 	tidy_ptr<Device> device = {};
 	Surface *surface = {};
-	DebugUtils *debug_utils = {};
 	MemoryAllocator *memory_allocator = {};
 
 	vec<AttachmentContainer> containers = {};

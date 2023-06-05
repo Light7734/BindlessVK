@@ -8,6 +8,11 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
+using mat4 = arr<f32, 4 * 4>;
+using vec4 = arr<f32, 4>;
+using vec3 = arr<f32, 3>;
+using vec2 = arr<f32, 2>;
+
 /** Holds 3d mesh data
  *
  * The constructor is private, you need to use the friended loader classes to constrruct models
@@ -19,13 +24,13 @@ public:
 	friend class GltfLoader;
 
 public:
-	/** Holds attibutes of points-in-space to represent a geometric shape in gpu */
+	/** Holds attibutes of points-in-space to represent a geometric shape */
 	struct Vertex
 	{
-		Vec3f position;
-		Vec3f normal;
-		Vec3f tangent;
-		Vec2f uv;
+		vec3 position;
+		vec3 normal;
+		vec3 tangent;
+		vec2 uv;
 
 		auto static get_attributes() -> arr<vk::VertexInputAttributeDescription, 4>;
 		auto static get_bindings() -> arr<vk::VertexInputBindingDescription, 1>;
@@ -57,15 +62,15 @@ public:
 		vec<Node *> children;
 
 		vec<Primitive> mesh;
-		Mat4f transform;
+		mat4 transform;
 	};
 
 	/** Parameters that affect the shading of models */
 	struct MaterialParameters
 	{
-		Vec3f albedo = Vec3f(1.0f);
-		Vec3f diffuse = Vec3f(1.0f);
-		Vec3f specular = Vec3f(1.0f);
+		vec3 albedo = { 1.0f };
+		vec3 diffuse = { 1.0f };
+		vec3 specular = { 1.0f };
 
 		i32 albedo_index;
 		i32 normal_index;

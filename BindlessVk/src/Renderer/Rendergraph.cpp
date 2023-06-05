@@ -1,8 +1,7 @@
 #include "BindlessVk/Renderer/Rendergraph.hpp"
 
+#include "Amender/Logger.hpp"
 #include "BindlessVk/Texture/Texture.hpp"
-
-#include <fmt/format.h>
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -13,7 +12,6 @@ RenderGraphBuilder::RenderGraphBuilder(
 )
     : vk_context(vk_context)
     , device(vk_context->get_device())
-    , debug_utils(vk_context->get_debug_utils())
     , memory_allocator(memory_allocator)
     , descriptor_allocator(descriptor_allocator)
 {
@@ -102,7 +100,7 @@ void RenderGraphBuilder::build_node_buffer_inputs(RenderNodeBlueprint const &nod
 
 void RenderGraphBuilder::build_node_texture_inputs(RenderNodeBlueprint const &node_blueprint)
 {
-	debug_utils->log(LogLvl::eWarn, "Texture inputs are not supported (yet)");
+	log_wrn("Texture inputs are not supported (yet)");
 }
 
 void RenderGraphBuilder::build_node_descriptors(RenderNodeBlueprint const &node_blueprint)
@@ -328,10 +326,9 @@ void RenderGraphBuilder::build_node_compute_descriptors(
 	    bindings,
 	    &extended_info,
 	});
-	debug_utils->set_object_name(
-	    device->vk(),
+	device->set_object_name(
 	    node->compute_descriptor_set_layout,
-	    fmt::format("graph_compute_descriptor_set_layout")
+	    "graph_compute_descriptor_set_layout"
 	);
 
 	// pipeline layout
@@ -339,12 +336,7 @@ void RenderGraphBuilder::build_node_compute_descriptors(
 	    {},
 	    node->compute_descriptor_set_layout,
 	});
-
-	debug_utils->set_object_name(
-	    device->vk(),
-	    node->compute_pipeline_layout,
-	    fmt::format("graph_compute_pipeline_layout")
-	);
+	device->set_object_name(node->compute_pipeline_layout, "graph_compute_pipeline_layout");
 
 	// descriptor sets
 	if (!bindings.empty())
@@ -357,10 +349,10 @@ void RenderGraphBuilder::build_node_compute_descriptors(
 			    node->compute_descriptor_set_layout
 
 			);
-			debug_utils->set_object_name(
-			    device->vk(),
+			device->set_object_name(
 			    node->compute_descriptor_sets.back().vk(),
-			    fmt::format("graph_compute_descriptor_set_{}", i)
+			    "graph_compute_descriptor_set_{}",
+			    i
 			);
 		}
 	}
@@ -383,10 +375,9 @@ void RenderGraphBuilder::build_node_graphics_descriptors(
 	    bindings,
 	    &extended_info,
 	});
-	debug_utils->set_object_name(
-	    device->vk(),
+	device->set_object_name(
 	    node->graphics_descriptor_set_layout,
-	    fmt::format("graph_graphics_descriptor_set_layout")
+	    "graph_graphics_descriptor_set_layout"
 	);
 
 	// pipeline layout
@@ -395,11 +386,7 @@ void RenderGraphBuilder::build_node_graphics_descriptors(
 	        {},
 	        node->graphics_descriptor_set_layout,
 	    });
-	debug_utils->set_object_name(
-	    device->vk(),
-	    node->graphics_pipeline_layout,
-	    fmt::format("graph_graphics_pipeline_layout")
-	);
+	device->set_object_name(node->graphics_pipeline_layout, "graph_graphics_pipeline_layout");
 
 	// descriptor sets
 	if (!bindings.empty())
@@ -412,10 +399,10 @@ void RenderGraphBuilder::build_node_graphics_descriptors(
 			    node->graphics_descriptor_set_layout
 			);
 
-			debug_utils->set_object_name(
-			    device->vk(),
+			device->set_object_name(
 			    node->graphics_descriptor_sets.back().vk(),
-			    fmt::format("graph_graphics_descriptor_set_{}", i)
+			    "graph_graphics_descriptor_set_{}",
+			    i
 			);
 		}
 	}

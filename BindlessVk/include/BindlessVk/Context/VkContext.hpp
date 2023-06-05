@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Context/DebugUtils.hpp"
 #include "BindlessVk/Context/Device.hpp"
 #include "BindlessVk/Context/Gpu.hpp"
 #include "BindlessVk/Context/Instance.hpp"
@@ -22,20 +21,12 @@ public:
 	/** Argumented constructor
 	 *
 	 * @param instance The vulkan instance wrapper
-	 * @param debug_utils The debug utils wrapper
 	 * @param surface The vulkan surface wrapper
 	 * @param gpu The vulkan physical device wrapper
 	 * @param queues The vulkan queues wrapper
 	 * @param device The vulkan device wrapper
 	 */
-	VkContext(
-	    Instance *instance,
-	    DebugUtils *debug_utils,
-	    Surface *surface,
-	    Gpu *gpu,
-	    Queues *queues,
-	    Device *device
-	);
+	VkContext(Instance *instance, Surface *surface, Gpu *gpu, Queues *queues, Device *device);
 
 	/** Destructor */
 	~VkContext();
@@ -44,12 +35,6 @@ public:
 	auto get_instance() const
 	{
 		return instance;
-	}
-
-	/** Trivial accessor for debug_utils */
-	auto get_debug_utils() const
-	{
-		return debug_utils;
 	}
 
 	/** Trivial accessor for device */
@@ -84,7 +69,6 @@ public:
 
 private:
 	Instance *instance = {};
-	DebugUtils *debug_utils = {};
 	Device *device = {};
 	Surface *surface = {};
 	Gpu *gpu = {};

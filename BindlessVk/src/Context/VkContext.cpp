@@ -4,16 +4,8 @@
 
 namespace BINDLESSVK_NAMESPACE {
 
-VkContext::VkContext(
-    Instance *instance,
-    DebugUtils *debug_utils,
-    Surface *surface,
-    Gpu *gpu,
-    Queues *queues,
-    Device *device
-)
+VkContext::VkContext(Instance *instance, Surface *surface, Gpu *gpu, Queues *queues, Device *device)
     : instance(instance)
-    , debug_utils(debug_utils)
     , surface(surface)
     , gpu(gpu)
     , queues(queues)

@@ -147,7 +147,6 @@ private:
 	VkContext const *vk_context = {};
 
 	Device const *device = {};
-	DebugUtils const *debug_utils = {};
 
 	MemoryAllocator const *memory_allocator = {};
 	DescriptorAllocator *descriptor_allocator = {};

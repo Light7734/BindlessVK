@@ -123,7 +123,6 @@ private:
 
 	tidy_ptr<Device const> device = {};
 
-	DebugUtils const *debug_utils = {};
 	MemoryAllocator const *memory_allocator = {};
 
 	Image image = {};

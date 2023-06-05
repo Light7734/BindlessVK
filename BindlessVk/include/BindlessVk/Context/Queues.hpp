@@ -1,7 +1,6 @@
 #pragma once
 
 #include "BindlessVk/Common/Common.hpp"
-#include "BindlessVk/Context/DebugUtils.hpp"
 #include "BindlessVk/Context/Device.hpp"
 #include "BindlessVk/Context/Gpu.hpp"
 
@@ -19,7 +18,7 @@ public:
 	 * @param device The device
 	 * @param gpu The selected gpu
 	 */
-	Queues(Device *device, Gpu *gpu, DebugUtils *debug_utils);
+	Queues(Device *device, Gpu *gpu);
 
 	/** Default destructor */
 	~Queues() = default;

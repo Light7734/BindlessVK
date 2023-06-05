@@ -37,11 +37,11 @@ public:
 	 */
 	LayoutAllocator(VkContext const *vk_context);
 
-	/** Move constuctor */
-	LayoutAllocator(LayoutAllocator &&other);
+	/** Default move constructor */
+	LayoutAllocator(LayoutAllocator &&other) = default;
 
-	/** Move assignment opeator */
-	LayoutAllocator &operator=(LayoutAllocator &&other);
+	/** Default move assignment opeator */
+	LayoutAllocator &operator=(LayoutAllocator &&other) = default;
 
 	/** Deleted copy constructor */
 	LayoutAllocator(LayoutAllocator const &) = delete;
@@ -82,7 +82,7 @@ private:
 	) -> u64;
 
 private:
-	Device *device = {};
+	tidy_ptr<Device> device = {};
 
 	hash_map<u64, vk::DescriptorSetLayout> descriptor_set_layouts = {};
 	hash_map<u64, vk::PipelineLayout> pipeline_layouts = {};

@@ -2,9 +2,9 @@
 
 /* windows */
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <Windows.h>
-    #undef NOMINMAX
+	#define NOMINMAX
+	#include <Windows.h>
+	#undef NOMINMAX
 #endif
 
 /* containers */
@@ -25,6 +25,7 @@
 #include <utility>
 
 /* input/output */
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <sstream>

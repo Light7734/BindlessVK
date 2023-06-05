@@ -20,7 +20,7 @@ StagingPool::StagingPool(
 		    },
 		    size,
 		    1u,
-		    fmt::format("staging_buffer_{}", i),
+		    std::format("staging_buffer_{}", i),
 		});
 }
 

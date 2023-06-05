@@ -12,7 +12,6 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/Buffer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Buffers/FragmentedBuffer.cpp
 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/DebugUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Device.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Gpu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Context/Instance.cpp
@@ -53,12 +52,13 @@ target_include_directories(
     BindlessVk
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
+    PRIVATE ${CMAKE_SOURCE_DIR}/Amender/include
+
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/tinygltf/
-    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/fmt/include
 )
 
 target_link_libraries(
@@ -68,8 +68,7 @@ target_link_libraries(
     PRIVATE ktx
     PRIVATE tinygltf
     PRIVATE spirv-reflect-static
-    PRIVATE spdlog
-    PRIVATE fmt
+    PRIVATE Amender
 )
 
 target_precompile_headers(

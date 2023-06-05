@@ -88,7 +88,6 @@ private:
 
 	Surface const *surface = {};
 	Queues const *queues = {};
-	DebugUtils const *debug_utils = {};
 
 	vk::SwapchainKHR swapchain = {};
 

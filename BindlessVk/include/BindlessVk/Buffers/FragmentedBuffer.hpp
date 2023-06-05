@@ -75,8 +75,6 @@ public:
 	void return_fragment(Fragment returned_fragment);
 
 private:
-	DebugUtils *debug_utils = {};
-
 	Type type = {};
 
 	vec<Fragment> fragments = {};

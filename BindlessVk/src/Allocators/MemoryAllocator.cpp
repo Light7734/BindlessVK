@@ -1,5 +1,7 @@
 #include "BindlessVk/Allocators/MemoryAllocator.hpp"
 
+#include "Amender/Logger.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 void MemoryAllocator::allocate_memory_callback(
@@ -10,14 +12,7 @@ void MemoryAllocator::allocate_memory_callback(
     void *const VMA_NULLABLE vma_user_data
 )
 {
-	auto const [callback, user_data] = *static_cast<DebugUtils::Callback *>(vma_user_data);
-
-	callback(
-	    DebugCallbackSource::eVma,
-	    LogLvl::eTrace,
-	    fmt::format("Allocate: {}", size),
-	    user_data
-	);
+	log_trc("Allocate: {}", size);
 }
 
 void MemoryAllocator::free_memory_callback(
@@ -28,15 +23,13 @@ void MemoryAllocator::free_memory_callback(
     void *const VMA_NULLABLE vma_user_data
 )
 {
-	auto const [callback, user_data] = *static_cast<DebugUtils::Callback *>(vma_user_data);
-	callback(DebugCallbackSource::eVma, LogLvl::eTrace, fmt::format("Free: {}", size), user_data);
+	log_trc("Free: {}", size);
 }
 
 
 MemoryAllocator::MemoryAllocator(VkContext const *vk_context)
 {
 	auto const gpu = vk_context->get_gpu();
-	auto const debug_utils = vk_context->get_debug_utils();
 	auto const device = vk_context->get_device();
 	auto const instance = vk_context->get_instance();
 
@@ -72,7 +65,7 @@ MemoryAllocator::MemoryAllocator(VkContext const *vk_context)
 	auto const device_memory_callbacks = vma::DeviceMemoryCallbacks {
 		&allocate_memory_callback,
 		&free_memory_callback,
-		debug_utils->get_callback(),
+		{},
 	};
 
 	auto const allocator_info = vma::AllocatorCreateInfo(

@@ -13,7 +13,6 @@ KtxLoader::KtxLoader(
     , staging_buffer(staging_buffer)
 {
 	texture.device = vk_context->get_device();
-	texture.debug_utils = vk_context->get_debug_utils();
 	texture.memory_allocator = memory_allocator;
 }
 

@@ -15,6 +15,13 @@ public:
 		vec<c_str> layers;
 	};
 
+	/** Severity and type filter to determine the verbosity of debug callback */
+	struct Filter
+	{
+		vk::DebugUtilsMessageSeverityFlagsEXT severity_flags;
+		vk::DebugUtilsMessageTypeFlagsEXT type_flags;
+	};
+
 public:
 	/** Default constructor */
 	Instance() = default;
@@ -22,8 +29,9 @@ public:
 	/** Argumented constructor
 	 *
 	 * @param requirements The required layers and extensions
+	 * @param filter Validation layer callback filter
 	 */
-	Instance(Requirements const &requirements);
+	Instance(Requirements const &requirements, Filter const &filter);
 
 	/** Move constructor */
 	Instance(Instance &&other);
@@ -73,6 +81,7 @@ private:
 private:
 	vk::Instance instance = {};
 	Requirements requirements = {};
+	vk::DebugUtilsMessengerEXT messenger = {};
 };
 
 } // namespace BINDLESSVK_NAMESPACE

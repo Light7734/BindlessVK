@@ -9,8 +9,7 @@ FragmentedBuffer::FragmentedBuffer(
     usize size,
     str_view debug_name /** = default_debug_name */
 )
-    : debug_utils(vk_context->get_debug_utils())
-    , fragments({ { 0, size } })
+    : fragments({ { 0, size } })
     , type(type)
     , buffer(
 

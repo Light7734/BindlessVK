@@ -33,6 +33,22 @@ public:
 	/** Desctructor */
 	~Device();
 
+	/** Sets the vulkan object's name
+	 *
+	 * @param object A vulkan hpp object
+	 * @param name A null terminated str view to name of the object
+	 */
+	template<typename T, typename... Args>
+	void set_object_name(T object, std::format_string<Args...> fmt, Args &&...args) const
+	{
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT {
+		    object.objectType,
+		    (u64)((typename T::NativeType)(object)),
+		    std::format(fmt, std::forward<Args>(args)...).c_str(),
+		});
+	}
+
+
 	/** Submits the commands recorded to a command buffer by @a func
 	 *
 	 * @param func A function that writes to a command buffer
