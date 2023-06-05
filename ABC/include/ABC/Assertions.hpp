@@ -1,14 +1,16 @@
-#include "BindlessVk/Common/Aliases.hpp"
+#pragma once
+
+#include "Aliases.hpp"
 
 #include <exception>
+#include <format>
+#include <string>
 #include <type_traits>
 
-namespace BINDLESSVK_NAMESPACE {
-
 /** The base exception class */
-struct BindlessVkException: std::exception
+struct Exception: std::exception
 {
-	BindlessVkException(str const &what): msg(what)
+	Exception(str const &what): msg(what)
 	{
 	}
 
@@ -41,7 +43,7 @@ void inline throw_exception(Expr const &expr, str_view msg)
 	if constexpr (is_static_castable<Expr, int>())
 		what = std::format("{} - expr({})", msg, int(expr));
 
-	throw BindlessVkException(what);
+	throw Exception(what);
 }
 
 } // namespace details
@@ -82,5 +84,3 @@ void inline assert_false(Expr const &expr, std::format_string<Args...> fmt = "",
 	if (static_cast<bool>(expr))
 		details::throw_exception(expr, std::format(fmt, std::forward<Args>(args)...));
 }
-
-} // namespace BINDLESSVK_NAMESPACE

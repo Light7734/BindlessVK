@@ -18,14 +18,14 @@ int main(int argc, char *argv[])
 			delta_timer.reset();
 		}
 	}
-	catch (bvk::BindlessVkException exception)
+	catch (Exception exception)
 	{
-		log_crt("Uncaught BindlessVkException: {}", exception.what());
+		log_crt("Uncaught exception: {}", exception.what());
 		return 1;
 	}
 	catch (std::exception exception)
 	{
-		log_crt("Uncaught exception: {}", exception.what());
+		log_crt("Uncaught std::exception: {}", exception.what());
 		return 2;
 	}
 

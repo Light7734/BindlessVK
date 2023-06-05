@@ -55,6 +55,7 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/Amender/include
 
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
+    PRIVATE ${CMAKE_SOURCE_DIR}/ABC/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
@@ -73,5 +74,5 @@ target_link_libraries(
 
 target_precompile_headers(
     BindlessVk 
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
+    PRIVATE ${CMAKE_SOURCE_DIR}/ABC/pch.hpp
 )

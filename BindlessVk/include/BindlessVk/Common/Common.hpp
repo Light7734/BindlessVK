@@ -4,21 +4,15 @@
 	#define BINDLESSVK_NAMESPACE bvk
 #endif
 
-#include "BindlessVk/Common/Aliases.hpp"
-#include "BindlessVk/Common/Assertions.hpp"
-#include "BindlessVk/Common/PtrTypes.hpp"
-#include "BindlessVk/Common/Vulkan.hpp"
+#define VULKAN_HPP_USE_REFLECT             1
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
-#include <exception>
+#include <vk_mem_alloc.hpp>
+#include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/vulkan.hpp>
+#include <vulkan/vulkan_core.h>
 
 namespace BINDLESSVK_NAMESPACE {
-
-u64 constexpr hash_str(str_view const value)
-{
-	return *value.begin() ? static_cast<u64>(*value.begin()) + 33 * hash_str(value.begin() + 1) :
-	                        5381;
-}
-
 
 /** Maximum frames allowed to be in flight */
 auto constexpr max_frames_in_flight = usize { 3 };
@@ -29,7 +23,7 @@ auto constexpr default_debug_name = str_view { "unnamed" };
 /** Hashes T with a @a seed
  *
  * @param seed A seed, intented to be a previously generated hash_t value to combine hash a struct
- * @param value A T value, needs to be hashable by std::hash<T>
+ * @param value A T value, requires to be hashable by std::hash<T>
  */
 template<typename T>
 u64 hash_t(u64 seed, T const &value)

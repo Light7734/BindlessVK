@@ -442,3 +442,5 @@ imgui.ini
 # Documentations
 docs/html/
 docs/latex/
+
+profile.json

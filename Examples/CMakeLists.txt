@@ -27,6 +27,7 @@ target_include_directories(
     Framework
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Framework/include
+    PUBLIC ${CMAKE_SOURCE_DIR}/ABC/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/BindlessVk/include
     PUBLIC ${CMAKE_SOURCE_DIR}/Amender/include
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/entt/single_include/
@@ -47,7 +48,7 @@ target_link_libraries(
 
 target_precompile_headers(
     Framework
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
+    PRIVATE ${CMAKE_SOURCE_DIR}/ABC/pch.hpp
 )
 
 ####### RENDERGRAPHS #######
@@ -85,8 +86,8 @@ target_link_libraries(
 )
 
 target_precompile_headers(
-   Rendergraphs 
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
+    Rendergraphs 
+    PRIVATE ${CMAKE_SOURCE_DIR}/ABC/pch.hpp
 )
 
 ####### EXAMPLES #######
@@ -140,7 +141,7 @@ target_link_libraries(
 
 target_precompile_headers(
     Example_Development
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/pch.hpp
+    PRIVATE ${CMAKE_SOURCE_DIR}/ABC/pch.hpp
 )
 
 ####### TESTS #######

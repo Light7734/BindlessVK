@@ -1,6 +1,6 @@
 #pragma once
 
-namespace BINDLESSVK_NAMESPACE {
+#include <memory>
 
 template<typename T>
 using ref = std::shared_ptr<T>;
@@ -66,5 +66,3 @@ public:
 private:
 	T *ptr = {};
 };
-
-} // namespace BINDLESSVK_NAMESPACE

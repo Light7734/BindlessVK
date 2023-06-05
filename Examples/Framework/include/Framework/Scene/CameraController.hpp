@@ -49,13 +49,15 @@ public:
 			double mouse_x, mouse_y;
 			glfwGetCursorPos(window->get_glfw_handle(), &mouse_x, &mouse_y);
 
-			if (glfwGetInputMode(window->get_glfw_handle(), GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
+			if (glfwGetInputMode(window->get_glfw_handle(), GLFW_CURSOR) == GLFW_CURSOR_NORMAL)
+			{
 				last_mouse_x = mouse_x;
 				last_mouse_y = mouse_y;
 				return;
 			}
 
-			if (last_mouse_x == std::numeric_limits<double>::max()) {
+			if (last_mouse_x == std::numeric_limits<double>::max())
+			{
 				last_mouse_x = mouse_x;
 				last_mouse_y = mouse_y;
 				return;
@@ -84,7 +86,8 @@ private:
 	{
 		scene->group(entt::get<TransformComponent, CameraComponent>)
 		    .each([&](TransformComponent &transformComp, CameraComponent &cameraComp) {
-			    if (delta_x == 0.0 && delta_y == 0.0f) {
+			    if (delta_x == 0.0 && delta_y == 0.0f)
+			    {
 				    return;
 			    }
 

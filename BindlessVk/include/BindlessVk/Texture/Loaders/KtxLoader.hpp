@@ -11,8 +11,6 @@
 #include <ktx.h>
 #include <ktxvulkan.h>
 
-static_assert(KTX_SUCCESS == false, "KTX_SUCCESS was supposed to be 0 (false), but it isn't");
-
 namespace BINDLESSVK_NAMESPACE {
 
 class KtxLoader
