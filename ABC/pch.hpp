@@ -9,7 +9,6 @@
 #include <any>
 #include <chrono>
 #include <cinttypes>
-#include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <ctime>
@@ -24,6 +23,12 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
+
+/* numerics */
+#include <bit>
+#include <cmath>
+#include <random>
+#include <ratio>
 
 /* containers */
 #include <array>
