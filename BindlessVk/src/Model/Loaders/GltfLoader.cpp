@@ -1,12 +1,14 @@
 #include "BindlessVk/Model/Loaders/GltfLoader.hpp"
 
-#include "Amender/Logger.hpp"
+#include "Amender/Amender.hpp"
 #include "BindlessVk/Buffers/Buffer.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
 auto static mat4_from_f64ptr(f64 const *const ptr) -> mat4
 {
+	ScopeProfiler _;
+
 	auto mat = mat4 {};
 	for (usize i = 0; i < 4 * 4; ++i)
 		mat[i] = ptr[i];
@@ -16,6 +18,8 @@ auto static mat4_from_f64ptr(f64 const *const ptr) -> mat4
 
 auto static vec3_from_f64ptr(f64 const *const ptr) -> vec3
 {
+	ScopeProfiler _;
+
 	auto vec = vec3 {};
 	for (usize i = 0; i < 3; ++i)
 		vec[i] = ptr[i];
@@ -25,6 +29,8 @@ auto static vec3_from_f64ptr(f64 const *const ptr) -> vec3
 
 void static translate(mat4 &mat, vec3 v)
 {
+	ScopeProfiler _;
+
 	mat[3 * 4 + 0] += v[0];
 	mat[3 * 4 + 1] += v[1];
 	mat[3 * 4 + 2] += v[2];
@@ -32,6 +38,8 @@ void static translate(mat4 &mat, vec3 v)
 
 void static scale(mat4 &mat, vec3 v)
 {
+	ScopeProfiler _;
+
 	mat[0 * 4 + 0] *= v[0];
 	mat[0 * 4 + 1] *= v[0];
 	mat[0 * 4 + 2] *= v[0];
@@ -67,10 +75,13 @@ GltfLoader::GltfLoader(
     , staging_index_buffer(staging_index_buffer)
     , staging_texture_buffer(staging_texture_buffer)
 {
+	ScopeProfiler _;
 }
 
 auto GltfLoader::load_from_ascii(str_view const file_path, str_view const debug_name) -> Model
 {
+	ScopeProfiler _;
+
 	model.debug_name = debug_name;
 
 	load_gltf_model_from_ascii(file_path);
@@ -87,6 +98,8 @@ auto GltfLoader::load_from_ascii(str_view const file_path, str_view const debug_
 
 void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 {
+	ScopeProfiler _;
+
 	tinygltf::TinyGLTF gltf_context;
 	str err, warn;
 
@@ -104,6 +117,8 @@ void GltfLoader::load_gltf_model_from_ascii(str_view const file_path)
 
 void GltfLoader::load_textures()
 {
+	ScopeProfiler _;
+
 	model.textures.reserve(gltf_model.images.size());
 
 	for (u32 i = 0; auto &image : gltf_model.images)
@@ -123,6 +138,8 @@ void GltfLoader::load_textures()
 
 void GltfLoader::load_material_parameters()
 {
+	ScopeProfiler _;
+
 	for (auto &material : gltf_model.materials)
 	{
 		assert_false(
@@ -143,6 +160,8 @@ void GltfLoader::load_material_parameters()
 
 void GltfLoader::stage_mesh_data()
 {
+	ScopeProfiler _;
+
 	vertex_map = static_cast<Model::Vertex *>(staging_vertex_buffer->map_block(0));
 	index_map = static_cast<u32 *>(staging_index_buffer->map_block(0));
 
@@ -155,12 +174,16 @@ void GltfLoader::stage_mesh_data()
 
 void GltfLoader::write_mesh_data_to_gpu()
 {
+	ScopeProfiler _;
+
 	write_vertex_buffer_to_gpu();
 	write_index_buffer_to_gpu();
 }
 
 Model::Node *GltfLoader::load_node(const tinygltf::Node &gltf_node, Model::Node *parent_node)
 {
+	ScopeProfiler _;
+
 	auto *node = new Model::Node(parent_node);
 	set_initial_node_transform(gltf_node, node);
 
@@ -184,16 +207,21 @@ Model::Node *GltfLoader::load_node(const tinygltf::Node &gltf_node, Model::Node 
 
 void GltfLoader::write_vertex_buffer_to_gpu()
 {
+	ScopeProfiler _;
+
 	staging_vertex_buffer->unmap();
 
-	model.vertex_buffer_fragment =
-	    vertex_buffer->grab_fragment(vertex_count * sizeof(Model::Vertex));
+	model.vertex_buffer_fragment = vertex_buffer->grab_fragment(
+	    vertex_count * sizeof(Model::Vertex)
+	);
 
 	vertex_buffer->copy_staging_to_fragment(staging_vertex_buffer, model.vertex_buffer_fragment);
 }
 
 void GltfLoader::write_index_buffer_to_gpu()
 {
+	ScopeProfiler _;
+
 	staging_index_buffer->unmap();
 
 	model.index_buffer_fragment = index_buffer->grab_fragment(index_count * sizeof(u32));
@@ -202,6 +230,8 @@ void GltfLoader::write_index_buffer_to_gpu()
 
 void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::Node *node)
 {
+	ScopeProfiler _;
+
 	for (auto const &gltf_primitive : gltf_mesh.primitives)
 	{
 		auto first_index = index_count;
@@ -220,17 +250,21 @@ void GltfLoader::load_mesh_primitives(const tinygltf::Mesh &gltf_mesh, Model::No
 
 void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_primitive)
 {
-	auto const *position_buffer =
-	    (vec3 const *)get_primitive_attribute_buffer(gltf_primitive, "POSITION");
+	ScopeProfiler _;
 
-	auto const *normal_buffer =
-	    (vec3 const *)get_primitive_attribute_buffer(gltf_primitive, "NORMAL");
+	auto const *position_buffer = (vec3 const *)
+	    get_primitive_attribute_buffer(gltf_primitive, "POSITION");
 
-	auto const *tangent_buffer =
-	    (vec3 const *)get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
+	auto const *normal_buffer = (vec3 const *)
+	    get_primitive_attribute_buffer(gltf_primitive, "NORMAL");
 
-	auto const *uv_buffer =
-	    (vec2 const *)(get_primitive_attribute_buffer(gltf_primitive, "TEXCOORD_0"));
+	auto const *tangent_buffer = (vec3 const *)
+	    get_primitive_attribute_buffer(gltf_primitive, "TANGENT");
+
+	auto const *uv_buffer = (vec2 const *)(get_primitive_attribute_buffer(
+	    gltf_primitive,
+	    "TEXCOORD_0"
+	));
 
 	auto primitive_vertex_count = get_primitive_vertex_count(gltf_primitive);
 
@@ -252,6 +286,8 @@ void GltfLoader::load_mesh_primitive_vertices(const tinygltf::Primitive &gltf_pr
 
 auto GltfLoader::load_mesh_primitive_indices(const tinygltf::Primitive &gltf_primitive) -> u32
 {
+	ScopeProfiler _;
+
 	auto const &accessor = gltf_model.accessors[gltf_primitive.indices];
 	auto const &buffer_view = gltf_model.bufferViews[accessor.bufferView];
 	auto const &buffer = gltf_model.buffers[buffer_view.buffer];
@@ -299,6 +335,8 @@ auto GltfLoader::get_primitive_attribute_buffer(
     str_view const attribute_name
 ) -> f32 const *
 {
+	ScopeProfiler _;
+
 	auto const &it = gltf_primitive.attributes.find(attribute_name.data());
 	if (it == gltf_primitive.attributes.end())
 	{
@@ -315,6 +353,8 @@ auto GltfLoader::get_primitive_attribute_buffer(
 
 auto GltfLoader::get_primitive_vertex_count(const tinygltf::Primitive &gltf_primitive) -> usize
 {
+	ScopeProfiler _;
+
 	auto const &it = gltf_primitive.attributes.find("POSITION");
 	if (it == gltf_primitive.attributes.end())
 	{
@@ -327,11 +367,15 @@ auto GltfLoader::get_primitive_vertex_count(const tinygltf::Primitive &gltf_prim
 
 auto GltfLoader::get_primitive_index_count(tinygltf::Primitive const &gltf_primitive) -> usize
 {
+	ScopeProfiler _;
+
 	return gltf_model.accessors[gltf_primitive.indices].count;
 }
 
 void GltfLoader::set_initial_node_transform(tinygltf::Node const &gltf_node, Model::Node *node)
 {
+	ScopeProfiler _;
+
 	if (!gltf_node.matrix.empty())
 		node->transform = mat4_from_f64ptr(gltf_node.matrix.data());
 
@@ -350,11 +394,15 @@ void GltfLoader::set_initial_node_transform(tinygltf::Node const &gltf_node, Mod
 
 auto GltfLoader::node_has_any_children(tinygltf::Node const &gltf_node) -> bool
 {
+	ScopeProfiler _;
+
 	return gltf_node.children.size() > 1;
 }
 
 auto GltfLoader::node_has_any_mesh(tinygltf::Node const &gltf_node) -> bool
 {
+	ScopeProfiler _;
+
 	return gltf_node.mesh > -1;
 }
 

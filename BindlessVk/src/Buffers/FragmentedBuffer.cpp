@@ -1,5 +1,7 @@
 #include "BindlessVk/Buffers/FragmentedBuffer.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 FragmentedBuffer::FragmentedBuffer(
@@ -16,9 +18,9 @@ FragmentedBuffer::FragmentedBuffer(
           vk_context,
           memory_allocator,
 
-          vk::BufferUsageFlagBits::eTransferDst |
-              (type == Type::eVertex ? vk::BufferUsageFlagBits::eVertexBuffer :
-                                       vk::BufferUsageFlagBits::eIndexBuffer),
+          vk::BufferUsageFlagBits::eTransferDst
+              | (type == Type::eVertex ? vk::BufferUsageFlagBits::eVertexBuffer :
+                                         vk::BufferUsageFlagBits::eIndexBuffer),
 
           vma::AllocationCreateInfo {
               vma::AllocationCreateFlagBits::eHostAccessRandom,
@@ -31,10 +33,13 @@ FragmentedBuffer::FragmentedBuffer(
       )
     , map(buffer.map_block(0))
 {
+	ScopeProfiler _;
 }
 
 void FragmentedBuffer::copy_staging_to_fragment(Buffer *staging_buffer, Fragment fragment)
 {
+	ScopeProfiler _;
+
 	buffer.write_buffer(
 	    *staging_buffer,
 	    vk::BufferCopy {
@@ -47,6 +52,8 @@ void FragmentedBuffer::copy_staging_to_fragment(Buffer *staging_buffer, Fragment
 
 void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 {
+	ScopeProfiler _;
+
 	auto static offset = vk::DeviceSize {};
 
 	switch (type)
@@ -72,6 +79,8 @@ void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 
 [[nodiscard]] auto FragmentedBuffer::grab_fragment(u32 size) -> Fragment
 {
+	ScopeProfiler _;
+
 	for (auto &region : fragments)
 		if (region.length >= size)
 		{
@@ -93,6 +102,8 @@ void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 
 void FragmentedBuffer::return_fragment(Fragment returned_fragment)
 {
+	ScopeProfiler _;
+
 	// if returned_fragment is contiguous to any free region then
 	// simply expand the non-occupied region
 	for (auto &fragment : fragments)

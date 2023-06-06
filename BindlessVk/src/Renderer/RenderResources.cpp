@@ -1,5 +1,7 @@
 #include "BindlessVk/Renderer/RenderResources.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 RenderResources::RenderResources(
@@ -11,6 +13,8 @@ RenderResources::RenderResources(
     , device(vk_context->get_device())
     , memory_allocator(memory_allocator)
 {
+	ScopeProfiler _;
+
 	auto const extent = surface->get_framebuffer_extent();
 
 	auto container = AttachmentContainer {
@@ -40,6 +44,8 @@ RenderResources::RenderResources(
 
 RenderResources::~RenderResources()
 {
+	ScopeProfiler _;
+
 	if (!device)
 		return;
 
@@ -53,6 +59,8 @@ RenderResources::~RenderResources()
 
 auto RenderResources::try_get_attachment_index(u64 const key) -> u32
 {
+	ScopeProfiler _;
+
 	if (attachment_indices.contains(key))
 		return attachment_indices[key];
 
@@ -61,6 +69,8 @@ auto RenderResources::try_get_attachment_index(u64 const key) -> u32
 
 void RenderResources::add_key_to_attachment_index(u64 const key, u32 const attachment_index)
 {
+	ScopeProfiler _;
+
 	attachment_indices[key] = attachment_index;
 }
 
@@ -69,6 +79,8 @@ void RenderResources::create_color_attachment(
     vk::SampleCountFlagBits sample_count
 )
 {
+	ScopeProfiler _;
+
 	auto const framebuffer_extent = surface->get_framebuffer_extent();
 
 	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
@@ -157,6 +169,8 @@ void RenderResources::create_depth_attachment(
     vk::SampleCountFlagBits sample_count
 )
 {
+	ScopeProfiler _;
+
 	auto const framebuffer_extent = surface->get_framebuffer_extent();
 	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
 
@@ -239,6 +253,8 @@ void RenderResources::create_transient_attachment(
     vk::SampleCountFlagBits sample_count
 )
 {
+	ScopeProfiler _;
+
 	auto const framebuffer_extent = surface->get_framebuffer_extent();
 	auto const extent = calculate_attachment_image_extent(blueprint_attachment);
 
@@ -305,6 +321,8 @@ auto RenderResources::calculate_attachment_image_extent(
     RenderNodeBlueprint::Attachment const &blueprint_attachment
 ) const -> vk::Extent3D
 {
+	ScopeProfiler _;
+
 	switch (blueprint_attachment.size_type)
 	{
 	case RenderNode::SizeType::eSwapchainRelative:

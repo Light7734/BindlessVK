@@ -1,5 +1,7 @@
 #include "BindlessVk/Context/Swapchain.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 Swapchain::Swapchain(VkContext const *const vk_context)
@@ -8,6 +10,8 @@ Swapchain::Swapchain(VkContext const *const vk_context)
     , queues(vk_context->get_queues())
     , invalid(false)
 {
+	ScopeProfiler _;
+
 	destroy_image_views();
 
 	create_swapchain();
@@ -19,6 +23,8 @@ Swapchain::Swapchain(VkContext const *const vk_context)
 
 Swapchain::~Swapchain()
 {
+	ScopeProfiler _;
+
 	if (!device)
 		return;
 
@@ -27,6 +33,8 @@ Swapchain::~Swapchain()
 
 void Swapchain::create_swapchain()
 {
+	ScopeProfiler _;
+
 	auto const old_swapchain = swapchain;
 	auto const queues_indices = queues->get_indices();
 
@@ -54,6 +62,8 @@ void Swapchain::create_swapchain()
 
 void Swapchain::create_image_views()
 {
+	ScopeProfiler _;
+
 	image_views.resize(get_image_count());
 
 	for (u32 i = 0; i < get_image_count(); ++i)
@@ -82,6 +92,8 @@ void Swapchain::create_image_views()
 
 void Swapchain::set_object_names()
 {
+	ScopeProfiler _;
+
 	for (u32 i = 0; i < get_image_count(); ++i)
 	{
 		device->set_object_name(images[i], "swap_chain_image_{}", i);
@@ -91,14 +103,16 @@ void Swapchain::set_object_names()
 
 auto Swapchain::calculate_best_image_count() const -> u32
 {
+	ScopeProfiler _;
+
 	auto const min_image_count = surface->get_capabilities().minImageCount;
 	auto const max_image_count = surface->get_capabilities().maxImageCount;
 
 	auto const has_max_limit = max_image_count != 0;
 
 	// Desired image count is in range
-	if ((!has_max_limit || max_image_count >= DESIRED_SWAPCHAIN_IMAGES) &&
-	    min_image_count <= DESIRED_SWAPCHAIN_IMAGES)
+	if ((!has_max_limit || max_image_count >= DESIRED_SWAPCHAIN_IMAGES)
+	    && min_image_count <= DESIRED_SWAPCHAIN_IMAGES)
 		return DESIRED_SWAPCHAIN_IMAGES;
 
 	// Fall-back to 2 if in ange
@@ -112,6 +126,8 @@ auto Swapchain::calculate_best_image_count() const -> u32
 
 void Swapchain::destroy_image_views()
 {
+	ScopeProfiler _;
+
 	for (auto const image_view : image_views)
 		device->vk().destroyImageView(image_view);
 }

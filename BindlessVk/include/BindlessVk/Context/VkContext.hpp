@@ -7,8 +7,6 @@
 #include "BindlessVk/Context/Queues.hpp"
 #include "BindlessVk/Context/Surface.hpp"
 
-#include <any>
-
 namespace BINDLESSVK_NAMESPACE {
 
 /** Helper class for accessing preliminary vulkan wrapper */

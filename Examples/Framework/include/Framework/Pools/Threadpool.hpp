@@ -2,10 +2,6 @@
 
 #include "Framework/Common/Common.hpp"
 
-#include <condition_variable>
-#include <queue>
-#include <thread>
-
 struct JobContext
 {
 	uint32_t thread_index;

@@ -1,6 +1,6 @@
 #include "BindlessVk/Context/Queues.hpp"
 
-#include "Amender/Logger.hpp"
+#include "Amender/Amender.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -13,6 +13,8 @@ Queues::Queues(Device *device, Gpu *gpu)
     , graphics(device->vk().getQueue(graphics_index, 0))
     , present(device->vk().getQueue(present_index, 0))
 {
+	ScopeProfiler _;
+
 	log_inf("compute queue index: {}", compute_index);
 	log_inf("graphics queue index: {}", graphics_index);
 	log_inf("present queue index: {}", present_index);

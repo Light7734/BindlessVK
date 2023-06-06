@@ -1,5 +1,6 @@
 #include "BindlessVk/Texture/TextureLoader.hpp"
 
+#include "Amender/Amender.hpp"
 #include "BindlessVk/Texture/Loaders/BinaryLoader.hpp"
 #include "BindlessVk/Texture/Loaders/KtxLoader.hpp"
 
@@ -18,12 +19,14 @@ TextureLoader::TextureLoader(
     : vk_context(vk_context)
     , memory_allocator(memory_allocator)
 {
+	ScopeProfiler _;
+
 	auto const gpu = vk_context->get_gpu();
 
 	// @todo move this assertion to a proper place
 	assert_true(
-	    gpu->vk().getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures &
-	        vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
+	    gpu->vk().getFormatProperties(vk::Format::eR8G8B8A8Srgb).optimalTilingFeatures
+	        & vk::FormatFeatureFlagBits::eSampledImageFilterLinear,
 	    "Texture image format(eR8G8B8A8Srgb) does not support linear blitting"
 	);
 }
@@ -39,6 +42,8 @@ auto TextureLoader::load_from_binary(
     str_view const debug_name           /* = default_debug_name */
 ) const -> Texture
 {
+	ScopeProfiler _;
+
 	BinaryLoader loader(vk_context, memory_allocator, staging_buffer);
 	return std::move(loader.load(pixels, width, height, size, type, final_layout, debug_name));
 }
@@ -51,6 +56,8 @@ auto TextureLoader::load_from_ktx(
     str_view const debug_name     /* = default_debug_name */
 ) const -> Texture
 {
+	ScopeProfiler _;
+
 	KtxLoader loader(vk_context, memory_allocator, staging_buffer);
 	return std::move(loader.load(uri, type, layout, debug_name));
 }

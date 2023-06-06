@@ -1,9 +1,12 @@
 #include "BindlessVk/Texture/Image.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 Image::Image(vk::Image const image): allocated_image(image, {})
 {
+	ScopeProfiler _;
 }
 
 Image::Image(
@@ -14,10 +17,13 @@ Image::Image(
     : memory_allocator(memory_allocator)
     , allocated_image(memory_allocator->vma().createImage(create_info, allocate_info))
 {
+	ScopeProfiler _;
 }
 
 Image::~Image()
 {
+	ScopeProfiler _;
+
 	auto const &[image, allocation] = allocated_image;
 
 	if (memory_allocator)

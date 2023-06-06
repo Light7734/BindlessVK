@@ -2,8 +2,6 @@
 
 #include "Framework/Common/Common.hpp"
 
-#include <chrono>
-
 // Simple timer class to keep track of the elapsed time
 class Timer
 {

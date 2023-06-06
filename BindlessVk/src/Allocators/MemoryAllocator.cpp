@@ -1,6 +1,6 @@
 #include "BindlessVk/Allocators/MemoryAllocator.hpp"
 
-#include "Amender/Logger.hpp"
+#include "Amender/Amender.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -12,6 +12,7 @@ void MemoryAllocator::allocate_memory_callback(
     void *const VMA_NULLABLE vma_user_data
 )
 {
+	ScopeProfiler _;
 	log_trc("Allocate: {}", size);
 }
 
@@ -26,9 +27,10 @@ void MemoryAllocator::free_memory_callback(
 	log_trc("Free: {}", size);
 }
 
-
 MemoryAllocator::MemoryAllocator(VkContext const *vk_context)
 {
+	ScopeProfiler _;
+
 	auto const gpu = vk_context->get_gpu();
 	auto const device = vk_context->get_device();
 	auto const instance = vk_context->get_instance();
@@ -86,11 +88,15 @@ MemoryAllocator::MemoryAllocator(VkContext const *vk_context)
 
 MemoryAllocator::MemoryAllocator(MemoryAllocator &&other)
 {
+	ScopeProfiler _;
+
 	*this = std::move(other);
 }
 
 MemoryAllocator &MemoryAllocator::operator=(MemoryAllocator &&other)
 {
+	ScopeProfiler _;
+
 	this->allocator = other.allocator;
 	other.allocator = vma::Allocator {};
 
@@ -99,6 +105,8 @@ MemoryAllocator &MemoryAllocator::operator=(MemoryAllocator &&other)
 
 MemoryAllocator::~MemoryAllocator()
 {
+	ScopeProfiler _;
+
 	if (!allocator)
 		return;
 

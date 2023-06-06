@@ -1,5 +1,7 @@
 #include "BindlessVk/Texture/Loaders/BinaryLoader.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 BinaryLoader::BinaryLoader(
@@ -11,6 +13,8 @@ BinaryLoader::BinaryLoader(
     , memory_allocator(memory_allocator)
     , staging_buffer(staging_buffer)
 {
+	ScopeProfiler _;
+
 	texture.device = device;
 	texture.memory_allocator = memory_allocator;
 }
@@ -25,6 +29,8 @@ Texture BinaryLoader::load(
     str_view const debug_name
 )
 {
+	ScopeProfiler _;
+
 	texture.size = { width, height };
 	texture.format = vk::Format::eR8G8B8A8Srgb;
 	texture.mip_levels = std::floor(std::log2(std::max(width, height))) + 1;
@@ -43,6 +49,8 @@ Texture BinaryLoader::load(
 
 void BinaryLoader::create_image()
 {
+	ScopeProfiler _;
+
 	auto const [width, height] = texture.size;
 
 	texture.image = Image {
@@ -61,8 +69,8 @@ void BinaryLoader::create_image()
 		    1u,
 		    vk::SampleCountFlagBits::e1,
 		    vk::ImageTiling::eOptimal,
-		    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc |
-		        vk::ImageUsageFlagBits::eSampled,
+		    vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc
+		        | vk::ImageUsageFlagBits::eSampled,
 		    vk::SharingMode::eExclusive,
 		    0u,
 		    nullptr,
@@ -79,6 +87,8 @@ void BinaryLoader::create_image()
 
 void BinaryLoader::create_image_view()
 {
+	ScopeProfiler _;
+
 	texture.image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
 	    texture.image.vk(),
@@ -104,6 +114,8 @@ void BinaryLoader::create_image_view()
 
 void BinaryLoader::create_sampler()
 {
+	ScopeProfiler _;
+
 	texture.sampler = device->vk().createSampler(vk::SamplerCreateInfo {
 	    {},
 	    vk::Filter::eLinear,
@@ -128,12 +140,16 @@ void BinaryLoader::create_sampler()
 
 void BinaryLoader::stage_texture_data(u8 const *const pixels, vk::DeviceSize size)
 {
+	ScopeProfiler _;
+
 	memcpy(staging_buffer->map_block(0), pixels, size);
 	staging_buffer->unmap();
 }
 
 void BinaryLoader::write_texture_data_to_gpu()
 {
+	ScopeProfiler _;
+
 	device->immediate_submit([&](vk::CommandBuffer cmd) {
 		auto const [width, height] = texture.size;
 
@@ -183,6 +199,8 @@ void BinaryLoader::write_texture_data_to_gpu()
 
 void BinaryLoader::create_mipmaps(vk::CommandBuffer cmd)
 {
+	ScopeProfiler _;
+
 	auto [mip_width, mip_height] = texture.size;
 
 	for (u32 i = 1u; i < texture.mip_levels; ++i)

@@ -1,10 +1,13 @@
 #include "Development.hpp"
 
-#include <Amender/Logger.hpp>
+#include <Amender/Amender.hpp>
 
 /** The entry point */
 int main(int argc, char *argv[])
 {
+	Profiler::initialize("profile.json");
+	auto return_code = int { 0 };
+
 	try
 	{
 		DevelopmentExampleApplication application = DevelopmentExampleApplication();
@@ -21,13 +24,12 @@ int main(int argc, char *argv[])
 	catch (Exception exception)
 	{
 		log_crt("Uncaught exception: {}", exception.what());
-		return 1;
 	}
 	catch (std::exception exception)
 	{
 		log_crt("Uncaught std::exception: {}", exception.what());
-		return 2;
 	}
 
-	return 0;
+	Profiler::terminate();
+	return return_code;
 }

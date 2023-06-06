@@ -1,6 +1,6 @@
 #include "BindlessVk/Renderer/Renderer.hpp"
 
-#include <csignal>
+#include "Amender/Amender.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,12 +11,16 @@ Renderer::Renderer(VkContext const *const vk_context, MemoryAllocator *const mem
     , swapchain(vk_context)
     , resources(vk_context, memory_allocator, &swapchain)
 {
+	ScopeProfiler _;
+
 	create_sync_objects();
 	create_cmds(vk_context->get_gpu());
 }
 
 Renderer::~Renderer()
 {
+	ScopeProfiler _;
+
 	if (!device)
 		return;
 
@@ -26,6 +30,8 @@ Renderer::~Renderer()
 
 void Renderer::render_graph(RenderNode *const root_node)
 {
+	ScopeProfiler _;
+
 	wait_for_frame_fence();
 
 	image_index = acquire_next_image_index();
@@ -42,6 +48,8 @@ void Renderer::render_graph(RenderNode *const root_node)
 // 1 //
 void Renderer::create_sync_objects()
 {
+	ScopeProfiler _;
+
 	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
 		create_frame_sync_objects(i);
@@ -53,6 +61,8 @@ void Renderer::create_sync_objects()
 
 void Renderer::create_cmds(Gpu const *const gpu)
 {
+	ScopeProfiler _;
+
 	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
 		create_graphics_cmds(gpu, i);
@@ -62,12 +72,16 @@ void Renderer::create_cmds(Gpu const *const gpu)
 
 void Renderer::destroy_cmds()
 {
+	ScopeProfiler _;
+
 	for (auto const cmd_pool : graphics_cmd_pools)
 		device->vk().destroyCommandPool(cmd_pool);
 }
 
 void Renderer::destroy_sync_objects()
 {
+	ScopeProfiler _;
+
 	for (u32 i = 0; i < max_frames_in_flight; ++i)
 	{
 		device->vk().destroySemaphore(compute_semaphores[i]);
@@ -81,6 +95,8 @@ void Renderer::destroy_sync_objects()
 
 void Renderer::wait_for_frame_fence()
 {
+	ScopeProfiler _;
+
 	assert_false(
 	    device->vk().waitForFences(frame_fences[frame_index], true, std::numeric_limits<u32>::max())
 	);
@@ -90,12 +106,16 @@ void Renderer::wait_for_frame_fence()
 
 void Renderer::prepare_frame(RenderNode *const node)
 {
+	ScopeProfiler _;
+
 	reset_used_attachment_states();
 	prepare_node(node);
 }
 
 void Renderer::compute_frame(RenderNode *const node)
 {
+	ScopeProfiler _;
+
 	auto const cmd = compute_cmds[frame_index];
 	device->vk().resetCommandPool(compute_cmd_pools[frame_index]);
 
@@ -108,6 +128,8 @@ void Renderer::compute_frame(RenderNode *const node)
 
 void Renderer::graphics_frame(RenderNode *node)
 {
+	ScopeProfiler _;
+
 	auto const cmd = graphics_cmds[frame_index];
 	device->vk().resetCommandPool(graphics_cmd_pools[frame_index]);
 
@@ -121,6 +143,8 @@ void Renderer::graphics_frame(RenderNode *node)
 
 void Renderer::present_frame()
 {
+	ScopeProfiler _;
+
 	submit_present_queue();
 }
 
@@ -131,6 +155,8 @@ void Renderer::cycle_frame_index()
 
 auto Renderer::acquire_next_image_index() -> u32
 {
+	ScopeProfiler _;
+
 	auto const [result, index] = device->vk().acquireNextImageKHR(
 	    swapchain.vk(),
 	    std::numeric_limits<u64>::max(),
@@ -138,8 +164,8 @@ auto Renderer::acquire_next_image_index() -> u32
 	    {}
 	);
 
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR ||
-	    swapchain.is_invalid()) [[unlikely]]
+	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR
+	    || swapchain.is_invalid()) [[unlikely]]
 	{
 		device->vk().waitIdle();
 		swapchain.invalidate();
@@ -157,6 +183,8 @@ auto Renderer::acquire_next_image_index() -> u32
 
 void Renderer::create_frame_sync_objects(u32 const index)
 {
+	ScopeProfiler _;
+
 	frame_fences[index] = device->vk().createFence(vk::FenceCreateInfo {
 
 	    vk::FenceCreateFlagBits::eSignaled,
@@ -166,24 +194,32 @@ void Renderer::create_frame_sync_objects(u32 const index)
 
 void Renderer::create_compute_sync_objects(u32 const index)
 {
+	ScopeProfiler _;
+
 	compute_semaphores[index] = device->vk().createSemaphore({});
 	device->set_object_name(compute_semaphores[index], "compute_semaphores_{}", index);
 }
 
 void Renderer::create_graphics_sync_objects(u32 const index)
 {
+	ScopeProfiler _;
+
 	graphics_semaphores[index] = device->vk().createSemaphore({});
 	device->set_object_name(graphics_semaphores[index], "graphics_semaphore{}", index);
 }
 
 void Renderer::create_present_sync_objects(u32 index)
 {
+	ScopeProfiler _;
+
 	present_semaphores[index] = device->vk().createSemaphore({});
 	device->set_object_name(present_semaphores[index], "present_semaphore_{}", index);
 }
 
 void Renderer::create_compute_cmds(Gpu const *const gpu, u32 const index)
 {
+	ScopeProfiler _;
+
 	compute_cmd_pools[index] = device->vk().createCommandPool(vk::CommandPoolCreateInfo {
 	    {},
 	    gpu->get_compute_queue_index(),
@@ -200,6 +236,8 @@ void Renderer::create_compute_cmds(Gpu const *const gpu, u32 const index)
 
 void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 const index)
 {
+	ScopeProfiler _;
+
 	graphics_cmd_pools[index] = device->vk().createCommandPool(vk::CommandPoolCreateInfo {
 	    {},
 	    gpu->get_graphics_queue_index(),
@@ -218,6 +256,8 @@ void Renderer::create_graphics_cmds(Gpu const *const gpu, u32 const index)
 
 void Renderer::prepare_node(RenderNode *const node)
 {
+	ScopeProfiler _;
+
 	node->on_frame_prepare(frame_index, image_index);
 
 	for (auto *const child_node : node->get_children())
@@ -226,6 +266,8 @@ void Renderer::prepare_node(RenderNode *const node)
 
 void Renderer::compute_node(RenderNode *const node, i32 depth)
 {
+	ScopeProfiler _;
+
 	auto const cmd = compute_cmds[frame_index];
 	++depth;
 
@@ -242,6 +284,8 @@ void Renderer::compute_node(RenderNode *const node, i32 depth)
 
 void Renderer::graphics_node(RenderNode *const node, i32 depth)
 {
+	ScopeProfiler _;
+
 	auto const cmd = graphics_cmds[frame_index];
 	++depth;
 
@@ -270,6 +314,8 @@ void Renderer::graphics_node(RenderNode *const node, i32 depth)
 
 auto Renderer::try_apply_node_barriers(RenderNode *const node) -> bool
 {
+	ScopeProfiler _;
+
 	auto const cmd = graphics_cmds[frame_index];
 	auto applied_any_barriers = false;
 
@@ -331,21 +377,28 @@ auto Renderer::try_apply_node_barriers(RenderNode *const node) -> bool
 
 void Renderer::parse_node_rendering_info(RenderNode *const node)
 {
+	ScopeProfiler _;
+
 	// alias
 	auto &info = dynamic_pass_rendering_info;
 
 	for (auto const &attachment_slot : node->get_attachments())
 	{
-		auto *const attachment_container =
-		    resources.get_attachment_container(attachment_slot.resource_index);
+		auto *const attachment_container = resources.get_attachment_container(
+		    attachment_slot.resource_index
+		);
 
-		auto *const attachment =
-		    resources.get_attachment(attachment_slot.resource_index, image_index, frame_index);
+		auto *const attachment = resources.get_attachment(
+		    attachment_slot.resource_index,
+		    image_index,
+		    frame_index
+		);
 
 		if (attachment_slot.is_color_attachment())
 		{
-			auto const transient_attachment =
-			    resources.get_transient_attachment(attachment_slot.transient_resource_index);
+			auto const transient_attachment = resources.get_transient_attachment(
+			    attachment_slot.transient_resource_index
+			);
 
 			info.color_attachments.emplace_back(vk::RenderingAttachmentInfo {
 			    transient_attachment->image_view,
@@ -390,6 +443,8 @@ void Renderer::parse_node_rendering_info(RenderNode *const node)
 
 void Renderer::reset_used_attachment_states()
 {
+	ScopeProfiler _;
+
 	for (auto const &[container_index, image_index, frame_index] : used_attachment_indices)
 	{
 		auto *const container = resources.get_attachment_container(container_index);
@@ -403,6 +458,8 @@ void Renderer::reset_used_attachment_states()
 
 void Renderer::bind_node_compute_descriptors(RenderNode *const node, i32 depth)
 {
+	ScopeProfiler _;
+
 	auto const cmd = compute_cmds[frame_index];
 	auto const &descriptor_sets = node->get_compute_descriptor_sets();
 
@@ -420,6 +477,8 @@ void Renderer::bind_node_compute_descriptors(RenderNode *const node, i32 depth)
 
 void Renderer::bind_node_graphics_descriptors(RenderNode *const node, i32 depth)
 {
+	ScopeProfiler _;
+
 	auto const cmd = graphics_cmds[frame_index];
 	auto const &descriptor_sets = node->get_graphics_descriptor_sets();
 
@@ -437,6 +496,8 @@ void Renderer::bind_node_graphics_descriptors(RenderNode *const node, i32 depth)
 
 void Renderer::apply_backbuffer_barrier()
 {
+	ScopeProfiler _;
+
 	auto const cmd = graphics_cmds[frame_index];
 
 	auto *const backbuffer_container = resources.get_attachment_container(0);
@@ -476,11 +537,9 @@ void Renderer::apply_backbuffer_barrier()
 	cmd.endDebugUtilsLabelEXT();
 }
 
-#define PROFILE_SCOPE()
-
 void Renderer::submit_compute_queue()
 {
-	PROFILE_SCOPE();
+	ScopeProfiler _;
 
 	auto const compute_queue = queues->get_compute();
 	auto const cmd = compute_cmds[frame_index];
@@ -500,7 +559,7 @@ void Renderer::submit_compute_queue()
 
 void Renderer::submit_graphics_queue()
 {
-	PROFILE_SCOPE();
+	ScopeProfiler _;
 
 	auto const graphics_queue = queues->get_graphics();
 	auto const cmd = graphics_cmds[frame_index];
@@ -528,6 +587,8 @@ void Renderer::submit_graphics_queue()
 
 void Renderer::submit_present_queue()
 {
+	ScopeProfiler _;
+
 	try
 	{
 		auto const present_queue = queues->get_present();

@@ -2,11 +2,8 @@
 
 #include "Framework/UserInterface/ImguiVulkanBackend.hpp"
 
-#include <any>
 #include <backends/imgui_impl_glfw.h>
-#include <cassert>
 #include <imgui.h>
-#include <utility>
 
 Application::Application()
 {

@@ -1,5 +1,7 @@
 #include "BindlessVk/Shader/Shader.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 ShaderPipeline::ShaderPipeline(
     VkContext const *const vk_context,
@@ -16,6 +18,8 @@ ShaderPipeline::ShaderPipeline(
     , layout_allocator(layout_allocator)
     , debug_name(debug_name)
 {
+	ScopeProfiler _;
+
 	assert_false(shaders.empty(), "No shaders provided to shader pipeline {}", debug_name);
 
 	create_descriptor_set_layout(shaders);
@@ -33,6 +37,8 @@ ShaderPipeline::ShaderPipeline(
 
 ShaderPipeline::~ShaderPipeline()
 {
+	ScopeProfiler _;
+
 	if (!device)
 		return;
 
@@ -41,6 +47,8 @@ ShaderPipeline::~ShaderPipeline()
 
 void ShaderPipeline::create_descriptor_set_layout(vec<Shader *> const &shaders)
 {
+	ScopeProfiler _;
+
 	auto const shader_set_bindings = combine_descriptor_sets_bindings(shaders);
 
 	if (shader_set_bindings.empty())
@@ -62,6 +70,8 @@ void ShaderPipeline::create_pipeline_layout(
     DescriptorSetLayoutWithHash pass_descriptor_set_layout
 )
 {
+	ScopeProfiler _;
+
 	pipeline_layout = layout_allocator->goc_pipeline_layout(
 	    {},
 	    graph_descriptor_set_layout, // set = 0 -> per graph(frame)
@@ -76,6 +86,8 @@ void ShaderPipeline::create_graphics_pipeline(
     ShaderPipeline::Configuration const configuration
 )
 {
+	ScopeProfiler _;
+
 	auto const surface_color_format = surface->get_color_format();
 
 	auto const pipeline_rendering_info = vk::PipelineRenderingCreateInfo {
@@ -122,8 +134,10 @@ void ShaderPipeline::create_graphics_pipeline(
 		&pipeline_rendering_info,
 	};
 
-	auto const [result, graphics_pipeline] =
-	    device->vk().createGraphicsPipeline({}, graphics_pipeline_info);
+	auto const [result, graphics_pipeline] = device->vk().createGraphicsPipeline(
+	    {},
+	    graphics_pipeline_info
+	);
 
 	assert_false(result);
 	pipeline = graphics_pipeline;
@@ -133,6 +147,8 @@ void ShaderPipeline::create_graphics_pipeline(
 
 void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
 {
+	ScopeProfiler _;
+
 	auto const shader_stage_create_infos = create_shader_stage_create_infos(shaders);
 
 	auto const compute_pipeline_info = vk::ComputePipelineCreateInfo {
@@ -144,8 +160,10 @@ void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
 		{},
 	};
 
-	auto const [result, compute_pipeline] =
-	    device->vk().createComputePipeline({}, compute_pipeline_info);
+	auto const [result, compute_pipeline] = device->vk().createComputePipeline(
+	    {},
+	    compute_pipeline_info
+	);
 
 	assert_false(result);
 	pipeline = compute_pipeline;
@@ -156,6 +174,8 @@ void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
 auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const
     -> vec<vk::DescriptorSetLayoutBinding>
 {
+	ScopeProfiler _;
+
 	auto combined_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 
 	for (Shader *const shader : shaders)
@@ -175,6 +195,8 @@ auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shade
 auto ShaderPipeline::create_shader_stage_create_infos(vec<Shader *> const &shaders) const
     -> vec<vk::PipelineShaderStageCreateInfo>
 {
+	ScopeProfiler _;
+
 	auto shader_stage_create_infos = vec<vk::PipelineShaderStageCreateInfo> {};
 	shader_stage_create_infos.resize(shaders.size());
 

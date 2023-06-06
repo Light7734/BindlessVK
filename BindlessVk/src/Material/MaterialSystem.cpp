@@ -1,6 +1,6 @@
 #include "BindlessVk/Material/MaterialSystem.hpp"
 
-#include <ranges>
+#include "Amender/Amender.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,6 +11,8 @@ Material::Material(
 )
     : shader_pipeline(shader_pipeline)
 {
+	ScopeProfiler _;
+
 	if (shader_pipeline->uses_shader_descriptor_set_slot())
 	{
 		auto const descriptor_set_layout = shader_pipeline->get_descriptor_set_layout();

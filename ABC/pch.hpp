@@ -35,6 +35,7 @@
 #include <bitset>
 #include <list>
 #include <map>
+#include <queue>
 #include <set>
 #include <span>
 #include <unordered_map>
@@ -54,6 +55,7 @@
 
 /* thread support */
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 

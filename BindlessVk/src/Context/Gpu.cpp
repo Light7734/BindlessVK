@@ -1,5 +1,7 @@
 #include "BindlessVk/Context/Gpu.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 Gpu::Gpu(
@@ -11,6 +13,8 @@ Gpu::Gpu(
     , surface(surface)
     , requirements(requirements)
 {
+	ScopeProfiler _;
+
 	calculate_max_sample_counts();
 	calculate_queue_indices();
 	check_adequacy();
@@ -24,6 +28,8 @@ auto Gpu::pick_by_score(
     fn<u32(Gpu)> const calculate_score
 ) -> Gpu
 {
+	ScopeProfiler _;
+
 	auto adequate_gpus = vec<Gpu> {};
 	auto scores = vec<u32> {};
 
@@ -55,43 +61,62 @@ auto Gpu::pick_by_score(
 
 void Gpu::calculate_max_sample_counts()
 {
+	ScopeProfiler _;
+
 	auto const limits = physical_device.getProperties().limits;
 
 	auto const color_sample_counts = limits.framebufferColorSampleCounts;
 	auto const depth_sample_counts = limits.framebufferDepthSampleCounts;
 	auto const depth_color_sample_counts = color_sample_counts & depth_sample_counts;
 
-	max_color_samples =
-	    color_sample_counts & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
+	max_color_samples = color_sample_counts & vk::SampleCountFlagBits::e64 ?
+	                        vk::SampleCountFlagBits::e64 :
 
-	    color_sample_counts & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
-	    color_sample_counts & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
-	    color_sample_counts & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
-	    color_sample_counts & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
-	    color_sample_counts & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
-	                                                         vk::SampleCountFlagBits::e1;
+	                    color_sample_counts & vk::SampleCountFlagBits::e32 ?
+	                        vk::SampleCountFlagBits::e32 :
+	                    color_sample_counts & vk::SampleCountFlagBits::e16 ?
+	                        vk::SampleCountFlagBits::e16 :
+	                    color_sample_counts & vk::SampleCountFlagBits::e8 ?
+	                        vk::SampleCountFlagBits::e8 :
+	                    color_sample_counts & vk::SampleCountFlagBits::e4 ?
+	                        vk::SampleCountFlagBits::e4 :
+	                    color_sample_counts & vk::SampleCountFlagBits::e2 ?
+	                        vk::SampleCountFlagBits::e2 :
+	                        vk::SampleCountFlagBits::e1;
 
-	max_depth_samples =
-	    depth_sample_counts & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
-	    depth_sample_counts & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
-	    depth_sample_counts & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
-	    depth_sample_counts & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
-	    depth_sample_counts & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
-	    depth_sample_counts & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
-	                                                         vk::SampleCountFlagBits::e1;
+	max_depth_samples = depth_sample_counts & vk::SampleCountFlagBits::e64 ?
+	                        vk::SampleCountFlagBits::e64 :
+	                    depth_sample_counts & vk::SampleCountFlagBits::e32 ?
+	                        vk::SampleCountFlagBits::e32 :
+	                    depth_sample_counts & vk::SampleCountFlagBits::e16 ?
+	                        vk::SampleCountFlagBits::e16 :
+	                    depth_sample_counts & vk::SampleCountFlagBits::e8 ?
+	                        vk::SampleCountFlagBits::e8 :
+	                    depth_sample_counts & vk::SampleCountFlagBits::e4 ?
+	                        vk::SampleCountFlagBits::e4 :
+	                    depth_sample_counts & vk::SampleCountFlagBits::e2 ?
+	                        vk::SampleCountFlagBits::e2 :
+	                        vk::SampleCountFlagBits::e1;
 
-	max_color_and_depth_samples =
-	    depth_color_sample_counts & vk::SampleCountFlagBits::e64 ? vk::SampleCountFlagBits::e64 :
-	    depth_color_sample_counts & vk::SampleCountFlagBits::e32 ? vk::SampleCountFlagBits::e32 :
-	    depth_color_sample_counts & vk::SampleCountFlagBits::e16 ? vk::SampleCountFlagBits::e16 :
-	    depth_color_sample_counts & vk::SampleCountFlagBits::e8  ? vk::SampleCountFlagBits::e8 :
-	    depth_color_sample_counts & vk::SampleCountFlagBits::e4  ? vk::SampleCountFlagBits::e4 :
-	    depth_color_sample_counts & vk::SampleCountFlagBits::e2  ? vk::SampleCountFlagBits::e2 :
-	                                                               vk::SampleCountFlagBits::e1;
+	max_color_and_depth_samples = depth_color_sample_counts & vk::SampleCountFlagBits::e64 ?
+	                                  vk::SampleCountFlagBits::e64 :
+	                              depth_color_sample_counts & vk::SampleCountFlagBits::e32 ?
+	                                  vk::SampleCountFlagBits::e32 :
+	                              depth_color_sample_counts & vk::SampleCountFlagBits::e16 ?
+	                                  vk::SampleCountFlagBits::e16 :
+	                              depth_color_sample_counts & vk::SampleCountFlagBits::e8 ?
+	                                  vk::SampleCountFlagBits::e8 :
+	                              depth_color_sample_counts & vk::SampleCountFlagBits::e4 ?
+	                                  vk::SampleCountFlagBits::e4 :
+	                              depth_color_sample_counts & vk::SampleCountFlagBits::e2 ?
+	                                  vk::SampleCountFlagBits::e2 :
+	                                  vk::SampleCountFlagBits::e1;
 }
 
 void Gpu::calculate_queue_indices()
 {
+	ScopeProfiler _;
+
 	auto const queue_family_properties = physical_device.getQueueFamilyProperties();
 
 	u32 index = 0u;
@@ -108,21 +133,25 @@ void Gpu::calculate_queue_indices()
 
 		++index;
 
-		if (graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
-		    present_queue_index != VK_QUEUE_FAMILY_IGNORED &&
-		    compute_queue_index != VK_QUEUE_FAMILY_IGNORED)
+		if (graphics_queue_index != VK_QUEUE_FAMILY_IGNORED
+		    && present_queue_index != VK_QUEUE_FAMILY_IGNORED
+		    && compute_queue_index != VK_QUEUE_FAMILY_IGNORED)
 			break;
 	}
 }
 
 void Gpu::check_adequacy()
 {
-	adequate = has_required_features() && has_required_queues() && has_required_extensions() &&
-	           can_present_to_surface();
+	ScopeProfiler _;
+
+	adequate = has_required_features() && has_required_queues() && has_required_extensions()
+	           && can_present_to_surface();
 }
 
 auto Gpu::has_required_features() const -> bool
 {
+	ScopeProfiler _;
+
 	auto const required_features = requirements.physical_device_features;
 	auto const required_features_arr = vec<vk::Bool32>(
 	    reinterpret_cast<vk::Bool32 const *>(&required_features.robustBufferAccess),
@@ -144,13 +173,17 @@ auto Gpu::has_required_features() const -> bool
 
 auto Gpu::has_required_queues() const -> bool
 {
-	return graphics_queue_index != VK_QUEUE_FAMILY_IGNORED &&
-	       present_queue_index != VK_QUEUE_FAMILY_IGNORED &&
-	       compute_queue_index != VK_QUEUE_FAMILY_IGNORED;
+	ScopeProfiler _;
+
+	return graphics_queue_index != VK_QUEUE_FAMILY_IGNORED
+	       && present_queue_index != VK_QUEUE_FAMILY_IGNORED
+	       && compute_queue_index != VK_QUEUE_FAMILY_IGNORED;
 }
 
 auto Gpu::has_required_extensions() const -> bool
 {
+	ScopeProfiler _;
+
 	for (auto const &required_extension : requirements.logical_device_extensions)
 		if (!has_extension(required_extension))
 			return false;
@@ -160,6 +193,8 @@ auto Gpu::has_required_extensions() const -> bool
 
 auto Gpu::has_extension(c_str const extension) const -> bool
 {
+	ScopeProfiler _;
+
 	auto const available_extensions = physical_device.enumerateDeviceExtensionProperties();
 
 	for (auto const &available_extension : available_extensions)
@@ -171,6 +206,8 @@ auto Gpu::has_extension(c_str const extension) const -> bool
 
 auto Gpu::can_present_to_surface() const -> bool
 {
+	ScopeProfiler _;
+
 	return !physical_device.getSurfacePresentModesKHR(surface).empty();
 }
 

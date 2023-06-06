@@ -2,6 +2,8 @@
 
 #include "BindlessVk/Context/VkContext.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 VkContext::VkContext(Instance *instance, Surface *surface, Gpu *gpu, Queues *queues, Device *device)
@@ -11,10 +13,12 @@ VkContext::VkContext(Instance *instance, Surface *surface, Gpu *gpu, Queues *que
     , queues(queues)
     , device(device)
 {
+	ScopeProfiler _;
 }
 
 VkContext::~VkContext()
 {
+	ScopeProfiler _;
 }
 
 } // namespace BINDLESSVK_NAMESPACE

@@ -1,13 +1,18 @@
 #include "BindlessVk/Shader/Loaders/SpvLoader.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 SpvLoader::SpvLoader(VkContext const *const vk_context): device(vk_context->get_device())
 {
+	ScopeProfiler _;
 }
 
 Shader SpvLoader::load(str_view const path)
 {
+	ScopeProfiler _;
+
 	load_code(path);
 	reflect_code();
 
@@ -18,6 +23,8 @@ Shader SpvLoader::load(str_view const path)
 
 void SpvLoader::load_code(str_view const path)
 {
+	ScopeProfiler _;
+
 	auto file_stream = std::ifstream(path.data(), std::ios::ate);
 	usize const file_size = file_stream.tellg();
 	code.resize(file_size / sizeof(u32));
@@ -29,6 +36,8 @@ void SpvLoader::load_code(str_view const path)
 
 void SpvLoader::reflect_code()
 {
+	ScopeProfiler _;
+
 	assert_false(
 	    spvReflectCreateShaderModule(code.size() * sizeof(u32), code.data(), &reflection),
 	    "spvReflectCreateShderModule failed"
@@ -40,6 +49,8 @@ void SpvLoader::reflect_code()
 
 void SpvLoader::create_vulkan_shader_module()
 {
+	ScopeProfiler _;
+
 	shader.module = device->vk().createShaderModule(vk::ShaderModuleCreateInfo {
 	    {},
 	    code.size() * sizeof(u32),
@@ -49,6 +60,8 @@ void SpvLoader::create_vulkan_shader_module()
 
 void SpvLoader::reflect_descriptor_sets()
 {
+	ScopeProfiler _;
+
 	u32 descriptor_sets_count = 0;
 	assert_false(
 	    spvReflectEnumerateDescriptorSets(&reflection, &descriptor_sets_count, nullptr),
@@ -78,6 +91,8 @@ void SpvLoader::reflect_descriptor_sets()
 auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *const spv_set)
     -> vec<vk::DescriptorSetLayoutBinding>
 {
+	ScopeProfiler _;
+
 	vec<vk::DescriptorSetLayoutBinding> bindings = {};
 
 	for (u32 i_binding = 0; i_binding < spv_set->binding_count; ++i_binding)
@@ -98,6 +113,8 @@ auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *c
 auto SpvLoader::extract_descriptor_set_binding(SpvReflectDescriptorBinding const *const binding)
     -> vk::DescriptorSetLayoutBinding
 {
+	ScopeProfiler _;
+
 	vk::DescriptorSetLayoutBinding set_binding;
 	set_binding = binding->binding;
 
@@ -119,6 +136,8 @@ auto SpvLoader::extract_descriptor_set_binding(SpvReflectDescriptorBinding const
 
 void SpvLoader::reflect_shader_stage()
 {
+	ScopeProfiler _;
+
 	if (reflection.shader_stage & SPV_REFLECT_SHADER_STAGE_VERTEX_BIT)
 		shader.stage = vk::ShaderStageFlagBits::eVertex;
 	else if (reflection.shader_stage & SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT)

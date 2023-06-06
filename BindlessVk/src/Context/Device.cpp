@@ -1,9 +1,13 @@
 #include "BindlessVk/Context/Device.hpp"
 
+#include "Amender/Amender.hpp"
+
 namespace BINDLESSVK_NAMESPACE {
 
 Device::Device(Gpu *gpu)
 {
+	ScopeProfiler _;
+
 	auto indexing_features = vk::PhysicalDeviceDescriptorIndexingFeaturesEXT {};
 	indexing_features.descriptorBindingPartiallyBound = true;
 	indexing_features.runtimeDescriptorArray = true;
@@ -38,11 +42,15 @@ Device::Device(Gpu *gpu)
 
 Device::Device(Device &&other)
 {
+	ScopeProfiler _;
+
 	*this = std::move(other);
 }
 
 Device &Device::operator=(Device &&other)
 {
+	ScopeProfiler _;
+
 	this->device = other.device;
 	this->graphics_queue = other.graphics_queue;
 	this->immediate_cmd_pool = other.immediate_cmd_pool;
@@ -55,6 +63,8 @@ Device &Device::operator=(Device &&other)
 
 Device::~Device()
 {
+	ScopeProfiler _;
+
 	if (!device)
 		return;
 
@@ -69,6 +79,8 @@ void Device::immediate_submit(
     vk::QueueFlags const queue /* = vk::QueueFlagBits::eGraphics */
 ) const
 {
+	ScopeProfiler _;
+
 	auto const alloc_info = vk::CommandBufferAllocateInfo {
 		immediate_cmd_pool,
 		vk::CommandBufferLevel::ePrimary,
@@ -77,8 +89,9 @@ void Device::immediate_submit(
 
 	auto const cmd = device.allocateCommandBuffers(alloc_info)[0];
 
-	auto const beginInfo =
-	    vk::CommandBufferBeginInfo { vk::CommandBufferUsageFlagBits::eOneTimeSubmit };
+	auto const beginInfo = vk::CommandBufferBeginInfo {
+		vk::CommandBufferUsageFlagBits::eOneTimeSubmit
+	};
 
 	cmd.begin(beginInfo);
 	func(cmd);
@@ -102,6 +115,8 @@ void Device::immediate_submit(
 
 auto Device::create_queues_create_infos(Gpu *gpu) const -> vec<vk::DeviceQueueCreateInfo>
 {
+	ScopeProfiler _;
+
 	auto static constexpr queue_priority = arr<f32, 1> { 1.0 };
 
 	auto const graphics_queue_index = gpu->get_graphics_queue_index();

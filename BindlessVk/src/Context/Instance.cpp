@@ -1,6 +1,6 @@
 #include "BindlessVk/Context/Instance.hpp"
 
-#include "Amender/Logger.hpp"
+#include "Amender/Amender.hpp"
 
 VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
 
@@ -8,11 +8,14 @@ namespace BINDLESSVK_NAMESPACE {
 
 auto static parse_message_type(VkDebugUtilsMessageTypeFlagsEXT const message_types) -> c_str
 {
+	ScopeProfiler _;
+
 	if (message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
 		return "GENERAL";
 
-	if (message_types == (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-	                      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT))
+	if (message_types
+	    == (VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+	        | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT))
 		return "VALIDATION | PERFORMANCE";
 
 	if (message_types == VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
@@ -24,6 +27,8 @@ auto static parse_message_type(VkDebugUtilsMessageTypeFlagsEXT const message_typ
 auto static parse_message_severity(VkDebugUtilsMessageSeverityFlagBitsEXT const message_severity)
     -> LogLvl
 {
+	ScopeProfiler _;
+
 	switch (message_severity)
 	{
 	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT: return LogLvl::eTrace;
@@ -44,6 +49,8 @@ auto static validation_layers_callback(
     void *const vulkan_user_data
 ) -> VkBool32
 {
+	ScopeProfiler _;
+
 	auto const type = parse_message_type(message_types);
 	auto const level = parse_message_severity(message_severity);
 
@@ -54,6 +61,8 @@ auto static validation_layers_callback(
 Instance::Instance(Requirements const &requirements, Filter const &filter)
     : requirements(requirements)
 {
+	ScopeProfiler _;
+
 	load_functions();
 	check_layer_support();
 	create_instance();
@@ -70,11 +79,15 @@ Instance::Instance(Requirements const &requirements, Filter const &filter)
 
 Instance::Instance(Instance &&other)
 {
+	ScopeProfiler _;
+
 	*this = std::move(other);
 }
 
 Instance &Instance::operator=(Instance &&other)
 {
+	ScopeProfiler _;
+
 	this->instance = other.instance;
 	this->requirements = other.requirements;
 
@@ -85,6 +98,8 @@ Instance &Instance::operator=(Instance &&other)
 
 Instance::~Instance()
 {
+	ScopeProfiler _;
+
 	if (!instance)
 		return;
 
@@ -94,6 +109,8 @@ Instance::~Instance()
 
 void Instance::load_functions()
 {
+	ScopeProfiler _;
+
 	VULKAN_HPP_DEFAULT_DISPATCHER.init(
 	    vk::DynamicLoader().getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr")
 	);
@@ -101,6 +118,8 @@ void Instance::load_functions()
 
 void Instance::check_layer_support()
 {
+	ScopeProfiler _;
+
 	for (auto const layer : requirements.layers)
 		if (!has_layer(layer))
 			assert_fail("Required layer: {} is not supported", layer);
@@ -108,6 +127,8 @@ void Instance::check_layer_support()
 
 void Instance::create_instance()
 {
+	ScopeProfiler _;
+
 	auto const application_info = vk::ApplicationInfo {
 		"BindlessVk",
 		VK_MAKE_VERSION(1, 0, 0),
@@ -133,6 +154,8 @@ void Instance::create_instance()
 
 auto Instance::has_layer(c_str layer) const -> bool
 {
+	ScopeProfiler _;
+
 	for (auto const &layer_properties : vk::enumerateInstanceLayerProperties())
 		if (strcmp(layer, layer_properties.layerName))
 			return true;

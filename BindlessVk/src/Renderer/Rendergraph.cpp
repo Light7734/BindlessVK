@@ -1,6 +1,6 @@
 #include "BindlessVk/Renderer/Rendergraph.hpp"
 
-#include "Amender/Logger.hpp"
+#include "Amender/Amender.hpp"
 #include "BindlessVk/Texture/Texture.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
@@ -15,10 +15,13 @@ RenderGraphBuilder::RenderGraphBuilder(
     , memory_allocator(memory_allocator)
     , descriptor_allocator(descriptor_allocator)
 {
+	ScopeProfiler _;
 }
 
 void RenderGraphBuilder::build_graph()
 {
+	ScopeProfiler _;
+
 	auto const backbuffer_attachment_key = node_blueprints.back().color_attachments.back().hash;
 	resources->add_key_to_attachment_index(backbuffer_attachment_key, 0);
 
@@ -31,6 +34,8 @@ void RenderGraphBuilder::build_graph()
 
 void RenderGraphBuilder::build_node(RenderNodeBlueprint const &node_blueprint)
 {
+	ScopeProfiler _;
+
 	build_node_color_attachments(node_blueprint);
 	build_node_depth_attachment(node_blueprint);
 	build_node_buffer_inputs(node_blueprint);
@@ -44,6 +49,8 @@ void RenderGraphBuilder::build_node(RenderNodeBlueprint const &node_blueprint)
 
 void RenderGraphBuilder::setup_node(RenderNodeBlueprint const &node_blueprint, RenderNode *parent)
 {
+	ScopeProfiler _;
+
 	node_blueprint.derived_object->on_setup(parent);
 
 	for (auto const &child_node_blueprint : node_blueprint.children)
@@ -52,6 +59,8 @@ void RenderGraphBuilder::setup_node(RenderNodeBlueprint const &node_blueprint, R
 
 void RenderGraphBuilder::build_node_color_attachments(RenderNodeBlueprint const &node_blueprint)
 {
+	ScopeProfiler _;
+
 	if (!node_blueprint.has_color_attachment())
 		return;
 
@@ -80,6 +89,8 @@ void RenderGraphBuilder::build_node_depth_attachment(RenderNodeBlueprint const &
 
 void RenderGraphBuilder::build_node_buffer_inputs(RenderNodeBlueprint const &node_blueprint)
 {
+	ScopeProfiler _;
+
 	auto *node = node_blueprint.derived_object;
 	node->buffer_inputs.reserve(node_blueprint.buffer_inputs.size());
 
@@ -90,8 +101,8 @@ void RenderGraphBuilder::build_node_buffer_inputs(RenderNodeBlueprint const &nod
 		    buffer_blueprint.usage,
 		    buffer_blueprint.allocation_info,
 		    buffer_blueprint.size,
-		    buffer_blueprint.update_frequency ==
-		            RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
+		    buffer_blueprint.update_frequency
+		            == RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame ?
 		        max_frames_in_flight :
 		        1,
 		    buffer_blueprint.name
@@ -100,11 +111,15 @@ void RenderGraphBuilder::build_node_buffer_inputs(RenderNodeBlueprint const &nod
 
 void RenderGraphBuilder::build_node_texture_inputs(RenderNodeBlueprint const &node_blueprint)
 {
+	ScopeProfiler _;
+
 	log_wrn("Texture inputs are not supported (yet)");
 }
 
 void RenderGraphBuilder::build_node_descriptors(RenderNodeBlueprint const &node_blueprint)
 {
+	ScopeProfiler _;
+
 	auto *const node = node_blueprint.derived_object;
 	auto graphics_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 	auto compute_bindings = vec<vk::DescriptorSetLayoutBinding> {};
@@ -127,6 +142,8 @@ void RenderGraphBuilder::build_node_descriptors(RenderNodeBlueprint const &node_
 
 void RenderGraphBuilder::initialize_node_descriptors(RenderNodeBlueprint const &node_blueprint)
 {
+	ScopeProfiler _;
+
 	auto *node = node_blueprint.derived_object;
 
 	auto buffer_infos = vec<vk::DescriptorBufferInfo> {};
@@ -146,6 +163,8 @@ auto RenderGraphBuilder::create_color_attachment(
     vk::SampleCountFlagBits sample_count
 ) -> RenderNode::Attachment
 {
+	ScopeProfiler _;
+
 	auto const has_input = !!attachment_blueprint.input_hash;
 	auto const is_multisampled = sample_count != vk::SampleCountFlagBits::e1;
 
@@ -165,8 +184,10 @@ auto RenderGraphBuilder::create_color_attachment(
 	attachment.resource_index = get_or_create_color_resource(attachment_blueprint, sample_count);
 
 	if (is_multisampled)
-		attachment.transient_resource_index =
-		    get_or_create_transient_color_resource(attachment_blueprint, sample_count);
+		attachment.transient_resource_index = get_or_create_transient_color_resource(
+		    attachment_blueprint,
+		    sample_count
+		);
 
 	assert_true(attachment.has_resource());
 	assert_true(is_multisampled == attachment.has_transient_resource());
@@ -179,12 +200,14 @@ auto RenderGraphBuilder::create_depth_attachment(
     vk::SampleCountFlagBits sample_count
 ) -> RenderNode::Attachment
 {
+	ScopeProfiler _;
+
 	auto const has_input = !!attachment_blueprint.input_hash;
 
 	auto attachment = RenderNode::Attachment {
 		vk::PipelineStageFlagBits::eEarlyFragmentTests,
-		vk::AccessFlagBits::eDepthStencilAttachmentRead |
-		    vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+		vk::AccessFlagBits::eDepthStencilAttachmentRead
+		    | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
 		vk::ImageLayout::eDepthAttachmentOptimal,
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
@@ -214,6 +237,8 @@ auto RenderGraphBuilder::get_or_create_color_resource(
     vk::SampleCountFlagBits sample_count
 ) -> u32
 {
+	ScopeProfiler _;
+
 	auto index = resources->try_get_attachment_index(attachment_blueprint.hash);
 
 	if (index != std::numeric_limits<u32>::max())
@@ -232,8 +257,12 @@ auto RenderGraphBuilder::get_or_create_transient_color_resource(
     vk::SampleCountFlagBits const sample_count
 ) -> u32
 {
-	auto index =
-	    resources->try_get_suitable_transient_attachment_index(attachment_blueprint, sample_count);
+	ScopeProfiler _;
+
+	auto index = resources->try_get_suitable_transient_attachment_index(
+	    attachment_blueprint,
+	    sample_count
+	);
 
 	if (index == std::numeric_limits<u32>::max())
 	{
@@ -253,6 +282,8 @@ auto RenderGraphBuilder::get_or_create_depth_resource(
     vk::SampleCountFlagBits sample_count
 ) -> u32
 {
+	ScopeProfiler _;
+
 	auto index = resources->try_get_attachment_index(attachment_blueprint.hash);
 
 	if (index != std::numeric_limits<u32>::max())
@@ -273,6 +304,8 @@ void RenderGraphBuilder::extract_node_buffer_descriptor_bindings(
     vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
 )
 {
+	ScopeProfiler _;
+
 	for (auto const &buffer_input : buffer_inputs)
 		extract_input_descriptor_bindings(
 		    buffer_input.descriptor_infos,
@@ -287,6 +320,8 @@ void RenderGraphBuilder::extract_node_texture_descriptor_bindings(
     vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
 )
 {
+	ScopeProfiler _;
+
 	for (auto const &texture_input : texture_inputs)
 		extract_input_descriptor_bindings(
 		    texture_input.descriptor_infos,
@@ -301,6 +336,8 @@ void RenderGraphBuilder::extract_input_descriptor_bindings(
     vec<vk::DescriptorSetLayoutBinding> *out_graphics_bindings
 )
 {
+	ScopeProfiler _;
+
 	for (auto const &descriptor_info : descriptor_infos)
 		if (descriptor_info.pipeline_bind_point == vk::PipelineBindPoint::eCompute)
 			out_compute_bindings->emplace_back(descriptor_info.layout);
@@ -314,6 +351,8 @@ void RenderGraphBuilder::build_node_compute_descriptors(
     vec<vk::DescriptorSetLayoutBinding> const &bindings
 )
 {
+	ScopeProfiler _;
+
 	auto const flags = vec<vk::DescriptorBindingFlags>(
 	    bindings.size(),
 	    vk::DescriptorBindingFlagBits::ePartiallyBound
@@ -363,6 +402,8 @@ void RenderGraphBuilder::build_node_graphics_descriptors(
     vec<vk::DescriptorSetLayoutBinding> const &bindings
 )
 {
+	ScopeProfiler _;
+
 	auto const flags = vec<vk::DescriptorBindingFlags>(
 	    bindings.size(),
 	    vk::DescriptorBindingFlagBits::ePartiallyBound
@@ -381,11 +422,12 @@ void RenderGraphBuilder::build_node_graphics_descriptors(
 	);
 
 	// pipeline layout
-	node->graphics_pipeline_layout =
-	    device->vk().createPipelineLayout(vk::PipelineLayoutCreateInfo {
+	node->graphics_pipeline_layout = device->vk().createPipelineLayout(
+	    vk::PipelineLayoutCreateInfo {
 	        {},
 	        node->graphics_descriptor_set_layout,
-	    });
+	    }
+	);
 	device->set_object_name(node->graphics_pipeline_layout, "graph_graphics_pipeline_layout");
 
 	// descriptor sets
@@ -414,6 +456,8 @@ void RenderGraphBuilder::extract_node_buffer_descriptor_writes(
     vec<vk::WriteDescriptorSet> *out_writes
 )
 {
+	ScopeProfiler _;
+
 	for (auto const buffer_blueprint : node_blueprint.buffer_inputs)
 		for (u32 i = 0; i < max_frames_in_flight; ++i)
 			extract_frame_buffer_descriptor_writes(
@@ -455,8 +499,10 @@ void RenderGraphBuilder::extract_frame_buffer_descriptor_writes(
     vec<vk::WriteDescriptorSet> *out_writes
 )
 {
-	auto const per_frame = buffer_blueprint.update_frequency ==
-	                       RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame;
+	ScopeProfiler _;
+
+	auto const per_frame = buffer_blueprint.update_frequency
+	                       == RenderNodeBlueprint::BufferInput::UpdateFrequency::ePerFrame;
 
 	auto const &buffer_input = node->buffer_inputs[buffer_blueprint.key];
 
@@ -483,6 +529,8 @@ void RenderGraphBuilder::extract_frame_texture_descriptor_writes(
     vec<vk::WriteDescriptorSet> *out_writes
 )
 {
+	ScopeProfiler _;
+
 	for (auto const &descriptor_info : texture_blueprint.descriptor_infos)
 		extract_descriptor_writes(
 		    descriptor_info,
@@ -502,6 +550,8 @@ void RenderGraphBuilder::extract_descriptor_writes(
     vec<vk::WriteDescriptorSet> *const out_writes
 )
 {
+	ScopeProfiler _;
+
 	for (u32 i = 0; i < descriptor_info.layout.descriptorCount; ++i)
 		out_writes->emplace_back(
 		    descriptor_set,
