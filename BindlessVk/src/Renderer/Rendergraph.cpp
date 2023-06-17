@@ -208,7 +208,7 @@ auto RenderGraphBuilder::create_depth_attachment(
 		vk::PipelineStageFlagBits::eEarlyFragmentTests,
 		vk::AccessFlagBits::eDepthStencilAttachmentRead
 		    | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-		vk::ImageLayout::eDepthAttachmentOptimal,
+		vk::ImageLayout::eDepthStencilAttachmentOptimal,
 		vk::ImageSubresourceRange {
 		    vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil,
 		    0,
