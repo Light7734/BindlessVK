@@ -1,13 +1,13 @@
 #include "BindlessVk/Model/Model.hpp"
 
-#include "Amender/Amender.hpp"
+
 #include "BindlessVk/Buffers/Buffer.hpp"
 
 namespace BINDLESSVK_NAMESPACE {
 
 Model::~Model()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (nodes.empty())
 		return;
@@ -18,7 +18,7 @@ Model::~Model()
 
 auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription, 4>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	return arr<vk::VertexInputAttributeDescription, 4> {
 		vk::VertexInputAttributeDescription {
@@ -50,7 +50,7 @@ auto Model::Vertex::get_attributes() -> arr<vk::VertexInputAttributeDescription,
 
 auto Model::Vertex::get_bindings() -> arr<vk::VertexInputBindingDescription, 1>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	return arr<vk::VertexInputBindingDescription, 1> {
 		vk::VertexInputBindingDescription {
@@ -63,7 +63,7 @@ auto Model::Vertex::get_bindings() -> arr<vk::VertexInputBindingDescription, 1>
 
 auto Model::Vertex::get_vertex_input_state() -> vk::PipelineVertexInputStateCreateInfo
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto static const attributes = get_attributes();
 	auto static const bindings = get_bindings();

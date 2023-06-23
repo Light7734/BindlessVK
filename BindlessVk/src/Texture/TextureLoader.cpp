@@ -1,6 +1,6 @@
 #include "BindlessVk/Texture/TextureLoader.hpp"
 
-#include "Amender/Amender.hpp"
+
 #include "BindlessVk/Texture/Loaders/BinaryLoader.hpp"
 #include "BindlessVk/Texture/Loaders/KtxLoader.hpp"
 
@@ -19,7 +19,7 @@ TextureLoader::TextureLoader(
     : vk_context(vk_context)
     , memory_allocator(memory_allocator)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const gpu = vk_context->get_gpu();
 
@@ -42,7 +42,7 @@ auto TextureLoader::load_from_binary(
     str_view const debug_name           /* = default_debug_name */
 ) const -> Texture
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	BinaryLoader loader(vk_context, memory_allocator, staging_buffer);
 	return std::move(loader.load(pixels, width, height, size, type, final_layout, debug_name));
@@ -56,7 +56,7 @@ auto TextureLoader::load_from_ktx(
     str_view const debug_name     /* = default_debug_name */
 ) const -> Texture
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	KtxLoader loader(vk_context, memory_allocator, staging_buffer);
 	return std::move(loader.load(uri, type, layout, debug_name));

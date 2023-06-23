@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
+option(TRACY_ENABLE "" ON)
+
 # Dependencies
 add_subdirectory(./entt)
 add_subdirectory(./glfw)
@@ -9,6 +11,7 @@ add_subdirectory(./nlohmann/)
 add_subdirectory(./spirv-reflect/)
 add_subdirectory(./spdlog)
 add_subdirectory(./tinygltf)
+add_subdirectory(./tracy)
 
 # Configuration files
 configure_file(${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h ${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h)

@@ -1,7 +1,5 @@
 #include "BindlessVk/Context/Swapchain.hpp"
 
-#include "Amender/Amender.hpp"
-
 namespace BINDLESSVK_NAMESPACE {
 
 Swapchain::Swapchain(VkContext const *const vk_context)
@@ -10,7 +8,7 @@ Swapchain::Swapchain(VkContext const *const vk_context)
     , queues(vk_context->get_queues())
     , invalid(false)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	destroy_image_views();
 
@@ -23,7 +21,7 @@ Swapchain::Swapchain(VkContext const *const vk_context)
 
 Swapchain::~Swapchain()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!device)
 		return;
@@ -33,7 +31,7 @@ Swapchain::~Swapchain()
 
 void Swapchain::create_swapchain()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const old_swapchain = swapchain;
 	auto const queues_indices = queues->get_indices();
@@ -62,7 +60,7 @@ void Swapchain::create_swapchain()
 
 void Swapchain::create_image_views()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	image_views.resize(get_image_count());
 
@@ -92,7 +90,7 @@ void Swapchain::create_image_views()
 
 void Swapchain::set_object_names()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	for (u32 i = 0; i < get_image_count(); ++i)
 	{
@@ -103,7 +101,7 @@ void Swapchain::set_object_names()
 
 auto Swapchain::calculate_best_image_count() const -> u32
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const min_image_count = surface->get_capabilities().minImageCount;
 	auto const max_image_count = surface->get_capabilities().maxImageCount;
@@ -126,7 +124,7 @@ auto Swapchain::calculate_best_image_count() const -> u32
 
 void Swapchain::destroy_image_views()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	for (auto const image_view : image_views)
 		device->vk().destroyImageView(image_view);

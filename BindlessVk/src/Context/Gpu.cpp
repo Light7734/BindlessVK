@@ -1,6 +1,6 @@
 #include "BindlessVk/Context/Gpu.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -13,7 +13,7 @@ Gpu::Gpu(
     , surface(surface)
     , requirements(requirements)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	calculate_max_sample_counts();
 	calculate_queue_indices();
@@ -28,7 +28,7 @@ auto Gpu::pick_by_score(
     fn<u32(Gpu)> const calculate_score
 ) -> Gpu
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto adequate_gpus = vec<Gpu> {};
 	auto scores = vec<u32> {};
@@ -61,7 +61,7 @@ auto Gpu::pick_by_score(
 
 void Gpu::calculate_max_sample_counts()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const limits = physical_device.getProperties().limits;
 
@@ -115,7 +115,7 @@ void Gpu::calculate_max_sample_counts()
 
 void Gpu::calculate_queue_indices()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const queue_family_properties = physical_device.getQueueFamilyProperties();
 
@@ -142,7 +142,7 @@ void Gpu::calculate_queue_indices()
 
 void Gpu::check_adequacy()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	adequate = has_required_features() && has_required_queues() && has_required_extensions()
 	           && can_present_to_surface();
@@ -150,7 +150,7 @@ void Gpu::check_adequacy()
 
 auto Gpu::has_required_features() const -> bool
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const required_features = requirements.physical_device_features;
 	auto const required_features_arr = vec<vk::Bool32>(
@@ -173,7 +173,7 @@ auto Gpu::has_required_features() const -> bool
 
 auto Gpu::has_required_queues() const -> bool
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	return graphics_queue_index != VK_QUEUE_FAMILY_IGNORED
 	       && present_queue_index != VK_QUEUE_FAMILY_IGNORED
@@ -182,7 +182,7 @@ auto Gpu::has_required_queues() const -> bool
 
 auto Gpu::has_required_extensions() const -> bool
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	for (auto const &required_extension : requirements.logical_device_extensions)
 		if (!has_extension(required_extension))
@@ -193,7 +193,7 @@ auto Gpu::has_required_extensions() const -> bool
 
 auto Gpu::has_extension(c_str const extension) const -> bool
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const available_extensions = physical_device.enumerateDeviceExtensionProperties();
 
@@ -206,7 +206,7 @@ auto Gpu::has_extension(c_str const extension) const -> bool
 
 auto Gpu::can_present_to_surface() const -> bool
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	return !physical_device.getSurfacePresentModesKHR(surface).empty();
 }

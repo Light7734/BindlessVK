@@ -1,6 +1,6 @@
 #include "BindlessVk/Shader/Shader.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 ShaderPipeline::ShaderPipeline(
@@ -18,7 +18,7 @@ ShaderPipeline::ShaderPipeline(
     , layout_allocator(layout_allocator)
     , debug_name(debug_name)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	assert_false(shaders.empty(), "No shaders provided to shader pipeline {}", debug_name);
 
@@ -37,7 +37,7 @@ ShaderPipeline::ShaderPipeline(
 
 ShaderPipeline::~ShaderPipeline()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!device)
 		return;
@@ -47,7 +47,7 @@ ShaderPipeline::~ShaderPipeline()
 
 void ShaderPipeline::create_descriptor_set_layout(vec<Shader *> const &shaders)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const shader_set_bindings = combine_descriptor_sets_bindings(shaders);
 
@@ -70,7 +70,7 @@ void ShaderPipeline::create_pipeline_layout(
     DescriptorSetLayoutWithHash pass_descriptor_set_layout
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	pipeline_layout = layout_allocator->goc_pipeline_layout(
 	    {},
@@ -86,7 +86,7 @@ void ShaderPipeline::create_graphics_pipeline(
     ShaderPipeline::Configuration const configuration
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const surface_color_format = surface->get_color_format();
 
@@ -147,7 +147,7 @@ void ShaderPipeline::create_graphics_pipeline(
 
 void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const shader_stage_create_infos = create_shader_stage_create_infos(shaders);
 
@@ -174,7 +174,7 @@ void ShaderPipeline::create_compute_pipeline(vec<Shader *> const &shaders)
 auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shaders) const
     -> vec<vk::DescriptorSetLayoutBinding>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto combined_bindings = vec<vk::DescriptorSetLayoutBinding> {};
 
@@ -195,7 +195,7 @@ auto ShaderPipeline::combine_descriptor_sets_bindings(vec<Shader *> const &shade
 auto ShaderPipeline::create_shader_stage_create_infos(vec<Shader *> const &shaders) const
     -> vec<vk::PipelineShaderStageCreateInfo>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto shader_stage_create_infos = vec<vk::PipelineShaderStageCreateInfo> {};
 	shader_stage_create_infos.resize(shaders.size());

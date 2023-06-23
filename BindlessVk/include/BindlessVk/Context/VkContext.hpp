@@ -7,7 +7,16 @@
 #include "BindlessVk/Context/Queues.hpp"
 #include "BindlessVk/Context/Surface.hpp"
 
+#include <tracy/TracyVulkan.hpp>
+
 namespace BINDLESSVK_NAMESPACE {
+
+struct TracyContext
+{
+	tracy::VkCtx *context;
+	vk::CommandPool pool;
+	vk::CommandBuffer cmd;
+};
 
 /** Helper class for accessing preliminary vulkan wrapper */
 class VkContext
@@ -25,6 +34,12 @@ public:
 	 * @param device The vulkan device wrapper
 	 */
 	VkContext(Instance *instance, Surface *surface, Gpu *gpu, Queues *queues, Device *device);
+
+	/** Default move constructor */
+	VkContext(VkContext &&other) = default;
+
+	/** Default move assignment operator */
+	VkContext &operator=(VkContext &&other) = default;
 
 	/** Destructor */
 	~VkContext();
@@ -59,6 +74,18 @@ public:
 		return queues;
 	}
 
+	/** Trivial accessor for tracy_graphics */
+	auto get_tracy_graphics() const
+	{
+		return tracy_graphics;
+	}
+
+	/** Trivial accessor for tracy_compute */
+	auto get_tracy_compute() const
+	{
+		return tracy_compute;
+	}
+
 	/** Trivial accessor for num_threads */
 	auto get_num_threads() const
 	{
@@ -66,11 +93,18 @@ public:
 	}
 
 private:
-	Instance *instance = {};
+	auto create_tracy_context_for_queue(vk::Queue queue, u32 queue_index) -> TracyContext;
+
+private:
+	tidy_ptr<Instance> instance = {};
+
 	Device *device = {};
 	Surface *surface = {};
 	Gpu *gpu = {};
 	Queues *queues = {};
+
+	TracyContext tracy_graphics;
+	TracyContext tracy_compute;
 
 	u32 num_threads = 1u;
 };

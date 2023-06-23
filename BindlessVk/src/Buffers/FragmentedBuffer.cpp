@@ -1,6 +1,6 @@
 #include "BindlessVk/Buffers/FragmentedBuffer.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -33,12 +33,12 @@ FragmentedBuffer::FragmentedBuffer(
       )
     , map(buffer.map_block(0))
 {
-	ScopeProfiler _;
+	ZoneScoped;
 }
 
 void FragmentedBuffer::copy_staging_to_fragment(Buffer *staging_buffer, Fragment fragment)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	buffer.write_buffer(
 	    *staging_buffer,
@@ -52,7 +52,7 @@ void FragmentedBuffer::copy_staging_to_fragment(Buffer *staging_buffer, Fragment
 
 void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto static offset = vk::DeviceSize {};
 
@@ -79,7 +79,7 @@ void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 
 [[nodiscard]] auto FragmentedBuffer::grab_fragment(u32 size) -> Fragment
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	for (auto &region : fragments)
 		if (region.length >= size)
@@ -102,7 +102,7 @@ void FragmentedBuffer::bind(vk::CommandBuffer cmd, u32 binding /** = 0 */) const
 
 void FragmentedBuffer::return_fragment(Fragment returned_fragment)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	// if returned_fragment is contiguous to any free region then
 	// simply expand the non-occupied region

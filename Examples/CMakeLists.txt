@@ -29,21 +29,22 @@ target_include_directories(
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Framework/include
     PUBLIC ${CMAKE_SOURCE_DIR}/ABC/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/BindlessVk/include
-    PUBLIC ${CMAKE_SOURCE_DIR}/Amender/include
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/entt/single_include/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/glfw/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/imgui/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
+    PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/tracy/public/
 )
 
 target_link_libraries(
     Framework
+    PRIVATE ABC
     PUBLIC BindlessVk
-    PRIVATE Amender
     PUBLIC vulkan
     PUBLIC glfw
     PUBLIC imgui
+    PUBLIC TracyClient
 )
 
 target_precompile_headers(
@@ -69,7 +70,6 @@ set_target_properties(
 target_include_directories(
     Rendergraphs
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/
-    PUBLIC ${CMAKE_SOURCE_DIR}/Amender/include
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Framework/include
     PUBLIC ${CMAKE_SOURCE_DIR}/BindlessVk/include
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/entt/single_include/
@@ -77,12 +77,13 @@ target_include_directories(
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/imgui/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
     PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
+    PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/tracy/public/
 )
 
 target_link_libraries(
     Rendergraphs
+    PRIVATE ABC
     PUBLIC Framework
-    PRIVATE Amender
 )
 
 target_precompile_headers(
@@ -109,7 +110,6 @@ target_include_directories(
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Development/
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Framework/include
-    PUBLIC ${CMAKE_SOURCE_DIR}/Amender/include
     PRIVATE ${CMAKE_SOURCE_DIR}/BindlessVk/include
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/VulkanMemoryAllocator/include/
@@ -119,12 +119,13 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/entt/single_include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/imgui/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/glfw/include/
+    PUBLIC ${CMAKE_SOURCE_DIR}/Vendor/tracy/public/
 )
 
 target_link_libraries(
     Example_Development
-    PRIVATE Amender
 
+    PRIVATE ABC
     PRIVATE AssetParser
     PRIVATE BindlessVk
     PRIVATE Framework

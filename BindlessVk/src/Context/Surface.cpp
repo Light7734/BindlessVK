@@ -1,6 +1,6 @@
 #include "BindlessVk/Context/Surface.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -15,7 +15,7 @@ Surface::Surface(
     , capabilities(gpu->vk().getSurfaceCapabilitiesKHR(surface))
     , fn_get_framebuffer_extent(get_framebuffer_extent)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	select_best_surface_format(calculate_format_score, gpu);
 	select_best_present_mode(calculate_present_mode_score, gpu);
@@ -28,7 +28,7 @@ void Surface::select_best_surface_format(
     Gpu const *const gpu
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const supported_formats = gpu->vk().getSurfaceFormatsKHR(surface);
 
@@ -52,7 +52,7 @@ void Surface::select_best_present_mode(
     Gpu const *const gpu
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const supported_present_modes = gpu->vk().getSurfacePresentModesKHR(surface);
 
@@ -71,7 +71,7 @@ void Surface::select_best_present_mode(
 
 void Surface::select_best_depth_format(Gpu const *const gpu)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const properties = gpu->vk().getProperties();
 	auto const formats = arr<vk::Format, 3> {
@@ -93,7 +93,7 @@ void Surface::select_best_depth_format(Gpu const *const gpu)
 
 void Surface::update_framebuffer_extent()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	framebuffer_extent = std::clamp(
 	    fn_get_framebuffer_extent(),

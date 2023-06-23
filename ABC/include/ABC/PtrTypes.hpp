@@ -38,12 +38,21 @@ public:
 		return *this;
 	}
 
+	tidy_ptr(tidy_ptr const &other) = default;
+
+	tidy_ptr &operator=(tidy_ptr const &other) = default;
+
 	operator T *()
 	{
 		return ptr;
 	}
 
 	T *operator->()
+	{
+		return ptr;
+	}
+
+	T *operator->() const
 	{
 		return ptr;
 	}

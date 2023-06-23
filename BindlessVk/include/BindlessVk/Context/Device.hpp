@@ -48,7 +48,6 @@ public:
 		});
 	}
 
-
 	/** Submits the commands recorded to a command buffer by @a func
 	 *
 	 * @param func A function that writes to a command buffer

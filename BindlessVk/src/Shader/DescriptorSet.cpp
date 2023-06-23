@@ -1,6 +1,6 @@
 #include "BindlessVk/Shader/DescriptorSet.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,12 +11,12 @@ DescriptorSet::DescriptorSet(
     : descriptor_allocator(descriptor_allocator)
     , allocated_descriptor_set(descriptor_allocator->allocate_descriptor_set(descriptor_set_layout))
 {
-	ScopeProfiler _;
+	ZoneScoped;
 }
 
 DescriptorSet::~DescriptorSet()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!descriptor_allocator)
 		return;

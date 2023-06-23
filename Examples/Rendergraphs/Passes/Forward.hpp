@@ -87,6 +87,9 @@ private:
 	Scene *scene = {};
 	bvk::Device *device = {};
 
+	bvk::TracyContext tracy_graphics;
+	bvk::TracyContext tracy_compute;
+
 	bvk::Buffer const *draw_indirect_buffer = {};
 
 	vk::Pipeline current_pipeline = {};

@@ -1,6 +1,5 @@
 #include "Development/Development.hpp"
 
-#include <Amender/Logger.hpp>
 #include <optional>
 #include <span>
 
@@ -36,9 +35,10 @@ void DevelopmentExampleApplication::on_tick(f64 const delta_time)
 	camera_controller.update();
 	renderer.render_graph(&render_graph);
 
-
 	if (renderer.is_swapchain_invalid())
 		assert_fail("swapchain-recreation is currently nuked");
+
+	FrameMark;
 }
 void DevelopmentExampleApplication ::setup_rng()
 {

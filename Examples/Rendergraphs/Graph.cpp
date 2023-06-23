@@ -6,7 +6,6 @@
 #include "Framework/Scene/Components.hpp"
 #include "Framework/Scene/Scene.hpp"
 
-#include <Amender/Logger.hpp>
 #include <imgui.h>
 
 BasicRendergraph::BasicRendergraph(bvk::VkContext const *const vk_context)

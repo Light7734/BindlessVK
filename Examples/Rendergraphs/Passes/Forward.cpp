@@ -8,6 +8,8 @@
 Forwardpass::Forwardpass(bvk::VkContext const *const vk_context)
     : bvk::RenderNode(vk_context)
     , device(vk_context->get_device())
+    , tracy_graphics(vk_context->get_tracy_graphics())
+    , tracy_compute(vk_context->get_tracy_compute())
 {
 }
 
@@ -41,9 +43,11 @@ void Forwardpass::on_frame_prepare(u32 frame_index, u32 image_index)
 
 void Forwardpass::on_frame_compute(vk::CommandBuffer cmd, u32 frame_index, u32 image_index)
 {
+	TracyVkZone(tracy_compute.context, cmd, "culling");
+
 	ImGui::Begin("Forwardpass options");
 
-	ImGui::Checkbox("freeze cull", &freeze_cull);
+	ImGui::Checkbox("freeze frustum culling", &freeze_cull);
 
 	if (!freeze_cull)
 	{
@@ -74,9 +78,11 @@ void Forwardpass::on_frame_graphics(
 
 void Forwardpass::render_static_meshes(u32 frame_index)
 {
+	TracyVkZone(tracy_graphics.context, cmd, "render_static_meshes");
 	switch_pipeline(model_pipeline->get_pipeline());
 
 	ImGui::Text("primitives: %u", primitive_count);
+
 	cmd.drawIndexedIndirect(
 	    *draw_indirect_buffer->vk(),
 	    0,
@@ -87,6 +93,8 @@ void Forwardpass::render_static_meshes(u32 frame_index)
 
 void Forwardpass::render_skyboxes()
 {
+	TracyVkZone(tracy_graphics.context, cmd, "render_skybox");
+
 	switch_pipeline(skybox_pipeline->get_pipeline());
 
 	auto const skyboxes = scene->view<const SkyboxComponent>();
@@ -108,6 +116,8 @@ void Forwardpass::switch_pipeline(vk::Pipeline pipeline)
 {
 	auto const extent = vk_context->get_surface()->get_framebuffer_extent();
 	auto const [width, height] = extent;
+
+	TracyVkZone(tracy_graphics.context, cmd, "switch_pipeline");
 
 	current_pipeline = pipeline;
 	cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, current_pipeline);
@@ -140,6 +150,8 @@ void Forwardpass::switch_pipeline(vk::Pipeline pipeline)
 
 void Forwardpass::draw_model(bvk::Model const *const model, u32 &primitive_index)
 {
+	TracyVkZone(tracy_graphics.context, cmd, "draw_model");
+
 	auto const index_offset = model->get_index_offset();
 	auto const vertex_offset = model->get_vertex_offset();
 

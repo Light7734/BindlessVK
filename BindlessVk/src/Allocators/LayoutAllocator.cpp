@@ -1,17 +1,15 @@
 #include "BindlessVk/Allocators/LayoutAllocator.hpp"
 
-#include "Amender/Amender.hpp"
-
 namespace BINDLESSVK_NAMESPACE {
 
 LayoutAllocator::LayoutAllocator(VkContext const *const context): device(context->get_device())
 {
-	ScopeProfiler _;
+	ZoneScoped;
 }
 
 LayoutAllocator::~LayoutAllocator()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!device)
 		return;
@@ -29,7 +27,7 @@ auto LayoutAllocator::goc_descriptor_set_layout(
     span<vk::DescriptorBindingFlags const> binding_flags
 ) -> DescriptorSetLayoutWithHash
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const hash = hash_descriptor_set_layout_info(layout_flags, bindings, binding_flags);
 
@@ -57,7 +55,7 @@ auto LayoutAllocator::goc_pipeline_layout(
     DescriptorSetLayoutWithHash shader_descriptor_set_layout
 ) -> vk::PipelineLayout
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const hash = hash_pipeline_layout_info(
 	    layout_flags,
@@ -99,7 +97,7 @@ auto LayoutAllocator::hash_descriptor_set_layout_info(
     span<vk::DescriptorBindingFlags const> binding_flags
 ) -> u64
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto hash = u64 {};
 
@@ -125,7 +123,7 @@ auto LayoutAllocator::hash_pipeline_layout_info(
     DescriptorSetLayoutWithHash shader_descriptor_set_layout
 ) -> u64
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto hash = u64 {};
 

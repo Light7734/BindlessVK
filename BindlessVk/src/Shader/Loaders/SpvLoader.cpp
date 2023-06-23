@@ -1,17 +1,17 @@
 #include "BindlessVk/Shader/Loaders/SpvLoader.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
 SpvLoader::SpvLoader(VkContext const *const vk_context): device(vk_context->get_device())
 {
-	ScopeProfiler _;
+	ZoneScoped;
 }
 
 Shader SpvLoader::load(str_view const path)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	load_code(path);
 	reflect_code();
@@ -23,7 +23,7 @@ Shader SpvLoader::load(str_view const path)
 
 void SpvLoader::load_code(str_view const path)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto file_stream = std::ifstream(path.data(), std::ios::ate);
 	usize const file_size = file_stream.tellg();
@@ -36,7 +36,7 @@ void SpvLoader::load_code(str_view const path)
 
 void SpvLoader::reflect_code()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	assert_false(
 	    spvReflectCreateShaderModule(code.size() * sizeof(u32), code.data(), &reflection),
@@ -49,7 +49,7 @@ void SpvLoader::reflect_code()
 
 void SpvLoader::create_vulkan_shader_module()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	shader.module = device->vk().createShaderModule(vk::ShaderModuleCreateInfo {
 	    {},
@@ -60,7 +60,7 @@ void SpvLoader::create_vulkan_shader_module()
 
 void SpvLoader::reflect_descriptor_sets()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	u32 descriptor_sets_count = 0;
 	assert_false(
@@ -91,7 +91,7 @@ void SpvLoader::reflect_descriptor_sets()
 auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *const spv_set)
     -> vec<vk::DescriptorSetLayoutBinding>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	vec<vk::DescriptorSetLayoutBinding> bindings = {};
 
@@ -113,7 +113,7 @@ auto SpvLoader::reflect_descriptor_set_bindings(SpvReflectDescriptorSet const *c
 auto SpvLoader::extract_descriptor_set_binding(SpvReflectDescriptorBinding const *const binding)
     -> vk::DescriptorSetLayoutBinding
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	vk::DescriptorSetLayoutBinding set_binding;
 	set_binding = binding->binding;
@@ -136,7 +136,7 @@ auto SpvLoader::extract_descriptor_set_binding(SpvReflectDescriptorBinding const
 
 void SpvLoader::reflect_shader_stage()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (reflection.shader_stage & SPV_REFLECT_SHADER_STAGE_VERTEX_BIT)
 		shader.stage = vk::ShaderStageFlagBits::eVertex;

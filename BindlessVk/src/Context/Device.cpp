@@ -1,12 +1,12 @@
 #include "BindlessVk/Context/Device.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
 Device::Device(Gpu *gpu)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto indexing_features = vk::PhysicalDeviceDescriptorIndexingFeaturesEXT {};
 	indexing_features.descriptorBindingPartiallyBound = true;
@@ -42,14 +42,14 @@ Device::Device(Gpu *gpu)
 
 Device::Device(Device &&other)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	*this = std::move(other);
 }
 
 Device &Device::operator=(Device &&other)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	this->device = other.device;
 	this->graphics_queue = other.graphics_queue;
@@ -63,7 +63,7 @@ Device &Device::operator=(Device &&other)
 
 Device::~Device()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!device)
 		return;
@@ -79,7 +79,7 @@ void Device::immediate_submit(
     vk::QueueFlags const queue /* = vk::QueueFlagBits::eGraphics */
 ) const
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const alloc_info = vk::CommandBufferAllocateInfo {
 		immediate_cmd_pool,
@@ -115,7 +115,7 @@ void Device::immediate_submit(
 
 auto Device::create_queues_create_infos(Gpu *gpu) const -> vec<vk::DeviceQueueCreateInfo>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto static constexpr queue_priority = arr<f32, 1> { 1.0 };
 

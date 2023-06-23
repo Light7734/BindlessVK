@@ -1,6 +1,6 @@
 #include "BindlessVk/Buffers/Buffer.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -19,7 +19,7 @@ Buffer::Buffer(
     , valid_block_size(desired_block_size)
     , debug_name(debug_name)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	calculate_block_size(vk_context->get_gpu());
 
@@ -47,7 +47,7 @@ Buffer::Buffer(
 
 Buffer::~Buffer()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!device)
 		return;
@@ -66,7 +66,7 @@ void Buffer::write_data(
     u32 const block_index
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (auto *map = map_block(block_index))
 	{
@@ -77,7 +77,7 @@ void Buffer::write_data(
 
 void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_copy)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	device->immediate_submit([&](vk::CommandBuffer cmd) {
 		auto &[buffer, allocation] = allocated_buffer;
@@ -87,7 +87,7 @@ void Buffer::write_buffer(Buffer const &src_buffer, vk::BufferCopy const &src_co
 
 auto Buffer::map_memory() -> u8 *
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (mapped)
 	{
@@ -103,7 +103,7 @@ auto Buffer::map_memory() -> u8 *
 
 void Buffer::calculate_block_size(Gpu const *const gpu)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const gpu_properties = gpu->vk().getProperties();
 	auto const min_alignment = gpu_properties.limits.minUniformBufferOffsetAlignment;
@@ -115,7 +115,7 @@ void Buffer::calculate_block_size(Gpu const *const gpu)
 
 void *Buffer::map_block(u32 const block_index)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (auto *map = map_memory())
 		return map + (block_size * block_index);
@@ -125,7 +125,7 @@ void *Buffer::map_block(u32 const block_index)
 
 auto Buffer::map_all() -> vec<void *>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (auto const map = map_memory())
 		return blockify_all_map(map);
@@ -135,7 +135,7 @@ auto Buffer::map_all() -> vec<void *>
 
 auto Buffer::map_all_zeroed() -> vec<void *>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (auto const map = map_memory())
 	{
@@ -148,7 +148,7 @@ auto Buffer::map_all_zeroed() -> vec<void *>
 
 auto Buffer::blockify_all_map(u8 *map) -> vec<void *>
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto maps = vec<void *>(block_count);
 	for (u32 i = 0; i < block_count; ++i)
@@ -159,7 +159,7 @@ auto Buffer::blockify_all_map(u8 *map) -> vec<void *>
 
 void *Buffer::map_block_zeroed(u32 const block_index)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (auto map = map_block(block_index))
 	{
@@ -172,7 +172,7 @@ void *Buffer::map_block_zeroed(u32 const block_index)
 
 void Buffer::unmap()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!mapped)
 		return;

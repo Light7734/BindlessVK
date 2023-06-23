@@ -1,6 +1,6 @@
 #include "BindlessVk/Material/MaterialSystem.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -11,7 +11,7 @@ Material::Material(
 )
     : shader_pipeline(shader_pipeline)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (shader_pipeline->uses_shader_descriptor_set_slot())
 	{

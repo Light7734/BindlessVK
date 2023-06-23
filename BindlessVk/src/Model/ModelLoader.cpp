@@ -1,6 +1,6 @@
 #include "BindlessVk/Model/ModelLoader.hpp"
 
-#include "Amender/Amender.hpp"
+
 #include "BindlessVk/Buffers/Buffer.hpp"
 #include "BindlessVk/Model/Loaders/GltfLoader.hpp"
 
@@ -14,7 +14,7 @@ ModelLoader::ModelLoader(
     , texture_loader(vk_context, memory_allocator)
     , memory_allocator(memory_allocator)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 }
 
 auto ModelLoader::load_from_gltf_ascii(
@@ -27,7 +27,7 @@ auto ModelLoader::load_from_gltf_ascii(
     str_view const debug_name /* = default_debug_name */
 ) const -> Model
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto loader = GltfLoader {
 		vk_context,       // curse

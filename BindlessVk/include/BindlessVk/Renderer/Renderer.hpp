@@ -129,6 +129,9 @@ private:
 
 	Swapchain swapchain = {};
 
+	TracyContext tracy_graphics;
+	TracyContext tracy_compute;
+
 	vec<tuple<u32, u32, u32>> used_attachment_indices = {};
 
 	RenderResources resources = {};

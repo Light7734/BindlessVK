@@ -1,11 +1,10 @@
 #include "Development.hpp"
 
-#include <Amender/Amender.hpp>
-
 /** The entry point */
 int main(int argc, char *argv[])
 {
-	Profiler::initialize("profile.json");
+	ZoneScoped;
+
 	auto return_code = int { 0 };
 
 	try
@@ -30,6 +29,5 @@ int main(int argc, char *argv[])
 		log_crt("Uncaught std::exception: {}", exception.what());
 	}
 
-	Profiler::terminate();
 	return return_code;
 }

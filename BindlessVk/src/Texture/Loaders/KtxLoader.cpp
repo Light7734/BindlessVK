@@ -1,6 +1,6 @@
 #include "BindlessVk/Texture/Loaders/KtxLoader.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 
 namespace BINDLESSVK_NAMESPACE {
@@ -14,7 +14,7 @@ KtxLoader::KtxLoader(
     , memory_allocator(memory_allocator)
     , staging_buffer(staging_buffer)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.device = vk_context->get_device();
 	texture.memory_allocator = memory_allocator;
@@ -27,7 +27,7 @@ Texture KtxLoader::load(
     str_view const debug_name
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.debug_name = debug_name;
 	load_ktx_texture(path);
@@ -46,7 +46,7 @@ Texture KtxLoader::load(
 
 void KtxLoader::load_ktx_texture(str_view const path)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	assert_false(
 	    ktxTexture_CreateFromNamedFile(
@@ -68,14 +68,14 @@ void KtxLoader::load_ktx_texture(str_view const path)
 
 void KtxLoader::destroy_ktx_texture()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	ktxTexture_Destroy(ktx_texture);
 }
 
 void KtxLoader::create_image()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const [width, height] = texture.size;
 
@@ -112,7 +112,7 @@ void KtxLoader::create_image()
 
 void KtxLoader::create_image_view()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
@@ -138,7 +138,7 @@ void KtxLoader::create_image_view()
 
 void KtxLoader::create_sampler()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.sampler = device->vk().createSampler(vk::SamplerCreateInfo {
 	    {},
@@ -163,7 +163,7 @@ void KtxLoader::create_sampler()
 
 void KtxLoader::stage_texture_data()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const *const src = ktxTexture_GetData(ktx_texture);
 	auto *const dst = staging_buffer->map_block(0);
@@ -173,7 +173,7 @@ void KtxLoader::stage_texture_data()
 
 void KtxLoader::write_texture_data_to_gpu(vk::ImageLayout const final_layout)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const buffer_copies = create_texture_face_buffer_copies();
 
@@ -202,7 +202,7 @@ void KtxLoader::write_texture_data_to_gpu(vk::ImageLayout const final_layout)
 
 vec<vk::BufferImageCopy> KtxLoader::create_texture_face_buffer_copies()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const [width, height] = texture.size;
 

@@ -41,6 +41,12 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/TextureLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/KtxLoader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Texture/Loaders/BinaryLoader.cpp
+
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Tracy.cpp
+)
+
+target_compile_definitions(
+    BindlessVk PRIVATE TRACY_ENABLE
 )
 
 set_target_properties(
@@ -52,7 +58,6 @@ target_include_directories(
     BindlessVk
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
-    PRIVATE ${CMAKE_SOURCE_DIR}/Amender/include
 
     PRIVATE ${CMAKE_SOURCE_DIR}/AssetParser/
     PRIVATE ${CMAKE_SOURCE_DIR}/ABC/include/
@@ -60,16 +65,18 @@ target_include_directories(
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/vma-hpp/include/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/spirv-reflect/
     PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/tinygltf/
+    PRIVATE ${CMAKE_SOURCE_DIR}/Vendor/tracy/public
 )
 
 target_link_libraries(
     BindlessVk 
+    PRIVATE ABC
     PRIVATE AssetParser
     PRIVATE vulkan
     PRIVATE ktx
     PRIVATE tinygltf
     PRIVATE spirv-reflect-static
-    PRIVATE Amender
+    PRIVATE TracyClient
 )
 
 target_precompile_headers(

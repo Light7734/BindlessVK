@@ -1,12 +1,12 @@
 #include "BindlessVk/Texture/Texture.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
 Texture::~Texture()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	if (!device)
 		return;
@@ -23,7 +23,7 @@ void Texture::transition_layout(
     vk::ImageLayout const new_layout
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	// Memory barrier
 	auto image_memory_barrier = vk::ImageMemoryBarrier {
@@ -104,7 +104,7 @@ void Texture::transition_layout(
 
 void Texture::blit(vk::CommandBuffer const cmd, u32 const mip_index, pair<i32, i32> const mip_size)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const [mip_width, mip_height] = mip_size;
 

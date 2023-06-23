@@ -1,6 +1,6 @@
 #include "BindlessVk/Texture/Loaders/BinaryLoader.hpp"
 
-#include "Amender/Amender.hpp"
+
 
 namespace BINDLESSVK_NAMESPACE {
 
@@ -13,7 +13,7 @@ BinaryLoader::BinaryLoader(
     , memory_allocator(memory_allocator)
     , staging_buffer(staging_buffer)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.device = device;
 	texture.memory_allocator = memory_allocator;
@@ -29,7 +29,7 @@ Texture BinaryLoader::load(
     str_view const debug_name
 )
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.size = { width, height };
 	texture.format = vk::Format::eR8G8B8A8Srgb;
@@ -49,7 +49,7 @@ Texture BinaryLoader::load(
 
 void BinaryLoader::create_image()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto const [width, height] = texture.size;
 
@@ -87,7 +87,7 @@ void BinaryLoader::create_image()
 
 void BinaryLoader::create_image_view()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.image_view = device->vk().createImageView(vk::ImageViewCreateInfo {
 	    {},
@@ -114,7 +114,7 @@ void BinaryLoader::create_image_view()
 
 void BinaryLoader::create_sampler()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	texture.sampler = device->vk().createSampler(vk::SamplerCreateInfo {
 	    {},
@@ -140,7 +140,7 @@ void BinaryLoader::create_sampler()
 
 void BinaryLoader::stage_texture_data(u8 const *const pixels, vk::DeviceSize size)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	memcpy(staging_buffer->map_block(0), pixels, size);
 	staging_buffer->unmap();
@@ -148,7 +148,7 @@ void BinaryLoader::stage_texture_data(u8 const *const pixels, vk::DeviceSize siz
 
 void BinaryLoader::write_texture_data_to_gpu()
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	device->immediate_submit([&](vk::CommandBuffer cmd) {
 		auto const [width, height] = texture.size;
@@ -199,7 +199,7 @@ void BinaryLoader::write_texture_data_to_gpu()
 
 void BinaryLoader::create_mipmaps(vk::CommandBuffer cmd)
 {
-	ScopeProfiler _;
+	ZoneScoped;
 
 	auto [mip_width, mip_height] = texture.size;
 
