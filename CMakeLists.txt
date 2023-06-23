@@ -19,7 +19,17 @@ add_subdirectory(ABC/)
 add_subdirectory(AssetBaker/)
 add_subdirectory(AssetParser/)
 add_subdirectory(BindlessVk/)
+
+target_compile_options(ABC PRIVATE -O3 -DNDEBUG -w)
+target_link_options(ABC PRIVATE -O3 -DNDEBUG -w)
+
+target_compile_options(AssetBaker PRIVATE -O3 -DNDEBUG -w)
+target_link_options(AssetBaker PRIVATE -O3 -DNDEBUG -w)
+
+target_compile_options(AssetParser PRIVATE -O3 -DNDEBUG -w )
+target_link_options(AssetParser PRIVATE -O3 -DNDEBUG -w)
+
+target_compile_options(BindlessVk PRIVATE -g -Og)
+target_link_options(BindlessVk PRIVATE -g -Og)
+
 add_subdirectory(Examples/)
-
-set(CMAKE_BUILD_TYPE DEBUG)
-

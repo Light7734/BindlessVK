@@ -18,6 +18,9 @@ add_library(
 
 )
 
+target_compile_options(Framework PRIVATE -g -Og -w)
+target_link_options(Framework PRIVATE -g -Og -w)
+
 set_target_properties(
     Framework PROPERTIES
     CXX_STANDARD 20
@@ -62,6 +65,9 @@ add_library(
     ${CMAKE_CURRENT_SOURCE_DIR}/Rendergraphs/Passes/UserInterface.cpp
 )
 
+target_compile_options(Rendergraphs PRIVATE -g -Og -w)
+target_link_options(Rendergraphs PRIVATE -g -Og -w)
+
 set_target_properties(
     Rendergraphs PROPERTIES
     CXX_STANDARD 20
@@ -98,6 +104,9 @@ add_executable(
     ${CMAKE_CURRENT_SOURCE_DIR}/Development/Development.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Development/Entrypoint.cpp
 )
+
+target_compile_options(Example_Development PRIVATE -g -Og -w)
+target_link_options(Example_Development  PRIVATE -g -Og -w)
 
 set_target_properties(
     Example_Development PROPERTIES
