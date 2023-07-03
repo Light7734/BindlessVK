@@ -36,6 +36,8 @@ add_subdirectory(./tracy)
 target_compile_options(TracyClient  PRIVATE -O3 -DNDEBUG -w)
 target_link_options(TracyClient  PRIVATE -O3 -DNDEBUG -w)
 
+add_subdirectory(./meshoptimizer)
+
 # Configuration files
 configure_file(${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h ${CMAKE_SOURCE_DIR}/Vendor/configs/imconfig.h)
 
